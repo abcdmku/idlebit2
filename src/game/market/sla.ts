@@ -2,22 +2,24 @@ import { G } from '../core/buffers';
 import { RATE_RING_TICKS, SLA_THRESHOLD } from '../core/constants';
 import { tallyFailed } from '../core/events';
 import { recordFailures } from '../core/failures';
-import { slaValue } from '../core/sla';
+import { pushOutcomes, resetSlaWindow, slaChecking, slaValue, slaWindow } from '../core/sla';
 import type { World } from '../core/world';
 import { FAIL_CAUSES, NO_DETAIL, type FailCause } from '../types/events';
 import { FAMILIES } from './families';
 
 /**
- * Work-weighted SLA (program D10.6, spec §4.2): SLA = (delivered + G) / (delivered + failed + G),
- * in ops. Every domain reports outcomes through core/events tallyMet / tallyFailed with their
+ * SLA (D28, spec §4.2): completed over completed plus failed, counting tasks, over the last 50 resolved
+ * tasks of the round; the 80% check waits for 10 resolved tasks. Work sums are still kept for the round report. Every domain reports outcomes through core/events tallyMet / tallyFailed with their
  * work; the market folds this tick's tallies into the round sums at the SLA step.
  */
 
 const CAUSES = FAIL_CAUSES.length;
 export const CAUSE_INDEX = Object.fromEntries(FAIL_CAUSES.map((c, i) => [c, i])) as Readonly<Record<FailCause, number>>;
 
-export const slaBelowThreshold = (w: World): boolean =>
-  slaValue(w.hot.g[G.deliveredWork]!, w.hot.g[G.failedWork]!, w.round.grace) < SLA_THRESHOLD;
+export const slaBelowThreshold = (w: World): boolean => {
+  const g = w.hot.g, win = slaWindow(g);
+  return slaChecking(g[G.met]! + g[G.failed]!) && slaValue(win.met, win.failed) < SLA_THRESHOLD;
+};
 
 /** Fails `count` tasks of `family` (`work` ops in total) with `cause` and a FAIL_DETAILS index (D5.3). */
 export function failTasks(w: World, family: number, cause: FailCause, count: number, work: number, detail: number = NO_DETAIL, taskId?: number): void {
@@ -48,6 +50,7 @@ export function countOutcomes(w: World): void {
   ring.failed[row] = failed;
   if (met !== 0) g[G.met] = g[G.met]! + met;
   if (failed !== 0) g[G.failed] = g[G.failed]! + failed;
+  pushOutcomes(g, met, failed);
   g[G.deliveredWork] = g[G.deliveredWork]! + g[G.metWorkTick]!;
   g[G.failedWork] = g[G.failedWork]! + g[G.failWorkTick]!;
   g[G.metWorkTick] = 0;
@@ -59,6 +62,7 @@ export function resetCounters(w: World): void {
   g[G.met] = 0; g[G.failed] = 0; g[G.taken] = 0; g[G.dismissed] = 0;
   g[G.deliveredWork] = 0; g[G.failedWork] = 0; g[G.metWorkTick] = 0; g[G.failWorkTick] = 0; g[G.ramWork] = 0; g[G.diskWork] = 0;
   for (let c = 0; c < CAUSES; c += 1) g[G.fail + c] = 0;
+  resetSlaWindow(g);
   w.hot.detailRound.fill(0);
   w.hot.fam.metWorkRound.fill(0);
   w.hot.fam.failedWorkRound.fill(0);

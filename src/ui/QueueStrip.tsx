@@ -11,7 +11,7 @@ import { TaskAccent, taskTypeStyle } from './art/TaskType';
 import { RimClock } from './hooks/headClock';
 import { familyName, payoutShort, payoutText } from './hooks/feedModel';
 import type { ShellLayout } from './layout';
-import { headRisk } from './queue/risk';
+import { headRisk, SLA_WINDOW } from './queue/risk';
 import { fits, HeadClock, InQueue, needShort, shortSeconds, TaskIcon, taskTitle, windowText } from './queue/taskText';
 import { box, T, useLayout } from './shell/geometry';
 import { shallowEqual, useGameSelector } from './storeHooks';
@@ -89,7 +89,11 @@ function ResearchTag({ L, r }: { L: ShellLayout; r: ResearchQueueEntryView }) {
 }
 
 export const stripOf = (s: RenderSnapshot) => ({ window: s.feed.window, research: s.feed.research, frozen: s.feed.timing !== 'running' || s.round.state !== 'running',
-  delivered: s.hud.sla.deliveredWork, failed: s.hud.sla.failedWork, grace: s.hud.sla.grace });
+  // D28: the SLA counts tasks over the round's last `window` resolved; the floor applies once `checking`.
+  met: s.hud.sla.met, failed: s.hud.sla.failed, checking: s.hud.sla.checking, slaWindow: slaWindowOf(s) });
+
+/** D28: the rolling window, once the snapshot publishes it. */
+export const slaWindowOf = (s: RenderSnapshot): number => (s.hud.sla as { window?: number }).window ?? SLA_WINDOW;
 
 export function QueueStrip() {
   const L = useLayout();
@@ -98,7 +102,7 @@ export function QueueStrip() {
   const rq = q.research && !q.research.running ? q.research : null;
   const running = !q.frozen, head = rq ? null : q.window[0] ?? null, behind = rq ? 0 : 1;
   const blocked = running && !!head && head.blockedBy !== null;
-  const risk = running && !!head && !head.committed && headRisk(q.delivered, q.failed, q.grace, head.work);
+  const risk = running && !!head && !head.committed && headRisk(q.met, q.failed, q.checking, q.slaWindow);
   const first = L.cards[0], last = L.cards[3];
   return <section className="queue" aria-label="Task queue" data-testid="queue">
     <div className={`panel head-slot${blocked ? ' blocked' : ''}${risk ? ' risk' : ''}${rq ? ' research-head' : ''}`}

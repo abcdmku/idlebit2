@@ -1036,7 +1036,21 @@ The user's words:
 3. **One at a time.** Only one project is in line or running.
 4. **The modes are retired.** No research shares, no idle-time research, and GPUs no longer research. Between rounds the market is paused but research still runs: every paused server takes it on all its threads.
 5. **The trade-off is the point.** While research holds a slot, the heads behind it wait: research costs SLA risk during a round and nothing between rounds. Work volumes are re-tuned to about N seconds of the era's typical hardware at unlock (`docs/research.md` §3.2): W1 20 ops (5–10 s at 2–4 Hz) up to W7 3e7. Data costs are unchanged. The D20 opening holds (round 1 without purchases ends at 0:55–1:07).
-6. **Implementation.** `hot.sys.researchThreads` per holder, `G.researchHolders` and `G.researchProject`; the take runs at the start of the route step (`exec/researchTask.ts`). A holder counts one slot and its threads as busy. `SAVE_VERSION` 9, pre-live reset. The feed carries `FeedSnapshot.research: ResearchQueueEntryView | null` beside the task `window`; task entries gain `kind: 'task'`.
+6. **Implementation.** `hot.sys.researchThreads` per holder, `G.researchHolders` and `G.researchProject`; the take runs at the start of the route step (`exec/researchTask.ts`). A holder counts one slot and its threads as busy. **Amendment (balance owner, 25 Oct, for lead review):** during a round a holder keeps one thread per system, so research slows the market instead of stopping it (a mid-round take on an idle box otherwise held every thread until the project ended, and the rack queue filled with tasks that could not start); between rounds holders spread over every thread. `SAVE_VERSION` 9, pre-live reset. The feed carries `FeedSnapshot.research: ResearchQueueEntryView | null` beside the task `window`; task entries gain `kind: 'task'`.
+
+**D28, 25 Oct: SLA is a plain count ratio over a rolling window (user).** Binding. It supersedes D10.6 (work-weighted SLA with a grace prior).
+
+> SLA could show the ratio of completed vs taken (dismissed doesnt show but should show at the end of the game)
+
+> i think sla isnt calced correctly
+
+1. **Formula.** `SLA = met / (met + failed)`, counting tasks, over the **last 50 resolved tasks of the round** (all of them before 50). `failed` covers every cause: timeout, cantRun, misroute, late, power, heat and swap. A split task counts once. Dismissed tasks, tasks dropped at round end and research (D27) are outside it. The HUD shows "SLA 92.0% · 46 / 50".
+2. **No hidden grace prior.** The shown ratio equals the shown percent. The 80% check starts once 10 tasks have resolved this round; before that the HUD shows "warming up".
+3. **Why a window (lead ruling).** A whole-round count let early small tasks hold a round above 80% long after the wall: in the real sim one System-era round ran 76 min (1,722 met, 431 failed) because each failing head takes its full 10 s. The last-50 window ends a round within about a minute of the wall at any fleet size.
+4. **What "not calced correctly" was.** The HUD showed task counts (met, failed) next to a work-weighted percent with a grace prior, so "41 / 44" could read 70% or 99%. The bookkeeping itself was sound: an audit test (`market/sla.test.ts`) checks every tick of a split, windowed, dismissing, researching rack that the round counters equal the sim's own met and failed events, each task once.
+5. **Round report.** Keeps the whole round's met, failed and dismissed totals, and the met and failed work.
+6. **Tuning.** The D20 opening is re-tuned for counts: the ramp is `T(I) = min(250, 4.5 × 2^(I / 3.5))`, AND Mask opens at I 0.6 (weight 14) and Compare at 1.6 (weight 10). Round 1 without purchases ends at 0:38–1:18 (median 0:57) on Can't run · cache; an active round 1 at 4:23–5:10.
+7. **Fields.** `hud.sla`: `met` and `failed` (the window), `percent`, `checking` (10 resolved), `window` (50), `roundMet`, `roundFailed`. `deliveredWork`, `failedWork` and `grace` remain until the UI stops reading them. `SAVE_VERSION` 11 (the window lives in `hot.g`).
 
 ## 16. Shared rules for agents
 

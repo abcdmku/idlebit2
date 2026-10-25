@@ -4,11 +4,11 @@ import type { LevelId } from '../../types/ids';
 import type { TreeRow } from './treeRow';
 
 export const DATA_BY_TIER: Readonly<Record<WorkTier, number>> = {
-  1: 1, 2: 100, 3: 1_000, 4: 12_000, 5: 15_000, 6: 50_000, 7: 1_000_000, 8: 4_000_000,
+  1: 1, 2: 100, 3: 1_000, 4: 9_000, 5: 15_000, 6: 50_000, 7: 1_000_000, 8: 4_000_000,
   9: 1.5e7, 10: 4e7, 11: 6e7, 12: 2e8, 13: 4e8, 14: 3e9, 15: 1e10,
 };
 export const WORK_TIER_OPS: Readonly<Record<WorkTier, number>> = {
-  1: 20, 2: 600, 3: 5_000, 4: 1.5e5, 5: 1e6, 6: 3e6, 7: 3e7, 8: 1e9,
+  1: 20, 2: 600, 3: 5_000, 4: 1.5e5, 5: 3e5, 6: 1e6, 7: 3e7, 8: 2e8,
   9: 5e9, 10: 2e10, 11: 2.5e10, 12: 3e10, 13: 4e10, 14: 6e10, 15: 1e11,
 };
 export const RESEARCH_CREDITS: Readonly<Record<string, string>> = {
@@ -36,28 +36,28 @@ const chipGen = (g: number) => (['core', 'clock', 'l1', 'l2', 'l3', 'scheduler',
 const n = (...row: TreeRow): TreeRow => row;
 
 export const TREE_ROWS: readonly TreeRow[] = [
-  n("pipelining", "Pipelining", "compute", [], "cpu", "hz", 1, 1, [cap("lanesPerCore", 2)], ["bits", "pickup"]),
-  n("superscalar", "Superscalar", "compute", ["pipelining"], "cpu", "hz", 3, 1_000, [cap("lanesPerCore", 4)], ["ints"]),
+  n("pipelining", "Pipelining", "compute", [], "cpu", "hz", 3, 1_000, [cap("lanesPerCore", 2)], ["bits", "pickup"]),
+  n("superscalar", "Superscalar", "compute", ["pipelining"], "cpu", "hz", 4, 9_000, [cap("lanesPerCore", 4)], ["ints"]),
   n("outOfOrder", "Out-of-order", "compute", ["superscalar", "fabKhz"], "cpu", "khz", 7, 1_000_000, [cap("lanesPerCore", 8)], ["ints", "threads"]),
   n("simd", "SIMD", "compute", ["outOfOrder", "fabMhz"], "cpu", "mhz", 10, 4e7, [cap("lanesPerCore", 16)], ["threads", "rackDist"]),
   n("wideVector", "Wide vectors", "compute", ["simd", "fabGhz"], "cpu", "ghz", 12, 2e8, [cap("lanesPerCore", 32)], ["roomDist"]),
-  n("dualCore", "Dual core", "compute", ["fifoSched"], "cpu", "hz", 2, 100, [cap("coreSites", 2)], ["pickup", "bits"]),
-  n("quadCore", "Quad core", "compute", ["dualCore", "l2Cache"], "cpu", "hz", 3, 1_000, [cap("coreSites", 4)], ["threads"]),
+  n("dualCore", "Dual core", "compute", ["fifoSched"], "cpu", "hz", 3, 1_000, [cap("coreSites", 2)], ["pickup", "bits"]),
+  n("quadCore", "Quad core", "compute", ["dualCore", "l2Cache"], "cpu", "hz", 4, 9_000, [cap("coreSites", 4)], ["threads"]),
   n("octaCore", "8 cores", "compute", ["quadCore", "fabKhz"], "cpu", "khz", 7, 1_000_000, [cap("coreSites", 8)], ["threads", "density"]),
   n("cores16", "16 cores", "compute", ["octaCore", "fabMhz"], "cpu", "mhz", 10, 4e7, [cap("coreSites", 16)], ["rackDist", "density"]),
   n("chiplets", "Chiplets", "compute", ["cores16", "fabGhz"], "cpu", "ghz", 12, 2e8, [cap("coreSites", 32)], ["roomDist", "density"]),
   n("stacked3d", "Stacked cache", "compute", ["chiplets", "dataCenter"], "cpu", "ghz", 13, 4e8, [gen("l3", 4)], ["region", "density"]),
-  n("fabKhz", "kHz fab", "compute", ["systemBoard", "superscalar"], "system", "khz", 6, 150_000, chipGen(1), ["bits", "ints", "threads", "energy"]),
+  n("fabKhz", "kHz fab", "compute", ["systemBoard", "superscalar"], "system", "khz", 4, 27_000, chipGen(1), ["bits", "ints", "threads", "energy"]),
   n("fabMhz", "MHz fab", "compute", ["fabKhz", "rack"], "rack", "mhz", 9, 4.5e7, chipGen(2), ["ram", "rackDist", "energy"]),
   n("fabGhz", "GHz fab", "compute", ["fabMhz", "room"], "room", "ghz", 11, 1.8e8, chipGen(3), ["roomDist", "energy"]),
-  n("l2Cache", "L2 cache", "compute", ["pipelining"], "cpu", "hz", 2, 100, [gen("l2", 0)], ["ints", "gate"]),
+  n("l2Cache", "L2 cache", "compute", ["pipelining"], "cpu", "hz", 3, 1_000, [gen("l2", 0)], ["ints", "gate"]),
   n("l3Cache", "L3 cache", "compute", ["l2Cache", "systemBoard"], "system", "hz", 5, 15_000, [gen("l3", 0)], ["ints", "ram"]),
   n("smt", "SMT", "compute", ["timeSlice", "octaCore"], "cpu", "khz", 7, 1_000_000, [cap("threadsPerCore", 2), rule("smt", { shareRate: 0.6 })], ["pickup"]),
   n("dualSocket", "Dual socket", "compute", ["octaCore", "rack"], "system", "khz", 8, 4_000_000, [cap("cpuSockets", 2), rule("socketFactor", { s2: 0.92 }), rule("socketSpanPenalty", { ramBandwidth: 0.5 })], ["density", "threads"]),
   n("quadSocket", "4 sockets", "compute", ["dualSocket"], "system", "khz", 9, 1.5e7, [cap("cpuSockets", 4), rule("socketFactor", { s3: 0.85, s4: 0.78 })], ["density", "rackDist"]),
   n("dma", "DMA engine", "compute", ["memController"], "system", "hz", 5, 15_000, [rule("dma")], ["ram", "storage"]), // D26: RAM and disk parts
   n("prefetch", "Prefetcher", "compute", ["dma", "l3Cache"], "system", "khz", 6, 50_000, [rule("prefetch")], ["ram"]),
-  n("memController", "Memory ctrl", "memory", ["systemBoard"], "system", "hz", 4, 12_000, [gen("ram", 0)], ["ram", "gate"]),
+  n("memController", "Memory ctrl", "memory", ["systemBoard"], "system", "hz", 4, 9_000, [gen("ram", 0)], ["ram", "gate"]),
   n("ddr", "DDR", "memory", ["memController"], "system", "hz", 5, 15_000, [gen("ram", 1)], ["ram"]),
   n("ddr2", "DDR2", "memory", ["ddr", "fabKhz"], "system", "khz", 7, 1_000_000, [gen("ram", 2)], ["ram"]),
   n("ddr3", "DDR3", "memory", ["ddr2", "fabMhz"], "system", "mhz", 10, 4e7, [gen("ram", 3)], ["ram", "rackDist"]),
@@ -100,7 +100,7 @@ export const TREE_ROWS: readonly TreeRow[] = [
   n("timeSlice", "Time slicing", "scheduling", ["fifoSched"], "cpu", "hz", 2, 100, [strat("system", "timeSlice")], ["pickup"]),
   n("priorityQ", "Priority", "scheduling", ["sjf"], "cpu", "hz", 3, 1_000, [strat("system", "priority")], ["energy"]),
   n("mlfq", "Aging (MLFQ)", "scheduling", ["sjf", "timeSlice"], "cpu", "hz", 3, 1_000, [strat("system", "mlfq")], ["pickup"]),
-  n("workStealing", "Work stealing", "scheduling", ["quadCore"], "cpu", "hz", 3, 1_000, [rule("workStealing")], ["threads"]),
+  n("workStealing", "Work stealing", "scheduling", ["quadCore"], "cpu", "hz", 4, 9_000, [rule("workStealing")], ["threads"]),
   n("numaAware", "NUMA-aware", "scheduling", ["dualSocket"], "system", "khz", 8, 4_000_000, [rule("numaAware")], ["ram", "rackDist"]),
   n("lbCapability", "Capability-aware", "scheduling", ["rack"], "rack", "khz", 8, 4_000_000, [filt("net", "capability")], ["misroute"]),
   n("lbHealth", "Health checks", "scheduling", ["lbCapability"], "rack", "khz", 8, 4_000_000, [filt("net", "health")], ["overload", "heat"]),
@@ -147,7 +147,7 @@ export const TREE_ROWS: readonly TreeRow[] = [
   n("turbo", "Turbo boost", "power", ["dvfs", "fabKhz"], "system", "khz", 7, 1_000_000, [rule("turbo", { clock: 1.25, loadWatts: 1.8, maxUsage: 0.9, maxF: 80 })], ["pickup"]),
   n("powerCap", "Power capping", "power", ["dvfs", "telemetry"], "system", "hz", 6, 50_000, [rule("powerCap", { step: 0.1 })], ["overload"]),
   n("loadShed", "Load shedding", "power", ["powerCap", "room"], "room", "mhz", 11, 6e7, [rule("loadShed", { atTimerS: 5 })], ["overload"]),
-  n("psu80", "80 Plus", "power", ["systemBoard"], "system", "hz", 4, 12_000, [gen("psu", 1), rule("lossFraction", { psu: 0.2 })], ["energy", "heat"]),
+  n("psu80", "80 Plus", "power", ["systemBoard"], "system", "hz", 4, 9_000, [gen("psu", 1), rule("lossFraction", { psu: 0.2 })], ["energy", "heat"]),
   n("psuBronze", "80 Plus Bronze", "power", ["psu80", "fabKhz"], "system", "khz", 7, 1_000_000, [gen("psu", 2), rule("lossFraction", { psu: 0.15 })], ["energy", "heat"]),
   n("psuGold", "80 Plus Gold", "power", ["psuBronze", "rack"], "rack", "khz", 8, 4_000_000, [gen("psu", 3), rule("lossFraction", { psu: 0.1 })], ["energy", "heat"]),
   n("psuPlatinum", "80 Plus Platinum", "power", ["psuGold", "fabMhz"], "rack", "mhz", 10, 4e7, [gen("psu", 4), rule("lossFraction", { psu: 0.07 })], ["energy", "heat"]),
@@ -173,7 +173,7 @@ export const TREE_ROWS: readonly TreeRow[] = [
   n("economizer", "Free cooling", "cooling", ["chilledWater"], "room", "ghz", 11, 6e7, [rule("economizer", { aboveOutsideF: 5, watts: 0.1 })], ["energy"]),
   n("closedLoop", "Closed loop", "cooling", ["chilledWater", "dataCenter"], "global", "ghz", 13, 4e8, [gen("roomCooler", 4)], ["heat", "energy"]),
   n("closedLoop2", "Two-phase loop", "cooling", ["closedLoop", "regions"], "global", "ghz", 14, 3e9, [gen("roomCooler", 5)], ["heat", "energy"]),
-  n("systemBoard", "System", "structure", ["dualCore", "l2Cache"], "system", "hz", 4, 36_000, [view("system"), gen("psu", 0)], ["ram", "gpu", "storage"]),
+  n("systemBoard", "System", "structure", ["dualCore", "l2Cache"], "system", "hz", 4, 27_000, [view("system"), gen("psu", 0)], ["ram", "gpu", "storage"]),
   n("rack", "Rack", "structure", ["fabKhz"], "rack", "khz", 6, 150_000, [view("rack"), gen("rackCooler", 0), gen("pdu", 0), gen("lb", 0), gen("switch", 0)], ["density", "rackDist"]),
   n("room", "Room", "structure", ["rack", "fabMhz"], "room", "mhz", 10, 1.2e8, [view("room"), gen("roomCooler", 0), gen("ups", 0), gen("row", 0)], ["density", "roomDist"]),
   n("hallExpansion", "Third row", "structure", ["room", "spineLeaf"], "room", "ghz", 11, 6e7, [cap("roomRows", 3)], ["density"]),

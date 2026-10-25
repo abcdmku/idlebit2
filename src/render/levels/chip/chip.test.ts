@@ -108,8 +108,21 @@ describe('CPU labels', () => {
     const open = { ...chipScene('landing'), coreSites: 2, slots: [{ kind: 'core', index: 1, locked: false }, { kind: 'scheduler', index: 0, locked: false }] } as ChipSnapshot;
     expect(labels(open)).toMatchObject({ queue: 'Queue none', core1: 'Core 2 empty' });
   });
-  it('summarises a 32-core grid in one tag', () => {
-    expect(labels(chipScene('max')).cores).toBe('Cores 21 / 32 busy · 4 GHz');
+  it('gives every grid core its own speed when a label fits, else the tag carries it; the tag stays in the cores block', () => {
+    const max = chipScene('max'), full = labels(max), fl = floorOf('desktop');
+    // 32 tiles are too small for a body-size label, so the tag (over the full grid) carries the speed.
+    expect(full.cores).toBe('Cores 21 / 32 busy · 4 GHz');
+    expect(Object.keys(full).filter(k => /^core\d+$/.test(k))).toEqual([]);
+    const four = { ...max, coreSites: 4, cores: max.cores.slice(0, 1), slots: [] };
+    const out = labelBuffer(four, 'desktop', false, 2), tag = out.find('cores')!;
+    expect(tag).not.toBeNull(); expect(tag.x).toBeGreaterThanOrEqual(fl.cores.x); expect(tag.x).toBeLessThan(fl.clock.x);
+    expect(labels(four, 'desktop', false, 3).core0).toBe('4 GHz');
+  });
+  it('shows a sleeping core dimmed with its C-state instead of its speed', () => {
+    const mid = chipScene('mid'), asleep = { ...mid, cores: [{ ...mid.cores[0]!, busy: 0, hz: 0, sleep: 'C1' as const }, mid.cores[1]!] };
+    expect(labels(asleep).core0).toBe('Core 1 · C1');
+    const fills = draw(asleep, 2000);
+    expect(fills.some(f => f.c === P.ink && f.a < 1 && f.w > 20)).toBe(true);
   });
   it('shows nothing working while paused', () => {
     expect(labels(chipScene('mid'), 'desktop', true)).toMatchObject({ queue: 'Queue 0 / 4', core0s: 'idle' });
@@ -231,15 +244,6 @@ describe('CPU affordable brackets and locked sites (A25)', () => {
     expect(inside).toEqual([]);
     expect(rec.fills.filter(q => q.x === r.x && q.y === r.y && q.w === r.w && q.h === r.h).map(q => q.c)).toEqual([P.wafer]);
     expect(rec.fills.filter(q => q.c === P.silkLo && q.x === r.x && q.y === r.y)).toHaveLength(2);
-  });
-});
-
-describe('CPU grid tag speed', () => {
-  it('prints one rate when the cores match, else the range', async () => {
-    const { rateRange } = await import('./labels');
-    expect(rateRange([{ rate: 2000 }, { rate: 2000 }])).toBe('2 kHz');
-    expect(rateRange([{ rate: 1000 }, { rate: 2000 }])).toBe('1–2 kHz');
-    expect(rateRange([{ rate: 512 }, { rate: 1000 }])).toBe('512 Hz–1 kHz');
   });
 });
 

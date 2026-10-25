@@ -5,7 +5,7 @@ import {
 } from '../index';
 import { MAX_ACCELS, MAX_UPS } from '../core/constants';
 import { rqLen, rqLevel, rqRow } from '../core/routerQueue';
-import { portSpeedPrice } from '../build/catalog';
+import { energyRatio, PARTS, portSpeedPrice, ratedRate } from '../build/catalog';
 import { researchDef } from '../build/research/tree';
 import type { GpuGeneration } from '../types/gpu';
 import type { Policy } from './policies';
@@ -202,6 +202,9 @@ export function score(state: GameState, q: Quote): number | null {
   if (a.type === 'upgradeRouterQueue') {
     // D25.7: a deeper queue only helps when entries wait in it and heads still time out.
     if (a.unit.kind !== 'rack') return null;
+    // A queue deeper than two entries per server only holds work the rack can't start.
+    const servers = state.build.racks[a.unit.id]?.servers.filter((x) => x !== null).length ?? 0;
+    if (servers < 2 || rqLevel(state.compiled, 0, a.unit.id) >= 2 * servers) return null;
     const full = rqLen(state.hot, rqRow(state.hot, 0, a.unit.id)) >= rqLevel(state.compiled, 0, a.unit.id);
     const last = state.round.reports.at(-1);
     if (!full || !last || last.failedByCause.timeout === 0) return null;
@@ -215,6 +218,9 @@ export function score(state: GameState, q: Quote): number | null {
   }
   if (rate) {
     const next = tryAction(state, a);
+    const target = cpuTarget(a);
+    // hardware-progression.md §3: a player stops pushing a CPU whose energy ratio falls under CPU_MIN_RATIO.
+    if (next && target !== null && coreRatio(next, target) < CPU_MIN_RATIO && coreRatio(next, target) < coreRatio(state, target)) return null;
     const gain = next ? income(next) - income(state) : 0;
     return gain > 0 ? cost / gain : null;
   }
@@ -231,6 +237,8 @@ export function score(state: GameState, q: Quote): number | null {
       && (after.vramBits > (before?.vramBits ?? 0) || after.cores > (before?.cores ?? 0))
       && after.opsPerS > 2 * ENERGY_PRICE * (after.idleW + after.loadW);
     if (bigger && lastFailedOn(state, ['vram', 'gpuCores']) && supplyNeeded(state, a)) return GATE_PAYBACK_S * cost / Math.max(1, income(state));
+    // A pushed card whose ops are worth less than twice its energy is not worth its upgrade.
+    if (after.upgrades > 0 && after.opsPerS < 2 * ENERGY_PRICE * (after.idleW + after.loadW)) return null;
     const next = tryAction(state, a);
     const gain = next ? income(next) - income(state) : 0;
     return gain > 0 ? cost / gain : null;
@@ -245,8 +253,9 @@ function gateDetail(a: GameAction): readonly string[] | null {
     : a.type === 'addPart' ? a.kind : a.type === 'upgradeAll' ? a.kind : a.type === 'installGpu' ? 'gpu' : null;
   switch (kind) {
     case 'l1': case 'l2': case 'l3': return ['cache'];
-    case 'ram': return ['ram'];
-    case 'drive': return ['storage'];
+    // D26: a box with no RAM reports cache; RAM or a drive answers a RAM wall; RAM answers spill.
+    case 'ram': return ['cache', 'ram', 'disk'];
+    case 'drive': return ['ram', 'disk'];
     case 'gpu': return ['gpu', 'vram', 'gpuCores'];
     default: return null;
   }
@@ -256,8 +265,27 @@ const CHEAP_GATE_S = 60;
 /** Capacity gates are bought when cheap, or when the last round failed on what they answer. */
 function gateNeeded(state: GameState, a: GameAction, cost: number): boolean {
   const details = gateDetail(a);
+  if (ramPastRatio(state, a)) return false;
   if (!details || cost <= CHEAP_GATE_S * Math.max(1, income(state))) return true;
   return lastFailedOn(state, details);
+}
+/**
+ * A RAM level whose energy ratio would fall below RAM_MIN_RATIO (hardware-progression.md §3) costs more to
+ * run than its capacity is worth: a player adds a module or a newer generation instead.
+ */
+const RAM_MIN_RATIO = 2.5;
+/** The cores' energy ratio: ops per second against their full-use Credits per second at the reference price. */
+const CPU_MIN_RATIO = 2.5;
+function coreRatio(state: GameState, id: number): number {
+  const c = state.compiled.sys, w = (c.coreIdleW[id] ?? 0) + (c.coreLoadW[id] ?? 0);
+  return w > 0 ? computeRate(state, id) / (0.01 * w) : Infinity;
+}
+function ramPastRatio(state: GameState, a: GameAction): boolean {
+  if (a.type !== 'upgradePart' || a.part.unit.kind !== 'system' || a.part.slot.kind !== 'ram') return false;
+  const m = state.build.systems[a.part.unit.id]?.spec.ram[a.part.slot.index];
+  if (!m) return false;
+  const era = (PARTS.ram.watts as { era: readonly number[] }).era[m.gen] ?? 0;
+  return energyRatio(era, ratedRate(PARTS.ram, m.gen, 1), ratedRate(PARTS.ram, m.gen, m.level + 1)) < RAM_MIN_RATIO;
 }
 const lastFailedOn = (state: GameState, details: readonly string[]): boolean =>
   state.round.reports.at(-1)?.details.some((d) => details.includes(d.detail)) ?? false;
@@ -341,6 +369,9 @@ function creditReserve(state: GameState): number {
     const fee = amountToNumber(n.creditCost);
     if (fee > 0 && fee <= horizon && (reserve === 0 || fee < reserve)) reserve = fee;
   }
+  // The first GPU is a save-up goal once GPU tasks block rounds: a player stops buying levels to afford it.
+  const noGpu = !state.build.systems.some((x) => x?.spec.accels.some((a) => a.kind === 'gpu'));
+  if (reserve === 0 && noGpu && (state.research.unlocks.gens.gpu & 1) !== 0 && state.round.reports.slice(-4).some((r) => r.details.some((d) => d.detail === 'gpu'))) reserve = GPU_ENTRY_PRICE;
   return reserve;
 }
 
@@ -352,7 +383,8 @@ function buyParts(state: GameState, policy: Policy, log: BotEvent[]): GameState 
     let best: Quote | null = null, bestScore = Infinity;
     const credits = amountToNumber(s.wallet.credits);
     for (const q of buyable(s, quotes)) {
-      if (reserve > 0 && credits - amountToNumber(q.cost) < reserve) continue;
+      // The reserve holds back gates and levels, not purchases that raise net income (a native CPU saves energy).
+      if (reserve > 0 && !q.gpu && cpuTarget(q.action) === null && credits - amountToNumber(q.cost) < reserve) continue;
       const v = score(s, q);
       if (v !== null && v < bestScore) { best = q; bestScore = v; }
     }
@@ -379,7 +411,7 @@ const byDataCost = (a: ResearchNodeView, b: ResearchNodeView) => amountCompare(a
 /** Off-path research that unblocks income; a sensible player takes it as soon as the budget allows. */
 const ESSENTIAL = ['fifoSched', 'dualCore', 'memController', 'psu80', 'gpuGen1', 'storageCtl', 'octaCore', 'outOfOrder', 'lbCapability', 'portExpansion', 'sw100k', 'gddr6', 'gpuGen2', 'densePorts', 'meteredPdu'];
 /** Off-path research since the last milestone started may spend this share of the next milestone path's Data. */
-const OFF_PATH_SHARE = 0.25;
+const OFF_PATH_SHARE = 0.5;
 
 /**
  * Research like a player saving for the next level: the next milestone and its missing
@@ -397,7 +429,7 @@ function researchLeftS(state: GameState): number {
 /** A project this short is fine to run mid-round; a longer one waits for the round to end. */
 const RESEARCH_MIDROUND_S = 10;
 /** Between rounds, wait for a project to finish when it needs at most this long. */
-const RESEARCH_WAIT_S = 1800;
+const RESEARCH_WAIT_S = 300;
 
 function startResearch(state: GameState, log: BotEvent[]): GameState {
   const tree = selectResearchTree(state);

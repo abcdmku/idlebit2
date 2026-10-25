@@ -45,8 +45,15 @@ export interface HudSnapshot {
   /** Whole Credits per minute over the trailing 60 s. */
   readonly netPerMinute: Amount;
   /** Work-weighted (spec §4.2): percent = floor(SLA × 1000) / 10. met/failed are task counts; the work sums are ops. */
+  /**
+   * D28: met and failed count the last `window` (50) resolved tasks of the round, and percent = met / (met +
+   * failed) ("SLA 92.0% · 46 / 50"); dismissals are outside it. `checking` is false until 10 tasks have
+   * resolved this round ("warming up"): the round can't end before. roundMet and roundFailed are the round's totals.
+   * deliveredWork, failedWork and grace are the retired work-weighted inputs, kept until the UI stops reading them.
+   */
   readonly sla: {
-    readonly met: number; readonly failed: number; readonly percent: number;
+    readonly met: number; readonly failed: number; readonly percent: number; readonly checking: boolean;
+    readonly window: number; readonly roundMet: number; readonly roundFailed: number;
     readonly deliveredWork: number; readonly failedWork: number; readonly grace: number;
   };
   readonly roundState: RoundPhase;
@@ -112,11 +119,19 @@ export interface ResearchBadge {
 
 export type LevelSnapshot = ChipSnapshot | SystemSnapshot | RackSnapshot | RoomSnapshot | GlobalSnapshot;
 
+export type CoreSleep = 'C1' | 'C3' | 'C6' | 'S3';
 export interface CoreView {
   readonly socket: number;
   readonly lanes: number;
   /** This core's own rate in ops/s: its lanes × its socket's clock, as compile runs it (the core's upgrade quote shows it). */
   readonly rate: number;
+  /**
+   * The core's live clock in Hz: the socket clock × its active modifiers (spec §9.3: DVFS or turbo,
+   * thermal throttle, power caps). 0 while it sleeps, and while its system is unpowered.
+   */
+  readonly hz: number;
+  /** The sleep state while the core sleeps: an idle core's C-state, or 'S3' with its whole system asleep; else null. */
+  readonly sleep: CoreSleep | null;
   readonly generation: number;
   readonly level: number;
   readonly busy: number;

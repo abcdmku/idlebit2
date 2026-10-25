@@ -25,6 +25,8 @@ export function drawPiece(g: G, x: number, y: number, w: number, h: number, left
 /** The piece inside a small grid core site: a 4 art tall gauge at the foot of its top face. */
 export function drawGridPiece(g: G, r: Rect, left: number, colour: string): void {
   if (r.w < 6 || r.h < 10) return;
+  // Short tiles (under 18 art px) leave room for their speed label: the piece drains along the foot row.
+  if (r.h < 18) { g.fillStyle = colour; g.fillRect(r.x + 1, r.y + r.h - 1, Math.round((r.w - 2) * Math.max(0, Math.min(1, left))), 1); return; }
   drawPiece(g, r.x + 1, r.y + r.h - 7, r.w - 2, 4, left, colour);
 }
 

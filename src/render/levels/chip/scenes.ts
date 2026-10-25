@@ -12,7 +12,7 @@ const core = (busy: boolean, progress: number, research = 0, run: Run | null = n
   const taskId = busy ? run?.taskId ?? next++ : null;
   return {
     socket: 0, lanes: 1, generation: 0, level: 1, busy: busy ? 1 : 0, family: busy ? run?.family ?? 2 : null, taskId,
-    progress, threads: 1, research, cstate: 0, shard: busy ? run?.shard ?? 0 : null, shardThreads: busy ? run?.threads ?? 1 : 0, rate: 0,
+    progress, threads: 1, research, cstate: 0, shard: busy ? run?.shard ?? 0 : null, shardThreads: busy ? run?.threads ?? 1 : 0, rate: 0, hz: 0, sleep: null,
   };
 };
 /** One QA shard transfer on the pipe (all D25 fields set). */
@@ -39,7 +39,7 @@ export function chipScene(scene: CpuScene, simTimeMs = 2000): ChipSnapshot {
       : [core(true, 0.62), core(scene !== 'paused', 0.25)];
   const hz = max ? 4e9 : 1024, bits = max ? 2 ** 28 : 64;
   // A core's own rate is the sim's (lanes × socket clock); a scene sets it the same way.
-  for (let i = 0; i < cores.length; i++) cores[i] = { ...cores[i]!, rate: cores[i]!.lanes * hz };
+  for (let i = 0; i < cores.length; i++) cores[i] = { ...cores[i]!, rate: cores[i]!.lanes * hz, hz };
   void simTimeMs;
   return {
     level: 'chip', parent: { level: 'system', id: systemId(0) }, systemId: systemId(0), cpuCount: 1, online: 'onMarket', tier: 0,

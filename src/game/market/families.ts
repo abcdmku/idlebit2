@@ -64,8 +64,8 @@ function fam(key: string, name: string, band: number, from: number, to: number, 
 
 fam('bitFlip', 'Bit Flip', 0, 0, 5, 10, 'c1', { wsF: 1, dataRatio: 12 }, 'Toggle a stream of bits, one per op.');
 fam('parity', 'Parity Check', 0, 0.8, 6.5, 8, 'c1', { wsF: 1, dataRatio: 15 }, 'XOR-fold a stream into one parity bit.');
-fam('andMask', 'AND Mask', 0, 1.6, 7, 6, 'c1', { wsF: 2, dataRatio: 25 }, 'Clear bits with a mask, bit by bit.');
-fam('compare', 'Compare', 0, 2.4, 8, 7, 'c2', { wsF: 2, dataRatio: 25 }, 'Which of two numbers is larger, MSB first?');
+fam('andMask', 'AND Mask', 0, 0.6, 7, 14, 'c1', { wsF: 2, dataRatio: 25 }, 'Clear bits with a mask, bit by bit.');
+fam('compare', 'Compare', 0, 1.6, 8, 10, 'c2', { wsF: 2, dataRatio: 25 }, 'Which of two numbers is larger, MSB first?');
 fam('intAdd', 'Integer Add', 0, 3.2, 9, 8, 'c2', { wsF: 3, dataRatio: 25 }, 'Ripple-carry add: a, b and the carry.');
 fam('popcount', 'Bit Count', 1, 4, 9.5, 6, 'c2', { wsF: 4, dataRatio: 30 }, 'Count set bits into a 4-bit counter.');
 fam('crc8', 'CRC-8', 1, 4.4, 10, 7, 'c3', { wsF: 8, dataRatio: 30 }, '8-bit polynomial check over a stream.');
@@ -78,19 +78,19 @@ fam('intSort', 'Integer Sort', 1, 8.8, 16, 6, 'c4', { wsF: 64, wsP: 0.25, dataRa
 fam('hashBatch', 'Hash Batch', 2, 10, 18, 6, 'c6', { wsF: 768, th: 4, dataRatio: 80 }, 'SHA-256 over a batch, one block per thread.');
 fam('lzCompress', 'LZ Compress', 2, 10.8, 18.5, 6, 'c5', { wsF: 512, th: 4, dataRatio: 40 }, 'Deflate logs, one window per thread.');
 fam('monteCarlo', 'Monte Carlo', 2, 11.6, 18, 5, 'c6', { wsF: 64, th: 8, g: GRAIN.tile, dataRatio: 100 }, 'Estimate pi with independent samples.');
-fam('jsonParse', 'JSON Parse', 3, 12.5, 20, 7, 'c5', { wsF: 256, wsP: 1, g: GRAIN.serial, dataRatio: 40 }, 'Parse a big API response into a tree.');
-fam('mergeSort', 'Merge Sort', 3, 13.1, 21, 8, 'c2 r3', { wsP: 2, dataRatio: 60 }, 'Sort an array too big for cache.');
-fam('kvGet', 'KV Cache Get', 3, 13.7, 22, 7, 'c1 r4', { wsP: 4, g: GRAIN.fine, dataRatio: 50 }, 'Serve hot keys from an in-RAM map.');
-fam('sqlJoin', 'SQL Join', 3, 14.5, 23, 7, 'c2 r4', { th: 2, wsP: 4, dataRatio: 15 }, 'Hash-join two tables in RAM.');
+fam('jsonParse', 'JSON Parse', 3, 11.5, 20, 7, 'c5', { wsF: 256, wsP: 4, g: GRAIN.serial, dataRatio: 40 }, 'Parse a big API response into a tree.');
+fam('mergeSort', 'Merge Sort', 3, 12, 21, 8, 'c2 r3', { wsP: 8, dataRatio: 60 }, 'Sort an array too big for cache.');
+fam('kvGet', 'KV Cache Get', 3, 12.5, 22, 7, 'c1 r4', { wsP: 12, g: GRAIN.fine, dataRatio: 50 }, 'Serve hot keys from an in-RAM map.');
+fam('sqlJoin', 'SQL Join', 3, 13, 23, 7, 'c2 r4', { th: 2, wsP: 12, dataRatio: 15 }, 'Hash-join two tables in RAM.');
 fam('graphBfs', 'Graph BFS', 3, 18, 26, 5, 'c1 r5', { th: 4, wsP: 8, dataRatio: 20 }, 'Walk a social graph level by level.');
 fam('matmul', 'Matrix Multiply', 3, 20, 28, 6, 'c4 r2', { th: 4, wsP: 2, g: GRAIN.fine, dataRatio: 70 }, 'Dense float matrix product.');
-fam('imageBlur', 'Image Blur', 4, 15, 24, 7, 'r1 g10', { wsP: 1, gpuCoresMin: 1, vram: 1, dataRatio: 60 }, 'Gaussian blur on a photo.');
-fam('thumbnail', 'Thumbnail', 4, 15.6, 23, 6, 'c1 r1 g6', { wsP: 1, gpuCoresMin: 1, vram: 1, g: GRAIN.tile, dataRatio: 70 }, 'Resize uploads for a feed.');
+fam('imageBlur', 'Image Blur', 4, 12.5, 24, 7, 'r1 g4', { wsP: 1, gpuCoresMin: 1, vram: 1, dataRatio: 60 }, 'Gaussian blur on a photo.');
+fam('thumbnail', 'Thumbnail', 4, 13, 23, 6, 'c1 r1 g3', { wsP: 1, gpuCoresMin: 1, vram: 1, g: GRAIN.tile, dataRatio: 70 }, 'Resize uploads for a feed.');
 fam('transcode', 'Video Transcode', 4, 19.5, 28, 7, 'c1 r2 g10', { th: 2, wsP: 1, gpuCoresMin: 4, vram: 2, g: GRAIN.coarse, dataRatio: 60 }, 'H.264 to AV1, one segment.');
 fam('inference', 'ML Inference', 4, 17, 29, 8, 'r1 g12', { wsP: 1, gpuCoresMin: 0, vram: 4, tensor: true, dataRatio: 12 }, 'Run a trained model on a batch.');
 fam('rayTrace', 'Ray Trace Tile', 4, 22, 30, 5, 'g14', { gpuCoresMin: 16, vram: 2, g: GRAIN.tile, dataRatio: 80 }, 'Render one 64x64 tile.');
-fam('logIngest', 'Log Ingest', 5, 16.5, 26, 7, 'c1 d4', { disk: 8, g: GRAIN.medium, dataRatio: 10 }, 'Append and index server logs.');
-fam('backup', 'Backup', 5, 17.2, 27, 6, 'd6', { disk: 16, g: GRAIN.serial, dataRatio: 40 }, 'Snapshot a volume to disk.');
+fam('logIngest', 'Log Ingest', 5, 12.5, 26, 7, 'c1 d4', { disk: 16, g: GRAIN.medium, dataRatio: 10 }, 'Append and index server logs.');
+fam('backup', 'Backup', 5, 13.2, 27, 6, 'd6', { disk: 24, g: GRAIN.serial, dataRatio: 40 }, 'Snapshot a volume to disk.');
 fam('indexBuild', 'Index Build', 5, 18.5, 29, 6, 'c2 r2 d3', { wsP: 2, disk: 4, dataRatio: 12 }, 'Build a B-tree over a table.');
 fam('compaction', 'LSM Compaction', 5, 21, 31, 5, 'c1 r2 d4', { wsP: 1, disk: 8, dataRatio: 30 }, 'Merge sorted runs into one.');
 fam('sqlScan', 'SQL Scan', 5, 23, 33, 6, 'c2 r3 d3', { th: 4, wsP: 2, disk: 2, g: GRAIN.medium, dataRatio: 12 }, 'Full table scan with filters.');

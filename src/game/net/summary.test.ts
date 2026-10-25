@@ -63,6 +63,7 @@ describe('D24 routing summaries', () => {
       }
       state = commitWorld(state, w, 0);
     }
-    expect(checks).toBeGreaterThan(600);
+    // D28: the count SLA ends the round on the random power kills after about 420 running ticks.
+    expect(checks).toBeGreaterThan(400);
   });
 });

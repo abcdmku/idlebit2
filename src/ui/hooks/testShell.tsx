@@ -22,7 +22,7 @@ export function baseSnapshot(): RenderSnapshot {
   const chip: NodeRef = { level: 'chip', id: systemId(0) }, system: NodeRef = { level: 'system', id: systemId(0) };
   return {
     epoch: 1, tick: 0, simTimeMs: 0, bootMs: 10_000,
-    hud: { credits: amount(0), data: amount(0), netPerMinute: amount(0), sla: { met: 0, failed: 0, percent: 100, deliveredWork: 0, failedWork: 0, grace: 10 },
+    hud: { credits: amount(0), data: amount(0), netPerMinute: amount(0), sla: { met: 0, failed: 0, percent: 100, checking: false, window: 50, roundMet: 0, roundFailed: 0, deliveredWork: 0, failedWork: 0, grace: 10 },
       roundState: 'running', roundIndex: 1, roundElapsedMs: 0, autoReturnInMs: null },
     feed: { roundIndex: 1, timing: 'running', window: Array.from({ length: 5 }, (_, i) => entry(i + 1)), research: null,
       headDeadlineTick: 99, blockedBy: null, transfers: [], inTransfer: 0, queued: 0, running: 0, taken: 0, dismissed: 0,

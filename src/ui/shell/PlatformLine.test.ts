@@ -19,3 +19,12 @@ describe('platform line news (A11, A16)', () => {
     expect(newsSince(s, { failure: 0, event: 0 }).round).toBe(2);
   });
 });
+
+describe('platform notices in player words', () => {
+  it('a save reset reads as a one-time player message; other notices pass through', async () => {
+    const { noticeText } = await import('./PlatformLine');
+    expect(noticeText('Save reset: Save version 8 is not 10')).toEqual({ text: 'New version: your save was reset.', once: true });
+    expect(noticeText('Saving is off')).toEqual({ text: 'Saving is off', once: false });
+    expect(noticeText(null)).toBeNull();
+  });
+});

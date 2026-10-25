@@ -1,10 +1,10 @@
 import { baseRate, startIntensity, taskSize } from './curve';
 
 describe('intensity curve (D12.1, D20, tasks.md §3)', () => {
-  it('ramps T(I) = min(250, 7 × 2^(I / 5)) seconds per unit', () => {
-    expect(1 / baseRate(0)).toBeCloseTo(7, 9);
-    expect(1 / baseRate(5)).toBeCloseTo(14, 9);
-    expect(1 / baseRate(20)).toBeCloseTo(112, 9);
+  it('ramps T(I) = min(250, 4.5 × 2^(I / 3.5)) seconds per unit (D28 re-tune)', () => {
+    expect(1 / baseRate(0)).toBeCloseTo(4.5, 9);
+    expect(1 / baseRate(3.5)).toBeCloseTo(9, 9);
+    expect(1 / baseRate(14)).toBeCloseTo(72, 9);
     expect(1 / baseRate(30)).toBe(250);
   });
 

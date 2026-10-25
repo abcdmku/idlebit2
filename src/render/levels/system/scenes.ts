@@ -10,7 +10,7 @@ const ID = systemId(0), PARENT = { level: 'system', id: ID } as const;
 interface Run { readonly taskId: number; readonly family: number; readonly shard: number; readonly threads: number }
 const core = (lanes: number, busy: boolean, progress: number, research = 0, run: Run | null = null): CoreView => ({
   socket: 0, lanes, generation: 0, level: lanes, busy: busy ? 1 : 0, family: busy ? run?.family ?? 0 : null, taskId: busy ? run?.taskId ?? 380 + lanes : null,
-  progress, threads: 1, research, cstate: 0, shard: busy ? run?.shard ?? 0 : null, shardThreads: busy ? run?.threads ?? 1 : 0, rate: lanes * 1024,
+  progress, threads: 1, research, cstate: 0, shard: busy ? run?.shard ?? 0 : null, shardThreads: busy ? run?.threads ?? 1 : 0, rate: lanes * 1024, hz: 1024, sleep: null,
 });
 const PARALLEL: Run = { taskId: 700, family: 13, shard: 1, threads: 2 }, ACCEL: Run = { taskId: 701, family: 22, shard: 0, threads: 1 };
 export function chipScene(stage: 'boot' | 'chip' | 'system' | 'shard', online: ChipSnapshot['online'] = 'onMarket'): ChipSnapshot {

@@ -104,17 +104,17 @@ D27 makes research a task that cuts the line: it holds a slot and its threads on
 | W2 | 600 | CPU, round 2 | 1–2 cores, about 20 Hz, 2 lanes | about 15 s |
 | W3 | 5,000 | CPU, rounds 2–4 | 2–4 cores, 50–100 Hz, 2 lanes | about 15 s |
 | W4 | 1.5e5 | System opens | 4 cores, 0.3–1 kHz, 4 lanes | about 20 s |
-| W5 | 1e6 | System, kHz | 4 cores, 1–3 kHz, 4 lanes | about 30 s |
-| W6 | 3e6 | Late System, `fabKhz`, `rack` | the first kHz package, about 1e5 ops/s | about 30 s |
+| W5 | 3e5 | System, kHz | 2–4 cores, 0.5–2 kHz, 2–4 lanes | about 30 s |
+| W6 | 1e6 | Late System, `rack` | the first kHz package, about 3e4–1e5 ops/s | 10–30 s |
 | W7 | 3e7 | kHz, Rack | one kHz system to a starter rack, 2e5–1e6 ops/s | 30 s – 2 min |
-| W8 | 1e9 | Rack, early | about 40 min |
-| W9 | 5e9 | Rack, late, `fabMhz` | 3–4 h |
-| W10 | 2e10 | MHz, `room` | about 12 h: the Room save-up is research time as much as Data |
-| W11 | 2.5e10 | Room, `fabGhz` | about a day at the Room-entry fleet (research gets 1e5–5e5 ops/s); less as rooms fill |
-| W12 | 3e10 | GHz, `dataCenter`, `zoneAware` | 1–2 days on the real Room fleet |
-| W13 | 4e10 | Data center, `regions` | days |
-| W14 | 6e10 | Regions, `intercontinental` | model era |
-| W15 | 1e11 | Late regions | model era |
+| W8 | 2e8 | Rack, early | a starter rack, 1e6–1e7 ops/s; one thread per system in a round | 20–200 s between rounds |
+| W9 | 5e9 | Rack, late, `fabMhz` | — | 3–4 h |
+| W10 | 2e10 | MHz, `room` | — | about 12 h: the Room save-up is research time as much as Data |
+| W11 | 2.5e10 | Room, `fabGhz` | — | about a day at the Room-entry fleet (research gets 1e5–5e5 ops/s); less as rooms fill |
+| W12 | 3e10 | GHz, `dataCenter`, `zoneAware` | — | 1–2 days on the real Room fleet |
+| W13 | 4e10 | Data center, `regions` | — | days |
+| W14 | 6e10 | Regions, `intercontinental` | — | model era |
+| W15 | 1e11 | Late regions | — | model era |
 
 ### 3.3 Data cost
 
@@ -130,13 +130,13 @@ Structure unlocks and fab generations cost 3× their tier, so each era jump is a
 | W6 | 50,000 | 150,000 | `fabKhz` at 3:33 and `rack` at 6:20; **Rack** opens at 6:40–6:48 (D19: 5–8 h) |
 | W7 | 1e6 | 3e6 | Rack-era nodes: 10–20 min of Rack Data (5e6–6e6 per hour) |
 | W8 | 4e6 | 1.2e7 | under an hour of Rack Data |
-| W9 | 1.5e7 | 4.5e7 | `fabMhz` at about 1 d 6 h |
-| W10 | 4e7 | 1.2e8 | `room` starts at about 2 d 8 h; **Room** opens at 3 d 2 h – 3 d 6 h (D19: 2–4 days) |
-| W11 | 6e7 | 1.8e8 | Room era: `fabGhz`, `stealRoom` |
-| W12 | 2e8 | 6e8 | `dataCenter` (D19 zones: about 1–2 weeks) |
-| W13 | 4e8 | 1.2e9 | `regions` (D19: 2–4 weeks) |
-| W14 | 3e9 | 9e9 | `intercontinental` |
-| W15 | 1e10 | 3e10 | Late regions; every data center at 2–4 months (model) |
+| W9 | 1.5e7 | 4.5e7 | — | `fabMhz` at about 1 d 6 h |
+| W10 | 4e7 | 1.2e8 | — | `room` starts at about 2 d 8 h; **Room** opens at 3 d 2 h – 3 d 6 h (D19: 2–4 days) |
+| W11 | 6e7 | 1.8e8 | — | Room era: `fabGhz`, `stealRoom` |
+| W12 | 2e8 | 6e8 | — | `dataCenter` (D19 zones: about 1–2 weeks) |
+| W13 | 4e8 | 1.2e9 | — | `regions` (D19: 2–4 weeks) |
+| W14 | 3e9 | 9e9 | — | `intercontinental` |
+| W15 | 1e10 | 3e10 | — | Late regions; every data center at 2–4 months (model) |
 
 W11–W15 are starting values from the real Room-era Data income (about 6e6 per hour while the bot holds one rack) and the design model's D19 timeline; the real chain proves them as far as it reaches (`docs/tasks.md` §9). Every value is an exact whole number as a double; the wallet holds Data as an exact integer.
 
@@ -214,21 +214,21 @@ Columns: id, short name, prerequisites, the zoom level where it first matters, e
 
 | id | Name | Requires | Level | Era / tier | Effect | Short | Answers |
 |---|---|---|---|---|---|---|---|
-| `pipelining` | Pipelining | | CPU | Hz W1 | Lane ceiling per core 1→2. The Core plate can now buy lane levels. | Cores run 2 ops a cycle | `bits`, `pickup` |
-| `superscalar` | Superscalar | pipelining | CPU | Hz W3 | Lane ceiling 2→4. | Cores run 4 ops a cycle | `ints` |
+| `pipelining` | Pipelining | | CPU | Hz W3 | Lane ceiling per core 1→2. The Core plate can now buy lane levels. | Cores run 2 ops a cycle | `bits`, `pickup` |
+| `superscalar` | Superscalar | pipelining | CPU | Hz W4 | Lane ceiling 2→4. | Cores run 4 ops a cycle | `ints` |
 | `outOfOrder` | Out-of-order | superscalar, fabKhz | CPU | kHz W7 | Lane ceiling 4→8. | Cores run 8 ops a cycle | `ints`, `threads` |
 | `simd` | SIMD | outOfOrder, fabMhz | CPU | MHz W10 | Lane ceiling 8→16. | Cores run 16 ops a cycle | `threads`, `rackDist` |
 | `wideVector` | Wide vectors | simd, fabGhz | CPU | GHz W12 | Lane ceiling 16→32. | Cores run 32 ops a cycle | `roomDist` member specs |
-| `dualCore` | Dual core | fifoSched | CPU | Hz W2 | Core sites 1→2. The Core tray item is enabled. | Up to 2 cores per CPU | `pickup`, `bits` |
-| `quadCore` | Quad core | dualCore, l2Cache | CPU | Hz W3 | Core sites 2→4. | Up to 4 cores per CPU | `threads` |
+| `dualCore` | Dual core | fifoSched | CPU | Hz W3 | Core sites 1→2. The Core tray item is enabled. | Up to 2 cores per CPU | `pickup`, `bits` |
+| `quadCore` | Quad core | dualCore, l2Cache | CPU | Hz W4 | Core sites 2→4. | Up to 4 cores per CPU | `threads` |
 | `octaCore` | 8 cores | quadCore, fabKhz | CPU | kHz W7 | Core sites 4→8. | Up to 8 cores per CPU | `threads`, `density` |
 | `cores16` | 16 cores | octaCore, fabMhz | CPU | MHz W10 | Core sites 8→16. | Up to 16 cores per CPU | `rackDist`, `density` |
 | `chiplets` | Chiplets | cores16, fabGhz | CPU | GHz W12 | Core sites 16→32, the cap per CPU (D7.2). | Up to 32 cores per CPU | `roomDist`, `density` |
 | `stacked3d` | Stacked cache | chiplets, dataCenter | CPU | GHz W13 | Cores stay capped at 32 (D7.2), so this is cache. L3 gen 4 (stacked SRAM): 8× L3 capacity per level at gen 3's watts, so big per-member working sets fit in cache. | Stacked L3: 8× cache per level | `region` member specs, `density` |
-| `fabKhz` | kHz fab | systemBoard, superscalar | System | kHz W6 | Gen 1 of core (2 base lanes), clock (1 kHz base), L1, L2, L3, scheduler and CPU package. Opens Barebones kHz. | Opens kHz chips and Barebones kHz | all bands, `energy` |
+| `fabKhz` | kHz fab | systemBoard, superscalar | System | kHz W4 | Gen 1 of core (2 base lanes), clock (1 kHz base), L1, L2, L3, scheduler and CPU package. Opens Barebones kHz. | Opens kHz chips and Barebones kHz | all bands, `energy` |
 | `fabMhz` | MHz fab | fabKhz, rack | Rack | MHz W9 | Gen 2 of every chip part. Opens Barebones MHz. | Opens MHz chips and Barebones MHz | all bands, `energy` |
 | `fabGhz` | GHz fab | fabMhz, room | Room | GHz W11 | Gen 3 of every chip part. Opens Barebones GHz. | Opens GHz chips and Barebones GHz | all bands, `energy` |
-| `l2Cache` | L2 cache | pipelining | CPU | Hz W2 | New chip part L2, shared by all cores. Capacity 8× an L1 of the same level, for 2× the watts. Adds to the cache tier (D26): bits that fit cache cost no memory time, so bigger cache speeds RAM-heavy work and delays spill. | Adds shared L2 cache, 8× L1 size | `ints`, `gate` |
+| `l2Cache` | L2 cache | pipelining | CPU | Hz W3 | New chip part L2, shared by all cores. Capacity 8× an L1 of the same level, for 2× the watts. Adds to the cache tier (D26): bits that fit cache cost no memory time, so bigger cache speeds RAM-heavy work and delays spill. | Adds shared L2 cache, 8× L1 size | `ints`, `gate` |
 | `l3Cache` | L3 cache | l2Cache, systemBoard | System | Hz W5 | New chip part L3, shared. Capacity 64× an L1 of the same level, for 6× the watts. | Adds shared L3 cache, 64× L1 size | `ints`, `ram` before RAM |
 | `smt` | SMT | timeSlice, octaCore | CPU | kHz W7 | Each core holds 2 running tasks. Scheduler K may reach 2× cores, still at most 32. Two tasks on one core each run at 0.6× the core's rate (1.2× combined). | Each core runs 2 tasks at once | `pickup` |
 | `dualSocket` | Dual socket | octaCore, rack | System | kHz W8 | CPU sockets 1→2. Every CPU in a system is identical: CPU 2 copies CPU 1's generation and levels, and an upgrade applies to all, priced × CPU count. All cores pool under one scheduler (D7.3). Socket factor 0.92 in `η_cfg` (D7.5). A task whose threads span sockets runs its RAM stream stages at 0.5× bandwidth. | Up to 2 CPUs per system | `density`, `threads` |
@@ -306,7 +306,7 @@ System scope (the scheduler chip part):
 | `timeSlice` | Time slicing | fifoSched | CPU | Hz W2 | Strategy time slicing: admits up to 2× K tasks; running tasks share cores in 100 ms slices, so n tasks on c cores each progress at c/n. Pickup stays fast; completion slows. | Scheduler: time slicing, 2× tasks | `pickup` |
 | `priorityQ` | Priority | sjf | CPU | Hz W3 | Strategy priority: highest payout per unit work first. Trades task count for Credits. | Scheduler: best pay first | `energy`, late-round earnings |
 | `mlfq` | Aging (MLFQ) | sjf, timeSlice | CPU | Hz W3 | Strategy MLFQ: SJF, but a queued task that has waited 3 s or more starts first. No queued task starves. | Scheduler: SJF that never starves | `pickup` |
-| `workStealing` | Work stealing | quadCore | CPU | Hz W3 | Rule (D25.3): an idle thread joins a running shard that holds fewer threads than `floor(units / grain)`, mid-shard. | Idle cores join running shards | `threads` |
+| `workStealing` | Work stealing | quadCore | CPU | Hz W4 | Rule (D25.3): an idle thread joins a running shard that holds fewer threads than `floor(units / grain)`, mid-shard. | Idle cores join running shards | `threads` |
 | `numaAware` | NUMA-aware | dualSocket | System | kHz W8 | Rule: a task stays on one socket when its threads fit there; it spans sockets only when they don't. | Tasks stay on one socket if they fit | `ram`, `rackDist` |
 
 Network scopes (rack load balancer, then room, site and backbone):
@@ -566,7 +566,7 @@ export type Era = "hz" | "khz" | "mhz" | "ghz";
 export type WorkTier = 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12 | 13 | 14 | 15;
 
 export const DATA_BY_TIER: Record<WorkTier, number> = {
-  1: 1, 2: 100, 3: 1_000, 4: 12_000, 5: 15_000, 6: 50_000, 7: 1_000_000, 8: 4_000_000,
+  1: 1, 2: 100, 3: 1_000, 4: 9_000, 5: 15_000, 6: 50_000, 7: 1_000_000, 8: 4_000_000,
   9: 1.5e7, 10: 4e7, 11: 6e7, 12: 2e8, 13: 4e8, 14: 3e9, 15: 1e10,
 };
 /** Structure unlocks and fab generations cost 3x their tier's Data. */
@@ -575,7 +575,7 @@ export const MILESTONE_IDS = ["systemBoard", "fabKhz", "rack", "fabMhz", "room",
 
 /** D27: about N seconds of the era's typical hardware at unlock; see §3.2. */
 export const WORK_TIER_OPS: Record<WorkTier, number> = {
-  1: 20, 2: 600, 3: 5_000, 4: 1.5e5, 5: 1e6, 6: 3e6, 7: 3e7, 8: 1e9,
+  1: 20, 2: 600, 3: 5_000, 4: 1.5e5, 5: 3e5, 6: 1e6, 7: 3e7, 8: 2e8,
   9: 5e9, 10: 2e10, 11: 2.5e10, 12: 3e10, 13: 4e10, 14: 6e10, 15: 1e11,
 };
 
@@ -671,21 +671,21 @@ const n = (
 
 export const RESEARCH_V3: readonly ResearchNode[] = [
   // Compute
-  n("pipelining", "Pipelining", "compute", [], "cpu", "hz", 1, 1, [cap("lanesPerCore", 2)], ["bits", "pickup"]),
-  n("superscalar", "Superscalar", "compute", ["pipelining"], "cpu", "hz", 3, 1_000, [cap("lanesPerCore", 4)], ["ints"]),
+  n("pipelining", "Pipelining", "compute", [], "cpu", "hz", 3, 1_000, [cap("lanesPerCore", 2)], ["bits", "pickup"]),
+  n("superscalar", "Superscalar", "compute", ["pipelining"], "cpu", "hz", 4, 9_000, [cap("lanesPerCore", 4)], ["ints"]),
   n("outOfOrder", "Out-of-order", "compute", ["superscalar", "fabKhz"], "cpu", "khz", 7, 1_000_000, [cap("lanesPerCore", 8)], ["ints", "threads"]),
   n("simd", "SIMD", "compute", ["outOfOrder", "fabMhz"], "cpu", "mhz", 10, 4e7, [cap("lanesPerCore", 16)], ["threads", "rackDist"]),
   n("wideVector", "Wide vectors", "compute", ["simd", "fabGhz"], "cpu", "ghz", 12, 2e8, [cap("lanesPerCore", 32)], ["roomDist"]),
-  n("dualCore", "Dual core", "compute", ["fifoSched"], "cpu", "hz", 2, 100, [cap("coreSites", 2)], ["pickup", "bits"]),
-  n("quadCore", "Quad core", "compute", ["dualCore", "l2Cache"], "cpu", "hz", 3, 1_000, [cap("coreSites", 4)], ["threads"]),
+  n("dualCore", "Dual core", "compute", ["fifoSched"], "cpu", "hz", 3, 1_000, [cap("coreSites", 2)], ["pickup", "bits"]),
+  n("quadCore", "Quad core", "compute", ["dualCore", "l2Cache"], "cpu", "hz", 4, 9_000, [cap("coreSites", 4)], ["threads"]),
   n("octaCore", "8 cores", "compute", ["quadCore", "fabKhz"], "cpu", "khz", 7, 1_000_000, [cap("coreSites", 8)], ["threads", "density"]),
   n("cores16", "16 cores", "compute", ["octaCore", "fabMhz"], "cpu", "mhz", 10, 4e7, [cap("coreSites", 16)], ["rackDist", "density"]),
   n("chiplets", "Chiplets", "compute", ["cores16", "fabGhz"], "cpu", "ghz", 12, 2e8, [cap("coreSites", 32)], ["roomDist", "density"]),
   n("stacked3d", "Stacked cache", "compute", ["chiplets", "dataCenter"], "cpu", "ghz", 13, 4e8, [gen("l3", 4)], ["region", "density"]),
-  n("fabKhz", "kHz fab", "compute", ["systemBoard", "superscalar"], "system", "khz", 6, 150_000, chipGen(1), ["bits", "ints", "threads", "energy"]),
+  n("fabKhz", "kHz fab", "compute", ["systemBoard", "superscalar"], "system", "khz", 4, 27_000, chipGen(1), ["bits", "ints", "threads", "energy"]),
   n("fabMhz", "MHz fab", "compute", ["fabKhz", "rack"], "rack", "mhz", 9, 4.5e7, chipGen(2), ["ram", "rackDist", "energy"]),
   n("fabGhz", "GHz fab", "compute", ["fabMhz", "room"], "room", "ghz", 11, 1.8e8, chipGen(3), ["roomDist", "energy"]),
-  n("l2Cache", "L2 cache", "compute", ["pipelining"], "cpu", "hz", 2, 100, [gen("l2", 0)], ["ints", "gate"]),
+  n("l2Cache", "L2 cache", "compute", ["pipelining"], "cpu", "hz", 3, 1_000, [gen("l2", 0)], ["ints", "gate"]),
   n("l3Cache", "L3 cache", "compute", ["l2Cache", "systemBoard"], "system", "hz", 5, 15_000, [gen("l3", 0)], ["ints", "ram"]),
   n("smt", "SMT", "compute", ["timeSlice", "octaCore"], "cpu", "khz", 7, 1_000_000, [cap("threadsPerCore", 2), rule("smt", { shareRate: 0.6 })], ["pickup"]),
   n("dualSocket", "Dual socket", "compute", ["octaCore", "rack"], "system", "khz", 8, 4_000_000, [cap("cpuSockets", 2), rule("socketFactor", { s2: 0.92 }), rule("socketSpanPenalty", { ramBandwidth: 0.5 })], ["density", "threads"]),
@@ -694,7 +694,7 @@ export const RESEARCH_V3: readonly ResearchNode[] = [
   n("prefetch", "Prefetcher", "compute", ["dma", "l3Cache"], "system", "khz", 6, 50_000, [rule("prefetch")], ["ram"]),
 
   // Memory
-  n("memController", "Memory ctrl", "memory", ["systemBoard"], "system", "hz", 4, 12_000, [gen("ram", 0)], ["ram", "gate"]),
+  n("memController", "Memory ctrl", "memory", ["systemBoard"], "system", "hz", 4, 9_000, [gen("ram", 0)], ["ram", "gate"]),
   n("ddr", "DDR", "memory", ["memController"], "system", "hz", 5, 15_000, [gen("ram", 1)], ["ram"]),
   n("ddr2", "DDR2", "memory", ["ddr", "fabKhz"], "system", "khz", 7, 1_000_000, [gen("ram", 2)], ["ram"]),
   n("ddr3", "DDR3", "memory", ["ddr2", "fabMhz"], "system", "mhz", 10, 4e7, [gen("ram", 3)], ["ram", "rackDist"]),
@@ -743,7 +743,7 @@ export const RESEARCH_V3: readonly ResearchNode[] = [
   n("timeSlice", "Time slicing", "scheduling", ["fifoSched"], "cpu", "hz", 2, 100, [strat("system", "timeSlice")], ["pickup"]),
   n("priorityQ", "Priority", "scheduling", ["sjf"], "cpu", "hz", 3, 1_000, [strat("system", "priority")], ["energy"]),
   n("mlfq", "Aging (MLFQ)", "scheduling", ["sjf", "timeSlice"], "cpu", "hz", 3, 1_000, [strat("system", "mlfq")], ["pickup"]),
-  n("workStealing", "Work stealing", "scheduling", ["quadCore"], "cpu", "hz", 3, 1_000, [rule("workStealing")], ["threads"]),
+  n("workStealing", "Work stealing", "scheduling", ["quadCore"], "cpu", "hz", 4, 9_000, [rule("workStealing")], ["threads"]),
   n("numaAware", "NUMA-aware", "scheduling", ["dualSocket"], "system", "khz", 8, 4_000_000, [rule("numaAware")], ["ram", "rackDist"]),
   // Scheduling: network scopes
   n("lbCapability", "Capability-aware", "scheduling", ["rack"], "rack", "khz", 8, 4_000_000, [filt("net", "capability")], ["misroute"]),
@@ -795,7 +795,7 @@ export const RESEARCH_V3: readonly ResearchNode[] = [
   n("turbo", "Turbo boost", "power", ["dvfs", "fabKhz"], "system", "khz", 7, 1_000_000, [rule("turbo", { clock: 1.25, loadWatts: 1.8, maxUsage: 0.9, maxF: 80 })], ["pickup"]),
   n("powerCap", "Power capping", "power", ["dvfs", "telemetry"], "system", "hz", 6, 50_000, [rule("powerCap", { step: 0.1 })], ["overload"]),
   n("loadShed", "Load shedding", "power", ["powerCap", "room"], "room", "mhz", 11, 6e7, [rule("loadShed", { atTimerS: 5 })], ["overload"]),
-  n("psu80", "80 Plus", "power", ["systemBoard"], "system", "hz", 4, 12_000, [gen("psu", 1), rule("lossFraction", { psu: 0.2 })], ["energy", "heat"]),
+  n("psu80", "80 Plus", "power", ["systemBoard"], "system", "hz", 4, 9_000, [gen("psu", 1), rule("lossFraction", { psu: 0.2 })], ["energy", "heat"]),
   n("psuBronze", "80 Plus Bronze", "power", ["psu80", "fabKhz"], "system", "khz", 7, 1_000_000, [gen("psu", 2), rule("lossFraction", { psu: 0.15 })], ["energy", "heat"]),
   n("psuGold", "80 Plus Gold", "power", ["psuBronze", "rack"], "rack", "khz", 8, 4_000_000, [gen("psu", 3), rule("lossFraction", { psu: 0.1 })], ["energy", "heat"]),
   n("psuPlatinum", "80 Plus Platinum", "power", ["psuGold", "fabMhz"], "rack", "mhz", 10, 4e7, [gen("psu", 4), rule("lossFraction", { psu: 0.07 })], ["energy", "heat"]),
@@ -825,7 +825,7 @@ export const RESEARCH_V3: readonly ResearchNode[] = [
   n("closedLoop2", "Two-phase loop", "cooling", ["closedLoop", "regions"], "global", "ghz", 14, 3e9, [gen("roomCooler", 5)], ["heat", "energy"]),
 
   // Structure
-  n("systemBoard", "System", "structure", ["dualCore", "l2Cache"], "system", "hz", 4, 36_000, [view("system"), gen("psu", 0)], ["ram", "gpu", "storage"]),
+  n("systemBoard", "System", "structure", ["dualCore", "l2Cache"], "system", "hz", 4, 27_000, [view("system"), gen("psu", 0)], ["ram", "gpu", "storage"]),
   n("rack", "Rack", "structure", ["fabKhz"], "rack", "khz", 6, 150_000, [view("rack"), gen("rackCooler", 0), gen("pdu", 0), gen("lb", 0), gen("switch", 0)], ["density", "rackDist"]),
   n("room", "Room", "structure", ["rack", "fabMhz"], "room", "mhz", 10, 1.2e8, [view("room"), gen("roomCooler", 0), gen("ups", 0), gen("row", 0)], ["density", "roomDist"]),
   n("hallExpansion", "Third row", "structure", ["room", "spineLeaf"], "room", "ghz", 11, 6e7, [cap("roomRows", 3)], ["density"]),

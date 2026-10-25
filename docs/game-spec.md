@@ -26,7 +26,7 @@ Program D10 (tasks are pulled, never throttled). It supersedes the fixed 2 s cad
 | 21 | **Payload is work.** A task's transfer size is its work, `Σ stage work`, per member. `payloadBits` is derived, not authored. Transfer time = work / link speed at every hop. | §5.1, §7.4 |
 | 22 | **Prefetch.** With a scheduler, the pipe fills free queue slots while cores compute. Without one, the core waits for each transfer. | §6.4, §6.7 |
 | 23 | **One take per slot per tick.** Each slot takes at most one new task per tick. This bounds per-tick work for tiny tasks. | §6.4 |
-| 24 | **Work-weighted SLA.** SLA = (delivered work + G) / (delivered + failed work + G). G is 10 times the largest of the round's five opening tasks. | §4.2 |
+| 24 | **Count SLA (D28).** SLA = met / (met + failed) over the round's last 50 resolved tasks; dismissals and research are outside it; the 80% check waits for 10 resolved tasks. | §4.2 |
 | 25 | **Research is a task that cuts the line (D27).** Starting a project puts it at the queue front; systems with room take it and hold a slot and threads until it completes. No research shares, no idle-time research; between rounds it runs on every paused server. | §11.2 |
 | 26 | **Tick order.** The Arrivals step becomes Market: advance `I` and top up the visible window. Pre-Rack pulls and pipe transfers run inside Execution. The Deadlines step checks the head only. | §14.1 |
 | 27 | **Strategies.** System strategies order the system queue only; the market order is fixed. `mlfq` becomes aging inside the queue. `reserveOnRoute` becomes **queued take**. | §8.1, §7.6 |
@@ -198,20 +198,19 @@ Power-failure reboots and crash recoveries keep running between rounds. With no 
 
 ### 4.2 SLA
 
-SLA is **work-weighted** (program D10.6). Every task carries its work `W = s × pay/unit`, the sum of its stage work over its whole size, the same number as its payout (§5.1). A split task counts once, as a whole, never per shard (D25.5).
+SLA is a **plain count ratio** (D28), over the **last 50 resolved tasks of the round**:
 
 ```text
-SLA = (deliveredWork + G) / (deliveredWork + failedWork + G)
-G   = 10 × max W over the round's five opening tasks     (the grace prior)
+SLA = met / (met + failed)        over the round's last 50 resolved tasks (all of them before 50)
 ```
 
-- `deliveredWork` sums `W` of met tasks. `failedWork` sums the full `W` of failed tasks, never the unfinished remainder.
-- Dropped and dismissed tasks add to neither sum.
-- `G` is fixed at Return to market (at initialization for round 1) from the five visible tasks. One opening failure leaves SLA at 90.9% or more, so it can't end a round. At the boot curve's start the opening tasks are 1-op Bit Flips and `G = 10`.
-- Count weighting can't work with unlimited supply: millions of tiny early tasks would make a round unendable. Weighting by work makes the large late tasks decide the round.
-- SLA is global, covers the whole round, and resets only at Return to market.
-- It is evaluated once per tick, after all completions and failures of that tick.
-- The HUD shows `floor(SLA × 1000) / 10` percent, so a value just below 80% never reads 80.0%. The round report also keeps task counts.
+- A task counts once when it resolves: met when its last shard completes, failed with exactly one cause. A split task counts once, never per shard (D25.5). A late task counts once; its aborted siblings don't count.
+- Dismissed tasks, tasks dropped at round end, and the research task (D27) are outside it.
+- Within one tick, the tick's met tasks enter the window before its failed tasks, so the window is the same however an advance is cut.
+- **Warm-up.** The 80% check starts once 10 tasks have resolved this round (met + failed ≥ 10). Before that the HUD shows the ratio as "warming up", and the round can't end on SLA.
+- **Why a window.** Over the whole round, hundreds of early small tasks would keep the ratio above 80% long after the hardware hit its wall (each failing head takes its full 10 s). The window ends the round within about a minute of the wall, at any fleet size.
+- SLA is global and resets at Return to market. It is evaluated once per tick, after all completions and failures of that tick.
+- The HUD shows `floor(SLA × 1000) / 10` percent and the window's counts ("SLA 92.0% · 46 / 50"), so a value just below 80% never reads 80.0%. The round report keeps the whole round's met, failed and dismissed totals, and the met and failed work.
 
 A task is **met** when its last shard completes (§6.8). It **fails** with exactly one of seven causes (program D4.1, D26.5):
 
@@ -1103,7 +1102,7 @@ Each rack and zone has a crash timer `tHot`, in seconds:
 Starting a project, or the next queued project starting, puts the **research task** at the front of the market queue.
 
 - **In line.** It is the head. It has no clock, and it can't time out, be dismissed or fail on the queue. Nothing behind it is taken while it waits, and the first task behind it has no clock either. Auto-skip leaves the line alone.
-- **Taken.** At the route step (§14, step 4), before routing, every system with room takes it: a free slot by the usual rule (§6.4, one take per slot per tick) and at least one free hardware thread. Each holder keeps **one slot and the threads that were free when it took it** (a fine-grain divisible task, D25) until the project completes. It has no payload and no transfer, and it pays no Credits or Data. When it is taken, the next task becomes the head with a fresh 10 s.
+- **Taken.** At the route step (§14, step 4), before routing, every system with room takes it: a free slot by the usual rule (§6.4, one take per slot per tick) and at least one free hardware thread. Each holder keeps **one slot and one thread** during a round (a fine-grain divisible task, D25: one shard per system with room) until the project completes. It has no payload and no transfer, and it pays no Credits or Data. When it is taken, the next task becomes the head with a fresh 10 s.
 - **Running.** A holder researches at `threadRate × clockFactor × η_cfg × threads held`, times its rack's e(T). Its threads count as busy for tasks and for power (§9.1), and a holder never sleeps.
 - **Lost.** A holder that leaves `onMarket` or `paused` (dark, crashed, cold, offline, draining) lets go. When no holder is left, the task is back at the queue front with its progress kept.
 - **Done.** When the project completes, every holder lets go, and the next queued project, if any and paid, enters the line.

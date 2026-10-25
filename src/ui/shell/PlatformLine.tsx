@@ -61,9 +61,28 @@ function useFlash(): Flash | null {
   return flash;
 }
 
+/** Platform notices in player words. A save reset is a one-time message, shown for a few seconds. */
+export function noticeText(notice: string | null): { text: string; once: boolean } | null {
+  if (!notice) return null;
+  if (/^Save reset/i.test(notice)) return { text: 'New version: your save was reset.', once: true };
+  return { text: notice, once: false };
+}
+const ONCE_MS = 4000;
+
+/** A one-time notice shows for ONCE_MS from when it first appears, then never again. */
+function useNotice(notice: string | null): string | null {
+  const n = noticeText(notice), [hidden, setHidden] = useState<string | null>(null);
+  useEffect(() => {
+    if (!n?.once || hidden === n.text) return;
+    const timer = setTimeout(() => setHidden(n.text), ONCE_MS);
+    return () => clearTimeout(timer);
+  }, [n?.once, n?.text, hidden]);
+  return n && !(n.once && hidden === n.text) ? n.text : null;
+}
+
 export function PlatformLine() {
-  const p = usePlatformStatus(), L = useLayout(), flash = useFlash();
-  const status = p.catchingUp ? `Catching up${p.progress === null ? '' : ` · ${p.progress}%`}` : p.notice;
+  const p = usePlatformStatus(), L = useLayout(), flash = useFlash(), notice = useNotice(p.notice);
+  const status = p.catchingUp ? `Catching up${p.progress === null ? '' : ` · ${p.progress}%`}` : notice;
   const text = status ?? flash?.text ?? null;
   return <p className={`platform-line${status ? '' : ` ${flash?.tone ?? ''}`}`} role="status" hidden={!text} data-testid="platform-line"
     style={{ left: L.view.x + L.lat, top: L.view.y + L.view.h - L.lat - L.lh, maxWidth: L.view.w - 2 * L.lat, height: L.lh }}>{text}</p>;

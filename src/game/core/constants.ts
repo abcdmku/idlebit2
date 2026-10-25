@@ -30,6 +30,10 @@ export const OFFLINE_CAP_HOURS_BASE = 8;
 
 /* ---------- SLA (program D10.6, spec §4.2) ---------- */
 export const SLA_THRESHOLD = 0.8;
+/** D28: the 80% check starts once this many tasks have resolved (met + failed). */
+export const SLA_MIN_RESOLVED = 10;
+/** D28: the SLA counts the last this many resolved tasks of the round. */
+export const SLA_WINDOW = 50;
 /** G = SLA_GRACE_TASKS × the largest of the five opening tasks' work. */
 export const SLA_GRACE_TASKS = 10;
 
@@ -74,7 +78,8 @@ export const GATHER_WAIT_TICKS = secondsToTicks(10);
 /** D25 checkpointing: a lost shard's replacement must be picked up within this many ticks (10 s). */
 export const CHECKPOINT_TICKS = secondsToTicks(10);
 export const MAX_UPS = 2;
-export const MAX_ACTIVE_FAMILIES = 12;
+// The System-era bands (ram, gpu, storage) open at I 11.5–13.2 alongside threads and ints: 15 overlap there.
+export const MAX_ACTIVE_FAMILIES = 15;
 /** Catalog bound for per-family tallies. */
 export const MAX_FAMILIES = 64;
 export const MAX_SYSTEMS = MAX_SITES * MAX_ZONES_PER_SITE * RACKS_PER_ROOM * SERVERS_PER_RACK; // 6,912

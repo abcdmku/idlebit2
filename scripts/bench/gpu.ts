@@ -38,7 +38,7 @@ export function gpuActivity(state: GameState) {
   return { systems: c.len, poweredSystems, runningSystems, runningTasks, gpuStageTasks, busyCards, taskDuty,
     onMarketSystems: h.mode.subarray(0, c.len).filter((mode) => mode === MODE.onMarket).length,
     queuedTasks, met: state.hot.g[G.met]!, failed: state.hot.g[G.failed]!,
-    slaPercent: slaPercent(state.hot.g[G.deliveredWork]!, state.hot.g[G.failedWork]!, state.round.grace),
+    slaPercent: slaPercent(state.hot.g[G.met]!, state.hot.g[G.failed]!),
     maxPsuUsage, maxRackPduUsage, maxUpsUsage, maxGridUsage, maxRackTempF, maxRoomTempF,
     round: state.round.phase, tick: state.clock.tick };
 }

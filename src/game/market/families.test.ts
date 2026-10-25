@@ -17,7 +17,7 @@ describe('family catalog (tasks.md §5)', () => {
 
   it('pays the table\'s Pay/unit column', () => {
     const pay = Object.fromEntries(FAMILIES.map((f) => [f.key, payPerUnit(f)]));
-    expect(pay).toMatchObject({ bitFlip: 1, compare: 2, regex: 5, mergeSort: 5, imageBlur: 11, rayTrace: 14, trainShard: 20, llmTrain: 30, exchangeFeed: 6 });
+    expect(pay).toMatchObject({ bitFlip: 1, compare: 2, regex: 5, mergeSort: 5, imageBlur: 5, rayTrace: 14, trainShard: 20, llmTrain: 30, exchangeFeed: 6 });
   });
 
   it('folds RAM and storage stages into one mem stage and disk into the working set (D26.3), with band windows (D26.5)', () => {
@@ -25,7 +25,7 @@ describe('family catalog (tasks.md §5)', () => {
     expect(at('indexBuild').stages.map((s) => [s.resource, s.work.perSize])).toEqual([['compute', 2], ['mem', 5]]);
     expect(at('indexBuild').workingSet).toEqual({ fixed: 0, perSize: 6 });
     expect(at('backup').stages.map((s) => [s.resource, s.work.perSize])).toEqual([['mem', 6]]);
-    expect(at('backup').workingSet.perSize).toBe(16);
+    expect(at('backup').workingSet.perSize).toBe(24);
     expect(at('imageBlur').stages.map((s) => s.resource)).toEqual(['mem', 'gpu']);
     expect(['bitFlip', 'sqlScan', 'replWrite', 'teraSort', 'drBackup', 'euResidency', 'exchangeFeed'].map((k) => at(k).windowS))
       .toEqual([null, null, 120, 180, 240, 120, 60]);
@@ -87,6 +87,6 @@ describe('catalog sync with scripts/market-model.ts', () => {
       if (!f.stages.some((s) => s.resource === 'gpu')) expect([f.gpuCoresMin, f.vramBits.fixed, f.vramBits.perSize]).toEqual([0, 0, 0]);
       expect(f).not.toHaveProperty('gpus');
     }
-    expect(FAMILIES.filter((f) => f.affinity === 'accelerator')).toHaveLength(14);
+    expect(FAMILIES.filter((f) => f.affinity === 'accelerator')).toHaveLength(16);
   });
 });

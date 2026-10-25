@@ -71,20 +71,29 @@ function Wallet() {
 }
 
 /** SLA in the HUD's centre at the big size with its 60–100% meter (the 80% tick) and the round clock. */
+/**
+ * SLA in the HUD's centre (D28): the share of the round's last tasks that completed, met / (met +
+ * failed) over the rolling window, at the big size; the counts beside it; and its 60–100% meter with
+ * the 80% tick, or "warming up" until 10 tasks have resolved and the floor applies.
+ */
 function Sla() {
   const L = useLayout(), d = L.kind === 'desktop', n = L.N;
-  const g = useGameSelector(s => ({ phase: s.round.state, percent: s.hud.sla.percent, round: s.hud.roundIndex,
-    seconds: Math.floor(s.hud.roundElapsedMs / 1000) }), shallowEqual, 250);
-  const tone = g.percent >= 90 ? 'ok' : g.percent >= 80 ? 'warn' : 'bad';
+  const g = useGameSelector(s => ({ phase: s.round.state, percent: s.hud.sla.percent, met: s.hud.sla.met, failed: s.hud.sla.failed,
+    checking: s.hud.sla.checking, round: s.hud.roundIndex, seconds: Math.floor(s.hud.roundElapsedMs / 1000) }), shallowEqual, 250);
+  const tone = !g.checking ? 'mute' : g.percent >= 90 ? 'ok' : g.percent >= 80 ? 'warn' : 'bad';
   const when = g.phase === 'running' ? clockText(g.seconds * 1000) : g.phase === 'ended' ? 'round over' : 'between rounds';
-  // Reserved widths: "100.0%" and "R99 · 1:59:59", so the meter never moves while the numbers change.
-  return <span className="figrow sla" role="status" aria-label={`SLA ${slaText(g.percent)}, round ${g.round}, ${when}`} data-testid="sla-gauge"
+  const counts = `${g.met} / ${g.met + g.failed}`, meterW = (d ? 32 : 36) * n;
+  // Reserved widths ("100.0%", "50 / 50", the meter, "R99 · 1:59:59"), so nothing moves while the numbers change.
+  return <span className="figrow sla" role="status" aria-label={`SLA ${slaText(g.percent)}, ${counts} completed, round ${g.round}, ${when}`} data-testid="sla-gauge"
     style={{ left: L.sla.x, top: L.sla.y, width: L.sla.w, height: L.sla.h, justifyContent: 'center' }}>
     <span className="mute">SLA</span>
     <b className={`fig big ${tone}`} data-testid="sla" style={{ minWidth: 3.4 * L.big, textAlign: 'right' }}>{slaText(g.percent)}</b>
-    <i className="g-meter hud-meter" data-free="art" aria-hidden="true" title="80% ends the round" style={{ flex: 'none', width: (d ? 40 : 32) * n, height: 2 * n }}>
-      <b style={{ width: `${slaFill(g.percent).toFixed(1)}%` }} /><em style={{ top: -n, height: 4 * n, width: n }} /></i>
-    <span className="dim" data-testid="round" style={{ width: d ? 7 * L.body : 3 * L.body }}>{d ? `R${g.round} · ${when}` : `R${g.round}`}</span>
+    <span className="mute" data-testid="sla-counts" style={{ minWidth: 3.6 * L.body, textAlign: 'center' }}>{counts}</span>
+    {g.checking
+      ? <i className="g-meter hud-meter" data-free="art" aria-hidden="true" title="80% ends the round" style={{ flex: 'none', width: meterW, height: 2 * n }}>
+        <b style={{ width: `${slaFill(g.percent).toFixed(1)}%` }} /><em style={{ top: -n, height: 4 * n, width: n }} /></i>
+      : <span className="dim" data-testid="sla-warming" style={{ width: meterW, textAlign: 'center' }} title="The 80% floor applies after 10 tasks">warming up</span>}
+    <span className="dim" data-testid="round" style={{ width: d ? 7 * L.body : 2 * L.body }}>{d ? `R${g.round} · ${when}` : `R${g.round}`}</span>
   </span>;
 }
 

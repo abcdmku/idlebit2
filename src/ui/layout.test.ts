@@ -11,7 +11,7 @@ describe('L2 shell geometry', () => {
     expect([L.N, L.w, L.h, L.x, L.y]).toEqual([3, 1440, 888, 0, 6]);
     expect(L.world).toEqual({ x: 24, y: 24, w: 1392, h: 648 });
     expect(L.band).toEqual({ x: 24, y: 24, w: 1392, h: 48 });
-    expect([L.sla, L.wallet]).toEqual([{ x: 584, y: 24, w: 384, h: 48 }, { x: 1128, y: 24, w: 264, h: 48 }]);
+    expect([L.sla, L.wallet]).toEqual([{ x: 536, y: 24, w: 480, h: 48 }, { x: 1128, y: 24, w: 264, h: 48 }]);
     expect(L.strip).toEqual({ x: 24, y: 72, w: 1392, h: 48 });
     expect(L.headSlot).toEqual({ x: 24, y: 72, w: 240, h: 48 });
     expect(L.cards.map(c => [c.x, c.w])).toEqual([[264, 288], [552, 288], [840, 288], [1128, 288]]);

@@ -156,7 +156,8 @@ export function runCampaign(options: CampaignOptions = {}): CampaignResult {
       left = wait;
     }
     while (left > 0 && state.clock.tick < ticks) {
-      const piece = Math.min(left, ticks - state.clock.tick, state.round.phase === 'running' ? RUNNING_PIECE_TICKS : Infinity);
+      // Running pieces end on a fixed tick grid, so a stage boundary on the grid never moves when the bot sees a round end.
+      const piece = Math.min(left, ticks - state.clock.tick, state.round.phase === 'running' ? RUNNING_PIECE_TICKS - (state.clock.tick % RUNNING_PIECE_TICKS) : Infinity);
       const { state: next, report } = advanceGameOwned(state, piece * TICK_MS);
       state = next;
       left -= piece;

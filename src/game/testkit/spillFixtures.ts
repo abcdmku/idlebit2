@@ -70,6 +70,13 @@ function warm(state: GameState, intensity: number, ticks: number): GameState {
   return advanceGameOwned(primeMarket(state, intensity), ticks * TICK_MS).state;
 }
 
+/** The spill rack before its warm-up (debugging and fixtures that warm differently). */
+export const spillRackCold = (): GameState => buildState({
+  seed: 42, sites: 1, zonesPerSite: 1, racksPerZone: 1, serversPerRack: 8, unlocks: 'max', credits: '1000000000000000', data: '40000',
+  system: alternate, rack: rack(8, 12, 15, 4),
+});
+export const SPILL_WINDOW_INTENSITY = 27;
+
 export const SPILL_FLEETS = {
   /** Two small-RAM servers in an opened rack (fast ports), focus on system 0. */
   spillSystem: (): GameState => warm(buildState({
@@ -77,9 +84,6 @@ export const SPILL_FLEETS = {
     system: one(SMALL_RAM), rack: rack(2, 9, 12, 2),
   }), SPILL_INTENSITY, 300),
   /** Eight ECC servers, an SSD on odd slots, 10 MHz ports and a 100 MHz uplink; LB queue L4. */
-  spillRack: (): GameState => warm(buildState({
-    seed: 42, sites: 1, zonesPerSite: 1, racksPerZone: 1, serversPerRack: 8, unlocks: 'max', credits: '1000000000000000', data: '40000',
-    system: alternate, rack: rack(8, 12, 15, 4),
-  }), WINDOW_INTENSITY, 300),
+  spillRack: (): GameState => warm(spillRackCold(), WINDOW_INTENSITY, 300),
 } as const;
 export type SpillFleetName = keyof typeof SPILL_FLEETS;

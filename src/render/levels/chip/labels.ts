@@ -8,6 +8,7 @@ import type { ChipSnapshot } from '../../../game';
 import { familyName, whole } from '../../core';
 import type { LabelWriter, WorldFrame, WorldForm } from '../../core';
 import { arrangementOf, coreSites, coreText, floorOf } from './layout';
+import { coreSleep, coreSpeedText, speedRange, tileLabelFits, tileShowsSpeed } from './speed';
 import { emptyBlocks, isLive, lentCore, queueOpen, siteCount, siteLocked, spilledOut } from './world';
 
 const LEVEL_NAMES: Readonly<Record<'l1' | 'l2' | 'l3', string>> = { l1: 'L1', l2: 'L2', l3: 'L3' };
@@ -40,10 +41,26 @@ export function chipLabels(chip: ChipSnapshot, frame: WorldFrame, out: LabelWrit
     let busy = 0;
     for (const c of chip.cores) if (live && c.busy > 0) busy++;
     // A clean spot (A25): inside the empty block's top-left, off the bus trace; on a full grid, over its first row.
-    const b = emptyBlocks(chip, sites), box = b.open.n ? b.open.rows[b.open.n > 1 ? 1 : 0]! : b.locked.n ? b.locked.rows[b.locked.n > 1 ? 1 : 0]! : f.cores;
-    out.label('cores', box.x + 2, box.y + 2, 'left', true).text('Cores', 'name', true).text(`${busy} / ${whole(chip.cores.length)} busy`, 'value');
-    // Grid tiles are too small for a speed each, so the tag carries it: one rate, or the range.
-    if (chip.cores.length) out.text(`· ${rateRange(chip.cores)}`, 'mute');
+    // Each tile shows its own speed (user): a label centred in the tile when it fits, else the
+    // tile's readout (world.ts). A sleeping core shows its C-state, dimmed.
+    for (let i = 0; i < Math.min(sites.length, chip.cores.length); i++) {
+      const r = sites[i]!, core = chip.cores[i]!;
+      if (!tileLabelFits(core, r, frame)) continue;
+      out.label(LABEL_IDS[i]!, r.x + r.w / 2, r.y + 2, 'center').text(coreSpeedText(core), coreSleep(core) || !live ? 'dim' : 'value');
+    }
+    // The busy tag (no speed: the tiles carry it) sits in the empty block, inside the cores block,
+    // never over the Clock; a full grid has no free spot, and the lit tiles already show it.
+    // Tiles too small to show their speed at the body size (32 sites): the tag carries it instead.
+    let hidden = false;
+    for (let i = 0; i < Math.min(sites.length, chip.cores.length); i++) if (!tileShowsSpeed(chip.cores[i]!, sites[i]!, frame)) hidden = true;
+    const b = emptyBlocks(chip, sites), free = b.open.n ? b.open.rows[b.open.n > 1 ? 1 : 0]! : b.locked.n ? b.locked.rows[b.locked.n > 1 ? 1 : 0]! : null;
+    // A full grid has no free spot: the tag sits over its first row only when it must carry the speed.
+    const box = free ?? (hidden ? f.cores : null);
+    if (box) {
+      const x = box.w >= f.cores.w / 2 ? box.x : f.cores.x;
+      out.label('cores', x + 2, box.y + 2, 'left', true).text('Cores', 'name', true).text(`${busy} / ${whole(chip.cores.length)} busy`, 'value');
+      if (hidden && chip.cores.length) out.text(`· ${speedRange(chip)}`, 'mute');
+    }
     return;
   }
   let landing = live && chip.pipe.waiting && chip.pipe.transfer !== null;
@@ -55,8 +72,9 @@ export function chipLabels(chip: ChipSnapshot, frame: WorldFrame, out: LabelWrit
     }
     // A18: "Core 1 · 1 Hz" on one line, or name then Hz on their own lines, never "Core 11 Hz".
     out.label(LABEL_IDS[i]!, x, r.y + c.pad, 'left').text(CORE_NAMES[i]!, 'name', true);
-    // A core shows only its own speed (user): its rate, lanes × socket clock, as the core quote prints it.
-    if (wide) out.text(`· ${formatHertz(core.rate)}`, 'mute'); else out.br().text(formatHertz(core.rate), 'mute');
+    // A core shows its own live speed (user), or its C-state asleep.
+    const sp = coreSpeedText(core), spTone = coreSleep(core) ? 'dim' : 'mute';
+    if (wide) out.text(`· ${sp}`, spTone); else out.br().text(sp, spTone);
     const busy = live && core.busy > 0, lent = live && lentCore(core), idle = !busy && !lent;
     // The running task: its family icon and name, and its progress (task numbers are never shown).
     if (busy && core.family !== null) {
@@ -72,12 +90,3 @@ export function chipLabels(chip: ChipSnapshot, frame: WorldFrame, out: LabelWrit
   }
 }
 
-/** The cores' speeds: "2 kHz" when they match, "1–2 kHz" (or "512 Hz–1 kHz" across units) when they differ. */
-export function rateRange(cores: readonly { readonly rate: number }[]): string {
-  let lo = Infinity, hi = -Infinity;
-  for (const c of cores) { lo = Math.min(lo, c.rate); hi = Math.max(hi, c.rate); }
-  const a = formatHertz(lo), b = formatHertz(hi);
-  if (a === b) return a;
-  const ua = a.slice(a.lastIndexOf(' ')), ub = b.slice(b.lastIndexOf(' '));
-  return ua === ub ? `${a.slice(0, a.lastIndexOf(' '))}–${b}` : `${a}–${b}`;
-}

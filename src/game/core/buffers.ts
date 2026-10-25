@@ -263,8 +263,13 @@ export const G = {
   queued: 42,
   /** D27: systems holding the research task, and the TREE_INDEX of the project they hold it for (-1 none). */
   researchHolders: 43, researchProject: 44,
+  /**
+   * D28 rolling SLA window: the last SLA_WINDOW resolved tasks of the round as a bit ring (1 = met, newest
+   * in bit 0, exact in a float64 below 2^53), how many it holds, and how many of them were met.
+   */
+  slaRing: 45, slaLen: 46, slaMet: 47,
 } as const;
-export const G_SIZE = 45;
+export const G_SIZE = 48;
 
 export interface CompiledBuffers {
   readonly sys: Table<typeof SYS_COMPILED>;

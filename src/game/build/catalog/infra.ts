@@ -5,13 +5,15 @@ import type { CatalogRow } from './types';
 export const RACK_COOLER: CatalogRow = {
   id: 'rackCooler', scope: 'rack', names: ['Fan tray', 'High-flow air', 'Rear-door water', 'Direct-to-chip water'],
   gates: [r('rack'), r('rackAir2'), r('rackWater'), r('rackWater2')], curve: 'flow',
-  base: [5e5, 5e6, 5e9, 5e12], watts: { kind: 'cooler', wpw: [0.01, 0.008, 0.004, 0.003] },
+  // ×10 for the CSV energy ratio (hardware-progression.md §3): a native kHz server draws about 10× its old watts.
+  base: [5e6, 5e7, 5e10, 5e13], watts: { kind: 'cooler', wpw: [0.01, 0.008, 0.004, 0.003] },
   tech: ['air', 'air', 'water', 'water'], tau: [60, 60, 6, 6],
   price: [2.4e6, 1.2e7, 4.3e11, 3.7e14], upgrade: [1.5e6, 1.5e6, 1.8e10, 9e13],
 };
 export const PDU: CatalogRow = {
   id: 'pdu', scope: 'rack', names: ['Basic PDU', 'Metered PDU', 'Switched PDU'], gates: [r('rack'), r('meteredPdu'), r('switchedPdu')],
-  curve: 'flow', base: [1e6, 2e8, 5e14], watts: { kind: 'supply', loss: [0.04, 0.03, 0.02], lossPerLevel: 0.005 },
+  // ×10 with the rack cooler, for the CSV energy ratio.
+  curve: 'flow', base: [1e7, 2e9, 5e15], watts: { kind: 'supply', loss: [0.04, 0.03, 0.02], lossPerLevel: 0.005 },
   price: [2.4e6, 1.2e7, 1.4e11], upgrade: [1.5e6, 1.5e6, 1.8e10],
 };
 /**

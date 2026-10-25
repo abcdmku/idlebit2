@@ -124,7 +124,8 @@ b, .b { font-weight: 700; }
 .round-plate .rp-c.zero { color: var(--dim); }
 .round-plate .rp-detail { color: var(--muted); min-height: var(--lh); margin: 8px 0 0; }
 .round-plate .rp-spill { min-height: var(--lh); margin: 4px 0 0; }
-.round-plate .rp-bottom, .round-plate .rp-top { grid-template-columns: 1fr 1fr; column-gap: 16px; }
+.round-plate .rp-bottom { grid-template-columns: 1fr 1fr; column-gap: 16px; }
+.round-plate .rp-top { grid-template-columns: repeat(3, 1fr); column-gap: 12px; }
 .l-desktop .round-plate .rp-causes { grid-template-columns: repeat(3, 1fr); }
 .round-plate .rp-fix { display: flex; align-items: center; gap: 8px; min-height: 48px; margin-top: 4px; }
 .round-plate .rp-fix-t { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

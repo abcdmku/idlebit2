@@ -34,7 +34,7 @@ describe('testkit fleets', () => {
     expect(s.hot.g[G.met]).toBeGreaterThan(0);
     expect(s.hot.g[G.failed]).toBe(0);
     expect(s.hot.g[G.recUsed]).toBeGreaterThan(0);
-    expect(slaValue(s.hot.g[G.deliveredWork]!, s.hot.g[G.failedWork]!, s.round.grace)).toBeGreaterThan(0.8);
+    expect(slaValue(s.hot.g[G.met]!, s.hot.g[G.failed]!)).toBeGreaterThan(0.8);
     expect(s.hot.rack.tempF.subarray(0, c.rack.len).every((f) => f < 100)).toBe(true);
     expect(s.hot.room.tempF.subarray(0, c.room.len).every((f) => f < 100)).toBe(true);
     for (const usage of [s.hot.sys.psuUsage, s.hot.rack.pduUsage, s.hot.room.upsUsage, s.hot.site.gridUsage]) {

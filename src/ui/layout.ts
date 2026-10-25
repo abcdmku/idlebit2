@@ -123,7 +123,7 @@ function desktop(N: 2 | 3, aw: number, ah: number, safe: SafeInsets): DesktopLay
   // The band: the ladder at the left, the currencies stacked at the right, SLA centred between them.
   const band0 = rungs(band, 16 * N, U), rungLabel = r(band0[4].x + band0[4].w + 16, band.y, N === 3 ? 128 : 96, band.h);
   const walletW = N === 3 ? 264 : 200, wallet = r(band.x + band.w - U - walletW, band.y, walletW, band.h);
-  const free0 = rungLabel.x + rungLabel.w + 8, free1 = wallet.x - 8, slaW = snap8(Math.min(N === 3 ? 384 : 304, free1 - free0));
+  const free0 = rungLabel.x + rungLabel.w + 8, free1 = wallet.x - 8, slaW = snap8(Math.min(N === 3 ? 480 : 368, free1 - free0));
   const sla = r(snap8(free0 + (free1 - free0 - slaW) / 2), band.y, slaW, band.h);
   return {
     kind: 'desktop', N, lat, gutter: U, x, y, w: W, h: H, body, lh, big: N === 3 ? 32 : 24, mid: N === 3 ? 20 : 16,

@@ -12,6 +12,7 @@ import type { CoreArrangement } from './layout';
 import { coreColor, drawGridPiece, drawShardGroups, remaining } from './shards';
 import { CLOCK_TRACE, bar, cacheBlock, clockBlock, coreBlock, coreGhost, drawMetal, lockedSite, pad, queueBlock, queueGhost, staticCpu } from './sprites';
 import { blockOf, createBlock, drawBlock } from './block';
+import { dimIfAsleep } from './speed';
 import type { Block } from './block';
 
 type G = CanvasRenderingContext2D;
@@ -136,7 +137,11 @@ function drawCore(g: G, r: Rect, core: CoreView | undefined, live: boolean, chip
   if (!core) { if (siteLocked(chip, i)) lockedSite(g, r); else coreGhost(g, r); return; }
   const busy = live && core.busy > 0, lent = live && lentCore(core), colour = busy ? coreColor(core) ?? P.op : P.op;
   coreBlock(g, r, busy, lent);
-  if (n > 2) { if (busy) drawGridPiece(g, r, remaining(core.progress), colour); return; }
+  dimIfAsleep(g, r, core, live);
+  if (n > 2) {
+    if (busy) drawGridPiece(g, r, remaining(core.progress), colour);
+    return;
+  }
   // Big sites (L2): the task's family icon under the name, its piece gauge near the foot.
   const c = coreText(r, arr), bw = r.w - 2 * c.pad;
   if (busy && core.family !== null) drawFamilyIcon(g, familyId(core.family), c.icon.x, c.icon.y);

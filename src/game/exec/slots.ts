@@ -114,6 +114,8 @@ export function recountSummaries(w: World): void {
       if (kind[s] === STORAGE_NODE || ADMIT_MODE[mode[s]!] !== 1) continue;
       if (rackOpened[sysRack[s]!] === 1 && port[s]! < 0) continue;
       const slots = Math.max(1, slotCap[s]!, keff[s]!);
+      // D26 queue cap, as canAdmit: a queue held back by memory or threads admits only while queued + reserved < Q.
+      if (queueCapped(w, s)) continue;
       if (busy < slots && slots - (takeTick[s] === tick ? takes[s]! : 0) > 0) { free += 1; mask |= 1 << k; }
     }
     noteRackAdmits(w, rack, mask);
@@ -143,6 +145,7 @@ function recountRack(w: World, rack: number): void {
     if (cs.kind[s] === STORAGE_NODE || ADMIT_MODE[hs.mode[s]!] !== 1) continue;
     if (c.rack.opened[cs.rack[s]!] === 1 && cs.port[s]! < 0) continue;
     const slots = Math.max(1, cs.slots[s]!, cs.keff[s]!);
+    if (queueCapped(w, s)) continue;
     if (busy < slots && slots - (hs.takeTick[s] === tick ? hs.takes[s]! : 0) > 0) { free += 1; mask |= 1 << k; }
   }
   const d = free - h.rack.freeSlots[rack]!;

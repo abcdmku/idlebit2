@@ -9,7 +9,8 @@ const idle = (f = 1) => ({ kind: 'idle', idle: IDLE.map((w) => w * f) }) as cons
 
 export const CPU: CatalogRow = {
   id: 'cpu', scope: 'chip', names: TIERS.map((t) => `${t} package`), gates: FAB, curve: 'fixed',
-  base: [1, 1, 1, 1], watts: idle(), price: [500, 5e4, 2.1e8, 9.3e10], upgrade: [0, 0, 0, 0],
+  // The kHz package carries the CSV kHz tier unlock (about 2e6 Credits with its first core, clock and L1).
+  base: [1, 1, 1, 1], watts: idle(), price: [500, 1.4e6, 2.1e8, 9.3e10], upgrade: [0, 0, 0, 0],
 };
 /** Rate part: rate = lanes × socket clock; native = base lanes × CLOCK.base[g]. */
 export const CORE: CatalogRow = {

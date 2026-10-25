@@ -56,7 +56,8 @@ describe('CPU shards (D25)', () => {
   it('drains a piece on every small grid core too, and joins grid neighbours of one shard', () => {
     const max = chipScene('max'), grid = coreSites(floorOf('desktop'), 32), fills = draw(max, 2000);
     const c1 = bandColor(familyId(2)), r1 = grid[1]!, r2 = grid[2]!;
-    expect(onSite(fills, r1, c1).some(q => q.h === 2 && q.w === Math.round((r1.w - 4) * (1 - max.cores[1]!.progress)))).toBe(true);
+    // Short grid tiles (under 18 art px) drain their piece along the foot row, under the speed readout.
+    expect(onSite(fills, r1, c1).some(q => q.h === 1 && q.y === r1.y + r1.h - 1 && q.w === Math.round((r1.w - 2) * (1 - max.cores[1]!.progress)))).toBe(true);
     expect(fills.some(q => q.c === c1 && q.x === r1.x + r1.w && q.w === r2.x - r1.x - r1.w)).toBe(true);
     // cores 2 and 3 run different shards (3 is idle): no bridge
     expect(fills.some(q => q.c === c1 && q.x === r2.x + r2.w && q.w === grid[3]!.x - r2.x - r2.w)).toBe(false);

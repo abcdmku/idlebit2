@@ -131,9 +131,11 @@ export function RoundReportPlate({ report, percent, onReturn, onClose }: {
         <i className="x-glyph" aria-hidden="true" style={{ width: 12, height: 12, '--x-w': '1px' } as CSSProperties} /></button>
     </header>
     <div className="rp-sla"><span className="rp-k">SLA</span><span className="rp-v">{slaText(percent)}</span><SlaMeter percent={percent} /></div>
+    {/* D28: the whole round's counts. Dismissed tasks never count toward SLA; this is the one place they show. */}
     <ul className="p-list rp-top">
-      <li><span>Met</span><span className="v">{wholeText(report.met)}</span></li>
+      <li><span>Completed</span><span className="v" data-testid="rp-met">{wholeText(report.met)}</span></li>
       <li className="bad"><span>Failed</span><span className="v" data-testid="rp-failed">{wholeText(failed)}</span></li>
+      <li><span>Dismissed</span><span className="v mute" data-testid="rp-dismissed">{wholeText(report.dismissed)}</span></li>
     </ul>
     <div className="rp-causes">
       {FAIL_CAUSES.map(c => {

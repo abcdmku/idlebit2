@@ -44,7 +44,13 @@ function hold(w: World, s: number, threads: number): void {
   dirtySystem(w, s);
 }
 
-/** A holder takes `more` free threads (between rounds only). */
+/**
+ * Threads a holder keeps during a round (D27 amendment): one per system, a fine-grain shard on every system
+ * with room, so research slows the market instead of stopping it. Between rounds it spreads over every thread.
+ */
+const ROUND_THREADS = 1;
+
+/** A holder takes `more` free threads (between rounds), or gives |more| back (a round starts). */
 function grow(w: World, s: number, more: number): void {
   const h = w.hot.sys;
   h.researchThreads[s] = h.researchThreads[s]! + more;
@@ -107,7 +113,16 @@ export function researchTakePhase(w: World): boolean {
   const want = wanted(w);
   if (g[G.researchHolders]! > 0) {
     if (want !== g[G.researchProject]) releaseResearch(w);
-    else for (let s = 0; s < w.compiled.sys.len; s += 1) if (h.researchThreads[s]! > 0 && !researchesInMode(h.mode[s]!)) release(w, s);
+    else {
+      const running = w.round.phase === 'running';
+      for (let s = 0; s < w.compiled.sys.len; s += 1) {
+        const t = h.researchThreads[s]!;
+        if (t === 0) continue;
+        if (!researchesInMode(h.mode[s]!)) release(w, s);
+        // In a round a holder keeps one thread: the market resumes on the rest (round start after a spread).
+        else if (running && t > ROUND_THREADS) grow(w, s, ROUND_THREADS - t);
+      }
+    }
   }
   // Between rounds nothing else runs: holders spread over every thread, and idle servers join.
   if (w.round.phase !== 'running' && g[G.researchHolders]! > 0) {
@@ -120,7 +135,8 @@ export function researchTakePhase(w: World): boolean {
   if (want < 0 || g[G.researchHolders]! > 0) return false;
   for (let s = 0; s < w.compiled.sys.len; s += 1) {
     if (!canTake(w, s)) continue;
-    hold(w, s, hwThreads(w, s) - h.busyThreads[s]!);
+    const free = hwThreads(w, s) - h.busyThreads[s]!;
+    hold(w, s, w.round.phase === 'running' ? Math.min(ROUND_THREADS, free) : free);
     if (w.round.phase === 'running') noteTake(w, s);
   }
   if (g[G.researchHolders]! === 0) return false;

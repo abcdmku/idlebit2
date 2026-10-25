@@ -3,7 +3,10 @@ import { CEILINGS_MAX, MAX_CORES_PER_CPU, MAX_CPUS } from '../core/constants';
 import type { CpuBuild, PartLevel, SystemSpec } from '../types/build';
 import { QUEUE_STRATEGY_IDS, type PartId } from '../types/catalog';
 import { familyId, type NodeRef, type SystemId } from '../types/ids';
-import type { CacheLevelView, ChipSnapshot, CoreView, SchedulerView } from '../types/snapshot';
+import { G } from '../core/buffers';
+import { MODE } from '../core/timers';
+import { DRAW_NONE, DRAW_SLEEP, drawKind } from '../phys/draw';
+import type { CacheLevelView, ChipSnapshot, CoreSleep, CoreView, SchedulerView } from '../types/snapshot';
 import type { GameState } from '../types/state';
 import type { BuildSlotView } from '../types/views';
 import { modeName, psuView } from './common';
@@ -102,10 +105,16 @@ export function chipSnapshot(state: GameState, id: SystemId, parent: NodeRef | n
 
   const cstate = cstateOf(h.cstate[id]);
   const hz = c.clockHz[id] ?? 0;
+  // Live clock (spec §9.3): the socket clock × clockFactor (P-state, thermal throttle, power caps).
+  // Unpowered modes run no clock; an S3-asleep system's cores all sleep; an idle core sinks to the C-state.
+  const draw = drawKind(h.mode[id] ?? MODE.empty, (state.hot.g[G.researchHolders] ?? 0) > 0);
+  const liveHz = draw === DRAW_NONE || draw === DRAW_SLEEP ? 0 : hz * (h.clockFactor[id] ?? 1);
   const cores: CoreView[] = parts.map((part, i) => {
     const busy = Math.max(0, Math.min(tpc, busyThreads - i * tpc)) / tpc;
+    const sleep: CoreSleep | null = draw === DRAW_SLEEP ? 'S3' : draw !== DRAW_NONE && busy === 0 && cstate > 0 ? `C${cstate as 1 | 3 | 6}` : null;
     return {
       socket: 0, lanes: coreLanes(state, part), rate: capacity(PARTS.core, part.gen, part.level) * hz, generation: part.gen, level: part.level, busy,
+      hz: sleep === null ? liveHz : 0, sleep,
       taskId: taskIds[i]!, family: fam[i]! >= 0 ? familyId(fam[i]!) : null, progress: prog[i]!, threads: tpc,
       shard: shardIx[i]! >= 0 ? shardIx[i]! : null, shardThreads: group[i]!,
       research: share > 0 ? Math.min(1 - busy, share) : 0, cstate: busy > 0 ? 0 : cstate,

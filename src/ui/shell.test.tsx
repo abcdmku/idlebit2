@@ -29,9 +29,19 @@ describe('band', () => {
     expect(text('[data-testid=sla-gauge]')).toContain('0:38');
     // the round number sits beside the clock (A16), with the 60–100% meter and its 80% tick (A12)
     expect(text('[data-testid=round]')).toBe('R1 · 0:38');
-    expect($('.hud-meter em')).not.toBeNull();
+    // D28: before 10 resolved tasks the floor doesn't apply: the counts show, and "warming up" in the meter's place
+    expect(text('[data-testid=sla-counts]')).toBe('0 / 0');
+    expect(text('[data-testid=sla-warming]')).toBe('warming up');
     act(() => store.set({ hud: { credits: amount(5) } }));
     expect(text('[data-testid=credits]')).toBe('5');
+  });
+  it('once 10 tasks have resolved, the counts sit beside SLA with its meter and 80% tick (D28)', () => {
+    const store = fakeStore();
+    store.set({ hud: { sla: { met: 41, failed: 3, percent: 93.1, checking: true, window: 50, roundMet: 0, roundFailed: 0, deliveredWork: 0, failedWork: 0, grace: 0 } } });
+    mounted = mount(<Hud />, store, DESKTOP);
+    expect([text('[data-testid=sla]'), text('[data-testid=sla-counts]')]).toEqual(['93.1%', '41 / 44']);
+    expect($('[data-testid=sla-warming]')).toBeNull();
+    expect($('.hud-meter em')).not.toBeNull();
   });
   it('keeps all five rungs in place; a locked rung opens research', () => {
     mounted = mount(<Hud />, fakeStore(), DESKTOP);
@@ -224,11 +234,13 @@ describe('upgrade callout (D15.4)', () => {
 describe('round plate', () => {
   it('reports the round and offers one Return to market', () => {
     const store = fakeStore();
-    store.set({ round: { state: 'ended', lastReport: report(), canReturn: true }, hud: { sla: { met: 28_400, failed: 7129, percent: 79.9, deliveredWork: 28_400, failedWork: 7_129, grace: 10 } } });
+    store.set({ round: { state: 'ended', lastReport: report(), canReturn: true }, hud: { sla: { met: 28_400, failed: 7129, percent: 79.9, checking: true, window: 50, roundMet: 28_400, roundFailed: 7129, deliveredWork: 28_400, failedWork: 7_129, grace: 10 } } });
     mounted = mount(<RoundPlate />, store);
     expect(text('.p-sub')).toBe('Round 14 · 14:05');
     expect(text('.rp-v')).toBe('79.9%');
     expect(text('[data-testid=rp-failed]')).toBe('7,129');
+    // D28: the round's own counts; dismissed shows here and nowhere else
+    expect([text('[data-testid=rp-met]'), text('[data-testid=rp-dismissed]')]).toEqual(['28.4k', '0']);
     expect(text('[data-testid=rp-detail]')).toBe("Can't run · RAM ×387");
     // no footnote, no type table, no peak intensity (A02, A26); energy and net are listed
     expect(text('[data-testid=round-plate]')).not.toMatch(/rejoins|Peak|Met work/);

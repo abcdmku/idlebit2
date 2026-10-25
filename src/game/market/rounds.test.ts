@@ -20,51 +20,53 @@ const withAutoReturn = (s: GameState, delay = 150): GameState => ({
   research: { ...s.research, unlocks: { ...s.research.unlocks, rules: [...s.research.unlocks.rules, 'autoReturn'], autoReturnDelayTicks: delay } },
 });
 
-/** Ends the round of `s` at tick 50 with three "Can't run · RAM" failures of 100 ops each, at peak I. */
+/** Ends the round of `s` at tick 50 with ten "Can't run · RAM" failures of 100 ops each (D28 warm-up), at peak I. */
 function endedAt50(s: GameState, peak = 0): GameState {
   const w = openWorld(s);
   w.tick = 50;
   w.round.peakIntensity = peak;
-  failTasks(w, 0, 'cantRun', 3, 300, FAIL_DETAILS.indexOf('ram'));
+  failTasks(w, 0, 'cantRun', 10, 1000, FAIL_DETAILS.indexOf('ram'));
   roundPhase(w);
   eventPhase(w);
   w.tick += 1;
   return commitWorld(s, w, 0);
 }
 
-describe('work-weighted SLA (program D10.6, spec §4.2)', () => {
-  it('weights by ops with a grace prior of 10 opening tasks', () => {
-    const s = marketState();
-    // The boot curve opens on 1-op Bit Flips: G = 10.
-    expect(s.round.grace).toBe(10);
-    expect(slaValue(0, 0, 10)).toBe(1);
-    expect(slaValue(30, 10, 10)).toBe(0.8);
-    expect(slaValue(1e6, 1, 10)).toBeGreaterThan(0.99);
+describe('count SLA over the last 50 resolved tasks (D28, spec §4.2)', () => {
+  it('is completed over completed plus failed', () => {
+    expect(slaValue(0, 0)).toBe(1);
+    expect(slaValue(40, 10)).toBe(0.8);
+    expect(slaValue(1e6, 1)).toBeGreaterThan(0.99);
   });
 
-  it('keeps the round at exactly 80% and ends it below, inside the SLA step', () => {
+  it('keeps the round at exactly 80% and ends it below, inside the SLA step, once 10 tasks resolved', () => {
     const w = openWorld(marketState());
     w.tick = 40;
-    w.hot.g[G.deliveredWork] = 30;
-    failTasks(w, 0, 'timeout', 1, 10);
-    roundPhase(w);
+    failTasks(w, 0, 'timeout', 2, 2);
+    roundPhase(w); eventPhase(w);
+    // 2 failed of 2: below 80%, but still warming up.
+    expect(w.round.phase).toBe('running');
+    tallyMet(w, 0, 8, 0, 8);
+    roundPhase(w); eventPhase(w);
     expect(w.round.phase).toBe('running');
     failTasks(w, 0, 'timeout', 1, 1);
-    roundPhase(w);
+    roundPhase(w); eventPhase(w);
     expect(w.round.phase).toBe('ended');
     expect(w.round.endTick).toBe(41);
   });
 
-  it('lets many small failures pass that one large failure of equal count would not', () => {
-    const run = (work: number) => {
+  it('forgets results older than the last 50', () => {
+    const run = (failures: number) => {
       const w = openWorld(marketState());
-      w.hot.g[G.deliveredWork] = 1000;
-      failTasks(w, 0, 'timeout', 1, work);
-      roundPhase(w);
+      tallyMet(w, 0, 500, 0, 500);
+      roundPhase(w); eventPhase(w);
+      failTasks(w, 0, 'timeout', failures, failures);
+      roundPhase(w); eventPhase(w);
       return w.round.phase;
     };
-    expect(run(100)).toBe('running');
-    expect(run(400)).toBe('ended');
+    // Whole-round, 500 met would hold 80% through 125 failures; the window falls below after 11.
+    expect(run(10)).toBe('running');
+    expect(run(11)).toBe('ended');
   });
 });
 
@@ -73,7 +75,7 @@ describe('round end and return (spec §4.1, §4.6, §4.7, D12.1)', () => {
     const initial = marketState(), w = openWorld(initial);
     const memory = FAMILIES.findIndex(f => f.band === 'ram');
     tallyMet(w, 0, 3, 0, 30);
-    failTasks(w, memory, 'cantRun', 2, 300);
+    failTasks(w, memory, 'cantRun', 8, 300); // 11 resolved: past the D28 warm-up
     dismissAt(w, 0);
     w.ledger.roundGross = 120n;
     w.ledger.roundEnergy = 40n;
@@ -104,9 +106,9 @@ describe('round end and return (spec §4.1, §4.6, §4.7, D12.1)', () => {
     expect(s.hot.g[G.frontLen]).toBe(0);
     expect(s.hot.sys.mode[0]).toBe(MODE.paused);
     const report = s.round.reports.at(-1)!;
-    expect(report).toMatchObject({ index: 1, startTick: 0, durationTicks: 51, durationMs: 5100, met: 0, dismissed: 0, failedWork: 300 });
-    expect(report.failedByCause.cantRun).toBe(3);
-    expect(report.details).toEqual([{ cause: 'cantRun', detail: 'ram', count: 3 }]);
+    expect(report).toMatchObject({ index: 1, startTick: 0, durationTicks: 51, durationMs: 5100, met: 0, dismissed: 0, failedWork: 1000 });
+    expect(report.failedByCause.cantRun).toBe(10);
+    expect(report.details).toEqual([{ cause: 'cantRun', detail: 'ram', count: 10 }]);
     expect(s.round.autoReturnTick).toBeNull();
     expect(s.events.entries.some((e) => e.kind === 'roundEnded' && e.round === 1)).toBe(true);
   });

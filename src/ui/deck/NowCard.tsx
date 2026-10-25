@@ -24,7 +24,7 @@ export function NowCard() {
   const rq = q.research && !q.research.running ? q.research : null;
   const head = rq ? null : q.window[0] ?? null, running = !q.frozen && r.phase === 'running';
   const blocked = running && !!head && head.blockedBy !== null;
-  const risk = running && !!head && !head.committed && headRisk(q.delivered, q.failed, q.grace, head.work);
+  const risk = running && !!head && !head.committed && headRisk(q.met, q.failed, q.checking, q.slaWindow);
   const d = L.kind === 'desktop', n = L.N, icon = 16 * n;
   const ix = d ? L.lat : 8, iy = d ? L.lat : 16, tx = ix + icon + 8, w = L.dismiss.x - L.now.x - tx - 8;
   const lines = d ? [L.lat, L.lat + L.lh, L.lat + 2 * L.lh] : [16, 32, 48];

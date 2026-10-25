@@ -15,7 +15,8 @@ export const RAM_CAPACITY_FACTOR: readonly number[] = [1, 2, 4, 6, 8, 12, 16, 20
 export const RAM: CatalogRow = {
   id: 'ram', scope: 'system', names: ['SDRAM', 'DDR', 'DDR2', 'DDR3', 'DDR4', 'DDR5'],
   gates: [r('memController'), r('ddr'), r('ddr2'), r('ddr3'), r('ddr4'), r('ddr5')], curve: 'step',
-  base: [64, 128, 2 ** 20, 2 ** 30, 2 ** 32, 2 ** 38], base2: [16, 32, 3.2e4, 6.4e7, 2.56e8, 1.28e11],
+  // SDRAM and DDR hold the System era's data-heavy working sets (tens of kbit) at mid levels, before E decays into loss.
+  base: [256, 512, 2 ** 20, 2 ** 30, 2 ** 32, 2 ** 38], base2: [16, 32, 3.2e4, 6.4e7, 2.56e8, 1.28e11],
   capacityTable: RAM_CAPACITY_FACTOR, watts: { kind: 'ratio', era: [0, 0, 1, 2, 2, 3] },
   price: [3e5, 4.5e5, 5e6, 3e10, 5e10, 5e13], upgrade: [12, 12, 1.2e5, 1.5e9, 1.5e9, 7.7e12],
 };
@@ -40,8 +41,10 @@ export const NPU: CatalogRow = {
 export const STORAGE: CatalogRow = {
   id: 'storage', scope: 'system', names: ['HDD', 'SSD', 'NVMe', 'SCM'], gates: [r('storageCtl'), r('ssd'), r('nvme'), r('scm')],
   // D26.2: IO re-based to 1/16 (HDD, SSD), 1/4 (NVMe) and 1/2 (SCM) of the era's RAM bandwidth, so spill to disk is slow.
-  curve: 'flow', base: [2048, 2 ** 24, 2 ** 34, 2 ** 44], base2: [1, 2000, 1.6e7, 6.4e10], watts: { kind: 'rate', wPerUnit: 1 },
-  price: [2e6, 5e6, 3e10, 5e13], upgrade: UP,
+  // The HDD is the System-era drive: big and slow, priced like the SDRAM module. Its IO at L1 is about 1/16 of
+  // SDRAM at the levels a System-era box holds (L15–L25), so spill slows work 4–16× instead of stalling it.
+  curve: 'flow', base: [2048, 2 ** 24, 2 ** 34, 2 ** 44], base2: [512, 2000, 1.6e7, 6.4e10], watts: { kind: 'rate', wPerUnit: 1 },
+  price: [3e5, 5e6, 3e10, 5e13], upgrade: UP,
 };
 /** Board PSU: a supply (capacity W, loss only). */
 export const PSU: CatalogRow = {

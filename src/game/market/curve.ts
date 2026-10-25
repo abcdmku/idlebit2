@@ -3,7 +3,7 @@ import type { FamilyDef } from '../types/catalog';
 /** Round-age difficulty and seeded variation (docs/tasks.md §3, program D12.1). */
 export const CURVE = {
   /** Ramp: one unit of I takes T(I) = min(Tmax, T0 × 2^(I / H)) seconds. D20: steep early, so an un-upgraded round 1 ends near 60 s. */
-  T0: 7, H: 5, Tmax: 250,
+  T0: 4.5, H: 3.5, Tmax: 250,
   /** A round opens at max(0, previous peak I − startBack). */
   startBack: 6,
   sizeJit: 0.2, weightJit: 0.3, dataJit: 0.1,
