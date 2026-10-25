@@ -11,7 +11,8 @@ export const SAVE_SCHEMA = 'bitrouge-v3' as const;
 // Pre-live reset: v6 adds saved per-family round work and dismissal counters.
 // Pre-live reset: v7 is D25 (divisible tasks): record units/shard/parent, the parent pool and router queues.
 // Pre-live reset: v8 is D26 (memory hierarchy, windows): record placement and parts, parent windows, the deadline ring.
-export const SAVE_VERSION = 8;
+// Pre-live reset: v9 is D27 (research is a task that cuts the line): research holders in hot, the research modes removed.
+export const SAVE_VERSION = 9;
 
 export interface SaveEnvelope {
   readonly schema: typeof SAVE_SCHEMA;

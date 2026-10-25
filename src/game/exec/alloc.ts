@@ -92,7 +92,8 @@ export function landPipe(w: World, s: number, tau: number): void {
 export function startQueued(w: World, s: number, tau: number, span: Span): number {
   const strategy = strategyOf(w, s);
   const h = w.hot.sys, rec = w.hot.rec;
-  const keff = keffOf(w, s);
+  // D27: a research holder runs one fewer task.
+  const keff = keffOf(w, s) - (h.researchThreads[s]! > 0 ? 1 : 0);
   const threads = hwThreads(w, s);
   let started = 0;
   while (h.running[s]! < keff) {

@@ -8,6 +8,7 @@ import { compileAll } from '../core/topology';
 import { commitWorld, openWorld } from '../core/world';
 import { deriveUnlocks } from '../build/research/effects';
 import { researchDef } from '../build/research/tree';
+import { researchPhase } from '../build';
 import { enqueue } from '../exec/alloc';
 import { noteAdmitted } from '../exec/slots';
 import { FAMILIES, payoutAt } from '../market/families';
@@ -50,10 +51,13 @@ function hardware(): GameState {
 }
 
 function startLink(state: GameState): GameState {
-  const started = act(act(state, { type: 'setResearchPriority', mode: 'shared' }),
-    { type: 'startResearch', project: researchId('gpuLink') });
-  // Seed a paid project one operation from completion; the next tick supplies real hardware work.
-  return { ...started, research: { ...started.research, activeProgress: researchDef('gpuLink')!.work - 1 } };
+  const started = act(state, { type: 'startResearch', project: researchId('gpuLink') });
+  // Complete the paid project through the real research step (compile, accelerator reconcile).
+  // Under D27 a running ray trace holds every thread, so the test supplies the remaining work directly.
+  const w = openWorld(started);
+  w.hot.g[G.researchOps] = researchDef('gpuLink')!.work;
+  researchPhase(w);
+  return commitWorld(started, w, 0);
 }
 
 function linkedRayTrace(): GameState {

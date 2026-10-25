@@ -1,7 +1,8 @@
 import { researchPhase } from '../build';
 import { admitPhase, runPhase } from '../exec';
 import { latePhase } from '../exec/outcome';
-import { deadlinePhase, marketPhase, roundPhase, startRound } from '../market';
+import { deadlinePhase, marketPhase, promoteHead, roundPhase, startRound } from '../market';
+import { researchTakePhase } from '../exec/researchTask';
 import { linkPhase, routePhase } from '../net';
 import { powerPhase, thermalPhase } from '../phys';
 import { eventPhase } from './events';
@@ -24,6 +25,15 @@ export function timersStep(w: World): void {
   }
 }
 
+/**
+ * Step 4: the research task first (D27: it cuts the line; once taken, the next task is head with a
+ * fresh 10 s), then routing.
+ */
+export function routeStep(w: World): void {
+  if (researchTakePhase(w) && w.round.phase === 'running') promoteHead(w);
+  routePhase(w);
+}
+
 /** Step 7: the head's clock, then completion windows (D26.5). */
 export function deadlinesStep(w: World): void {
   deadlinePhase(w);
@@ -38,7 +48,7 @@ export const PHASES: readonly (readonly [name: string, phase: Phase])[] = [
   ['timers', timersStep],
   ['market', marketPhase],
   ['links', linkPhase],
-  ['route', routePhase],
+  ['route', routeStep],
   ['admit', admitPhase],
   ['run', runPhase],
   ['deadlines', deadlinesStep],
@@ -57,7 +67,7 @@ export function runTick(w: World): void {
   timersStep(w);
   marketPhase(w);
   linkPhase(w);
-  routePhase(w);
+  routeStep(w);
   admitPhase(w);
   runPhase(w);
   deadlinesStep(w);

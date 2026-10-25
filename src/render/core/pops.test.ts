@@ -41,13 +41,15 @@ describe('payout pops', () => {
     pops.add(0, LEFT, 1000, 1, 0); pops.add(1, RIGHT, 1000, 2, 0);
     expect(frame(pops, 1000).sort()).toEqual(['+1', '+2']);
   });
-  it('holds back a pop that would cover a young neighbour, then shows it with everything since', () => {
+  it('holds back a pop whose path would cross a live neighbour, then shows it with everything since', () => {
     const pops = new PayoutPops();
     pops.add(0, LEFT, 1000, 1, 0); frame(pops, 1000);
     pops.add(1, NEXT, 1100, 2, 0);
     expect(frame(pops, 1100)).toEqual(['+1']);
     pops.add(1, NEXT, 1300, 3, 0);
-    expect(frame(pops, 1500 + 10)).toEqual(['+1', '+5']);
+    // Rising pops are kept apart over their whole path, so it waits for the neighbour's life to end.
+    expect(frame(pops, 1500 + 10)).toEqual(['+1']);
+    expect(frame(pops, 2000 + 10)).toEqual(['+5']);
   });
   it('drops completions older than a pop life and skips sub-unit payouts', () => {
     const pops = new PayoutPops();
@@ -59,5 +61,24 @@ describe('payout pops', () => {
     const c = { tau: 0.5 } as Completion;
     expect(completionMs({ ...c, tick: 12 }, 40)).toBe(1250);
     expect(completionMs(c, 40)).toBe(3950);
+  });
+});
+describe('pop motion', () => {
+  it('rises 14 art px, eased out, in whole px, and fades over the last 60% of its life', async () => {
+    const { popMotion } = await import('./pops');
+    const m = { rise: 0, alpha: 1 }, at = (t: number) => ({ ...popMotion(t, m) });
+    expect(at(0)).toEqual({ rise: 0, alpha: 1 });
+    expect(at(200).rise).toBeGreaterThan(5); expect(at(400).alpha).toBe(1);
+    expect(at(700).alpha).toBeCloseTo(0.5); expect(at(1000)).toEqual({ rise: 14, alpha: 0 });
+    for (let t = 0; t <= 1000; t += 50) expect(Number.isInteger(at(t).rise)).toBe(true);
+  });
+  it('stacks credits over data with no backing plate, showing only non-zero lines', () => {
+    const pops = new PayoutPops(), rec = recordingContext();
+    pops.add(0, LEFT, 1000, 5, 2); pops.add(1, RIGHT, 1000, 7, 0);
+    pops.draw(rec.g, 1000, CAM, VP, RATIO, DESKTOP_TYPE, 3, VP, false);
+    const five = rec.texts.find(t => t.text === '+5')!, two = rec.texts.find(t => t.text === '+2')!;
+    expect(two.y - five.y).toBe(DESKTOP_TYPE.line); expect(two.x).toBe(five.x);
+    expect(rec.texts.map(t => t.text).sort()).toEqual(['+2', '+5', '+7']);
+    expect(rec.fills).toHaveLength(0);
   });
 });

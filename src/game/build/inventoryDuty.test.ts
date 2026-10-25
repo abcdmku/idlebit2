@@ -14,7 +14,7 @@ import { deserializeSave, serializeSave } from '../save/serialize';
 import { buildState } from '../testkit/builders';
 import type { GameAction } from '../types/actions';
 import type { AccelBuild, GpuBuild, GpuModelId } from '../types/gpu';
-import { rackId, researchId, systemId, type PartRef } from '../types/ids';
+import { rackId, systemId, type PartRef } from '../types/ids';
 import type { GameState } from '../types/state';
 import { acceleratorView } from '../view/accelerators';
 import { rackConfig } from './configModel';
@@ -29,7 +29,7 @@ function act(state: GameState, action: GameAction): GameState {
   return result.state;
 }
 
-function billed(accels: readonly AccelBuild[] = [gpu()], hotSwap = true, servers = 1, researchDuty = false): GameState {
+function billed(accels: readonly AccelBuild[] = [gpu()], hotSwap = true, servers = 1): GameState {
   const base = buildState({ sites: 1, zonesPerSite: 1, racksPerZone: 1, serversPerRack: servers,
     round: 'running', unlocks: 'max', credits: '1000000000000000000000000000000', data: '1000000000000000000000000000000',
     system: (id, rack, slot) => {
@@ -39,11 +39,7 @@ function billed(accels: readonly AccelBuild[] = [gpu()], hotSwap = true, servers
   });
   const completed = base.research.completed.filter((id) => id !== 'gpuLink' && id !== 'gpuGen9' && (hotSwap || id !== 'hotSwap'));
   const research = { ...base.research, completed, unlocks: deriveUnlocks(completed) };
-  let start: GameState = { ...base, research, compiled: compileAll(base.build, research) };
-  if (researchDuty) {
-    start = act(start, { type: 'startResearch', project: researchId('gpuGen9') });
-    start = act(start, { type: 'setResearchPriority', mode: 'shared' });
-  }
+  const start: GameState = { ...base, research, compiled: compileAll(base.build, research) };
   const w = openWorld(start), family = FAMILIES.find((f) => f.key === 'rayTrace')!, scale = 2000;
   for (let s = 0; s < servers; s += 1) {
     const r = allocRecord(w.hot), rec = w.hot.rec;
@@ -119,14 +115,6 @@ describe('accelerator inventory edits after billing', () => {
       });
     }
 
-    it(`clears billed NPU research duty on a generic NPU generation replacement, hot-swap ${hotSwap}`, () => {
-      const before = billed([gpu(), { kind: 'npu', gen: 0, level: 1 }], hotSwap, 1, true);
-      expect(before.hot.sys.accelResearchS[1]).toBeGreaterThan(0);
-      const after = act(before, { type: 'replacePart', part: part(1), generation: 1, preserveCapacity: false });
-      expect(after.build.systems[0]!.spec.accels[1]).toEqual({ kind: 'npu', gen: 1, level: 1 });
-      cleared(after);
-      accountsAndContinuation(before, after);
-    });
   }
 
   for (const kind of ['gpu', 'npu'] as const) {
@@ -141,14 +129,6 @@ describe('accelerator inventory edits after billing', () => {
     });
   }
 
-  it('clears task and research duty when identical GPU slots and an NPU shift left', () => {
-    const before = billed([gpu(), gpu(), { kind: 'npu', gen: 0, level: 1 }], true, 1, true);
-    expect(before.hot.sys.accelResearchS.slice(0, 3).every((v) => v > 0)).toBe(true);
-    const after = act(before, { type: 'removePart', part: part() });
-    expect(after.build.systems[0]!.spec.accels).toEqual([gpu(), { kind: 'npu', gen: 0, level: 1 }]);
-    cleared(after);
-    accountsAndContinuation(before, after);
-  });
 });
 
 describe('hot accelerator upgrades retain card history', () => {
@@ -169,13 +149,4 @@ describe('hot accelerator upgrades retain card history', () => {
     });
   }
 
-  it('keeps task and research duty when upgrading an NPU', () => {
-    const before = billed([gpu(), { kind: 'npu', gen: 0, level: 1 }], true, 1, true);
-    expect(before.hot.sys.accelResearchS[1]).toBeGreaterThan(0);
-    const after = act(before, { type: 'upgradePart', part: part(1) });
-    expect(after.hot.sys.accelTaskS).toEqual(before.hot.sys.accelTaskS);
-    expect(after.hot.sys.accelResearchS).toEqual(before.hot.sys.accelResearchS);
-    expect(after.hot.sys.running).toEqual(before.hot.sys.running);
-    accountsAndContinuation(before, after);
-  });
 });

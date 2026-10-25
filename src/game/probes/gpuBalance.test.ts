@@ -27,7 +27,7 @@ describe('GPU isolated economic comparison', () => {
   });
 
   it('keeps the early 125x rate step explicit', () => {
-    expect(earlyGpuDiscontinuity()).toMatchObject({ ratio: 125, currentNativeOpsPerS: 4000, gen2ResearchGpuOnlySeconds1330: 50000 });
+    expect(earlyGpuDiscontinuity()).toMatchObject({ ratio: 125, currentNativeOpsPerS: 4000, gen2ResearchGpuOnlySeconds1330: 7500 });
   });
 
   it('selects the D8 watt and push coefficients from the parameter sweep', () => {

@@ -16,9 +16,9 @@ import { lumpStep, rackSurroundF, roomSurroundF } from './thermal';
 export function physSettled(w: World): boolean {
   const c = w.compiled, h = w.hot;
   if (h.g[G.utilityW] !== 0) return false;
-  const researchOn = w.research.active !== null && !w.research.stoppedInsolvent;
+  const researchOn = w.hot.g[G.researchHolders]! > 0;
   for (let s = 0; s < c.sys.len; s += 1) {
-    if (drawKind(h.sys.mode[s]!, researchOn) !== DRAW_NONE) return false;
+    if (drawKind(h.sys.mode[s]!, researchOn && h.sys.researchThreads[s]! > 0) !== DRAW_NONE) return false;
     if (h.sys.drawW[s] !== 0 || h.sys.psuUsage[s] !== 0 || h.sys.psuOverTicks[s] !== 0 || h.sys.psuRebootTicks[s] !== 0) return false;
   }
   const throttle = physSettings(w).throttle;

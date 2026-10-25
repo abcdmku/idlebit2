@@ -11,7 +11,7 @@ import { integrateAccelerators, resetAccelUsage, resetSystemAccelUsage } from '.
 import { publishRunBoundary } from './boundary';
 import { hwThreads } from './est';
 import { completeRecord } from './outcome';
-import { BACKGROUND_TASK_SHARE, researchOn, researchRateOf, SHARED_TASK_SHARE, taskShare } from './research';
+import { researchOn, researchRateOf, taskShare } from './research';
 import { strategyOf } from './schedulers';
 import { keffOf, runsTasks } from './slots';
 import { stealThreads } from './stealing';
@@ -32,10 +32,10 @@ import { diskRate, firstPart } from './memory';
  * event and leave clocks, rates and meters as they are, so skipping it changes nothing. While
  * research runs, a skipped rack still tallies its research, which follows e(T) every tick.
  */
-function execStamp(w: World, share: number, research: boolean): number {
+function execStamp(w: World, research: boolean): number {
   const running = w.round.phase === 'running' ? 1 : 0;
-  const shareCode = share === 1 ? 0 : share === BACKGROUND_TASK_SHARE ? 1 : share === SHARED_TASK_SHARE ? 2 : 3;
-  return 1 + ((w.build.revision * 2 + running) * 2 + (research ? 1 : 0)) * 4 + shareCode;
+  // D27: research holders change only at takes and releases, which dirty their racks; the count stamps the rest.
+  return 1 + ((w.build.revision * 2 + running) * 2 + (research ? 1 : 0)) * 65_536 + w.hot.g[G.researchHolders]! % 65_536;
 }
 
 const span = newSpan();
@@ -276,7 +276,7 @@ export function runPhase(w: World): void {
   const c = w.compiled, hot = w.hot;
   const share = taskShare(w);
   const research = researchOn(w);
-  const stamp = execStamp(w, share, research);
+  const stamp = execStamp(w, research);
   const all = w.visitAll === true || hot.g[G.execStamp] !== stamp;
   hot.g[G.execStamp] = stamp;
   // A full pass also clears meters of dead systems; otherwise each visit clears its own.

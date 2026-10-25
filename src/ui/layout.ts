@@ -128,7 +128,8 @@ function desktop(N: 2 | 3, aw: number, ah: number, safe: SafeInsets): DesktopLay
   return {
     kind: 'desktop', N, lat, gutter: U, x, y, w: W, h: H, body, lh, big: N === 3 ? 32 : 24, mid: N === 3 ? 20 : 16,
     world, view, band, strip, headSlot, cards: [card(0), card(1), card(2), card(3)],
-    now, dismiss: r(now.x + now.w - lat - KEY_W, now.y + lat, KEY_W, KEY_H),
+    // The head card's key is wide enough for "Return to market" on one line; Dismiss keeps the same box.
+    now, dismiss: r(now.x + now.w - lat - 144, now.y + lat, 144, KEY_H),
     buy: r(world.x, deckY + rowsH, b1w, KEY_H), research: r(b2x, deckY + rowsH, b2w, KEY_H),
     rows: [row(0), row(1), row(2), row(3), row(4)],
     drawer: r(b2x, top, b2w, view.h),

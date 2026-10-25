@@ -120,11 +120,12 @@ describe('head card (user, 25 Oct: the main task below, above the deck)', () => 
   it('between rounds the same key reads Return, in the same place', () => {
     const store = fakeStore();
     mounted = card(store);
-    expect(rectOf('[data-testid=dismiss]')).toBe('552px 24px 96px 48px');
+    expect(rectOf('[data-testid=dismiss]')).toBe('504px 24px 144px 48px');
     act(() => store.set({ round: { state: 'between', canReturn: true }, feed: { timing: 'onReturn', headDeadlineTick: null } }));
     expect($('[data-testid=dismiss]')).toBeNull();
-    expect(rectOf('[data-testid=return]')).toBe('552px 24px 96px 48px');
+    expect(rectOf('[data-testid=return]')).toBe('504px 24px 144px 48px');
     expect(text('[data-testid=now]')).toContain('Starts after Return');
+    expect(text('[data-testid=return]')).toBe('Return to market');
     act(() => $('[data-testid=return]')!.click());
     expect(store.actions).toEqual([{ type: 'returnToMarket' }]);
   });

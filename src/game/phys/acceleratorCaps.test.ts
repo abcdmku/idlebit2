@@ -10,7 +10,6 @@ import { admittedOf, noteAdmitted, slotsOf } from '../exec/slots';
 import { probeHead, takeHead } from '../market/queue';
 import { feed } from '../exec/testWorld';
 import type { FamilyDef } from '../types/catalog';
-import { researchId } from '../types/ids';
 import { powerPhase } from './power';
 import { physState, physTicks, physWorld } from './testWorld';
 import { thermalPhase } from './thermal';
@@ -116,28 +115,6 @@ describe.each(['psu', 'pdu'] as const)('%s caps with uncappable draw', (supply) 
     tick(w);
     expect(w.hot.sys.mode[0]).toBe(MODE.onMarket);
     expect(w.hot.sys.drawW[0]).toBe(0);
-  });
-
-  it('research GPU duty accumulates overload and below-capacity draw clears it at the same rate', () => {
-    const w = fixture(supply);
-    w.research.active = researchId('phys-cap-test');
-    w.research.mode = 'focus';
-    tick(w, 80);
-    expect(overTicks(w, supply)).toBe(80);
-    expect(w.hot.sys.accelResearchS[7]).toBe(DT_S);
-    w.research.active = null;
-    tick(w, 79);
-    expect(overTicks(w, supply)).toBe(1);
-    expect(w.hot.sys.drawW[0]).toBe(10);
-    expect(w.hot.sys.accelResearchS[7]).toBe(0);
-    tick(w);
-    expect(overTicks(w, supply)).toBe(0);
-    expect(capFactor(w, supply)).toBe(1);
-    w.research.active = researchId('phys-cap-test');
-    tick(w, 99);
-    expect(overTicks(w, supply)).toBe(99);
-    tick(w);
-    expect(w.hot.sys.mode[0]).toBe(MODE.dark);
   });
 
   it('reduces CPU clock and load while GPU throughput and watts remain unchanged', () => {

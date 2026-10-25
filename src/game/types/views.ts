@@ -300,6 +300,7 @@ export interface ChipQueueEntryView {
 
 /** One queue entry (spec §16.2): a stable identity, its work and requirements, and whether it can be dismissed. */
 export interface QueueEntryView extends TaskRequirementsView {
+  readonly kind: 'task';
   readonly task: TaskRef;
   readonly key: number;
   readonly icons: readonly TaskIcon[];
@@ -314,6 +315,29 @@ export interface QueueEntryView extends TaskRequirementsView {
   readonly transferS: number | null;
   /** D26.5: for taken work returned to the front, the last tick it may be met (takeTick + deadline − 1); null when untaken or the family has none. */
   readonly windowEndTick: number | null;
+}
+/**
+ * D27: the research task in the market line. While `running` is false it is the head: it waits at
+ * the front of the queue, ahead of `FeedSnapshot.window`, with no clock, and the tasks behind it wait.
+ * Once taken it runs on `holders` systems until the project completes; it pays nothing.
+ */
+export interface ResearchQueueEntryView {
+  readonly kind: 'research';
+  /** Stable while the project is in line or running: −1 − the project's tree index (never a task ID). */
+  readonly key: number;
+  readonly project: ResearchId;
+  readonly name: string;
+  /** The project's compute work, ops. */
+  readonly work: number;
+  /** Work done, 0–1 (kept across losses and rounds). */
+  readonly progress: number;
+  /** Taken: some system holds it. False: it is the head, waiting for a system with room. */
+  readonly running: boolean;
+  /** Systems holding it, and the threads they hold. */
+  readonly holders: number;
+  readonly threads: number;
+  /** Research ops per second this tick (0 while waiting). */
+  readonly opsPerSec: number;
 }
 /**
  * One shard moving over a link at its real speed (D10.4, D12.4, D25.4). All shards of one take

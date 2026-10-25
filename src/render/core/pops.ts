@@ -1,8 +1,8 @@
-// Payout pops: +Credits / +Data on the component that completed the work, at the completion's
-// real sim time. A level maps each completion to a component (LevelRenderer.payoutAnchor). The board
-// sums completions that hit one component within MERGE_MS into one pop and keeps one live pop per
-// component. It holds back a pop whose plate would cover another component's young pop. So the
-// screen never sprays, whatever the completion rate. Pay is per whole task: a multi-member or (D25)
+// Payout pops: +Credits over +Data on the component that completed the work, at the completion's
+// real sim time, rising and fading out with no backing plate. A level maps each completion to a
+// component (LevelRenderer.payoutAnchor). The board sums completions that hit one component within
+// MERGE_MS into one pop and keeps one live pop per component. It holds back a pop whose rising path
+// would cross another component's live pop. So the screen never sprays, whatever the completion rate. Pay is per whole task: a multi-member or (D25)
 // sharded task is one completion, located at the component that finished its last piece.
 import { TICK_MS } from '../../game';
 import type { CompletionView } from '../../game';
@@ -10,7 +10,7 @@ import { toScreen } from './camera';
 import type { Camera, PixelRatio } from './camera';
 import { whole } from './format';
 import type { Rect } from './geom';
-import { TAG_FILL, TONE } from './labels';
+import { TONE } from './labels';
 import type { Typography } from './labels';
 import { SPR } from './sprites';
 
@@ -23,10 +23,17 @@ export type Completion = CompletionView & {
   readonly seq?: number; readonly tick?: number;
   readonly rack?: number | null; readonly room?: number | null; readonly site?: number | null;
 };
-/** Sim ms. */
-export const POP_LIFE_MS = 1000, POP_RISE_MS = 300, POP_FADE_MS = 300, POP_MERGE_MS = 250;
-/** Art px the plate rises over POP_RISE_MS, one art px at a time. */
-export const POP_RISE_ART = 3;
+/** Sim ms. A pop fades out over the last POP_FADE_SHARE of its life. */
+export const POP_LIFE_MS = 1000, POP_MERGE_MS = 250, POP_FADE_SHARE = 0.6;
+/** Art px a pop rises over its life, eased out (fast start, slow end), one whole art px at a time. */
+export const POP_RISE_ART = 14;
+/** The pop's rise (art px) and opacity at `age` sim ms. */
+export function popMotion(age: number, out: { rise: number; alpha: number }): { rise: number; alpha: number } {
+  const u = Math.max(0, Math.min(1, age / POP_LIFE_MS));
+  out.rise = Math.round(POP_RISE_ART * (1 - (1 - u) ** 3));
+  out.alpha = Math.max(0, Math.min(1, (1 - u) / POP_FADE_SHARE));
+  return out;
+}
 export const MAX_POPS = 24, MAX_PENDING = 64;
 /** When a completion happened, in sim ms. */
 export function completionMs(c: Completion, snapshotTick: number): number {
@@ -39,9 +46,9 @@ interface Pop {
   credText: string; dataText: string; credW: number; dataW: number;
 }
 const rect = (): Rect => ({ x: 0, y: 0, w: 0, h: 0 });
-const at = { x: 0, y: 0 }, plate = rect(), other = rect();
+const at = { x: 0, y: 0 }, plate = rect(), other = rect(), motion = { rise: 0, alpha: 1 };
 /** The HUD's currency icons, 8 art px: one line tall at N (24 CSS px desktop, 16 phone). */
-const ICON = 8, PAD = 4, GAP = 4, SEP = 8;
+const ICON = 8, GAP = 4, INK = '#0e0b1c';
 
 export class PayoutPops {
   private readonly pending: Pending[] = Array.from({ length: MAX_PENDING }, () => ({ key: -1, at: 0, credits: 0, data: 0, anchor: rect(), merge: POP_MERGE_MS }));
@@ -103,14 +110,17 @@ export class PayoutPops {
       this.texts(g, pop); this.dropPending(i);
     }
   }
-  /** True while the plate would cover another component's pop that is still in its first half. */
+  /**
+   * True while the pop's whole path (its block from rest to full rise) would cross the path of another
+   * component's live pop: rising pops are tall, so they are kept apart over their whole life.
+   */
   private blocked(g: CanvasRenderingContext2D, p: Pending, now: number, cam: Camera, vp: Rect, ratio: PixelRatio, type: Typography, n: number): boolean {
-    const cw = g.measureText(`+${whole(p.credits)}`).width, dw = p.data >= 1 ? g.measureText(`+${whole(p.data)}`).width : 0;
-    plateRect(p.anchor, cw, dw, 0, cam, vp, ratio, type, n, plate);
+    const cw = p.credits >= 1 ? g.measureText(`+${whole(p.credits)}`).width : 0, dw = p.data >= 1 ? g.measureText(`+${whole(p.data)}`).width : 0;
+    pathRect(p.anchor, cw, dw, cam, vp, ratio, type, n, plate);
     for (let i = 0; i < this.popCount; i++) {
       const o = this.pops[i]!;
-      if (o.key === p.key || now - o.born >= POP_LIFE_MS / 2) continue;
-      plateRect(o.anchor, o.credW, o.dataW, 0, cam, vp, ratio, type, n, other);
+      if (o.key === p.key || now - o.born >= POP_LIFE_MS) continue;
+      pathRect(o.anchor, o.credW, o.dataW, cam, vp, ratio, type, n, other);
       if (plate.x < other.x + other.w && other.x < plate.x + plate.w && plate.y < other.y + other.h && other.y < plate.y + plate.h) return true;
     }
     return false;
@@ -123,22 +133,22 @@ export class PayoutPops {
   }
   private drawPop(g: CanvasRenderingContext2D, pop: Pop, now: number, cam: Camera, vp: Rect, ratio: PixelRatio, type: Typography,
     n: number, reduced: boolean): void {
-    const age = Math.max(0, now - pop.born);
-    const rise = reduced ? 0 : Math.round(Math.min(1, age / POP_RISE_MS) * POP_RISE_ART);
-    plateRect(pop.anchor, pop.credW, pop.dataW, rise, cam, vp, ratio, type, n, plate);
-    g.globalAlpha = reduced ? 1 : Math.min(1, (POP_LIFE_MS - age) / POP_FADE_MS);
-    g.fillStyle = TAG_FILL; g.fillRect(plate.x, plate.y, plate.w, plate.h);
-    const icon = ICON * n, iy = plate.y + Math.round((plate.h - icon) / 2 / n) * n, ty = plate.y + plate.h / 2;
-    let x = plate.x + PAD;
-    if (pop.credText) {
-      g.drawImage(SPR.coin8, x, iy, icon, icon); x += icon + GAP;
-      g.fillStyle = TONE.gold; g.fillText(pop.credText, x, ty); x += Math.ceil(pop.credW) + SEP;
-    }
-    if (pop.dataText) {
-      g.drawImage(SPR.gem8, x, iy, icon, icon); x += icon + GAP;
-      g.fillStyle = TONE.data; g.fillText(pop.dataText, x, ty);
-    }
+    popMotion(Math.max(0, now - pop.born), motion);
+    blockRect(pop.anchor, pop.credW, pop.dataW, reduced ? 0 : motion.rise, cam, vp, ratio, type, n, plate);
+    g.globalAlpha = reduced ? 1 : motion.alpha;
+    // No backing plate (user): each line is its icon, then the amount with a 1·N ink outline.
+    const icon = ICON * n, line = Math.max(type.line, icon);
+    g.lineWidth = 2 * n; g.lineJoin = 'round'; g.strokeStyle = INK;
+    let y = plate.y;
+    if (pop.credText) { this.line(g, SPR.coin8, pop.credText, TONE.gold, plate.x, y, icon, line, n); y += line; }
+    if (pop.dataText) this.line(g, SPR.gem8, pop.dataText, TONE.data, plate.x, y, icon, line, n);
     g.globalAlpha = 1;
+  }
+  /** One line: the icon at the block's left edge, the amount beside it, outlined in ink. */
+  private line(g: CanvasRenderingContext2D, img: CanvasImageSource, text: string, colour: string, x: number, y: number, icon: number, line: number, n: number): void {
+    const iy = y + Math.round((line - icon) / 2 / n) * n, ty = y + line / 2, tx = x + icon + GAP;
+    g.drawImage(img, x, iy, icon, icon);
+    g.strokeText(text, tx, ty); g.fillStyle = colour; g.fillText(text, tx, ty);
   }
   private find(key: number): Pop | null {
     for (let i = 0; i < this.popCount; i++) if (this.pops[i]!.key === key) return this.pops[i]!;
@@ -155,18 +165,22 @@ export class PayoutPops {
 }
 
 /**
- * The plate in CSS px: centred on the anchor, one line tall, `rise` art px up, every edge on the
- * art grid (N CSS px from the viewport origin) so the icons stay crisp.
+ * The pop's block in CSS px: the credits line over the data line (only the non-zero ones), left-aligned
+ * on the icons, centred on the anchor and `rise` art px up. Every edge sits on the art grid (N CSS px
+ * from the viewport origin) so the icons stay crisp.
  */
-function plateRect(anchor: Rect, credW: number, dataW: number, rise: number, cam: Camera, vp: Rect, ratio: PixelRatio,
+function blockRect(anchor: Rect, credW: number, dataW: number, rise: number, cam: Camera, vp: Rect, ratio: PixelRatio,
   type: Typography, n: number, out: Rect): Rect {
   toScreen(cam, vp, ratio, anchor.x + anchor.w / 2, anchor.y + anchor.h / 2, at);
-  const icon = ICON * n;
-  let w = PAD * 2;
-  if (credW > 0) w += icon + GAP + Math.ceil(credW);
-  if (dataW > 0) w += (credW > 0 ? SEP : 0) + icon + GAP + Math.ceil(dataW);
-  out.w = Math.ceil(w / n) * n; out.h = Math.max(type.line, icon);
+  const icon = ICON * n, line = Math.max(type.line, icon), lines = (credW > 0 ? 1 : 0) + (dataW > 0 ? 1 : 0);
+  out.w = Math.ceil((icon + GAP + Math.ceil(Math.max(credW, dataW))) / n) * n; out.h = Math.max(1, lines) * line;
   out.x = vp.x + Math.round((at.x - out.w / 2 - vp.x) / n) * n;
   out.y = vp.y + Math.round((at.y - out.h / 2 - vp.y) / n) * n - rise * n;
+  return out;
+}
+/** The block's whole path: from rest up to its full rise. */
+function pathRect(anchor: Rect, credW: number, dataW: number, cam: Camera, vp: Rect, ratio: PixelRatio, type: Typography, n: number, out: Rect): Rect {
+  blockRect(anchor, credW, dataW, 0, cam, vp, ratio, type, n, out);
+  out.y -= POP_RISE_ART * n; out.h += POP_RISE_ART * n;
   return out;
 }

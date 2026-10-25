@@ -1,3 +1,4 @@
+import { G } from '../core/buffers';
 import { MAX_UPS } from '../core/constants';
 import { MODE, setUnitMode } from '../core/timers';
 import { touchSystem } from '../core/touch';
@@ -27,7 +28,8 @@ import {
 export function powerPhase(w: World): void {
   const settings = physSettings(w);
   const c = w.compiled, h = w.hot;
-  const researchOn = w.research.active !== null && !w.research.stoppedInsolvent;
+  // D27: only research holders draw for research.
+  const researchOn = w.hot.g[G.researchHolders]! > 0;
   const k = powerCache(w, settings, researchOn);
   const links = linkWatts(w);
 
@@ -170,7 +172,7 @@ function systemStep(w: World, s: number, settings: PhysSettings, researchOn: boo
   const mode0 = sys.mode[s], cap0 = sys.capFactor[s], over0 = sys.psuOverTicks[s], cstate0 = sys.cstate[s];
   const dvfs0 = sys.dvfsOn[s], turbo0 = sys.turboOn[s], wake0 = sys.wakeTicks[s], clock0 = sys.clockFactor[s];
   syncMode(w, s);
-  const kind = drawKind(sys.mode[s]!, researchOn);
+  const kind = drawKind(sys.mode[s]!, researchOn && sys.researchThreads[s]! > 0);
   const d = systemDraw(w, s, kind, settings);
   const delivered = d.deliveredW;
   const cap = settings.psuLive ? c.sys.psuCapW[s]! : 0;
@@ -200,7 +202,7 @@ function systemStep(w: World, s: number, settings: PhysSettings, researchOn: boo
       }
     }
   }
-  const sleep = sleepStep(w, s, settings, researchOn);
+  const sleep = sleepStep(w, s, settings);
   if (sleep === SLEEP_WAIT) due = Math.min(due, Math.max(sys.emptySinceTick[s]!, w.round.startTick) + S3_AFTER_TICKS);
   publishClockFactor(w, s);
   const failed = overloadFailed(sys.psuOverTicks[s]!);
@@ -222,9 +224,9 @@ const SLEEP_NONE = 0, SLEEP_STAMP = 1, SLEEP_WAIT = 2, SLEEP_CHANGED = 3;
 
 /**
  * S3 sleep (spec §9.3): an on-market system in an opened rack with nothing admitted or reserved
- * for 10 s, and no Shared or Focus research on it, sleeps. A pending wake ends 2 s after the route.
+ * for 10 s (a research holder counts as holding, D27), sleeps. A pending wake ends 2 s after the route.
  */
-function sleepStep(w: World, s: number, settings: PhysSettings, researchOn: boolean): number {
+function sleepStep(w: World, s: number, settings: PhysSettings): number {
   const h = w.hot.sys;
   const mode = h.mode[s]!;
   if (mode === MODE.asleep) {
@@ -236,10 +238,9 @@ function sleepStep(w: World, s: number, settings: PhysSettings, researchOn: bool
   }
   // Paused systems are left untouched so quiescent ticks change nothing; the round start bounds the wait instead.
   if (mode === MODE.paused || mode === MODE.empty) return SLEEP_NONE;
-  const holding = h.running[s]! + h.queueLen[s]! + h.reserved[s]! > 0;
+  const holding = h.running[s]! + h.queueLen[s]! + h.reserved[s]! + h.researchThreads[s]! > 0;
   if (mode !== MODE.onMarket || holding) { h.emptySinceTick[s] = w.tick; return SLEEP_STAMP; }
   if (!settings.s3Sleep || w.compiled.rack.opened[w.compiled.sys.rack[s]!] !== 1) return SLEEP_NONE;
-  if (researchOn && w.research.mode !== 'background') return SLEEP_NONE;
   if (w.tick - Math.max(h.emptySinceTick[s]!, w.round.startTick) < S3_AFTER_TICKS) return SLEEP_WAIT;
   setUnitMode(w, s, MODE.asleep);
   return SLEEP_CHANGED;

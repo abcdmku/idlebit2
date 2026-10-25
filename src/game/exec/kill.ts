@@ -13,6 +13,7 @@ import type { UnitRef } from '../types/ids';
 import { resetClocks } from './clocks';
 import { CAUSE, failRecord, releaseReservation, returnParent, returnTask } from './outcome';
 import { recountSummaries } from './slots';
+import { recountResearchThreads } from './researchTask';
 import { NRES } from './shape';
 
 /**
@@ -137,5 +138,6 @@ export function dropAllWork(w: World): void {
   dirtyAll(w);
   dropBacklog(w);
   hot.g[G.running] = 0; hot.g[G.queued] = 0; hot.g[G.transitCount] = 0; hot.g[G.busyThreads] = 0;
+  recountResearchThreads(w);
   recountSummaries(w);
 }

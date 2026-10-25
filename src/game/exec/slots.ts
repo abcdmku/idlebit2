@@ -34,7 +34,8 @@ export const slotsOf = (w: World, s: number): number => Math.max(1, w.compiled.s
 
 export const admittedOf = (w: World, s: number): number => {
   const h = w.hot.sys;
-  return h.running[s]! + h.queueLen[s]! + h.reserved[s]!;
+  // D27: a research holder uses one slot.
+  return h.running[s]! + h.queueLen[s]! + h.reserved[s]! + (h.researchThreads[s]! > 0 ? 1 : 0);
 };
 
 /**
@@ -63,7 +64,7 @@ export function canAdmit(w: World, s: number): boolean {
   if (w.compiled.rack.opened[c.rack[s]!] === 1 && c.port[s]! < 0) return false;
   const slots = Math.max(1, c.slots[s]!, c.keff[s]!);
   if (queueCapped(w, s)) return false;
-  return h.running[s]! + h.queueLen[s]! + h.reserved[s]! < slots && slots - (h.takeTick[s] === w.tick ? h.takes[s]! : 0) > 0;
+  return h.running[s]! + h.queueLen[s]! + h.reserved[s]! + (h.researchThreads[s]! > 0 ? 1 : 0) < slots && slots - (h.takeTick[s] === w.tick ? h.takes[s]! : 0) > 0;
 }
 
 /** Applies a system's can-admit flip to the rack, room and site summaries. */
@@ -101,14 +102,14 @@ export function recountSummaries(w: World): void {
   // canAdmit and admittedOf over flat columns: the same reads and sums, once per system.
   const cs = c.sys, hs = h.sys, tick = w.tick, servers = c.rack.servers, rackOpened = c.rack.opened;
   const alive = cs.alive, kind = cs.kind, sysRack = cs.rack, port = cs.port, slotCap = cs.slots, keff = cs.keff;
-  const mode = hs.mode, running = hs.running, queueLen = hs.queueLen, reserved = hs.reserved, takeTick = hs.takeTick, takes = hs.takes;
+  const mode = hs.mode, running = hs.running, queueLen = hs.queueLen, reserved = hs.reserved, takeTick = hs.takeTick, takes = hs.takes, research = hs.researchThreads;
   for (let rack = 0; rack < c.rack.len; rack += 1) {
     if (c.rack.alive[rack] !== 1) continue;
     let free = 0, admitted = 0, mask = 0;
     for (let k = 0; k < SERVERS_PER_RACK; k += 1) {
       const s = servers[rack * SERVERS_PER_RACK + k]!;
       if (s < 0 || alive[s] !== 1) continue;
-      const busy = running[s]! + queueLen[s]! + reserved[s]!;
+      const busy = running[s]! + queueLen[s]! + reserved[s]! + (research[s]! > 0 ? 1 : 0);
       admitted += busy;
       if (kind[s] === STORAGE_NODE || ADMIT_MODE[mode[s]!] !== 1) continue;
       if (rackOpened[sysRack[s]!] === 1 && port[s]! < 0) continue;
@@ -137,7 +138,7 @@ function recountRack(w: World, rack: number): void {
   for (let k = 0; k < SERVERS_PER_RACK; k += 1) {
     const s = servers[rack * SERVERS_PER_RACK + k]!;
     if (s < 0 || cs.alive[s] !== 1) continue;
-    const busy = hs.running[s]! + hs.queueLen[s]! + hs.reserved[s]!;
+    const busy = hs.running[s]! + hs.queueLen[s]! + hs.reserved[s]! + (hs.researchThreads[s]! > 0 ? 1 : 0);
     admitted += busy;
     if (cs.kind[s] === STORAGE_NODE || ADMIT_MODE[hs.mode[s]!] !== 1) continue;
     if (c.rack.opened[cs.rack[s]!] === 1 && cs.port[s]! < 0) continue;

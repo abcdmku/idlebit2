@@ -7,7 +7,6 @@ import { commitWorld, type World } from '../core/world';
 import { runPhase } from '../exec/run';
 import { feed } from '../exec/testWorld';
 import type { FamilyDef } from '../types/catalog';
-import { researchId } from '../types/ids';
 import type { GameState } from '../types/state';
 import { powerPhase } from './power';
 import { physState, physWorld } from './testWorld';
@@ -53,12 +52,6 @@ function tick(w: World): void {
   w.tick += 1;
 }
 
-const startResearch = (w: World, mode: 'background' | 'shared' | 'focus'): void => {
-  w.research.active = researchId('phys-test');
-  w.research.mode = mode;
-  w.ledger.credits = 1000n;
-};
-
 describe('accelerator execution and power integration', () => {
   it('bills a completed half-tick task on its actual GPU, then clears duty next tick', () => {
     const w = fixture();
@@ -90,59 +83,6 @@ describe('accelerator execution and power integration', () => {
     expect([...w.hot.sys.accelTaskS.slice(0, 3)]).toEqual([DT_S / 2, DT_S / 2, 0]);
     expect(w.hot.sys.drawW[0]).toBe(60);
     expect(w.hot.sys.accelUsedVram[POOL_DOMAIN]).toBe(0);
-  });
-
-  it.each([
-    ['background', 0.9, 0.1, 14.4], ['shared', 0.75, 0.25, 15], ['focus', 0, 1, 18],
-  ] as const)('%s research publishes card work and duty once', (mode, taskShare, researchShare, ops) => {
-    const w = fixture();
-    startResearch(w, mode);
-    feed(w, 0, 1, 40);
-    tick(w);
-    expect(w.hot.sys.accelTaskS[1]).toBeCloseTo(DT_S * taskShare, 12);
-    expect(w.hot.sys.accelResearchS[1]).toBeCloseTo(DT_S * researchShare, 12);
-    expect(w.hot.sys.accelResearchS[0]).toBe(DT_S);
-    expect(w.hot.sys.accelResearchS[2]).toBe(DT_S);
-    expect(w.hot.sys.accelResearchOps[0]).toBeCloseTo(ops, 12);
-    expect(w.hot.sys.drawW[0]).toBe(150);
-    for (let p = 0; p < MAX_ACCELS; p += 1) {
-      expect(w.hot.sys.accelTaskS[p]! + w.hot.sys.accelResearchS[p]!).toBeLessThanOrEqual(DT_S);
-    }
-  });
-
-  it('uses leftover time for research after a task completes midway through the tick', () => {
-    const w = fixture();
-    startResearch(w, 'background');
-    feed(w, 0, 1, 3);
-    tick(w);
-    // 3 ops at 90% of the card's 40 ops/s take 1/12 s; research gets 10% of that time, then the rest.
-    expect(w.hot.sys.accelTaskS[1]).toBeCloseTo(0.075, 12);
-    expect(w.hot.sys.accelResearchS[1]).toBeCloseTo(0.025, 12);
-    expect(w.hot.sys.accelResearchOps[0]).toBeCloseTo(14 + 40 * 0.025, 12);
-    expect(w.hot.sys.drawW[0]).toBe(150);
-  });
-
-  it('applies rack and configuration efficiency once to research work, without scaling card watts', () => {
-    const w = fixture();
-    startResearch(w, 'focus');
-    w.hot.rack.eff[0] = 0.5;
-    w.compiled.sys.etaCfg[0] = 0.5;
-    tick(w);
-    expect(w.hot.sys.accelResearchOps[0]).toBe(4.5);
-    expect(w.hot.sys.drawW[0]).toBe(150);
-  });
-
-  it.each(['offline', 'between'] as const)('%s research draws and bills all cards with no tasks', (mode) => {
-    const w = fixture();
-    startResearch(w, 'background');
-    if (mode === 'offline') w.hot.sys.mode[0] = MODE.offline;
-    else { w.round.phase = 'between'; w.hot.sys.mode[0] = MODE.paused; }
-    tick(w);
-    expect([...w.hot.sys.accelTaskS.slice(0, 3)]).toEqual([0, 0, 0]);
-    expect([...w.hot.sys.accelResearchS.slice(0, 3)]).toEqual([DT_S, DT_S, DT_S]);
-    expect(w.hot.sys.accelResearchOps[0]).toBe(18);
-    expect(w.hot.sys.drawW[0]).toBe(150);
-    expect(w.ledger.energyMeter).toBe(0.15);
   });
 
   it('power failure releases actual GPU holds and lists without erasing the consumed tick', () => {

@@ -154,14 +154,14 @@ export function powerCache(w: World, settings: PhysSettings, researchOn: boolean
     k = allocCache(c);
     caches.set(w.hot, k);
   }
-  if (k.compiled !== c || k.settings !== settings || k.researchOn !== researchOn || k.researchMode !== w.research.mode
+  if (k.compiled !== c || k.settings !== settings || k.researchOn !== researchOn || k.researchMode !== ''
     || k.roundPhase !== w.round.phase || k.startTick !== w.round.startTick) {
     flushStamps(w, k);
     k.stable.fill(0);
     k.rackForce.fill(1);
     k.log = null;
     k.compiled = c; k.settings = settings; k.researchOn = researchOn;
-    k.researchMode = w.research.mode; k.roundPhase = w.round.phase; k.startTick = w.round.startTick;
+    k.researchMode = ''; k.roundPhase = w.round.phase; k.startTick = w.round.startTick;
   }
   return k;
 }

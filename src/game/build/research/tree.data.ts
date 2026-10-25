@@ -8,7 +8,7 @@ export const DATA_BY_TIER: Readonly<Record<WorkTier, number>> = {
   9: 1.5e7, 10: 4e7, 11: 6e7, 12: 2e8, 13: 4e8, 14: 3e9, 15: 1e10,
 };
 export const WORK_TIER_OPS: Readonly<Record<WorkTier, number>> = {
-  1: 1_000, 2: 5_000, 3: 3e4, 4: 1e6, 5: 1.5e6, 6: 3e6, 7: 2e8, 8: 1e9,
+  1: 20, 2: 600, 3: 5_000, 4: 1.5e5, 5: 1e6, 6: 3e6, 7: 3e7, 8: 1e9,
   9: 5e9, 10: 2e10, 11: 2.5e10, 12: 3e10, 13: 4e10, 14: 6e10, 15: 1e11,
 };
 export const RESEARCH_CREDITS: Readonly<Record<string, string>> = {

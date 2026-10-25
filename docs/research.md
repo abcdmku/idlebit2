@@ -96,17 +96,17 @@ D19 stretches the game to months. Data and work are now fitted to the real campa
 
 ### 3.2 Work tiers
 
-D19 re-tiers research for a months-long game, from the real campaign bot (`scripts/balance/chain.ts`) through Room and from the design model beyond it. W1–W6 are unchanged in work: before Rack the Hz and kHz chips research far faster than Data arrives. From W7 on, work follows the measured research rate, not the old 24 h model. With the pipe capping each server, research gets idle threads plus 10% of busy ones: about 4e5–5e5 ops/s for a full kHz rack.
+D27 makes research a task that cuts the line: it holds a slot and its threads on the systems that take it, and the market waits behind it. So work is sized as **about N seconds of the era's typical hardware at unlock**: the mid-era clock (`docs/balance/hardware-progression/cpu_cost_spec.csv`) times the usual cores and lanes at that level. N is 10–20 s at the CPU level, where research holds the only core and the head behind it waits, and grows to about a minute from System on and a few minutes from Rack on. Between rounds every powered server takes it, on all its threads.
 
-| Tier | Work (ops) | Era | Duration on the real bot's fleet |
-|---|---:|---|---|
-| W1 | 1,000 | CPU, round 1 (roots) | seconds once clock levels land |
-| W2 | 5,000 | CPU, round 2 | seconds |
-| W3 | 3e4 | CPU, rounds 2–4 | seconds |
-| W4 | 1e6 | System opens | 1–3 min |
-| W5 | 1.5e6 | System, Hz | 2–4 min |
-| W6 | 3e6 | Late Hz, `fabKhz`, `rack` | under a minute on kHz parts |
-| W7 | 2e8 | kHz, Rack | about 8 min |
+| Tier | Work (ops) | Era | Typical hardware at unlock | Duration |
+|---|---:|---|---|---|
+| W1 | 20 | CPU, round 1 (roots) | 1 core, 2–4 Hz | 5–10 s |
+| W2 | 600 | CPU, round 2 | 1–2 cores, about 20 Hz, 2 lanes | about 15 s |
+| W3 | 5,000 | CPU, rounds 2–4 | 2–4 cores, 50–100 Hz, 2 lanes | about 15 s |
+| W4 | 1.5e5 | System opens | 4 cores, 0.3–1 kHz, 4 lanes | about 20 s |
+| W5 | 1e6 | System, kHz | 4 cores, 1–3 kHz, 4 lanes | about 30 s |
+| W6 | 3e6 | Late System, `fabKhz`, `rack` | the first kHz package, about 1e5 ops/s | about 30 s |
+| W7 | 3e7 | kHz, Rack | one kHz system to a starter rack, 2e5–1e6 ops/s | 30 s – 2 min |
 | W8 | 1e9 | Rack, early | about 40 min |
 | W9 | 5e9 | Rack, late, `fabMhz` | 3–4 h |
 | W10 | 2e10 | MHz, `room` | about 12 h: the Room save-up is research time as much as Data |
@@ -573,9 +573,9 @@ export const DATA_BY_TIER: Record<WorkTier, number> = {
 export const MILESTONE_DATA_FACTOR = 3;
 export const MILESTONE_IDS = ["systemBoard", "fabKhz", "rack", "fabMhz", "room", "fabGhz", "dataCenter", "regions", "intercontinental"] as const;
 
-/** Derived from scripts/market-model.ts (D5.6); see §3. */
+/** D27: about N seconds of the era's typical hardware at unlock; see §3.2. */
 export const WORK_TIER_OPS: Record<WorkTier, number> = {
-  1: 1_000, 2: 5_000, 3: 3e4, 4: 1e6, 5: 1.5e6, 6: 3e6, 7: 2e8, 8: 1e9,
+  1: 20, 2: 600, 3: 5_000, 4: 1.5e5, 5: 1e6, 6: 3e6, 7: 3e7, 8: 1e9,
   9: 5e9, 10: 2e10, 11: 2.5e10, 12: 3e10, 13: 4e10, 14: 6e10, 15: 1e11,
 };
 

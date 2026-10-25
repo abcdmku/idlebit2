@@ -130,17 +130,6 @@ describe('accelerator research duty consumption', () => {
     expect(fullDraw(w)).toBe(90);
   });
 
-  it.each(['offline', 'between'] as const)('%s research bills each physical card without active task stages', (mode) => {
-    const w = cards();
-    research(w, 'background');
-    if (mode === 'offline') w.hot.sys.mode[0] = MODE.offline;
-    else { w.round.phase = 'between'; w.hot.sys.mode[0] = MODE.paused; }
-    for (const slot of [0, 3, 7]) w.hot.sys.accelResearchS[slot] = DT_S;
-    physTicks(w, 1, (x) => expect(x.hot.bill[0]).toBe(150));
-    expect(w.hot.sys.active[2]).toBe(0);
-    expect(w.hot.sys.drawW[0]).toBe(150);
-  });
-
   it.each([
     [MODE.boot, true, 10], [MODE.asleep, true, 0.3],
     [MODE.dark, true, 0], [MODE.crashed, true, 0], [MODE.cold, true, 0],

@@ -112,6 +112,8 @@ export const SYS_HOT = {
   /** D26.1: bits held per tier by running shards (and unified-memory VRAM overflow); a storage node's usedDisk includes servers' spill onto it. */
   usedCache: f64, usedRam: f64, usedDisk: f64, usedVram: f64, queueHead: neg1, queueTail: neg1, queueLen: u16,
   running: u16, reserved: u16, ioHolds: u8, busy: f64, researchOps: f64,
+  /** D27: threads this system holds for the research task (0 = not a holder). Counted in busyThreads and as one admitted slot. */
+  researchThreads: u16,
   /** Σ est seconds of admitted + reserved tasks (leastWork); busy threads per socket; research ops/s at e = 1. */
   estS: f64, sockBusy: { t: 'u16', stride: MAX_CPUS }, researchRate: f64,
   drawW: f64, psuUsage: f64, psuOverTicks: i32, psuRebootTicks: i32, capFactor: { t: 'f64', fill: 1 },
@@ -259,8 +261,10 @@ export const G = {
   ramWork: 40, diskWork: 41,
   /** Queued tasks over every system (moved here when late took slot 14). */
   queued: 42,
+  /** D27: systems holding the research task, and the TREE_INDEX of the project they hold it for (-1 none). */
+  researchHolders: 43, researchProject: 44,
 } as const;
-export const G_SIZE = 43;
+export const G_SIZE = 45;
 
 export interface CompiledBuffers {
   readonly sys: Table<typeof SYS_COMPILED>;
@@ -315,7 +319,7 @@ export function allocHot(size: FleetSize, records = 8): HotBuffers {
   const g = new Float64Array(G_SIZE);
   g[G.nextTaskId] = 1;
   g[G.frontHead] = -1; g[G.frontTail] = -1; g[G.recFree] = -1; g[G.parentFree] = -1;
-  g[G.rqSites] = size.sites; g[G.rqRooms] = size.rooms;
+  g[G.rqSites] = size.sites; g[G.rqRooms] = size.rooms; g[G.researchProject] = -1;
   return {
     g, rng: new Uint32Array(4),
     sys: allocTable(SYS_HOT, size.systems, size.systems),

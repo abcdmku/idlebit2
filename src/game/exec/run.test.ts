@@ -137,35 +137,6 @@ describe('shared resources', () => {
   });
 });
 
-describe('research share (spec §11.2)', () => {
-  const withResearch = (w: World, mode: 'background' | 'shared' | 'focus') => {
-    w.research.active = 'x' as never;
-    w.research.mode = mode;
-  };
-  it('focus stops task progress and gives research every op', () => {
-    const w = lone({ gpuOps: 0 });
-    withResearch(w, 'focus');
-    feed(w, F.cpu, 1, 0.5);
-    steps(w, 20);
-    expect(metOf(w, F.cpu)).toBe(0);
-    expect(w.hot.g[G.researchOps]).toBeCloseTo(2, 9);
-  });
-  it('shared runs tasks at 0.75 and research at 0.25', () => {
-    const w = lone();
-    withResearch(w, 'shared');
-    feed(w, F.cpu, 1, 0.7);
-    expect(tickOf(w, F.cpu, 1)).toBe(9);
-  });
-  it('background research takes idle threads plus 10% of busy ones (D10.7)', () => {
-    const w = lone({ threads: 2, K: 1, gpuOps: 0 });
-    withResearch(w, 'background');
-    feed(w, F.cpu, 1, 5);
-    steps(w, 10);
-    // One idle thread for 1 s, plus 10% of the busy one.
-    expect(w.hot.g[G.researchOps]).toBeCloseTo(1.1, 9);
-  });
-});
-
 describe('work stealing (spec §6.5)', () => {
   it('free threads join a running shard short of floor(units / grain) threads', () => {
     const run = (rules: string[]) => {

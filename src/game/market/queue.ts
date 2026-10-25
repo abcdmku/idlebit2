@@ -9,6 +9,7 @@ import { baseRate, baseWeight, CURVE, sizeJitter, taskSize } from './curve';
 import { FAMILIES, payoutAt } from './families';
 import { canRunFleet, detailIndex } from './fleet';
 import { failTasks } from './sla';
+import { researchQueued } from '../exec/researchTask';
 
 /**
  * The endless queue (program D10, spec §5.2, §14.1 steps 2 and 7). The window holds the next five
@@ -66,6 +67,8 @@ export function graceOf(window: readonly QueuedTask[]): number {
 /** The first tick a head promoted now can be taken (spec §5.2): this tick until the deadline step, else the next. */
 const headNow = (w: World): number => w.tick + (w.late ? 1 : 0);
 const promote = (w: World): void => { w.market.headTick = headNow(w); };
+/** D27: the research task left the queue front; the task head gets a fresh 10 s. */
+export const promoteHead = (w: World): void => promote(w);
 
 const ringRow = (w: World): number => w.tick % RATE_RING_TICKS;
 
@@ -93,7 +96,7 @@ function leaveWindow(w: World, i: number): void {
  * window[0]. Pass it to takeHead or dropProbe. -1 when the round is not running.
  */
 export function probeHead(w: World): number {
-  if (w.round.phase !== 'running') return -1;
+  if (w.round.phase !== 'running' || researchQueued(w)) return -1;
   const front = w.hot.g[G.frontHead]!;
   if (front >= 0) return front;
   const t = w.market.window[0];
@@ -180,7 +183,7 @@ export function headGate(w: World): number {
  * the back. A dismissed head promotes the next with a fresh 10 s. Changes no SLA sum or count.
  */
 export function dismissAt(w: World, i: number): void {
-  const wasHead = i === 0 && w.hot.g[G.frontHead]! < 0;
+  const wasHead = i === 0 && w.hot.g[G.frontHead]! < 0 && !researchQueued(w);
   const family = w.market.window[i]!.family;
   w.hot.fam.dismissedRound[family] = w.hot.fam.dismissedRound[family]! + 1;
   leaveWindow(w, i);
@@ -222,13 +225,15 @@ export function marketPhase(w: World): void {
   ring.at[row] = w.tick;
   ring.taken[row] = 0;
   if (!w.research.unlocks.rules.includes('autoSkip')) return;
+  if (researchQueued(w)) return;
   for (let i = 0; i < QUEUE_VISIBLE && w.hot.g[G.frontHead]! < 0 && headGate(w) !== 0; i += 1) dismissAt(w, 0);
 }
 
 /** Deadlines (tick step 7): the head only. Untaken at the end of headTick + 99, it fails once. */
 export function deadlinePhase(w: World): void {
   w.late = true;
-  if (w.round.phase !== 'running') return;
+  // D27: the research task at the front has no clock, and the task behind it is not the head yet.
+  if (w.round.phase !== 'running' || researchQueued(w)) return;
   if (w.tick >= headDeadlineTick(w.market.headTick) && peekHead(w, head)) failHead(w);
 }
 /** Index of a task in the window, or -1. */

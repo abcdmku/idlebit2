@@ -6,6 +6,7 @@ import {
 import { MAX_ACCELS, MAX_UPS } from '../core/constants';
 import { rqLen, rqLevel, rqRow } from '../core/routerQueue';
 import { portSpeedPrice } from '../build/catalog';
+import { researchDef } from '../build/research/tree';
 import type { GpuGeneration } from '../types/gpu';
 import type { Policy } from './policies';
 
@@ -384,6 +385,20 @@ const OFF_PATH_SHARE = 0.25;
  * Research like a player saving for the next level: the next milestone and its missing
  * prerequisites first (cheapest first), then essential nodes and other extras within a budget.
  */
+/** D27: seconds of work left on the active project, on every thread of the fleet. */
+function researchLeftS(state: GameState): number {
+  const r = state.research;
+  if (r.active === null) return 0;
+  const c = state.compiled.sys;
+  let rate = 0;
+  for (let id = 0; id < c.len; id += 1) if (c.alive[id] === 1) rate += (c.threadRate[id] ?? 0) * (c.threads[id] ?? 0) * (c.etaCfg[id] ?? 1);
+  return rate > 0 ? Math.max(0, researchDef(r.active)!.work - r.activeProgress) / rate : Infinity;
+}
+/** A project this short is fine to run mid-round; a longer one waits for the round to end. */
+const RESEARCH_MIDROUND_S = 10;
+/** Between rounds, wait for a project to finish when it needs at most this long. */
+const RESEARCH_WAIT_S = 1800;
+
 function startResearch(state: GameState, log: BotEvent[]): GameState {
   const tree = selectResearchTree(state);
   if (tree.active !== null) return state;
@@ -411,6 +426,7 @@ function startResearch(state: GameState, log: BotEvent[]): GameState {
   const offPath = open.filter((n) => !path.has(n.id) && since + amountToNumber(n.dataCost) <= OFF_PATH_SHARE * pathData).sort(byDataCost);
   const pick = onPath ?? offPath.find((n) => ESSENTIAL.includes(n.id)) ?? (target ? offPath[0] : open.sort(byDataCost)[0]);
   if (!pick) return state;
+  if (state.round.phase === 'running' && researchLeftS({ ...state, research: { ...state.research, active: pick.id, activeProgress: 0 } }) > RESEARCH_MIDROUND_S) return state;
   const next = tryAction(state, { type: 'startResearch', project: pick.id });
   if (!next) return state;
   const paid = quote(state, { kind: 'research', project: pick.id }).quotes[0]!;
@@ -426,7 +442,9 @@ export function decide(state: GameState, policy: Policy, log: BotEvent[]): GameS
   let s = state;
   if (policy.researches) s = startResearch(s, log);
   if (policy.buys) s = buyParts(s, policy, log);
-  if (s.round.phase !== 'running') {
+  // D27: research holds threads and the market waits behind it, so a player lets a short project
+  // finish between rounds before returning.
+  if (s.round.phase !== 'running' && !(s.research.active !== null && researchLeftS(s) <= RESEARCH_WAIT_S)) {
     const next = tryAction(s, { type: 'returnToMarket' });
     if (next) {
       log.push({ tick: s.clock.tick, kind: 'return', label: `round ${next.round.index}`, cost: '0' });

@@ -11,6 +11,7 @@ export function recordingContext(): Recording {
     imageSmoothingEnabled: false,
     get font() { return state.font; }, set font(v: string) { state.font = v; },
     fillText(text: string, x: number, y: number, maxWidth?: number) { texts.push({ text, x, y, maxWidth, font: state.font }); },
+    strokeText() {}, lineWidth: 1, lineJoin: 'miter', strokeStyle: '',
     measureText(text: string) { return { width: text.length * 8 }; },
     textBaseline: 'alphabetic',
     fillRect(x: number, y: number, w: number, h: number) { fills.push({ x, y, w, h, c: state.fillStyle, a: state.globalAlpha }); },

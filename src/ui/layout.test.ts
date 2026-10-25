@@ -17,7 +17,7 @@ describe('L2 shell geometry', () => {
     expect(L.cards.map(c => [c.x, c.w])).toEqual([[264, 288], [552, 288], [840, 288], [1128, 288]]);
     expect(L.view.y).toBe(120);
     expect(L.now).toEqual({ x: 24, y: 696, w: 672, h: 120 });
-    expect(L.dismiss).toEqual({ x: 576, y: 720, w: 96, h: 48 });
+    expect(L.dismiss).toEqual({ x: 528, y: 720, w: 144, h: 48 });
     expect(L.buy).toEqual({ x: 24, y: 816, w: 672, h: 48 });
     expect(L.kind === 'desktop' && L.rows[0]).toEqual({ x: 720, y: 696, w: 696, h: 24 });
     expect(L.research).toEqual({ x: 720, y: 816, w: 696, h: 48 });
