@@ -118,6 +118,8 @@ D27 makes research a task that cuts the line: it holds a slot and its threads on
 
 ### 3.3 Data cost
 
+**D32.** A node's price `D` (the Data column) is paid as `D` Data plus `10 × D` Credits at Start. `CREDITS_ONLY` nodes (power, cooling, physical operations, `lowVoltRam`; §9) pay the `10 × D` Credits and no Data. Research therefore competes with hardware for Credits: the bot's milestone saves and the CPU-generation save hold back off-path research.
+
 Structure unlocks and fab generations cost 3× their tier, so each era jump is a save-up target: `systemBoard`, `fabKhz`, `rack`, `fabMhz`, `room`, `fabGhz`, `dataCenter`, `regions` and `intercontinental`. The real bot saves for the next milestone's path and spends at most a quarter of it on other nodes.
 
 | Tier | Data | Milestone Data | Against the real Data income |
@@ -588,18 +590,18 @@ export const WORK_TIER_OPS: Record<WorkTier, number> = {
   9: 5e9, 10: 2e10, 11: 2.5e10, 12: 3e10, 13: 4e10, 14: 6e10, 15: 1e11,
 };
 
-/** Whole-Credit Amount inputs. Omitted IDs cost zero Credits. Never convert through Number. */
-export const RESEARCH_CREDITS: Readonly<Record<string, string>> = {
-  gpuGen1: "0",
-  gpuGen2: "640000000",
-  gpuGen3: "6400000000",
-  gpuGen4: "64000000000",
-  gpuGen5: "640000000000",
-  gpuGen6: "6400000000000",
-  gpuGen7: "64000000000000",
-  gpuGen8: "640000000000000",
-  gpuGen9: "6400000000000000",
-};
+/** D32: every node also costs CREDITS_PER_DATA x its Data price D in Credits, paid with the Data at Start. */
+export const CREDITS_PER_DATA = 10;
+/** D32: power, cooling and operations nodes that have nothing to do with data cost Credits only: 10 x D Credits, 0 Data. */
+export const CREDITS_ONLY = [
+  "cstateC1", "cstateC3", "cstateC6", "dualFeed", "dvfs", "hvIntake", "loadShed", "meteredPdu",
+  "packageC", "powerCap", "psu80", "psuBronze", "psuGold", "psuPlatinum", "psuTitanium", "s3Sleep",
+  "substation", "switchedPdu", "turbo", "upsLithium", "upsOnline", "chilledWater", "chilledWater2", "closedLoop",
+  "closedLoop2", "containment", "economizer", "hotColdAisle", "rackAir2", "rackVarSpeed", "rackWater", "rackWater2",
+  "roomAir2", "roomVarSpeed", "thermalThrottle", "autoReturn", "configSave", "cronTuning", "fastBoot", "gracefulDrain",
+  "hotPlug", "hotSwap", "offline12", "offline24", "offline48", "researchQueue", "rollingUpgrade", "telemetry",
+  "warmBoot", "lowVoltRam",
+];
 
 export type PartId =
   | "core" | "clock" | "l1" | "l2" | "l3" | "scheduler" | "cpu" | "psu"
@@ -656,10 +658,10 @@ export interface ResearchNode {
   level: ZoomLevel;
   era: Era;
   tier: WorkTier;
-  /** Data paid when the project starts (D3). Whole number; these literals are exact doubles, and the wallet holds Data as an exact integer. */
+  /** The node's price D (D3, D32): Data paid when the project starts, 0 for CREDITS_ONLY nodes. Whole number; these literals are exact doubles, and the wallet holds Data as an exact integer. */
   data: number;
-  /** Whole-Credit decimal string, paid once at actual start, never on queue. */
-  creditCost?: string;
+  /** D32: CREDITS_PER_DATA x D whole Credits, paid once at actual start, never on queue. */
+  creditCost: number;
   effects: readonly ResearchEffect[];
   answers: readonly AnswerCode[];
 }
@@ -676,7 +678,7 @@ const chipGen = (g: number) =>
 const n = (
   id: string, name: string, category: ResearchCategory, requires: string[],
   level: ZoomLevel, era: Era, tier: WorkTier, data: number, effects: ResearchEffect[], answers: AnswerCode[],
-): ResearchNode => ({ id, name, category, requires, level, era, tier, data, creditCost: RESEARCH_CREDITS[id], effects, answers });
+): ResearchNode => ({ id, name, category, requires, level, era, tier, data: (CREDITS_ONLY as readonly string[]).includes(id) ? 0 : data, creditCost: CREDITS_PER_DATA * data, effects, answers });
 
 export const RESEARCH_V3: readonly ResearchNode[] = [
   // Compute

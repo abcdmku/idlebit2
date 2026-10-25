@@ -114,8 +114,9 @@ function desktop(N: 2 | 3, aw: number, ah: number, safe: SafeInsets): DesktopLay
   const world = r(U, U, W - 2 * U, deckY - 2 * U);
   const band = r(U, U, world.w, 2 * U);
   const strip = r(U, band.y + band.h, world.w, 2 * U);
-  // Five cards, head first: the next 4 share the width on the lattice and the head takes the rest.
-  const cardW = Math.floor((world.w - 10 * U) / 4 / U) * U, headW = world.w - 4 * cardW;
+  // Five cards, head first: the head keeps room for the longest name and its state on one line ("Replicated
+  // Write restarting"); the next 4 share the rest on the lattice and the head takes what is left over.
+  const headMin = N === 3 ? 14 * U : 16 * U, cardW = Math.floor((world.w - headMin) / 4 / U) * U, headW = world.w - 4 * cardW;
   const headSlot = r(U, strip.y, headW, strip.h);
   const card = (i: number) => r(headSlot.x + headW + i * cardW, strip.y, cardW, strip.h);
   const top = strip.y + strip.h;

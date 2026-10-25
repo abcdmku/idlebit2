@@ -2,15 +2,33 @@ import { amount, amountCompare, ZERO_AMOUNT, type Amount } from '../amount';
 import { effectText, RESEARCH, researchDef } from '../build/research/tree';
 import { G } from '../core/buffers';
 import { MODE } from '../core/timers';
-import { TICKS_PER_SECOND } from '../core/constants';
+import { TICK_MS, TICKS_PER_SECOND } from '../core/constants';
 import type { ResearchDef } from '../types/catalog';
 import type { LevelId } from '../types/ids';
 import type { ResearchBadge } from '../types/snapshot';
 import type { GameState, ResearchState } from '../types/state';
 import type { ResearchNodeState, ResearchNodeView, ResearchTreeView } from '../types/views';
+import { researchChange } from './researchChange';
 import { researchRoot } from './researchParts';
 import { researchCreditsPerMinute, researchLenders } from './lenders';
 import { answerTypes } from '../market/taskTypes';
+
+/** Income needs this much elapsed round time before it means anything. */
+const INCOME_MIN_MS = 10_000;
+/**
+ * Round-time income for research ETAs (ResearchTreeView.income): the running round's totals over
+ * its elapsed time, else the last report's over its duration.
+ */
+export function roundIncome(state: GameState): ResearchTreeView['income'] {
+  const round = state.round;
+  const running = round.phase === 'running';
+  const last = running ? null : round.reports.at(-1) ?? null;
+  const ms = running ? Math.max(0, state.clock.tick - round.startTick) * TICK_MS : last?.durationMs ?? 0;
+  if (ms < INCOME_MIN_MS) return { dataPerSec: 0, creditsPerSec: 0 };
+  const data = running ? Number(round.data) : Number(last!.data);
+  const net = running ? Number(round.gross) - Number(round.energy) : Number(last!.net);
+  return { dataPerSec: data / (ms / 1000), creditsPerSec: net / (ms / 1000) };
+}
 
 /**
  * Research ops of the last tick, scaled to a second. Exec writes each holder's tally to sys.researchOps;
@@ -30,21 +48,45 @@ export function researchOpsPerSec(state: GameState): number {
  * threads; between rounds every paused, linked server holds all of its threads.
  */
 export function holdOpsPerSec(state: GameState): number {
+  return heldOpsPerSec(state, true);
+}
+
+/**
+ * Research ops/s once systems take the project, whichever slots are busy now
+ * (ResearchTreeView.takenOpsPerSec): ROUND_THREADS on every system that can hold it during a round,
+ * every thread between rounds; while a project runs, its current rate.
+ */
+export function takenOpsPerSec(state: GameState): number {
+  return heldOpsPerSec(state, false);
+}
+
+/** exec/researchTask: a holder keeps one thread during a round (D27 amendment), all of them between rounds. */
+const ROUND_THREADS = 1;
+
+/**
+ * exec/researchTask's take rule, read only. A live, linked server switched online can hold research:
+ * on the market (or asleep, woken by the take) during a round, paused between rounds. With
+ * `roomNow` it also needs a free slot and free threads now, and takes only those.
+ */
+function heldOpsPerSec(state: GameState, roomNow: boolean): number {
   if ((state.hot.g[G.researchHolders] ?? 0) > 0) return researchOpsPerSec(state);
   const c = state.compiled.sys, h = state.hot.sys, running = state.round.phase === 'running';
   let ops = 0;
   for (let s = 0; s < c.len; s += 1) {
-    if (c.alive[s] !== 1 || c.kind[s] !== 0) continue;
+    if (c.alive[s] !== 1 || c.kind[s] !== 0 || c.intent[s] !== 1) continue;
     if (state.compiled.rack.opened[c.rack[s]!] === 1 && c.port[s]! < 0) continue;
     const mode = h.mode[s]!, threads = Math.max(1, c.threads[s]!);
-    let free = threads;
+    let take = threads;
     if (running) {
       if (mode !== MODE.onMarket && mode !== MODE.asleep) continue;
-      const slots = Math.max(1, c.slots[s]!, c.keff[s]!);
-      if (h.running[s]! + h.queueLen[s]! + h.reserved[s]! >= slots) continue;
-      free = threads - h.busyThreads[s]!;
+      take = Math.min(ROUND_THREADS, threads);
+      if (roomNow) {
+        const slots = Math.max(1, c.slots[s]!, c.keff[s]!);
+        if (h.running[s]! + h.queueLen[s]! + h.reserved[s]! >= slots) continue;
+        take = Math.min(take, threads - h.busyThreads[s]!);
+      }
     } else if (mode !== MODE.paused) continue;
-    if (free > 0) ops += c.threadRate[s]! * h.clockFactor[s]! * c.etaCfg[s]! * free;
+    if (take > 0) ops += c.threadRate[s]! * h.clockFactor[s]! * c.etaCfg[s]! * take;
   }
   return ops;
 }
@@ -104,12 +146,12 @@ export function researchTree(state: GameState): ResearchTreeView {
       level: def.level, era: def.era, tier: def.tier,
       needsData: st === 'queued' && amountCompare(cost, state.wallet.data) > 0,
       effect: effectText(def.id), summary: def.summary, answers: answerTypes(def.answers),
-      ...researchRoot(def.id),
+      ...researchRoot(def.id), change: researchChange(state, def),
     });
   }
   const slots = r.unlocks.ceilings.researchQueue;
   return {
-    nodes, active: r.active, opsPerSec: researchOpsPerSec(state), holdOpsPerSec: holdOpsPerSec(state), queue: r.queue,
+    nodes, income: roundIncome(state), active: r.active, opsPerSec: researchOpsPerSec(state), holdOpsPerSec: holdOpsPerSec(state), takenOpsPerSec: takenOpsPerSec(state), queue: r.queue,
     queueSlots: slots > 1 ? slots : 0, horizon: researchHorizon(state),
     lenders: researchLenders(state), creditsPerMinute: researchCreditsPerMinute(state),
   };

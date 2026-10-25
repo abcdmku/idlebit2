@@ -1130,8 +1130,8 @@ Each rack and zone has a crash timer `tHot`, in seconds:
 
 ### 11.1 Projects
 
-- `docs/research.md` lists projects. Each has a **Data cost** (whole Data), a `work` volume in compute ops, prerequisites, and effects (Appendix C). The research plate shows Data, work and any exact Credit fee. GPU generation 1 costs 0 Credits; generations 2 through 9 charge `16 * B(g)` Credits once at actual start, in addition to Data and running energy. Other nodes retain their existing fees. The accepted GPU ruling supersedes D3 only for these explicit fees.
-- **Costs are paid when a project actually starts.** Require both Data and any `creditCost`, then debit them atomically once. Switching and resuming preserve progress and paid status and charge neither again. Cancellation refunds neither currency. Nothing else costs Data.
+- `docs/research.md` lists projects. Each has a price `D`, a `work` volume in compute ops, prerequisites, and effects (Appendix C). **D32:** a project costs `D` Data plus `10 × D` Credits; power, cooling and other non-data nodes (`CREDITS_ONLY`, research §9) cost the `10 × D` Credits only, with 0 Data. The research plate shows Data (or Credits only), Credits and work.
+- **Costs are paid when a project actually starts.** Require both Data and `creditCost`, then debit them atomically once; starting short of either is rejected. Switching and resuming preserve progress and paid status and charge neither again. Cancellation refunds neither currency. Nothing else costs Data.
 - One project is active. With the `researchQueue` ceiling the player may queue more, up to that many in total. Queuing reserves and debits neither currency. When the active project completes, the next queued project starts in the same tick only if both balances cover its costs. Otherwise it waits at the head with the missing Data/Credit reason and starts at the first eligible research step.
 - Progress is float64 ops. It is kept across losses, rounds, switching and cancellation.
 - Completion is checked at the research step (§14). Effects apply from the next tick.

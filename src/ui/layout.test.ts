@@ -13,8 +13,8 @@ describe('L2 shell geometry', () => {
     expect(L.band).toEqual({ x: 24, y: 24, w: 1392, h: 48 });
     expect([L.sla, L.endKey, L.wallet]).toEqual([{ x: 512, y: 24, w: 480, h: 48 }, { x: 1000, y: 24, w: 112, h: 48 }, { x: 1192, y: 24, w: 200, h: 48 }]);
     expect(L.strip).toEqual({ x: 24, y: 72, w: 1392, h: 48 });
-    expect(L.headSlot).toEqual({ x: 24, y: 72, w: 240, h: 48 });
-    expect(L.cards.map(c => [c.x, c.w])).toEqual([[264, 288], [552, 288], [840, 288], [1128, 288]]);
+    expect(L.headSlot).toEqual({ x: 24, y: 72, w: 336, h: 48 });
+    expect(L.cards.map(c => [c.x, c.w])).toEqual([[360, 264], [624, 264], [888, 264], [1152, 264]]);
     expect(L.view.y).toBe(120);
     expect(L.now).toEqual({ x: 24, y: 696, w: 672, h: 120 });
     expect(L.dismiss).toEqual({ x: 528, y: 720, w: 144, h: 48 });
@@ -41,6 +41,12 @@ describe('L2 shell geometry', () => {
     expect(L.research).toEqual({ x: 96, y: 704, w: 112, h: 64 });
     expect(L.buy).toEqual({ x: 216, y: 704, w: 160, h: 64 });
     expect(L.pipeSrc).toEqual({ x: 32, y: 168 });
+  });
+  it('the strip head holds the longest name with its state on one line at every desktop size', () => {
+    for (const [w, h] of [[1440, 900], [1920, 1080], [1280, 720], [1200, 760], [1100, 700], [1366, 768]] as const) {
+      const L = shellLayout(w, h), text = 'Replicated Write restarting'.length * 0.56 * L.body;
+      expect(L.headSlot.w - (L.lat + 16 * L.N + 8) - 8, `${w}x${h}`).toBeGreaterThanOrEqual(text);
+    }
   });
   it('N = 3 from 1200 × 760 (A01); smaller desktops drop to N = 2; narrow screens use the phone deck', () => {
     expect([shellLayout(1280, 800).kind, shellLayout(1280, 800).N, shellLayout(1200, 760).N, shellLayout(1440, 800).N]).toEqual(['desktop', 3, 3, 3]);

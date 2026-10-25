@@ -406,14 +406,19 @@ export type ResearchPartId =
   | 'structure';
 /** The hardware level a part belongs to: the research tab, whatever era the node unlocks in. */
 export type ResearchTabId = 'cpu' | 'system' | 'rack' | 'room' | 'global';
+/** A node's concrete before → after on the part it upgrades, as display strings ("Cores per CPU", "1", "2"). */
+export interface ResearchChangeView { readonly label: string; readonly before: string; readonly after: string }
 export interface ResearchNodeView {
   /** The root it grows from, and that root's hardware tab (a CPU part's node is on the CPU tab in every era). */
   readonly part: ResearchPartId;
   readonly tab: ResearchTabId;
+  /** Before → after against the current unlocks and build; null when the node has no clean scalar (fabs, structure, most rules). */
+  readonly change: ResearchChangeView | null;
   /** Deduplicated D23 task types answered by this node's catalog bands. */
   readonly answers: readonly TaskTypeId[];
   readonly needsCredits?: boolean;
-  readonly creditCost?: Amount;
+  /** D32: Credits paid at Start alongside dataCost (0 Data for Credits-only nodes). */
+  readonly creditCost: Amount;
   readonly id: ResearchId;
   readonly name: string;
   readonly category: ResearchCategory;
@@ -443,6 +448,11 @@ export interface LenderView {
 }
 export interface ResearchTreeView {
   readonly nodes: readonly ResearchNodeView[];
+  /**
+   * Round-time income for ETAs, per second: this round's Data and net Credits (gross − energy) over
+   * its elapsed time while it runs; else the last report's over its duration. 0 until 10 s have elapsed.
+   */
+  readonly income: { readonly dataPerSec: number; readonly creditsPerSec: number };
   readonly active: ResearchId | null;
   readonly opsPerSec: number;
   /**
@@ -450,6 +460,12 @@ export interface ResearchTreeView {
    * during a round, or every paused server's threads between rounds. While a project runs, its current rate.
    */
   readonly holdOpsPerSec: number;
+  /**
+   * Research ops/s once systems take the project, whichever slots are busy now: one thread on every
+   * system that can hold it during a round (D27 amendment), every thread of paused, linked, online
+   * servers between rounds; while a project runs, its current rate. For the hold estimate.
+   */
+  readonly takenOpsPerSec: number;
   readonly queue: readonly ResearchId[];
   /** 0 until researchQueue. */
   readonly queueSlots: number;

@@ -148,7 +148,7 @@ Do not sell energy savings as an immediate payback. At an offered load of 2.4 bi
 
 The IDs are `gpuGen1` through `gpuGen9`. The generic generation adapter uses internal index `g - 1`; model IDs keep displayed generations 1 through 9. Each node opens all 24 native models of that generation. Higher tiers require more Credits, not another research node. Do not require owning an expensive 9-series card to research a generation. Existing structural and CPU fab prerequisites remain as read-only dependencies.
 
-Generation 1 has no Credit fee. For `g = 2..9`, `creditFee(g) = 16 * B(g)`. Charge it exactly once when the project actually starts, including a queued start. Queuing reserves and debits neither currency. Wait until both balances suffice, then debit both atomically. Switching or resuming a paid project charges nothing again. Cancellation refunds neither the fee nor Data, under the existing cancel policy. Energy remains an additional running cost.
+**D32 supersedes this fee:** every GPU generation node costs Credits = 10 × its Data (gen 2: 1,000,000 Data + 10,000,000 Credits). The rest of this paragraph (charged once at actual start, atomic, no refunds) still holds. Former rule: generation 1 had no Credit fee; for `g = 2..9`, `creditFee(g) = 16 * B(g)`. Charge it exactly once when the project actually starts, including a queued start. Queuing reserves and debits neither currency. Wait until both balances suffice, then debit both atomically. Switching or resuming a paid project charges nothing again. Cancellation refunds neither the fee nor Data, under the existing cancel policy. Energy remains an additional running cost.
 
 | Node | Exact whole-Credit fee |
 |---|---:|

@@ -106,7 +106,7 @@ describe('queue strip (D10, D17.1): five cards, the head first, updated in place
     expect(text('[data-testid=strip-state]')).toBe('10 s');
     mounted.frame(3000);
     expect(text('[data-testid=strip-state]')).toBe('7 s');
-    expect($('.head-slot .rim-fill')!.style.width).toBe(`${Math.round((240 / 3 - 2) * 0.7) * 3}px`);
+    expect($('.head-slot .rim-fill')!.style.width).toBe(`${Math.round((336 / 3 - 2) * 0.7) * 3}px`);
     expect(cards().map(c => c.dataset.task)).toEqual(['1:1:2', '1:1:3', '1:1:4', '1:1:5']);
     expect(cards()[0]!.textContent).toContain('+1');
     act(() => store.set({ feed: { window: store.getSnapshot().feed.window.map((t, i) => (i ? t : { ...t, blockedBy: 'cache' })) } }));
@@ -312,11 +312,12 @@ describe('research cuts the line (D27)', () => {
     const store = fakeStore();
     store.set({ feed: { research: research(false), headDeadlineTick: null } });
     mounted = mount(<><QueueStrip /><OffersScope><Deck /></OffersScope></>, store, DESKTOP);
-    expect(text('[data-testid=research-head]')).toBe('Pipelining next');
+    expect(text('[data-testid=research-head]')).toBe('Pipelining 3k ops · next');
     expect(text('[data-testid=now]')).toContain('Pipelining 3k ops');
     const cards = [...mounted.host.querySelectorAll<HTMLElement>('.slot .tag')];
     expect(cards[0]!.dataset.task).toBe('1:1:1');
-    expect(cards[0]!.textContent).toContain('waiting');
+    // the card says the market waits when the line fits whole; at 1440 it keeps the name and payout
+    expect(cards[0]!.textContent).toBe('Bit Flip +1');
     expect(text('[data-testid=now]')).toContain('Next in line · runs on free threads');
     expect($('[data-testid=dismiss]')).toBeNull();
     expect(text('[data-testid=research-key]')).toContain('next in line');
@@ -328,6 +329,21 @@ describe('research cuts the line (D27)', () => {
     expect($('[data-testid=research-head]')).toBeNull();
     expect($('.head-slot .tag')!.dataset.task).toBe('1:1:1');
     expect(text('[data-testid=research-key]')).toBe('Research · Pipelining running · 1.2k ops/s42%');
+  });
+  it('phone: the Research tile reads two clean lines in every state', () => {
+    const store = fakeStore();
+    store.set({ feed: { research: research(true) } });
+    mounted = mount(<OffersScope><Deck /></OffersScope>, store, { width: 390, height: 780 });
+    const lines = () => [...$('[data-testid=research-key]')!.querySelectorAll('.t')].map(e => e.textContent);
+    expect(lines()).toEqual(['Research', 'Running 42%']);
+    act(() => store.set({ feed: { research: research(false) } }));
+    expect(lines()).toEqual(['Research', 'Next in line']);
+  });
+  it('phone: a project stopped for Credits says so on both lines', () => {
+    const store = fakeStore();
+    store.set({ feed: { research: research(true) }, research: { stoppedInsolvent: true } });
+    mounted = mount(<OffersScope><Deck /></OffersScope>, store, { width: 390, height: 780 });
+    expect([...$('[data-testid=research-key]')!.querySelectorAll('.t')].map(e => e.textContent)).toEqual(['Stopped', 'no Credits']);
   });
 });
 

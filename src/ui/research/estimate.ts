@@ -1,9 +1,15 @@
-// D27: a started project goes to the front of the line and holds the free threads until done, while
-// tasks wait. The Start key estimates that hold from ResearchTreeView.holdOpsPerSec.
+// Durations for the research screen: how long a project holds the hardware (D27: work over
+// ResearchTreeView.takenOpsPerSec) and how long until the wallet can pay (money.ts ETAs).
 
-/** "~12 s", "~4 min", "~3 h": how long `workOps` holds the hardware at `rate`. */
-export function holdText(workOps: number, rate: number | null): string | null {
-  if (!rate || rate <= 0 || !Number.isFinite(workOps)) return null;
-  const s = workOps / rate;
-  return s < 90 ? `~${Math.max(1, Math.ceil(s))} s` : s < 5400 ? `~${Math.round(s / 60)} min` : `~${Math.round(s / 3600)} h`;
+/** "~12 s", "~4 min", "~3 h", "~2 d". */
+export function durationText(s: number): string {
+  if (s < 90) return `~${Math.max(1, Math.ceil(s))} s`;
+  if (s < 5400) return `~${Math.round(s / 60)} min`;
+  if (s < 172_800) return `~${Math.round(s / 3600)} h`;
+  return `~${Math.round(s / 86_400)} d`;
+}
+
+/** Seconds `ops` of work holds the hardware at `rate` ops/s, or null without a rate. */
+export function holdSeconds(ops: number, rate: number | null): number | null {
+  return rate && rate > 0 && Number.isFinite(ops) ? ops / rate : null;
 }

@@ -10,7 +10,7 @@ import { maxLevel } from '../locks';
 import { deriveUnlocks } from './effects';
 import { DEFERRED_HARDWARE_RESEARCH, deferredHardwareResearch } from './runtimeCompatibility';
 import { effectText, nodeForCeiling, RESEARCH, researchDef } from './tree';
-import { RESEARCH_CREDITS, TREE_ROWS, WORK_TIER_OPS } from './tree.data';
+import { CREDITS_ONLY, CREDITS_PER_DATA, TREE_ROWS, WORK_TIER_OPS } from './tree.data';
 import { EFFECT_TEXT, SHORT_TEXT } from './tree.text';
 
 describe('deferred CPU/RAM research boundary', () => {
@@ -31,7 +31,7 @@ describe('deferred CPU/RAM research boundary', () => {
     for (const [id, name, category, requires, level, era, tier, data, effects, answers] of TREE_ROWS) {
       const reference: ResearchDef = {
         id: researchId(id), name, category, requires: requires.map(researchId), level: level === 'cpu' ? 'chip' : level,
-        era, tier, data, work: WORK_TIER_OPS[tier], creditCost: amount(RESEARCH_CREDITS[id] ?? '0'),
+        era, tier, data: CREDITS_ONLY.includes(id) ? 0 : data, work: WORK_TIER_OPS[tier], creditCost: amount(String(data * CREDITS_PER_DATA)),
         effects, effect: EFFECT_TEXT[id] ?? '', summary: SHORT_TEXT[id] ?? '', answers, implemented: true,
       };
       const runtime = researchDef(id)!;

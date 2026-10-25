@@ -401,8 +401,10 @@ export function creditReserve(state: GameState): number {
   // A fee more than half an hour of gross income away is a goal, not a reason to stop building.
   const horizon = RESERVE_HORIZON_S * grossRate(state);
   let reserve = 0;
+  // D32: research costs Credits too; a player saves for the next milestone's path and essential nodes.
+  const { path } = milestonePath(tree);
   for (const n of tree.nodes) {
-    if (n.state !== 'available' || !ESSENTIAL.includes(n.id) || !n.creditCost) continue;
+    if (n.state !== 'available' || !(ESSENTIAL.includes(n.id) || path.has(n.id))) continue;
     if (amountCompare(n.dataCost, state.wallet.data) > 0) continue;
     const fee = amountToNumber(n.creditCost);
     if (fee > 0 && fee <= horizon && (reserve === 0 || fee < reserve)) reserve = fee;
@@ -467,7 +469,24 @@ function buyParts(state: GameState, policy: Policy, log: BotEvent[]): GameState 
   return s;
 }
 
-const byDataCost = (a: ResearchNodeView, b: ResearchNodeView) => amountCompare(a.dataCost, b.dataCost) || a.workOps - b.workOps;
+/** D32: a node's price D: its Data, or a tenth of its Credits for Credits-only nodes. */
+const priceOf = (n: ResearchNodeView): number => Math.max(amountToNumber(n.dataCost), amountToNumber(n.creditCost) / 10);
+const byPrice = (a: ResearchNodeView, b: ResearchNodeView) => priceOf(a) - priceOf(b) || a.workOps - b.workOps;
+
+/** The next milestone and its missing prerequisites. */
+function milestonePath(tree: ReturnType<typeof selectResearchTree>): { path: Set<string>; target: string | undefined } {
+  const byId = new Map<string, ResearchNodeView>(tree.nodes.map((n) => [n.id, n]));
+  const path = new Set<string>();
+  const walk = (id: string) => {
+    const n = byId.get(id);
+    if (!n || n.state === 'done' || path.has(id)) return;
+    path.add(id);
+    n.requires.forEach(walk);
+  };
+  const target = MILESTONES.find((id) => byId.has(id) && byId.get(id)!.state !== 'done');
+  if (target) walk(target);
+  return { path, target };
+}
 
 /** Off-path research that unblocks income; a sensible player takes it as soon as the budget allows. */
 const ESSENTIAL = ['fifoSched', 'dualCore', 'memController', 'psu80', 'gpuGen1', 'storageCtl', 'octaCore', 'outOfOrder', 'lbCapability', 'portExpansion', 'sw100k', 'gddr6', 'gpuGen2', 'densePorts', 'meteredPdu'];
@@ -496,29 +515,24 @@ function startResearch(state: GameState, log: BotEvent[]): GameState {
   const tree = selectResearchTree(state);
   if (tree.active !== null) return state;
   const byId = new Map<string, ResearchNodeView>(tree.nodes.map((n) => [n.id, n]));
-  const path = new Set<string>();
-  const walk = (id: string) => {
-    const n = byId.get(id);
-    if (!n || n.state === 'done' || path.has(id)) return;
-    path.add(id);
-    n.requires.forEach(walk);
-  };
-  const target = MILESTONES.find((id) => byId.has(id) && byId.get(id)!.state !== 'done');
-  if (target) walk(target);
-  const pathData = [...path].reduce((sum, id) => sum + amountToNumber(byId.get(id)!.dataCost), 0);
+  const { path, target } = milestonePath(tree);
+  const pathData = [...path].reduce((sum, id) => sum + priceOf(byId.get(id)!), 0);
   let since = 0;
   for (let i = log.length - 1; i >= 0; i -= 1) {
     const e = log[i]!;
     if (e.kind !== 'research') continue;
     if (MILESTONES.includes(e.label)) break;
-    since += amountToNumber(e.cost);
+    since += Math.max(amountToNumber(e.cost), amountToNumber(e.creditCost ?? '0') / 10);
   }
   const open = tree.nodes.filter((n) => n.state === 'available'
     && quote(state, { kind: 'research', project: n.id }).quotes.some((q) => q.locked === null && q.affordable));
-  const onPath = open.filter((n) => path.has(n.id)).sort(byDataCost)[0];
-  const offPath = open.filter((n) => !path.has(n.id) && since + amountToNumber(n.dataCost) <= OFF_PATH_SHARE * pathData).sort(byDataCost);
-  const pick = onPath ?? offPath.find((n) => ESSENTIAL.includes(n.id)) ?? (target ? offPath[0] : open.sort(byDataCost)[0]);
+  const onPath = open.filter((n) => path.has(n.id)).sort(byPrice)[0];
+  const offPath = open.filter((n) => !path.has(n.id) && since + priceOf(n) <= OFF_PATH_SHARE * pathData).sort(byPrice);
+  const pick = onPath ?? offPath.find((n) => ESSENTIAL.includes(n.id)) ?? (target ? offPath[0] : open.sort(byPrice)[0]);
   if (!pick) return state;
+  // D32: research Credits come out of the hardware budget; off the milestone path, a new CPU generation's save comes first.
+  const save = path.has(pick.id) ? 0 : nextCpuSave(state), fee = amountToNumber(pick.creditCost);
+  if (save > 0 && amountToNumber(state.wallet.credits) - fee < save) return state;
   if (state.round.phase === 'running' && researchLeftS({ ...state, research: { ...state.research, active: pick.id, activeProgress: 0 } }) > RESEARCH_MIDROUND_S) return state;
   const next = tryAction(state, { type: 'startResearch', project: pick.id });
   if (!next) return state;

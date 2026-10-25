@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { act } from 'react';
-import { createInitialState, researchId, type Amount, type GameAction, type ResearchNodeView, type ResearchTreeView } from '../../game';
+import { createInitialState, researchId, selectContextualResearchTree, selectResearchTree, type Amount, type GameAction, type GameState,
+  type LevelId, type ResearchNodeView, type ResearchTreeView } from '../../game';
 import { createGameStore } from '../../platform/store';
 import { createLevelRegistry } from '../../render/core';
 import { createShellValue, ShellContext } from '../storeHooks';
@@ -9,128 +10,231 @@ import { shellLayout } from '../layout';
 import { LayoutContext } from '../shell/geometry';
 import { button, click, mount, type Mounted } from '../plates/testkit';
 import { ResearchScreen, ResearchView, type ResearchViewProps } from './ResearchScreen';
-import { projectKey, tabBadges, tabList, tabModel, type LineState } from './model';
+import { projectKey } from './model';
+import { NO_LINE, type LineState } from './status';
 
 let m: Mounted, acts: GameAction[];
 beforeEach(() => { m = mount(); acts = []; });
 afterEach(() => m.unmount());
 
-const node = (id: string, state: ResearchNodeView['state'], over: Partial<ResearchNodeView> = {}): ResearchNodeView => ({
-  id: researchId(id), name: id, category: 'compute', state, progress: 0, dataCost: '150000' as Amount, workOps: 3e6, requires: [], lockedBy: null,
-  level: 'system', era: 'khz', tier: 6, needsData: false, effect: '', summary: '', answers: [], part: 'cores', tab: 'cpu', ...over });
-const tree = (nodes: ResearchNodeView[], over: Partial<ResearchTreeView> = {}): ResearchTreeView => ({
-  nodes, active: null, opsPerSec: 6400, holdOpsPerSec: 250_000, queue: [], queueSlots: 0, horizon: 'system', lenders: [], creditsPerMinute: '9960' as Amount, ...over });
-const rich = { credits: '1000000' as Amount, data: '1000000' as Amount };
-const idle: LineState = { id: null, name: '', running: false, progress: 0 };
-const all = (t: ResearchTreeView) => new Set(t.nodes.map(n => n.id));
 const r = researchId;
+const node = (id: string, state: ResearchNodeView['state'], over: Partial<ResearchNodeView> = {}): ResearchNodeView => ({
+  id: r(id), name: id, category: 'compute', state, progress: 0, dataCost: '2500' as Amount, creditCost: '25000' as Amount, change: null,
+  workOps: 5000, requires: [], lockedBy: null, level: 'chip', era: 'hz', tier: 3, needsData: false, effect: `${id} effect.`, summary: `${id} summary.`,
+  answers: [], part: 'cores', tab: 'cpu', ...over });
+const tree = (nodes: ResearchNodeView[], over: Partial<ResearchTreeView> = {}): ResearchTreeView => ({
+  nodes, income: { dataPerSec: 1, creditsPerSec: 10 }, active: null, opsPerSec: 0, holdOpsPerSec: 100, takenOpsPerSec: 100, queue: [], queueSlots: 0,
+  horizon: 'chip', lenders: [], creditsPerMinute: '0' as Amount, ...over });
+const CPU_ONLY = { chip: true, system: false, rack: false, room: false, global: false };
+const rich = { credits: '1000000' as Amount, data: '1000000' as Amount };
 
 function view(t: ResearchTreeView, over: Partial<ResearchViewProps> = {}) {
-  m.render(<ResearchView L={shellLayout(1440, 900)} tree={t} visible={all(t)} unlocked={{ chip: true, system: true, rack: false, room: false, global: false }}
-    level="system" focusProject={null} wallet={rich} line={idle} between={false} onAction={a => acts.push(a)} onClose={() => undefined} {...over} />);
+  m.render(<ResearchView L={shellLayout(1440, 900)} tree={t} visible={new Set(t.nodes.map(n => n.id))} unlocked={CPU_ONLY} level="chip"
+    focusProject={null} wallet={rich} line={NO_LINE} between={false} onAction={a => acts.push(a)} onClose={() => undefined} {...over} />);
 }
-const rows = () => [...m.host.querySelectorAll<HTMLElement>('.lab-tree [data-project]')].map(b => `${b.dataset.project}: ${b.querySelector('.lr-st')?.textContent}`);
+const row = (id: string) => m.host.querySelector<HTMLButtonElement>(`.lab-tree [data-project="${id}"]`);
+const rowText = (id: string) => {
+  const b = row(id);
+  return b ? [b.querySelector('.lr-st')?.textContent, b.querySelector('.lr-ax')?.textContent].filter(Boolean).join(' / ') : null;
+};
+const key = () => m.host.querySelector<HTMLButtonElement>('.ld-key')!;
+const detail = () => m.host.querySelector('.ld-panel, .ld-sheet')!;
+const selected = () => m.host.querySelector<HTMLElement>('.lab-tree [aria-pressed="true"]')?.dataset.project;
+const tabNames = () => [...m.host.querySelectorAll('[role=tab]')].map(b => b.getAttribute('aria-label'));
 
-describe('research tabs (concept C2)', () => {
-  const t = tree([
-    node('pipelining', 'done', { part: 'clock' }), node('superscalar', 'available', { part: 'clock', requires: [r('pipelining')] }),
-    node('simd', 'locked', { part: 'clock', requires: [r('superscalar')], lockedBy: r('superscalar') }),
-    node('wideVector', 'locked', { part: 'clock', requires: [r('simd')], lockedBy: r('simd') }),
-    node('dualCore', 'available', { part: 'cores', dataCost: '500' as Amount }),
-    node('ddr', 'available', { part: 'ram', tab: 'system' }),
-    node('systemBoard', 'done', { part: 'structure', tab: 'system' }),
-    node('rack', 'locked', { part: 'structure', tab: 'rack', requires: [r('far')], lockedBy: r('far') }),
-  ]);
+// The user's phone screenshot: FIFO scheduler and C1 halt done, 267 Data.
+const early = () => tree([
+  node('fifoSched', 'done', { part: 'queue', name: 'FIFO scheduler' }),
+  node('cstateC1', 'done', { part: 'clock', name: 'C1 halt' }),
+  node('dualCore', 'available', { name: 'Dual core', requires: [r('fifoSched')], change: { label: 'Cores per CPU', before: '1', after: '2' } }),
+  node('pipelining', 'available', { part: 'clock', name: 'Pipelining' }),
+  node('cstateC3', 'locked', { part: 'clock', name: 'C3 sleep', dataCost: '0' as Amount, requires: [r('dualCore')], lockedBy: r('dualCore') }),
+  node('l2Cache', 'locked', { part: 'cache', name: 'L2 cache', requires: [r('pipelining')], lockedBy: r('pipelining') }),
+  node('quadCore', 'locked', { name: 'Quad core', dataCost: '50000' as Amount, creditCost: '500000' as Amount, requires: [r('dualCore'), r('l2Cache')], lockedBy: r('dualCore') }),
+  node('systemBoard', 'locked', { part: 'structure', tab: 'system', name: 'System', requires: [r('dualCore'), r('l2Cache')], lockedBy: r('dualCore') }),
+]);
 
-  it('a tab holds only its own parts, in board order, each with done, startable rows, one lock and a count', () => {
-    const cpu = tabModel(t, all(t), 'cpu', rich);
-    expect(cpu.parts.map(g => g.part)).toEqual(['cores', 'clock']);
-    const clock = cpu.parts[1]!;
-    expect(clock.done.map(n => n.id)).toEqual(['pipelining']);
-    expect(clock.open.map(n => n.id)).toEqual(['superscalar']);
-    expect(clock.lock?.id).toBe('simd');
-    expect(clock.later).toBe(1);
-    expect(cpu.next).toBeNull();
-    const system = tabModel(t, all(t), 'system', rich);
-    expect(system.parts.map(g => g.part)).toEqual(['ram']);
-    // Next level: this tab's structure folded as done, then what opens the next level, even before its prerequisites
-    expect(system.next?.done.map(n => n.id)).toEqual(['systemBoard']);
-    expect(system.next?.lock?.id).toBe('rack');
+describe('truthful states', () => {
+  it('a row says what it is: ready, short with the amount and when, locked with what it needs', () => {
+    view(early(), { wallet: { data: '267' as Amount, credits: '1000000' as Amount } });
+    expect(rowText('dualCore')).toBe('Need 2,233 Data / in ~37 min');
+    expect(rowText('cstateC3')).toBe('');
+    expect(row('cstateC3')!.closest('li')!.querySelector('[data-needs]')!.textContent).toBe('Needs Dual core');
+    // No part header claims "Nothing to start" over a startable row, and no dangling "N more later".
+    expect(m.host.textContent).not.toMatch(/Nothing to start|more later/);
+    expect([...m.host.querySelectorAll('.lp-done')].map(e => e.textContent)).toEqual(['0 of 2 done', '1 of 3 done', '0 of 1 done', '1 of 1 done']);
+    view(early());
+    expect(rowText('dualCore')).toBe('Ready');
+    expect(tabNames()).toEqual(['CPU, 2 ready', 'System, locked']);
   });
 
-  it('hides projects the installed hardware cannot use', () => {
-    const visible = all(t); visible.delete(r('ddr'));
-    expect(tabModel(t, visible, 'system', rich).parts).toEqual([]);
+  it('no answers chips: rows and the detail show no task types', () => {
+    view(early());
+    expect(m.host.querySelector('.lr-pips, .ld-chip, [data-task-type]')).toBeNull();
+    expect(detail().textContent).not.toMatch(/Answers/);
   });
 
-  it('owned tabs, one locked teaser, and badges that count startable projects', () => {
-    expect(tabList({ chip: true, system: true, rack: false, room: false, global: false })).toEqual({ owned: ['cpu', 'system'], teaser: 'rack' });
-    expect(tabList({ chip: true, system: true, rack: true, room: true, global: true })).toEqual({ owned: ['cpu', 'system', 'rack', 'room', 'global'], teaser: null });
-    expect(tabBadges(t, all(t), rich)).toEqual({ cpu: 2, system: 1, rack: 0, room: 0, global: 0 });
-    expect(tabBadges(t, all(t), { ...rich, data: '600' as Amount }).cpu).toBe(1);
+  it('shows only the currencies a project costs; Credits-only rows show just the coin', () => {
+    view(early());
+    expect(row('cstateC3')!.querySelectorAll('.pt > span')).toHaveLength(1);
+    expect(row('cstateC3')!.querySelector('.pt-c')?.textContent).toBe('25k');
+    expect(row('dualCore')!.querySelector('.pt')!.textContent).toBe('2,50025k');
   });
 
-  it('opens on the zoom level, switches tabs, and never mixes levels', () => {
-    view(t);
-    const tabs = [...m.host.querySelectorAll('[role=tab]')].map(b => b.textContent);
-    expect(tabs).toEqual(['CPU2', 'System1', 'Rack']);
-    expect(m.host.querySelector('[role=tab][aria-selected=true]')?.textContent).toBe('System1');
-    expect(button(m.host, /^Rack/).disabled).toBe(true);
-    expect(rows()).toEqual(['ddr: Ready', 'rack: After far']);
-    click(button(m.host, /^CPU/));
-    expect(rows()).toEqual(['dualCore: Ready', 'superscalar: Ready', 'simd: After superscalar']);
-    // the done fold opens on tap
-    click(m.host.querySelectorAll<HTMLButtonElement>('.lr.sum')[0]);
-    expect(rows()).toContain('pipelining: Done');
-    expect(m.host.textContent).toContain('1 more later');
+  it('when both currencies are short, the slower one leads and the detail names the other', () => {
+    // 2,233 Data at 1/s is ~37 min; 24,000 Credits at 10/s is ~40 min: Credits lead.
+    view(early(), { wallet: { data: '267' as Amount, credits: '1000' as Amount } });
+    expect(rowText('dualCore')).toBe('Need 24k Credits / in ~40 min');
+    click(row('dualCore'));
+    expect(key().textContent).toBe('Need 24k more Credits · ~40 min');
+    expect(key().disabled).toBe(true);
+    expect(detail().querySelector('.ld-facts')!.textContent).toContain('Also 2,233 more Data, in ~37 min');
+  });
+});
+
+describe('prerequisites are links', () => {
+  it('a locked row jumps to what it needs, selecting it', () => {
+    view(early());
+    click(row('l2Cache')!.closest('li')!.querySelector('[data-needs]'));
+    expect(selected()).toBe('pipelining');
+    expect(detail().querySelector('h3')?.textContent).toBe('Pipelining');
+    expect(acts).toEqual([]);
   });
 
-  it('Start goes next in line with the hold estimate; the detail shows needs, answers, Data and work', () => {
-    view(t, { focusProject: r('superscalar') });
-    expect(m.host.querySelector('[role=tab][aria-selected=true]')?.textContent).toBe('CPU2');
-    const panel = m.host.querySelector('.ld-panel')!;
-    expect(panel.querySelector('h3')?.textContent).toBe('superscalar');
-    expect(panel.querySelector('.ld-facts')?.textContent).toContain('✓ pipelining');
-    expect(panel.querySelector('.ld-facts')?.textContent).toContain('150k');
-    expect(panel.querySelector('.ld-facts')?.textContent).toContain('3M ops');
-    expect(panel.querySelector('.ld-note')?.textContent).toBe('Goes next in line · ~12 s on your hardware');
-    click(button(panel, /^Start/));
-    expect(acts).toEqual([{ type: 'startResearch', project: 'superscalar' }]);
+  it('the locked key names the project to research first and jumps there, through locked prerequisites', () => {
+    const t = early();
+    view(t, { focusProject: r('quadCore'), wallet: { data: '0' as Amount, credits: '0' as Amount } });
+    // Quad core needs Dual core (startable) and L2 cache (locked behind Pipelining).
+    expect(key().textContent).toBe('Research Dual core first');
+    const links = [...detail().querySelectorAll<HTMLElement>('.ld-facts [data-goto]')].map(b => b.textContent);
+    expect(links).toEqual(['Dual core', 'L2 cache']);
+    click(key());
+    expect(selected()).toBe('dualCore');
+    expect(acts).toEqual([]);
   });
 
-  it('D27: the project in line reads Next in line, then Running; every other row waits After it', () => {
-    const busy = tree([node('fabKhz', 'active', { part: 'fab', progress: 0.42, name: 'kHz fab' }), node('l2', 'available', { part: 'cache' })], { active: r('fabKhz') });
-    const line: LineState = { id: r('fabKhz'), name: 'kHz fab', running: false, progress: 0.42 };
-    view(busy, { level: 'chip', line });
-    expect(rows()).toEqual(['l2: After kHz fab', 'fabKhz: Next in line']);
-    click(m.host.querySelector('[data-project=l2]'));
-    expect(m.host.querySelector<HTMLButtonElement>('.ld-key')?.textContent).toBe('After kHz fab');
-    expect(m.host.querySelector<HTMLButtonElement>('.ld-key')?.disabled).toBe(true);
-    expect(m.host.querySelector('.ld-note')?.textContent).toBe('One project in line at a time');
-    view(busy, { level: 'chip', line: { ...line, running: true } });
-    expect(rows()).toContain('fabKhz: Running 42%');
+  it('a link to a project on another tab switches tab', () => {
+    const t = tree([
+      node('memController', 'available', { part: 'ram', tab: 'system', name: 'Memory ctrl' }),
+      node('dualSocket', 'locked', { name: 'Dual socket', requires: [r('memController')], lockedBy: r('memController') }),
+    ]);
+    view(t, { unlocked: { ...CPU_ONLY, system: true } });
+    expect(m.host.querySelector('[role=tab][aria-selected=true]')?.textContent).toMatch(/^CPU/);
+    click(row('dualSocket')!.closest('li')!.querySelector('[data-needs]'));
+    expect(m.host.querySelector('[role=tab][aria-selected=true]')?.textContent).toMatch(/^System/);
+    expect(selected()).toBe('memController');
   });
 
-  it('phone: the detail is a bottom sheet that folds open from its grip', () => {
-    view(t, { L: shellLayout(390, 780) });
+  it('every "Needs X" in the real tree has an X on screen, at every stage', () => {
+    const base = createInitialState(42);
+    const all = selectResearchTree(base).nodes;
+    const upTo = (tier: number) => {
+      const done = new Set<string>();
+      for (let more = true; more;) {
+        more = false;
+        for (const n of all) if (!done.has(n.id) && n.tier <= tier && n.requires.every(id => done.has(id))) { done.add(n.id); more = true; }
+      }
+      return all.filter(n => done.has(n.id)).map(n => n.id);
+    };
+    const stage = (completed: string[], levels: LevelId[]): GameState => ({ ...base, research: { ...base.research, completed: completed.map(r),
+      unlocks: { ...base.research.unlocks, levels: { ...base.research.unlocks.levels, ...Object.fromEntries(levels.map(l => [l, true])) } } } });
+    const stages = [stage([], []), stage(['fifoSched', 'cstateC1'], []), stage([...upTo(3), 'systemBoard'], ['system']),
+      stage([...new Set([...upTo(5), 'systemBoard', 'rack'])], ['system', 'rack'])];
+    for (const s of stages) {
+      const t = selectResearchTree(s), visible = new Set(selectContextualResearchTree(s).nodes.map(n => n.id));
+      view(t, { visible, unlocked: s.research.unlocks.levels, wallet: { data: '0' as Amount, credits: '0' as Amount } });
+      const shown = new Set<string>(), needs = new Set<string>();
+      for (const tab of [...m.host.querySelectorAll<HTMLButtonElement>('[role=tab]:not(:disabled)')]) {
+        click(tab);
+        m.host.querySelectorAll<HTMLElement>('.lab-tree [data-project]').forEach(e => shown.add(e.dataset.project!));
+        m.host.querySelectorAll<HTMLElement>('.lab-tree [data-needs]').forEach(e => needs.add(e.dataset.needs!));
+      }
+      expect(needs.size).toBeGreaterThan(0);
+      expect([...needs].filter(id => !shown.has(id))).toEqual([]);
+    }
+  });
+});
+
+describe('D27 keys', () => {
+  const line = (over: Partial<LineState>): LineState => ({ ...NO_LINE, id: r('dualCore'), name: 'Dual core', ...over });
+  const inLine = (progress: number) => tree(early().nodes.map(n => n.id === 'dualCore' ? { ...n, state: 'active' as const, progress } : n), { active: r('dualCore') });
+
+  it('Start goes next in line mid-round, runs now between rounds, with its hold and the line note', () => {
+    view(early(), { focusProject: r('dualCore') });
+    expect(key().textContent).toBe('Start · goes next in line');
+    expect(detail().textContent).toContain('5k ops · holds your hardware ~50 s');
+    expect(detail().textContent).toContain('Starting cuts the market line: tasks behind it wait while it runs.');
+    expect(detail().querySelector('.ld-change')?.textContent).toBe('Cores per CPU1→2');
+    click(key());
+    expect(acts).toEqual([{ type: 'startResearch', project: 'dualCore' }]);
+    view(early(), { focusProject: r('dualCore'), between: true });
+    expect(key().textContent).toBe('Start · runs now');
+    expect(detail().textContent).toContain('Between rounds it runs on paused servers: no SLA cost, energy only.');
+  });
+
+  it('next in line, then running with the time left; Pause keeps progress', () => {
+    view(inLine(0.42), { focusProject: r('dualCore'), line: line({ progress: 0.42 }) });
+    expect(key().textContent).toBe('Next in line');
+    expect(m.host.querySelector('.lab-line')?.textContent).toBe('Dual corenext in line');
+    view(inLine(0.42), { focusProject: r('dualCore'), line: line({ running: true, progress: 0.42, opsPerSec: 100 }) });
+    expect(key().textContent).toBe('Running 42% · ~30 s left');
+    expect(rowText('dualCore')).toBe('Running 42% / ~30 s left');
+    click(button(detail(), 'Pause'));
+    expect(acts).toEqual([{ type: 'cancelResearch' }]);
+  });
+
+  it('one at a time: others wait for the project in line, or queue once the queue is researched', () => {
+    view(inLine(0.1), { focusProject: r('pipelining'), line: line({ running: true }) });
+    expect(rowText('pipelining')).toBe('After Dual core');
+    expect(key().textContent).toBe('Wait for Dual core');
+    expect(tabNames()[0]).toBe('CPU');
+    view(tree([...inLine(0.1).nodes], { active: r('dualCore'), queueSlots: 3 }), { focusProject: r('pipelining'), line: line({ running: true }) });
+    click(key());
+    expect(acts).toEqual([{ type: 'queueResearch', project: 'pipelining' }]);
+  });
+
+  it('a paused project resumes free; a project stopped for Credits resumes once paid', () => {
+    view(tree(early().nodes.map(n => n.id === 'pipelining' ? { ...n, state: 'parked' as const, progress: 0.5 } : n)), { focusProject: r('pipelining') });
+    expect(rowText('pipelining')).toBe('Paused 50%');
+    click(key());
+    expect(acts).toEqual([{ type: 'startResearch', project: 'pipelining' }]);
+    view(inLine(0.3), { focusProject: r('dualCore'), line: line({ running: false, stopped: true }) });
+    expect(key().textContent).toBe('Resume');
+    click(key());
+    expect(acts.at(-1)).toEqual({ type: 'resumeResearch' });
+  });
+});
+
+describe('phone sheet', () => {
+  it('folded it holds the change, price, hold and key; open it holds everything', () => {
+    view(early(), { L: shellLayout(390, 780), focusProject: r('dualCore') });
     const sheet = m.host.querySelector('.ld-sheet')!;
+    expect(sheet.querySelector('.ld-change')?.textContent).toBe('Cores per CPU1→2');
+    expect(sheet.querySelector('.ld-line')?.textContent).toBe('2,50025kholds ~50 s');
+    expect(sheet.querySelector('.ld-key')?.textContent).toBe('Start · goes next in line');
     expect(sheet.querySelector('.ld-facts')).toBeNull();
-    click(sheet.querySelector('.ld-grip'));
-    expect(m.host.querySelector('.ld-sheet.open .ld-facts')).not.toBeNull();
+    click(sheet.querySelector('.ld-top'));
+    const facts = m.host.querySelector('.ld-sheet.open .ld-facts')!.textContent;
+    expect(facts).toContain('✓ FIFO scheduler');
+    expect(facts).toContain('Leads to');
+    // A jump folds the sheet so the target row shows.
+    click(m.host.querySelector('.ld-sheet [data-goto="cstateC3"]'));
+    expect(m.host.querySelector('.ld-sheet.open')).toBeNull();
+    expect(selected()).toBe('cstateC3');
   });
 });
 
 describe('connected research screen', () => {
   it('uses hardware discovery, and an opened project selects its own tab', () => {
     const base = createInitialState(42);
-    const state = { ...base, research: { ...base.research, completed: [researchId('systemBoard'), researchId('memController')],
+    const state = { ...base, research: { ...base.research, completed: [r('systemBoard'), r('memController')],
       unlocks: { ...base.research.unlocks, levels: { ...base.research.unlocks.levels, system: true } } } };
     const store = createGameStore({ initialState: state });
     const vs = createViewStore(store.getSnapshot, initialView(store.getSnapshot()));
     const layout = shellLayout(1440, 900);
     const shell = createShellValue(store, vs, createLevelRegistry(), { renderer: null, layout, plateBounds: layout.calloutBounds,
       frameListeners: new Set(), buildQuotes: null, drawCount: 0 });
-    vs.dispatch({ type: 'openResearch', project: researchId('gpuGen1') });
+    vs.dispatch({ type: 'openResearch', project: r('gpuGen1') });
     m.render(<ShellContext.Provider value={shell}><LayoutContext.Provider value={layout}><ResearchScreen /></LayoutContext.Provider></ShellContext.Provider>);
     expect(m.host.querySelector<HTMLElement>('[data-testid=research-drawer]')!.style.cssText).toContain(`top: ${layout.lab.y}px`);
     expect(m.host.querySelector('[role=tab][aria-selected=true]')?.textContent).toMatch(/^System/);
@@ -147,22 +251,16 @@ describe('connected research screen', () => {
   });
 });
 
-describe('project keys', () => {
-  it('follow state: queue only with free queue slots, Data shortfall disables', () => {
-    const t = { active: researchId('x'), queue: [], queueSlots: 0 };
-    expect(projectKey(node('b', 'available'), t)).toEqual({ label: 'One at a time', action: null });
-    expect(projectKey(node('b', 'available'), { ...t, queueSlots: 3 }).label).toBe('Queue');
-    expect(projectKey(node('b', 'available', { needsData: true }), { ...t, active: null })).toEqual({ label: 'Needs Data', action: null });
-    expect(projectKey(node('b', 'queued'), t).action).toEqual({ type: 'unqueueResearch', project: 'b' });
-  });
-
-  it('check exact wallet affordability for both fees without charging again on resume or unqueue', () => {
-    const n = node('gpuGen9', 'available', { creditCost: '9007199254740993' as Amount });
-    const t = tree([n]);
-    expect(projectKey(n, t, '9007199254740992' as Amount, n.dataCost).label).toBe('Needs Credits');
-    expect(projectKey(n, t, n.creditCost, '149999' as Amount).label).toBe('Needs Data');
-    expect(projectKey(n, t, n.creditCost, n.dataCost).action).toEqual({ type: 'startResearch', project: n.id });
-    expect(projectKey({ ...n, state: 'parked' }, t, '0' as Amount, '0' as Amount).action).toEqual({ type: 'resumeResearch' });
-    expect(projectKey({ ...n, state: 'queued', needsCredits: true }, t, '0' as Amount).action).toEqual({ type: 'unqueueResearch', project: n.id });
+describe('project keys for the deck and GPU plate', () => {
+  const t = { active: null, queue: [], queueSlots: 0 };
+  it('price both currencies, resume paused projects free, and hold one project at a time', () => {
+    const n = node('b', 'available');
+    expect(projectKey(n, t, '25000' as Amount, '2500' as Amount)).toEqual({ label: 'Start', action: { type: 'startResearch', project: 'b' } });
+    expect(projectKey(n, t, '24999' as Amount, '2500' as Amount).label).toBe('Needs Credits');
+    expect(projectKey(n, t, '25000' as Amount, '2499' as Amount).label).toBe('Needs Data');
+    expect(projectKey(n, { ...t, active: r('x') }, '25000' as Amount, '2500' as Amount)).toEqual({ label: 'One at a time', action: null });
+    expect(projectKey(n, { ...t, active: r('x'), queueSlots: 3 }, '25000' as Amount, '2500' as Amount).label).toBe('Queue');
+    expect(projectKey({ ...n, state: 'parked' }, t).action).toEqual({ type: 'startResearch', project: 'b' });
+    expect(projectKey({ ...n, state: 'queued' }, t).action).toEqual({ type: 'unqueueResearch', project: 'b' });
   });
 });

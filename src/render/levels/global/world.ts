@@ -121,6 +121,8 @@ export function drawGlobal(g: G, s: GlobalSnapshot, frame: WorldFrame, ctx: Glob
     if (!site.open) { const a = g.globalAlpha; g.globalAlpha = a * 0.5; R(g, b.x, b.y, b.w, b.h, P.ink); g.globalAlpha = a; }
     drawSign(g, i, site, frame.paused);
     if (site.siteId !== null) drawSite(g, i, site, frame, ctx, live);
+    // Between rounds an off-market site (it sits out the next round) is clearly darker.
+    if (frame.paused && site.siteId !== null && site.online === 'offline') { const a = g.globalAlpha; g.globalAlpha = a * 0.45; R(g, b.x, b.y, b.w, b.h, P.ink); g.globalAlpha = a; }
   }
   if (live) drawGlobalForks(g, s);
   // the scheduler hub beside the gateway: one LED per backbone link, lit while it carries a transfer

@@ -101,7 +101,7 @@ Program §1 and v2 program §7 apply:
 - Transfers: `transferProgress(transfer, simTimeMs, timeMs)`; packets travel only when the transfer lasts at least `MIN_VISIBLE_TRANSFER_S`.
 - Timers: `drawUnitLamp(...)`; feed countdowns `secondsLeft(...)`.
 - Glow is temperature (`heatFx`), a fault is `faultFx` while it holds, offline is `darkFx`.
-- While `frame.paused`, draw steady power LEDs only. The core draws the veil.
+- While `frame.paused`, draw steady power LEDs only. The core draws a light veil (`VEIL_ALPHA` 0.28) so the world stays readable for between-round choices.
 - No idle twinkles, breathing pulses, sheens or decorative blinks.
 
 ## Payouts

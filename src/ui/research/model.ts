@@ -1,9 +1,9 @@
-// The research screen model (concept C2, "hanging tree"): pure grouping of the research tree into
-// tabs by hardware level, parts in board order under each tab, and what each row and key say.
-// D27: a started project goes next in the market line; one project at a time.
+// The research board (concept C, "grows from your hardware"): tabs by hardware level, each holding
+// only its own level's parts in board order, and under each part the projects worth seeing now.
+// Every prerequisite a shown project still needs is shown too, so a "Needs X" always has an X to go to.
 import type { Amount, GameAction, LevelId, ResearchId, ResearchNodeView, ResearchPartId, ResearchTabId, ResearchTreeView } from '../../game';
 import type { PartIconKind } from '../art/deckArt';
-import { lacksAmount } from '../plates/gpuModel';
+import { priceOf, shortBy } from './money';
 
 export const TABS: readonly ResearchTabId[] = ['cpu', 'system', 'rack', 'room', 'global'];
 export const TAB_LEVEL: Readonly<Record<ResearchTabId, LevelId>> = { cpu: 'chip', system: 'system', rack: 'rack', room: 'room', global: 'global' };
@@ -12,7 +12,7 @@ export const TAB_NAMES: Readonly<Record<ResearchTabId, string>> = { cpu: 'CPU', 
 export const TAB_ICON: Readonly<Record<ResearchTabId, PartIconKind>> = { cpu: 'cpu', system: 'ram', rack: 'rack', room: 'cool', global: 'site' };
 
 type Part = Exclude<ResearchPartId, 'structure'>;
-/** Each tab's parts in board order. Structure nodes hang in the tab's "Next level" section. */
+/** Each tab's parts in board order. Structure projects sit in the tab's "Next level" section. */
 export const TAB_PARTS: Readonly<Record<ResearchTabId, readonly Part[]>> = {
   cpu: ['cores', 'clock', 'cache', 'queue', 'fab'],
   system: ['cpu', 'ram', 'drive', 'gpu', 'psu', 'board'],
@@ -37,56 +37,23 @@ export const PART_ICON: Readonly<Record<ResearchPartId, PartIconKind>> = {
   structure: 'rack',
 };
 
-export interface Wallet { readonly credits?: Amount; readonly data?: Amount }
-const OPEN = new Set<ResearchNodeView['state']>(['active', 'parked', 'queued', 'available']);
-const ORDER: Readonly<Record<ResearchNodeView['state'], number>> = { active: 0, parked: 1, queued: 2, available: 3, locked: 4, done: 5 };
-
-/** Startable now: available, paid for, and not waiting on Data or Credits. */
-export const isReady = (n: ResearchNodeView, w: Wallet) =>
-  n.state === 'available' && !n.needsData && !n.needsCredits && !lacksAmount(w.data, n.dataCost) && !lacksAmount(w.credits, n.creditCost);
-
+/** One part under a tab: its finished projects (folded) and the rows worth seeing now. */
 export interface PartGroup {
   readonly part: ResearchPartId;
   readonly done: readonly ResearchNodeView[];
-  /** Active, parked, queued and available rows the hardware can use (the contextual tree). */
-  readonly open: readonly ResearchNodeView[];
-  /** The one next project, shown only when everything it waits on is done or on screen. */
-  readonly lock: ResearchNodeView | null;
-  readonly later: number;
-  readonly ready: number;
+  /** Startable, short or in line first, then locked; each by price. Never reordered by the wallet. */
+  readonly rows: readonly ResearchNodeView[];
+  /** Every project of this part, done or not: the header's "3 of 9 done". */
+  readonly total: number;
 }
-export interface TabModel { readonly parts: readonly PartGroup[]; readonly next: PartGroup | null }
-
-/**
- * One tab: only its own level's parts (a CPU part's research stays on the CPU tab in every era).
- * `visible` is the contextual tree's ids (what the installed hardware can use).
- */
-export function tabModel(tree: ResearchTreeView, visible: ReadonlySet<ResearchId>, tab: ResearchTabId, w: Wallet): TabModel {
-  const shown = new Set(tree.nodes.filter(n => OPEN.has(n.state) && visible.has(n.id)).map(n => n.id));
-  const settled = (id: ResearchId) => shown.has(id) || tree.nodes.some(n => n.id === id && n.state === 'done');
-  const group = (part: ResearchPartId, nodes: readonly ResearchNodeView[], opener?: ResearchNodeView): PartGroup | null => {
-    const done = nodes.filter(n => n.state === 'done');
-    const open = nodes.filter(n => OPEN.has(n.state) && (shown.has(n.id) || n === opener))
-      .sort((a, b) => ORDER[a.state] - ORDER[b.state] || Number(a.dataCost) - Number(b.dataCost) || a.workOps - b.workOps);
-    const lock = opener?.state === 'locked' ? opener : nodes.filter(n => n.state === 'locked' && n.requires.every(settled))
-      .sort((a, b) => Number(a.dataCost) - Number(b.dataCost) || a.workOps - b.workOps)[0] ?? null;
-    if (!done.length && !open.length && !lock) return null;
-    return { part, done, open, lock, later: nodes.length - done.length - open.length - (lock ? 1 : 0), ready: open.filter(n => isReady(n, w)).length };
-  };
-  const parts = TAB_PARTS[tab].map(p => group(p, tree.nodes.filter(n => n.part === p))).filter((g): g is PartGroup => g !== null);
-  // Next level: this tab's structure, then the first project that opens the level after it.
-  const after = TABS[TABS.indexOf(tab) + 1];
-  const opener = after ? tree.nodes.find(n => n.part === 'structure' && n.tab === after && n.state !== 'done') : undefined;
-  const structure = tree.nodes.filter(n => n.part === 'structure' && n.tab === tab);
-  if (opener) structure.push(opener);
-  return { parts, next: group('structure', structure, opener) };
-}
-
-/** Startable projects on each tab: the tab badges. */
-export function tabBadges(tree: ResearchTreeView, visible: ReadonlySet<ResearchId>, w: Wallet): Readonly<Record<ResearchTabId, number>> {
-  const out: Record<ResearchTabId, number> = { cpu: 0, system: 0, rack: 0, room: 0, global: 0 };
-  for (const n of tree.nodes) if (visible.has(n.id) && isReady(n, w)) out[n.tab]++;
-  return out;
+export interface TabModel { readonly tab: ResearchTabId; readonly parts: readonly PartGroup[]; readonly next: PartGroup | null }
+export interface Board {
+  readonly owned: readonly ResearchTabId[];
+  /** The next level as a locked tab, or null at the top. */
+  readonly teaser: ResearchTabId | null;
+  readonly tabs: ReadonlyMap<ResearchTabId, TabModel>;
+  /** The tab each shown row is on (structure and later-level rows land on the last owned tab). */
+  readonly where: ReadonlyMap<ResearchId, ResearchTabId>;
 }
 
 /** The owned tabs, then the next level as one locked teaser. */
@@ -96,59 +63,103 @@ export function tabList(unlocked: Readonly<Record<LevelId, boolean>>): { owned: 
   return { owned, teaser: TABS[TABS.indexOf(owned[owned.length - 1]!) + 1] ?? null };
 }
 
-/** The project in the line (D27): waiting at the front, or running on a system. */
-export interface LineState { readonly id: ResearchId | null; readonly name: string; readonly running: boolean; readonly progress: number }
+const OPEN = new Set<ResearchNodeView['state']>(['active', 'parked', 'queued', 'available']);
+const cost = (n: ResearchNodeView) => { const p = priceOf(n); return [Number(p.data ?? 0), Number(p.credits ?? 0), n.workOps] as const; };
+const byPrice = (a: ResearchNodeView, b: ResearchNodeView) => {
+  const x = cost(a), y = cost(b);
+  return x[0] - y[0] || x[1] - y[1] || x[2] - y[2];
+};
 
-const pct = (p: number) => `${Math.floor(p * 100)}%`;
-
-/** What a row says at its right. */
-export function rowStatus(n: ResearchNodeView, line: LineState, names: ReadonlyMap<ResearchId, string>, w: Wallet): string {
-  switch (n.state) {
-    case 'done': return 'Done';
-    case 'active': return line.running ? `Running ${pct(n.progress)}` : 'Next in line';
-    case 'parked': return `Paused ${pct(n.progress)}`;
-    case 'queued': return 'Queued';
-    case 'locked': return n.lockedBy ? `After ${names.get(n.lockedBy) ?? n.lockedBy}` : 'Locked';
-    case 'available':
-      if (n.needsData || lacksAmount(w.data, n.dataCost)) return 'Needs Data';
-      if (n.needsCredits || lacksAmount(w.credits, n.creditCost)) return 'Needs Credits';
-      return line.id ? `After ${line.name}` : 'Ready';
+/**
+ * The board. Shown: every open project the hardware can use (`visible`, the contextual tree), one
+ * next locked project per part whose prerequisites are done or shown, what opens the next level,
+ * `focus`, and every unmet prerequisite of anything shown.
+ */
+export function buildBoard(tree: ResearchTreeView, visible: ReadonlySet<ResearchId>, unlocked: Readonly<Record<LevelId, boolean>>,
+  focus: ResearchId | null = null): Board {
+  const { owned, teaser } = tabList(unlocked);
+  const byId = new Map(tree.nodes.map(n => [n.id, n]));
+  const shown = new Set<ResearchId>(tree.nodes.filter(n => OPEN.has(n.state) && visible.has(n.id)).map(n => n.id));
+  const settled = (id: ResearchId) => shown.has(id) || byId.get(id)?.state === 'done';
+  // One next locked project per part (and per tab's structure), its prerequisites all done or shown.
+  const parts = new Map<string, ResearchNodeView[]>();
+  for (const n of tree.nodes) {
+    const k = n.part === 'structure' ? `structure:${n.tab}` : n.part;
+    parts.set(k, [...(parts.get(k) ?? []), n]);
   }
+  for (const nodes of parts.values()) {
+    const lock = nodes.filter(n => n.state === 'locked' && n.requires.every(settled)).sort(byPrice)[0];
+    if (lock) shown.add(lock.id);
+  }
+  // What opens the level after the last owned one.
+  const opener = teaser ? tree.nodes.find(n => n.part === 'structure' && n.tab === teaser && n.state !== 'done') : undefined;
+  if (opener) shown.add(opener.id);
+  const f = focus ? byId.get(focus) : undefined;
+  if (f && f.state !== 'done') shown.add(f.id);
+  // Close over unmet prerequisites so every "Needs X" has an X on screen.
+  const stack = [...shown];
+  while (stack.length) {
+    for (const id of byId.get(stack.pop()!)?.requires ?? []) {
+      const r = byId.get(id);
+      if (r && r.state !== 'done' && !shown.has(id)) { shown.add(id); stack.push(id); }
+    }
+  }
+
+  const last = owned[owned.length - 1]!;
+  const ownedSet = new Set(owned);
+  const where = new Map<ResearchId, ResearchTabId>();
+  const home = (n: ResearchNodeView): { tab: ResearchTabId; next: boolean } =>
+    ownedSet.has(n.tab) ? { tab: n.tab, next: n.part === 'structure' } : { tab: last, next: true };
+  const rowsOf = (nodes: readonly ResearchNodeView[]) => {
+    const rows = nodes.filter(n => shown.has(n.id) && n.state !== 'done');
+    return [...rows.filter(n => n.state !== 'locked').sort(byPrice), ...rows.filter(n => n.state === 'locked').sort(byPrice)];
+  };
+  const tabs = new Map<ResearchTabId, TabModel>();
+  for (const tab of owned) {
+    const groups: PartGroup[] = [];
+    for (const part of TAB_PARTS[tab]) {
+      const nodes = tree.nodes.filter(n => n.part === part && home(n).tab === tab && !home(n).next);
+      const done = nodes.filter(n => n.state === 'done'), rows = rowsOf(nodes);
+      if (done.length || rows.length) groups.push({ part, done, rows, total: nodes.length });
+    }
+    const nextNodes = tree.nodes.filter(n => shown.has(n.id) && home(n).tab === tab && home(n).next);
+    const nextRows = rowsOf(nextNodes);
+    const next = nextRows.length ? { part: 'structure' as const, done: [], rows: nextRows, total: nextRows.length } : null;
+    for (const g of next ? [...groups, next] : groups) for (const n of g.rows) where.set(n.id, tab);
+    tabs.set(tab, { tab, parts: groups, next });
+  }
+  return { owned, teaser, tabs, where };
 }
 
-/** The key a project shows: what tapping it does. */
+/** Rows in screen order on one tab. */
+export const tabRows = (m: TabModel): ResearchNodeView[] => [...m.parts, ...(m.next ? [m.next] : [])].flatMap(g => g.rows);
+
+/** The shown projects that list `id` as a prerequisite, and how many more come later. */
+export function leadsTo(tree: ResearchTreeView, board: Board, id: ResearchId): { shown: ResearchNodeView[]; later: number } {
+  const after = tree.nodes.filter(n => n.state !== 'done' && n.requires.includes(id));
+  const shown = after.filter(n => board.where.has(n.id));
+  return { shown, later: after.length - shown.length };
+}
+
+/**
+ * The one-line key other surfaces show for a project (the deck's ready count, the GPU plate). The
+ * research screen's own key is status.ts keyFor. A paused project resumes free through startResearch.
+ */
 export function projectKey(n: ResearchNodeView, tree: Pick<ResearchTreeView, 'active' | 'queue' | 'queueSlots'>, credits?: Amount, data?: Amount):
   { label: string; action: GameAction | null } {
   switch (n.state) {
     case 'done': return { label: 'Done', action: null };
-    case 'active': return { label: 'Cancel', action: { type: 'cancelResearch' } };
-    case 'parked': return { label: 'Resume', action: { type: 'resumeResearch' } };
+    case 'active': return { label: 'Pause', action: { type: 'cancelResearch' } };
+    case 'parked': return tree.active ? { label: 'One at a time', action: null } : { label: 'Resume', action: { type: 'startResearch', project: n.id } };
     case 'queued': return { label: 'Unqueue', action: { type: 'unqueueResearch', project: n.id } };
     case 'locked': return { label: 'Locked', action: null };
-    case 'available':
-      if (n.needsData || lacksAmount(data, n.dataCost)) return { label: 'Needs Data', action: null };
-      if (n.needsCredits || lacksAmount(credits, n.creditCost)) return { label: 'Needs Credits', action: null };
+    case 'available': {
+      const price = priceOf(n);
+      if (n.needsData || shortBy(data, price.data) > 0n) return { label: 'Needs Data', action: null };
+      if (n.needsCredits || shortBy(credits, price.credits) > 0n) return { label: 'Needs Credits', action: null };
       if (!tree.active) return { label: 'Start', action: { type: 'startResearch', project: n.id } };
-      if (tree.queue.length < tree.queueSlots) return { label: 'Queue', action: { type: 'queueResearch', project: n.id } };
+      if (tree.queue.length + 1 < tree.queueSlots) return { label: 'Queue', action: { type: 'queueResearch', project: n.id } };
       return { label: tree.queueSlots ? 'Queue full' : 'One at a time', action: null };
+    }
   }
-}
-
-/** The detail key and the line under it. */
-export function detailKey(n: ResearchNodeView, tree: ResearchTreeView, line: LineState, names: ReadonlyMap<ResearchId, string>, w: Wallet,
-  hold: string | null): { label: string; note: string; action: GameAction | null; tone: 'go' | 'alt' | 'off' } {
-  const k = projectKey(n, tree, w.credits, w.data);
-  if (n.state === 'active') return { label: 'Cancel', action: k.action, tone: 'alt', note: line.running ? `Running ${pct(n.progress)}` : 'Next in line' };
-  if (k.label === 'Start') return { label: 'Start', action: k.action, tone: 'go', note: hold ? `Goes next in line · ${hold} on your hardware` : 'Goes next in line' };
-  if (k.action) return { label: k.label, action: k.action, tone: k.label === 'Unqueue' ? 'alt' : 'go', note: '' };
-  if (k.label === 'One at a time' || k.label === 'Queue full') return { label: `After ${line.name}`, action: null, tone: 'off', note: 'One project in line at a time' };
-  return { label: rowStatus(n, line, names, w), action: null, tone: 'off', note: '' };
-}
-
-/** The row selected when a tab opens: the opened project, else the first startable, open or locked row. */
-export function firstRow(m: TabModel, focus: ResearchId | null): ResearchId | null {
-  const groups = m.next ? [...m.parts, m.next] : m.parts;
-  const all = groups.flatMap(g => [...g.open, ...(g.lock ? [g.lock] : []), ...g.done]);
-  if (focus && all.some(n => n.id === focus)) return focus;
-  return (groups.flatMap(g => g.open)[0] ?? groups.find(g => g.lock)?.lock ?? null)?.id ?? null;
 }

@@ -15,8 +15,8 @@ export function TaskIcon({ task, n }: { task: QueueEntryView; n: number }) {
   return <ArtCanvas w={16} h={16} n={n} artKey={String(task.family)} draw={g => drawTaskIcon(g, task.family)} />;
 }
 
-/** Whether a line of body text fits w px (Chakra Petch averages about 0.52 em a character, bold names included). */
-export const fits = (text: string, w: number, body: number): boolean => text.length * body * 0.52 <= w;
+/** Whether a line of body text fits w px (Chakra Petch averages about 0.52 em a character; 0.56 covers bold names and capitals). */
+export const fits = (text: string, w: number, body: number): boolean => text.length * body * 0.56 <= w;
 
 /** A transfer time on a narrow card: "2.3 s", "12 s"; wider cards say "lands 2.34 s". */
 export const shortSeconds = (s: number): string => (s < 10 ? `${s.toFixed(1)} s` : `${Math.round(s)} s`);

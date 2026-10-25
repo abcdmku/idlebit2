@@ -21,6 +21,8 @@ const block = (name: string): string => {
 };
 const nodeLines = appendix.split('\n').filter((line) => /^\s*n\("/.test(line)).map((line) => `  ${line.trim()}`);
 const milestones = appendix.match(/export const MILESTONE_IDS = (\[[^\]]*\])/)![1]!;
+const creditsPerData = appendix.match(/export const CREDITS_PER_DATA = (\d+);/)![1]!;
+const creditsOnly = appendix.match(/export const CREDITS_ONLY = (\[[^\]]*\]);/)![1]!;
 
 const effectText = new Map<string, string>();
 const shortText = new Map<string, string>();
@@ -40,7 +42,8 @@ import type { TreeRow } from './treeRow';
 
 export const DATA_BY_TIER: Readonly<Record<WorkTier, number>> = ${block('DATA_BY_TIER')};
 export const WORK_TIER_OPS: Readonly<Record<WorkTier, number>> = ${block('WORK_TIER_OPS')};
-export const RESEARCH_CREDITS: Readonly<Record<string, string>> = ${block('RESEARCH_CREDITS')};
+export const CREDITS_PER_DATA = ${creditsPerData};
+export const CREDITS_ONLY: readonly string[] = ${creditsOnly};
 export const MILESTONE_DATA_FACTOR = 3;
 export const MILESTONE_IDS: readonly string[] = ${milestones};
 

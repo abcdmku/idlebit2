@@ -34,7 +34,9 @@ function Tag({ L, t, slot, running, risk, waiting = false }: { L: ShellLayout; t
     // are on the big card below); a card its name and payout, then what it needs, its completion window
     // or its transfer time, only when that fits whole.
     // A card whose name and payout won't share a line takes two (cards have no clock bar to clear).
-    const name = familyName(t.family), full = payoutText(t), oneLine = head || fits(`${name} ${full}`, w, L.body);
+    // The head's name never gets cut: with its longest state word it either fits one line or takes two.
+    const name = familyName(t.family), full = payoutText(t);
+    const oneLine = head ? fits(`${name} ${!running ? 'next' : t.committed ? 'restarting 10 s' : 'blocked'}`, w, L.body) : fits(`${name} ${full}`, w, L.body);
     const pay = full;
     const lands = running && t.transferS !== null && t.transferS >= MIN_VISIBLE_TRANSFER_S;
     const extra = !running ? '' : waiting ? '· waiting' : blocked ? `needs ${needShort(t)}`
@@ -47,7 +49,7 @@ function Tag({ L, t, slot, running, risk, waiting = false }: { L: ShellLayout; t
       <span className="aic" style={{ left: L.lat, top: (rect.h - icon) / 2 }}><TaskIcon task={t} n={n} /></span>
       {oneLine ? <T x={tx} y={0} h={rect.h} w={w}><b>{name}</b> {head ? state : values}</T> : <>
         <T x={tx} y={0} w={w}><b>{name}</b></T>
-        <T x={tx} y={L.lh} w={w}>{values}</T>
+        <T x={tx} y={L.lh} w={w}>{head ? state : values}</T>
       </>}
     </>;
   } else if (head) {

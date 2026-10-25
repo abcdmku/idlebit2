@@ -12,7 +12,8 @@ import { researchPhase } from './projects';
 import { RESEARCH, researchDef } from './tree';
 
 const gen1 = researchId('gpuGen1'), gen2 = researchId('gpuGen2');
-const fee = 640000000n, data = 1000000n;
+// D32: every node costs 10 × its Data in Credits.
+const data = 1000000n, fee = 10n * data;
 function fixture(credits = fee, balance = data): GameState {
   const base = createInitialState(42);
   const completed = RESEARCH.filter((r) => r.id !== gen1 && r.id !== gen2).map((r) => r.id);
@@ -27,11 +28,10 @@ function ready(credits = fee, balance = data): GameState {
 }
 
 describe('GPU generation research fees', () => {
-  it('publishes nine generations with exact Credit fees, Data and work', () => {
+  it('publishes nine generations with Credits at 10 × Data (D32), Data and work', () => {
     for (let generation = 1; generation <= 9; generation += 1) {
       const node = researchDef(`gpuGen${generation}`)!;
-      const credits = generation === 1 ? 0n : 64000000n * 10n ** BigInt(generation - 1);
-      expect(node.creditCost).toBe(credits.toString());
+      expect(node.creditCost).toBe((BigInt(node.data) * 10n).toString());
       expect(node.effects).toContainEqual({ kind: 'gen', part: 'gpu', gen: generation - 1 });
       expect(node.work).toBeGreaterThan(0);
     }
@@ -54,13 +54,12 @@ describe('GPU generation research fees', () => {
     }
   });
 
-  it('preserves zero-fee research behavior while Credits are negative', () => {
+  it('rejects a start while Credits are negative (D32: every node has a Credit price)', () => {
     const state = fixture(-1n, 30000n);
-    expect(researchQuote(state, gen1).affordable).toBe(true);
+    expect(researchQuote(state, gen1).affordable).toBe(false);
     const out = applyAction(state, { type: 'startResearch', project: gen1 });
-    expect(out.ok).toBe(true);
-    expect(out.state.research).toMatchObject({ active: gen1, stoppedInsolvent: true });
-    expect(out.state.wallet).toMatchObject({ credits: '-1', data: String(30000 - researchDef(gen1)!.data) });
+    expect(out.ok).toBe(false);
+    expect(out.state).toBe(state);
   });
 
   it('does not charge a queued project until its actual queued start', () => {

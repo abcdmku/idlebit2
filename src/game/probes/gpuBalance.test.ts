@@ -4,7 +4,7 @@ import { earlyGpuDiscontinuity, gpuEnergyRows, gpuEnergySweep, gpuGenerationComp
 describe('GPU isolated economic comparison', () => {
   it('uses exact live fees, legal actions and the same starting budgets for every alternative', () => {
     const result = gpuGenerationComparison(3);
-    expect(result.research).toMatchObject({ credits: '64000000000', data: '40000000', work: 2e10 });
+    expect(result.research).toMatchObject({ credits: '400000000', data: '40000000', work: 2e10 });
     expect(result.hot.map((h) => h.upgrades)).toEqual([0, 1, 2, 3, 4, 5]);
     expect(result.native).toHaveLength(24);
     for (const row of [...result.hot, ...result.native]) {
@@ -20,7 +20,7 @@ describe('GPU isolated economic comparison', () => {
     const vs = next.vsHot[3], home = vs.regions.find((r) => r.region === 'us-east')!;
     expect(vs.preservesCoresAndVram).toBe(false);
     expect(vs.offeredOpsPerS).toBe(2.4e9);
-    expect(home.energyOnlyPaybackS! / 3600).toBeCloseTo(2.021811, 5);
+    expect(home.energyOnlyPaybackS! / 3600).toBeCloseTo(1.912617, 5);
     expect(result.hot[3].researchSecondsGpuOnly).toBeCloseTo(8.333333, 5);
     expect(result.hot[0].researchSecondsGpuOnly).toBeCloseTo(130.208333, 5);
     expect(result.hot[0].gates.every((g) => g.gate !== 0 || g.pairedRate === result.hot[0].stats.opsPerS)).toBe(true);

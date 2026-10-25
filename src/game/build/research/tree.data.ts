@@ -11,17 +11,16 @@ export const WORK_TIER_OPS: Readonly<Record<WorkTier, number>> = {
   1: 20, 2: 600, 3: 5_000, 4: 1.5e5, 5: 3e5, 6: 1e6, 7: 2.5e7, 8: 2e8,
   9: 5e9, 10: 2e10, 11: 2.5e10, 12: 3e10, 13: 4e10, 14: 6e10, 15: 1e11,
 };
-export const RESEARCH_CREDITS: Readonly<Record<string, string>> = {
-  gpuGen1: "0",
-  gpuGen2: "640000000",
-  gpuGen3: "6400000000",
-  gpuGen4: "64000000000",
-  gpuGen5: "640000000000",
-  gpuGen6: "6400000000000",
-  gpuGen7: "64000000000000",
-  gpuGen8: "640000000000000",
-  gpuGen9: "6400000000000000",
-};
+export const CREDITS_PER_DATA = 10;
+export const CREDITS_ONLY: readonly string[] = [
+  "cstateC1", "cstateC3", "cstateC6", "dualFeed", "dvfs", "hvIntake", "loadShed", "meteredPdu",
+  "packageC", "powerCap", "psu80", "psuBronze", "psuGold", "psuPlatinum", "psuTitanium", "s3Sleep",
+  "substation", "switchedPdu", "turbo", "upsLithium", "upsOnline", "chilledWater", "chilledWater2", "closedLoop",
+  "closedLoop2", "containment", "economizer", "hotColdAisle", "rackAir2", "rackVarSpeed", "rackWater", "rackWater2",
+  "roomAir2", "roomVarSpeed", "thermalThrottle", "autoReturn", "configSave", "cronTuning", "fastBoot", "gracefulDrain",
+  "hotPlug", "hotSwap", "offline12", "offline24", "offline48", "researchQueue", "rollingUpgrade", "telemetry",
+  "warmBoot", "lowVoltRam",
+];
 export const MILESTONE_DATA_FACTOR = 3;
 export const MILESTONE_IDS: readonly string[] = ["systemBoard", "fabKhz", "rack", "fabMhz", "room", "fabGhz", "dataCenter", "regions", "intercontinental"];
 

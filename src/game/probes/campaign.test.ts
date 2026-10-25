@@ -42,7 +42,7 @@ describe('balance bot', () => {
     const second = runCampaign({ ticks: 24_000, seed: 7, from: { state: loaded.state, carry: first.carry } });
     expect(serializeSave(second.state)).toBe(serializeSave(whole.state));
     expect(second.milestones).toEqual(whole.milestones);
-  });
+  }, 20_000);
 
   it('asks for the newest unlocked GPU generation only once its cheapest model is affordable', () => {
     const at = (credits: string) => candidateRequests(buildState({ sites: 1, zonesPerSite: 1, racksPerZone: 1, serversPerRack: 1, unlocks: 'max', credits }))

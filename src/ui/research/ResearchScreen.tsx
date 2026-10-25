@@ -1,30 +1,31 @@
-// The research screen (concept C2, "hanging tree"). Tabs by hardware level, each showing only its
-// own level's parts; the default tab follows the zoom and every owned tab stays usable. Under each
-// part: a folded "✓ N done", the projects you can start, one locked next project and a dim count.
-// D27: Start puts a project next in the market line; one project at a time.
-import { useMemo, useRef, useState, type CSSProperties } from 'react';
+// The research screen (concept C, "grows from your hardware"). Tabs by hardware level, each showing
+// only its own level's parts; the default tab follows the zoom. Every prerequisite is a link that
+// jumps to its project, switching tab when needed. D27: Start puts a project at the front of the
+// market line; one project at a time.
+import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
 import { selectContextualResearchTree, selectResearchTree, type GameAction, type LevelId, type RenderSnapshot, type ResearchId,
-  type ResearchNodeView, type ResearchTabId, type ResearchTreeView } from '../../game';
+  type ResearchTabId, type ResearchTreeView } from '../../game';
 import { ArtCanvas } from '../art/ArtCanvas';
-import { drawMiniIcon, drawPartIcon } from '../art/deckArt';
+import { drawMiniIcon } from '../art/deckArt';
 import { useDialogFocus } from '../hooks/useDialogFocus';
 import type { ShellLayout } from '../layout';
-import { GemIcon, LockIcon } from '../plates/icons';
-import { perMinuteText, wholeText } from '../plates/format';
+import { LockIcon } from '../plates/icons';
+import { wholeText } from '../plates/format';
 import { box, useLayout } from '../shell/geometry';
 import { useGameSelector, useShell, useViewState } from '../storeHooks';
-import { typeColor } from '../../render/core';
 import { DetailPanel, DetailSheet } from './ResearchDetail';
-import { firstRow, isReady, LEVEL_TAB, PART_ICON, PART_NAMES, rowStatus, TAB_ICON, TAB_NAMES, tabBadges, tabList, tabModel,
-  type LineState, type PartGroup, type Wallet } from './model';
+import { PartSection } from './ResearchTree';
+import { buildBoard, LEVEL_TAB, tabRows, TAB_ICON, TAB_NAMES, type Board } from './model';
+import { incomeOf, type Wallet } from './money';
+import { nodeStatus, NO_LINE, type KeyContext, type LineState } from './status';
 import '../styles/research.css';
 
-/** The phone sheet folded: grip, name and key, the line under the key. */
-const SHEET_H = 128;
+/** The phone sheet folded: name and state, what it changes, price and hold, and the key. */
+const SHEET_H = 168;
 
 export interface ResearchViewProps {
   L: ShellLayout;
-  /** The full tree (done counts, locks, "more later") and the ids the installed hardware can use. */
+  /** The full tree, and the ids the installed hardware can use (the contextual tree). */
   tree: ResearchTreeView;
   visible: ReadonlySet<ResearchId>;
   unlocked: Readonly<Record<LevelId, boolean>>;
@@ -38,101 +39,108 @@ export interface ResearchViewProps {
   onClose: () => void;
 }
 
+/** The row a tab opens on: the project in line, else the first startable, short or locked row. */
+function firstRow(board: Board, tab: ResearchTabId, ctx: KeyContext): ResearchId | null {
+  const m = board.tabs.get(tab);
+  if (!m) return null;
+  const rows = tabRows(m), order = ['running', 'next', 'stopped', 'ready', 'after', 'paused', 'queued', 'short', 'locked'];
+  const rank = (id: ResearchId) => order.indexOf(nodeStatus(ctx.byId.get(id)!, ctx).kind);
+  return rows.map(n => n.id).sort((a, b) => rank(a) - rank(b))[0] ?? null;
+}
+
 export function ResearchView(p: ResearchViewProps) {
-  const { L, tree, visible, unlocked, wallet, line, onAction, onClose } = p;
-  const ref = useRef<HTMLElement>(null);
+  const { L, tree, line, onAction, onClose } = p;
+  const ref = useRef<HTMLElement>(null), treeRef = useRef<HTMLDivElement>(null);
   useDialogFocus(ref, onClose);
-  const { owned, teaser } = tabList(unlocked);
-  const focusTab = p.focusProject ? tree.nodes.find(n => n.id === p.focusProject)?.tab : undefined;
+  const board = useMemo(() => buildBoard(tree, p.visible, p.unlocked, p.focusProject), [tree, p.visible, p.unlocked, p.focusProject]);
+  const byId = useMemo(() => new Map(tree.nodes.map(n => [n.id, n])), [tree]);
+  const ctx: KeyContext = { byId, line, wallet: p.wallet, income: incomeOf(tree.income), tree, between: p.between };
   const [tab, setTab] = useState<ResearchTabId>(() => {
-    const want = focusTab ?? LEVEL_TAB[p.level];
-    return owned.includes(want) ? want : owned[owned.length - 1]!;
+    const want = (p.focusProject && board.where.get(p.focusProject)) || LEVEL_TAB[p.level];
+    return board.tabs.has(want) ? want : board.owned[board.owned.length - 1]!;
   });
-  const model = tabModel(tree, visible, tab, wallet);
-  const [picked, setPicked] = useState<{ tab: ResearchTabId; id: ResearchId | null } | null>(null);
-  const selected = picked?.tab === tab ? picked.id : firstRow(model, p.focusProject);
+  const [picked, setPicked] = useState<ResearchId | null>(() => p.focusProject ?? firstRow(board, tab, ctx));
   const [unfolded, setUnfolded] = useState<ReadonlySet<string>>(new Set());
   const [sheetOpen, setSheetOpen] = useState(false);
-  const badges = tabBadges(tree, visible, wallet);
-  const names = new Map(tree.nodes.map(n => [n.id, n.name]));
-  const node = tree.nodes.find(n => n.id === selected) ?? null;
-  const done = tree.nodes.filter(n => n.state === 'done').length;
+  const [scrollTo, setScrollTo] = useState<{ id: ResearchId; n: number } | null>(null);
+  const model = board.tabs.get(tab) ?? board.tabs.get(board.owned[0]!)!;
+  const node = picked ? byId.get(picked) ?? null : null;
   const phone = L.kind === 'phone', iconN = L.N;
-  const cpm = Number(tree.creditsPerMinute);
-  const pick = (id: ResearchId) => setPicked({ tab, id });
+
+  const showTab = (t: ResearchTabId) => { setTab(t); setPicked(firstRow(board, t, ctx)); setSheetOpen(false); };
+  /** Jump to a project: its tab, selected, scrolled into view and focused. */
+  const jump = (id: ResearchId) => {
+    const t = board.where.get(id);
+    if (!t) return;
+    setTab(t); setPicked(id); setSheetOpen(false); setScrollTo(s => ({ id, n: (s?.n ?? 0) + 1 }));
+  };
+  // Opening research on another project while it is open jumps there.
+  const lastFocus = useRef(p.focusProject);
+  useEffect(() => {
+    if (p.focusProject && p.focusProject !== lastFocus.current) jump(p.focusProject);
+    lastFocus.current = p.focusProject;
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- only a new focus jumps
+  }, [p.focusProject]);
+  useEffect(() => {
+    if (!scrollTo) return;
+    const el = treeRef.current?.querySelector<HTMLElement>(`[data-project="${scrollTo.id}"]`);
+    el?.scrollIntoView?.({ block: 'nearest' });
+    el?.focus({ preventScroll: true });
+  }, [scrollTo]);
   const fold = (key: string) => setUnfolded(s => { const n = new Set(s); if (!n.delete(key)) n.add(key); return n; });
-  const detail = { node, tree, line, names, wallet, onAction };
 
-  const row = (n: ResearchNodeView, kind: 'open' | 'lock' | 'done') => {
-    const status = rowStatus(n, line, names, wallet), running = n.state === 'active';
-    const cls = kind === 'lock' ? 'lk' : kind === 'done' ? 'dn' : running ? `on${line.running ? '' : ' wait'}`
-      : `av${isReady(n, wallet) ? '' : ' poor'}${line.id && n.state === 'available' ? ' after' : ''}`;
-    return <li key={n.id} className={cls}>
-      <button type="button" className={`lr ${cls}`} data-qa-target data-project={n.id} aria-pressed={n.id === selected} onClick={() => pick(n.id)}>
-        <span className="lr-nm">{kind === 'lock' && <LockIcon />}<span>{n.name}</span></span>
-        {kind !== 'done' && <span className="lr-pips">{n.answers.map(t => <i key={t} style={{ background: typeColor(t) }} />)}</span>}
-        {kind !== 'done' && <span className="lr-cost"><GemIcon />{wholeText(n.dataCost)}</span>}
-        <span className="lr-st">{status}</span>
-        {running && line.running && <i className="lr-bar"><i style={{ width: `${Math.floor(n.progress * 100)}%` }} /></i>}
-      </button>
-    </li>;
+  const ready = (t: ResearchTabId) => {
+    const m = board.tabs.get(t);
+    return m ? tabRows(m).filter(n => nodeStatus(n, ctx).kind === 'ready').length : 0;
   };
+  const tabs = <div className="lab-tabs" role="tablist" style={{ gridTemplateColumns: `repeat(${board.owned.length + (board.teaser ? 1 : 0)}, minmax(0, 1fr))` }}>
+    {board.owned.map(t => {
+      const n = ready(t);
+      return <button key={t} type="button" role="tab" className="lab-tab" data-qa-target aria-selected={t === tab}
+        aria-label={`${TAB_NAMES[t]}${n ? `, ${n} ready` : ''}`} onClick={() => showTab(t)}>
+        {(!phone || board.owned.length < 4) && <ArtCanvas w={8} h={8} n={iconN} artKey={`rt:${t}`} draw={c => drawMiniIcon(c, TAB_ICON[t])} />}
+        <span>{TAB_NAMES[t]}</span>{n > 0 && <b className="n">{n}</b>}</button>;
+    })}
+    {board.teaser && <button type="button" role="tab" className="lab-tab lockd" disabled aria-label={`${TAB_NAMES[board.teaser]}, locked`}>
+      <span>{TAB_NAMES[board.teaser]}</span><LockIcon /></button>}
+  </div>;
 
-  const part = (g: PartGroup, next = false) => {
-    const key = `${tab}:${g.part}`, open = unfolded.has(key);
-    const spec = g.done.length ? g.done[g.done.length - 1]!.name : '';
-    return <section key={g.part} className={`lp${next ? ' next' : ''}`} aria-label={PART_NAMES[g.part]}>
-      {next ? <h3 className="lp-rule">Next level</h3> : <header className="lp-head">
-        <span className="lp-ico"><ArtCanvas w={16} h={16} n={iconN} artKey={`rp:${g.part}`} draw={c => drawPartIcon(c, PART_ICON[g.part])} /></span>
-        <h3>{PART_NAMES[g.part]}</h3>
-        <span className="lp-spec">{spec}</span>
-        <span className={`lp-ready${g.ready ? '' : ' none'}`}>{g.ready ? `${g.ready} ready` : 'Nothing to start'}</span>
-      </header>}
-      <ul className="br">
-        {g.done.length > 0 && <li className="dn">
-          <button type="button" className="lr sum" data-qa-target aria-expanded={open} onClick={() => fold(key)}>
-            <span className="lr-nm"><span>✓ {g.done.length} done</span></span><span className="lr-st">{open ? 'Hide' : 'Show'}</span></button></li>}
-        {open && g.done.map(n => row(n, 'done'))}
-        {g.open.map(n => row(n, 'open'))}
-        {g.lock && row(g.lock, 'lock')}
-        {g.later > 0 && <li className="later"><span className="lr-later">{g.later} more later</span></li>}
-      </ul>
-    </section>;
-  };
+  // The line: what holds the front of the market queue, as a link to it.
+  const cpm = Number(tree.creditsPerMinute);
+  const inLine = line.id ? byId.get(line.id) : undefined;
+  const lineWord = line.stopped ? 'stopped: no Credits' : line.running ? `running ${Math.floor(line.progress * 100)}%` : 'next in line';
+  const title = <div className="lab-title"><b>Research</b>
+    {inLine ? <button type="button" className="lab-line" data-qa-target data-goto={inLine.id} onClick={() => jump(inLine.id)}>
+      <span className="nm">{inLine.name}</span><span>{lineWord}</span>
+      {p.between && cpm > 0 && <span className="gold">−{wholeText(cpm)}/min</span>}</button>
+      : <span className="lab-line idle">Nothing in line</span>}</div>;
 
-  const tabs = <div className="lab-tabs" role="tablist" style={{ gridTemplateColumns: `repeat(${owned.length + (teaser ? 1 : 0)}, minmax(0, 1fr))` }}>
-      {owned.map(t => <button key={t} type="button" role="tab" className="lab-tab" data-qa-target aria-selected={t === tab}
-        onClick={() => { setTab(t); setSheetOpen(false); }}>
-        {(!phone || owned.length < 3) && <ArtCanvas w={8} h={8} n={iconN} artKey={`rt:${t}`} draw={c => drawMiniIcon(c, TAB_ICON[t])} />}
-        <span>{TAB_NAMES[t]}</span>{badges[t] > 0 && <b className="n">{badges[t]}</b>}</button>)}
-      {teaser && <button type="button" role="tab" className="lab-tab lockd" disabled aria-label={`${TAB_NAMES[teaser]}, locked`}>
-        <span>{TAB_NAMES[teaser]}</span><LockIcon /></button>}
-    </div>;
-
-  return <section ref={ref} className={`lab ${L.kind}`} style={{ ...box(L.lab), '--ib': `${16 * iconN + 8}px`, '--dw': `${L.N === 3 ? 480 : 384}px` } as CSSProperties}
+  const detail = { node, tree, board, ctx, onAction, onJump: jump };
+  const sheetH = sheetOpen && node ? Math.floor(L.lab.h * 0.72 / 8) * 8 : SHEET_H;
+  const tree$ = { ctx, selected: picked, onPick: (id: ResearchId) => setPicked(id), onJump: jump };
+  return <section ref={ref} className={`lab ${L.kind}`} style={{ ...box(L.lab), '--ib': `${16 * iconN + 8}px`, '--dw': `${L.N === 3 ? 480 : 384}px`, '--sheet': `${SHEET_H}px` } as CSSProperties}
     data-k="sheet" data-testid="research-drawer" role="dialog" aria-modal="true" aria-label="Research" tabIndex={-1} onPointerDown={e => e.stopPropagation()}>
     <header className="lab-head">
-      <div className="lab-title"><b>Research</b><span>{done} of {tree.nodes.length} done
-        {p.between && cpm > 0 && <span className="gold"> · {perMinuteText(-cpm, false)}</span>}</span></div>
+      {title}
       {!phone && tabs}
       <button type="button" className="lab-back" data-qa-target onClick={onClose}>Back</button>
     </header>
     {phone && tabs}
-    <div className="lab-tree" role="tabpanel" aria-label={TAB_NAMES[tab]}>
+    <div ref={treeRef} className="lab-tree" role="tabpanel" aria-label={TAB_NAMES[model.tab]}>
       {model.parts.length === 0 && !model.next && <p className="lab-empty">Nothing to research here yet.</p>}
-      {model.parts.map(g => part(g))}
-      {model.next && part(model.next, true)}
+      {model.parts.map(g => <PartSection key={g.part} g={g} iconN={iconN} open={unfolded.has(`${model.tab}:${g.part}`)}
+        onFold={() => fold(`${model.tab}:${g.part}`)} {...tree$} />)}
+      {model.next && <PartSection g={model.next} iconN={iconN} open={false} onFold={() => undefined} {...tree$} />}
     </div>
-    {phone ? <DetailSheet {...detail} open={sheetOpen} onToggle={() => setSheetOpen(o => !o)}
-      height={sheetOpen && node ? Math.floor(L.lab.h * 0.72 / 8) * 8 : SHEET_H} /> : <DetailPanel {...detail} />}
+    {phone ? <DetailSheet {...detail} open={sheetOpen} onToggle={() => setSheetOpen(o => !o)} height={sheetH} /> : <DetailPanel {...detail} />}
   </section>;
 }
 
-const lineOf = (s: RenderSnapshot, tree: ResearchTreeView): LineState => {
+const lineOf = (s: RenderSnapshot, tree: ResearchTreeView, stopped: boolean): LineState => {
   const r = s.feed.research;
-  if (r) return { id: r.project, name: r.name, running: r.running, progress: r.progress };
+  if (r) return { id: r.project, name: r.name, running: r.running, stopped, progress: r.progress, opsPerSec: r.opsPerSec || tree.takenOpsPerSec };
   const a = tree.nodes.find(n => n.id === tree.active);
-  return a ? { id: a.id, name: a.name, running: tree.opsPerSec > 0, progress: a.progress } : { id: null, name: '', running: false, progress: 0 };
+  return a ? { id: a.id, name: a.name, running: tree.opsPerSec > 0, stopped, progress: a.progress, opsPerSec: tree.takenOpsPerSec } : NO_LINE;
 };
 
 /** Connected screen: null unless research is open. */
@@ -146,7 +154,8 @@ function OpenResearch({ project }: { project: ResearchId | null }) {
   const shell = useShell(), L = useLayout();
   // Hardware changes can reveal projects even when the research badge is unchanged.
   const key = useGameSelector(s => `${s.epoch}|${shell.store.getState().build.revision}|${s.research.active}|${Math.floor(s.research.progress * 100)}|`
-    + `${s.research.queued}|${s.feed.research?.running}|${s.hud.data}|${s.hud.credits}|${s.hud.roundState}|${Object.values(s.unlocked).join()}`, Object.is, 250);
+    + `${s.research.queued}|${s.research.stoppedInsolvent}|${s.feed.research?.running}|${s.hud.data}|${s.hud.credits}|${s.hud.roundState}|`
+    + `${Object.values(s.unlocked).join()}|${Math.floor(s.hud.roundElapsedMs / 5000)}`, Object.is, 250);
   const level = useGameSelector(s => s.focus.level);
   const { tree, visible } = useMemo(() => {
     const state = shell.store.getState();
@@ -155,6 +164,6 @@ function OpenResearch({ project }: { project: ResearchId | null }) {
   }, [shell.store, key, project]);
   const s = shell.store.getSnapshot();
   return <ResearchView L={L} tree={tree} visible={visible} unlocked={s.unlocked} level={level} focusProject={project}
-    wallet={{ credits: s.hud.credits, data: s.hud.data }} line={lineOf(s, tree)} between={s.hud.roundState !== 'running'}
+    wallet={{ credits: s.hud.credits, data: s.hud.data }} line={lineOf(s, tree, s.research.stoppedInsolvent)} between={s.hud.roundState !== 'running'}
     onAction={a => shell.dispatch(a)} onClose={() => shell.view.dispatch({ type: 'cancel' })} />;
 }

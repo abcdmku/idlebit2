@@ -160,8 +160,8 @@ export type ResearchEffect =
 export type AnswerCode =
   | BandId | 'pickup' | 'misroute' | 'gate' | 'overload' | 'heat' | 'energy' | 'transfer' | 'downtime' | 'density' | 'idle';
 export interface ResearchDef {
-  /** Additional whole Credits paid once when research starts; omitted means zero. */
-  readonly creditCost?: Amount;
+  /** D32: whole Credits paid once when research starts, 10 × the node's price. */
+  readonly creditCost: Amount;
   readonly id: ResearchId;
   readonly name: string;
   readonly category: ResearchCategory;
@@ -169,7 +169,7 @@ export interface ResearchDef {
   readonly level: LevelId;
   readonly era: Era;
   readonly tier: WorkTier;
-  /** Whole Data paid at start (D3.4). Literals up to ~6e19 are exact doubles. */
+  /** Whole Data paid at start (D3.4); 0 for D32 Credits-only nodes. Literals up to ~6e19 are exact doubles. */
   readonly data: number;
   /** Compute work volume in ops. */
   readonly work: number;

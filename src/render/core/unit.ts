@@ -47,7 +47,8 @@ export function drawUnitLamp(g: G, x: number, y: number, w: number, state: LampS
   }
 }
 
-export const VEIL_ALPHA = 0.62;
+/** Between rounds the player still makes real choices (market, research, buying): a light veil keeps the world readable. */
+export const VEIL_ALPHA = 0.28;
 /** The paused-world veil, drawn over the whole canvas after the world. */
 export function drawVeil(g: G, w: number, h: number): void {
   const alpha = g.globalAlpha;

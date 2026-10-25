@@ -109,11 +109,13 @@ function useResearchReady(): number {
 }
 
 function ResearchKey() {
-  const L = useLayout(), { view } = useShell(), open = useViewState().sheet === 'research', ready = useResearchReady();
+  const L = useLayout(), { view, store } = useShell(), open = useViewState().sheet === 'research', ready = useResearchReady();
   // D27: the project in the line (feed.research) is the live truth: waiting at the front, or running on a system.
   const r = useGameSelector(s => ({ active: s.feed.research?.name ?? s.research.name, progress: s.feed.research?.progress ?? s.research.progress,
     needsData: s.research.needsData, stopped: s.research.stoppedInsolvent, queued: s.research.queued,
-    rate: s.feed.research?.opsPerSec ?? s.research.opsPerSec, waiting: s.feed.research ? !s.feed.research.running : false }), shallowEqual, 250);
+    rate: s.feed.research?.opsPerSec ?? s.research.opsPerSec, waiting: s.feed.research ? !s.feed.research.running : false,
+    // A paused project keeps its progress but holds no place in line.
+    paused: !s.research.active && Object.keys(store.getState().research.parked).length > 0 }), shallowEqual, 250);
   const n = L.N, d = L.kind === 'desktop', k = L.research, pct = r.active ? `${Math.floor(r.progress * 100)}%` : '';
   const idle = !r.active && ready ? <span className="gold">{ready} ready</span>
     : r.needsData ? <span className="dim">Needs Data</span> : <span className="dim">Idle</span>;
@@ -126,15 +128,18 @@ function ResearchKey() {
     <span className="aic" style={{ left: L.lat, top: d ? (k.h - 16 * n) / 2 : L.lat }}><ArtCanvas w={16} h={16} n={n} artKey="flask" draw={drawFlask} /></span>
     {d ? <>
       {/* One 48 px line: the project and its rate, or how many are ready; the % at the right. */}
-      <T x={tx} y={0} h={k.h} w={k.w - tx - L.lat - (r.active ? 56 : 0)}><b>Research</b>{r.stopped ? <span className="warn"> · stopped, no Credits</span>
+      <T x={tx} y={0} h={k.h} w={k.w - tx - L.lat - (r.active ? 56 : 0)}><b>Research</b>{r.stopped ? <span className="warn"> · Stopped · no Credits</span>
         : r.active && r.waiting ? <> <b>· {r.active}</b> <span className="rnd">next in line</span></>
         : r.active ? <> <b>· {r.active}</b> <span className="mute">running · {formatOps(r.rate)}/s{r.queued ? ` · ${r.queued} queued` : ''}</span></>
+        : r.paused ? <> <span className="mute">· Paused</span></>
         : <> <span className={ready ? 'gold' : 'dim'}>· {ready ? `${ready} ready` : r.needsData ? 'Needs Data' : 'Idle'}</span></>}</T>
       <T right={L.lat} y={0} h={k.h} className="rnd">{pct}</T>
     </> : <>
-      <T x={48} y={8} w={k.w - 52}><b>Research</b></T>
-      <T x={8} y={40} w={k.w - 16}>{r.active && r.waiting ? <span className="rnd">next in line</span>
-        : r.active ? <><span className="rnd">running {pct}</span> <span className="mute">{r.stopped ? 'stopped' : ''}</span></> : idle}</T>
+      {/* Two clean lines: the title (or "Stopped"), then one state. */}
+      <T x={48} y={8} w={k.w - 52}>{r.stopped ? <b className="warn">Stopped</b> : <b>Research</b>}</T>
+      <T x={8} y={40} w={k.w - 16}>{r.stopped ? <span className="warn">no Credits</span>
+        : r.active ? <span className="rnd">{r.waiting ? 'Next in line' : `Running ${pct}`}</span>
+        : r.paused ? <span className="mute">Paused</span> : idle}</T>
     </>}
   </button>;
 }
