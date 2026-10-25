@@ -208,9 +208,6 @@ function hasSibling(state: GameState, parent: ScopeRef): boolean {
   return false;
 }
 
-/** The newest researched CPU generation (Barebones tier). */
-const newestCpuTier = (state: GameState): number => 31 - Math.clz32(state.research.unlocks.gens.cpu || 1);
-
 /** A gate costing one second of income ranks like a rate part that pays back in this many seconds. */
 const GATE_PAYBACK_S = 20;
 
@@ -224,9 +221,7 @@ export function score(state: GameState, q: Quote): number | null {
   const cost = amountToNumber(q.cost);
   const a = q.action;
   const rate = cpuTarget(a) !== null || a.type === 'upgradePort' || a.type === 'addUnit';
-  // A player copies a working sibling; with capability routing on, a newest-tier barebones server is a cheaper start to build up.
-  if (a.type === 'addUnit' && a.source.kind === 'barebones' && hasSibling(state, a.parent)
-    && !(a.parent.kind === 'rack' && state.build.racks[a.parent.id]?.lb.filters.includes('capability') && a.source.tier === newestCpuTier(state))) return null;
+  if (a.type === 'addUnit' && a.source.kind === 'barebones' && hasSibling(state, a.parent)) return null;
   if (a.type === 'addUnit' && a.parent.kind === 'rack') {
     const room = rackHasRoom(state, a.parent.id);
     if (!room.port || !room.power) return null;
@@ -363,7 +358,8 @@ function supplyNeeded(state: GameState, a: GameAction): boolean {
       || (state.research.unlocks.gens.gpu !== 0 && !state.build.systems[unit.id]?.spec.accels.some((c) => c.kind === 'gpu')));
     case 'pdu': return unit.kind === 'rack' && ((h.rack.pduUsage[unit.id] ?? 0) > SUPPLY_USE
       || (rackHasRoom(state, unit.id).port && !rackHasRoom(state, unit.id).power && (state.build.racks[unit.id]?.servers.includes(null) ?? false)));
-    case 'rackCooler': return unit.kind === 'rack' && (h.rack.tempF[unit.id] ?? 0) > HOT_F;
+    // Hot, or the last round lost work to heat: a player adds cooling.
+    case 'rackCooler': return unit.kind === 'rack' && ((h.rack.tempF[unit.id] ?? 0) > HOT_F || (state.round.reports.at(-1)?.failedByCause.heat ?? 0) > 0);
     case 'roomCooler': return unit.kind === 'room' && (h.room.tempF[unit.id] ?? 0) > HOT_F;
     case 'ups': return unit.kind === 'room' && (h.room.upsUsage[unit.id * MAX_UPS] ?? 0) > SUPPLY_USE;
     default: return true;

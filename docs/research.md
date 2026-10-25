@@ -107,7 +107,7 @@ D27 makes research a task that cuts the line: it holds a slot and its threads on
 | W5 | 3e5 | System, kHz | 2–4 cores, 0.5–2 kHz, 2–4 lanes | about 30 s |
 | W6 | 1e6 | Late System, `rack` | the first kHz package, about 3e4–1e5 ops/s | 10–30 s |
 | W7 | 2.5e7 | kHz, `rack`, Rack | one kHz thread (about 15k ops/s) in a round: about 28 min per node before Rack, so each kHz node is one step of the pre-Rack stretch; 30 s – 2 min on a starter rack | about 28 min pre-Rack |
-| W8 | 2e8 | Rack, early | a starter rack, 1e6–1e7 ops/s; one thread per system in a round | 20–200 s between rounds |
+| W8 | 4e7 | Rack, early | one to four early-Rack servers, about 2.5e4 ops/s per research thread in a round and every thread between rounds | about 25 min on one server; minutes as the rack fills |
 | W9 | 5e9 | Rack, late, `fabMhz` | — | 3–4 h |
 | W10 | 2e10 | MHz, `room` | — | about 12 h: the Room save-up is research time as much as Data |
 | W11 | 2.5e10 | Room, `fabGhz` | — | about a day at the Room-entry fleet (research gets 1e5–5e5 ops/s); less as rooms fill |
