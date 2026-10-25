@@ -13,7 +13,7 @@ import { serverLcd } from './sprites';
 
 interface RackRefs {
   readonly node: NodeRef; readonly unit: UnitRef; readonly sw: SwitchRef;
-  readonly cooler: PartRef; readonly pdu: PartRef; readonly lb: PartRef; readonly swPart: PartRef;
+  readonly cooler: PartRef; readonly pdu: PartRef; readonly lb: PartRef; readonly swPart: PartRef; readonly powerCtl: PartRef;
 }
 const rackRefs = new Map<number, RackRefs>();
 function refsOf(id: RackId): RackRefs {
@@ -23,7 +23,7 @@ function refsOf(id: RackId): RackRefs {
     r = {
       node: { level: 'rack', id }, unit, sw: { kind: 'rack', id },
       cooler: { unit, slot: { kind: 'rackCooler' } }, pdu: { unit, slot: { kind: 'pdu' } },
-      lb: { unit, slot: { kind: 'lb' } }, swPart: { unit, slot: { kind: 'switch' } },
+      lb: { unit, slot: { kind: 'lb' } }, swPart: { unit, slot: { kind: 'switch' } }, powerCtl: { unit, slot: { kind: 'powerCtl' } },
     };
     rackRefs.set(id, r);
   }
@@ -78,8 +78,8 @@ export function rackTargets(s: RackSnapshot, out: HitTarget[], from: number): nu
   }
   sink.ax = colX(rackCol(s));
   let t = put('cooler', 'part', ROOF_RECT); if (t) t.part = refs.cooler;
-  // D31: Power control (empty, locked or installed). PartSlot has no 'powerCtl' kind yet: the id and unit name it.
-  t = put('powerCtl', 'part', POWER_CTL_RECT); if (t) t.unit = refs.unit;
+  // D31: the fifth slot, Power control under the cooler, empty or installed: it opens its plate.
+  t = put('powerCtl', 'part', POWER_CTL_RECT); if (t) { t.part = refs.powerCtl; t.unit = refs.unit; }
   t = put('pdu', 'part', STRIP_RECT); if (t) t.part = refs.pdu;
   t = put('plinth', 'part', PLINTH); if (t) t.part = refs.pdu;
   t = put('lb', 'part', LB_RECT); if (t) t.part = refs.lb;

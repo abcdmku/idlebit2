@@ -1,6 +1,6 @@
 ﻿import { amount } from './amount';
 import { formatAmount, formatCountdownMs, formatCredits, formatData, formatDurationMs,
-  formatMetric, formatNet, formatPrice, formatRate, formatSeconds, formatSignedAmount, formatWatts, formatSize, formatHertz, formatOps } from './format';
+  formatMetric, formatNet, formatPrice, formatRate, formatSeconds, formatSignedAmount, formatWatts, formatSize, formatHertz, formatOps, formatEnergy } from './format';
 
 // Approved core/format.js fmt/fmtTime and the Phase 0D wallet/part-plate examples.
 describe('shared mockup currency formatting',()=>{
@@ -75,6 +75,7 @@ describe('shared unit quantities (board, deck, callouts and cards)', () => {
     [formatOps, 1, '1 op'], [formatOps, 3, '3 ops'], [formatOps, 999, '999 ops'], [formatOps, 53_400, '53.4k ops'], [formatOps, 1.2e6, '1.2M ops'],
     // Rounding carries across a prefix; past Y the UI's scientific fallback.
     [formatSize, 999.7, '1 kb'], [formatHertz, 999_600, '1 MHz'], [formatOps, 1000, '1k ops'], [formatSize, 3e24, '3 Yb'],
+    [formatEnergy, 6e8, '600 MJ'], [formatEnergy, 1.2e11, '120 GJ'],
     [formatSize, 1.8e36, '1.80e36 b'], [formatOps, 0, '0 ops'], [formatSize, 0.5, '0.5 b'],
   ] as const)('%o(%d) is %s', (fmt, n, text) => {
     expect(fmt(n)).toBe(text);

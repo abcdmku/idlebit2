@@ -86,7 +86,7 @@ const lattice = (v: number, lat: number) => Math.round(v / lat) * lat;
  * moving entry without tags. Reads only the snapshot and the presentation time.
  */
 export function drawPipe(g: CanvasRenderingContext2D, s: RenderSnapshot, timeMs: number, paused: boolean, f: RestFraming,
-  vp: Rect, ratio: PixelRatio, entry: Point | null, type: Typography, rest = true): void {
+  vp: Rect, ratio: PixelRatio, entry: Point | null, type: Typography, rest = true, art: Rect | null = null): void {
   const p = f.pipe;
   if (!p) return;
   const n = f.scale, x0 = p.x / n, y0 = p.y / n, ry = p.runY / n;
@@ -114,16 +114,53 @@ export function drawPipe(g: CanvasRenderingContext2D, s: RenderSnapshot, timeMs:
   g.restore();
   if (!entry || !rest) return;
   // Labels in the left gutter under the run, beside the first drop (L2 D17, A05): the link and its
-  // speed, then the packet tag on the next line, so neither moves with the text or covers the art.
+  // speed, then the packet tag on the next line, so neither moves with the text. They never touch
+  // the focus art (`art`, CSS px): where one line would, each value takes its own line in the gutter.
   tags.clear();
-  const phone = f.form === 'phone', x = p.x + (phone ? 16 : 24), y = p.runY + (phone ? 8 : 24);
-  tags.label('pipe', x, y, 'left', true).text(`${link.name} ${formatHertz(link.speed)}`, 'net');
-  if (t && live && seconds >= MIN_VISIBLE_TRANSFER_S) {
-    const left = (1 - transferProgress(t, s.simTimeMs, timeMs)) * seconds;
-    tags.label('packet', x, y + type.line, 'left', true).text(`${formatOps(t.bits)} · ${secondsText(left)}`, 'net');
+  const speed = formatHertz(link.speed);
+  const moving = !!t && live && seconds >= MIN_VISIBLE_TRANSFER_S;
+  const bits = moving && t ? formatOps(t.bits) : '', secs = moving && t ? secondsText((1 - transferProgress(t, s.simTimeMs, timeMs)) * seconds) : '';
+  const spot = pipeTagSpot(p, vp, f, art, type, link.name, speed, bits, secs, tagAt);
+  const x = spot.x, y = spot.y;
+  if (!spot.stacked) {
+    tags.label('pipe', x, y, 'left', true).text(`${link.name} ${speed}`, 'net');
+    if (moving) tags.label('packet', x, y + type.line, 'left', true).text(`${bits} · ${secs}`, 'net');
+  } else {
+    tags.label('pipe', x, y, 'left', true).text(link.name, 'net');
+    tags.label('pipe2', x, y + type.line, 'left', true).text(speed, 'net');
+    if (moving && spot.packet) {
+      tags.label('packet', x, y + 2 * type.line, 'left', true).text(bits, 'net');
+      tags.label('packet2', x, y + 3 * type.line, 'left', true).text(secs, 'net');
+    }
   }
   screen.cx = vp.x + vp.w / 2; screen.cy = vp.y + vp.h / 2; screen.s = ratio.x;
   drawLabels(g, tags, screen, vp, ratio, type);
+}
+/** Rough CSS width of a label line at the body size (Chakra Petch averages under 0.6 em), plus its backing. */
+const tagWidth = (text: string, type: Typography): number => Math.ceil(text.length * type.body * 0.6) + 8;
+const tagAt = { x: 0, y: 0, stacked: false, packet: true };
+const overlaps = (x: number, y: number, w: number, h: number, r: Rect): boolean => x < r.x + r.w && r.x < x + w && y < r.y + r.h && r.y < y + h;
+/**
+ * Where the pipe tags go (CSS px): one line each under the run beside the first drop when that
+ * clears the art; else each value on its own line, there or at the view's left lattice, wherever
+ * the column fits left of the art (without the packet tag if only that is too wide: the packet
+ * itself still shows on the pipe); else (no room) the default spot.
+ */
+export function pipeTagSpot(p: { readonly x: number; readonly runY: number }, vp: Rect, f: RestFraming, art: Rect | null, type: Typography,
+  name: string, speed: string, bits: string, secs: string, out: { x: number; y: number; stacked: boolean; packet: boolean }): { x: number; y: number; stacked: boolean; packet: boolean } {
+  const phone = f.form === 'phone';
+  out.x = p.x + (phone ? 16 : 24); out.y = p.runY + (phone ? 8 : 24); out.stacked = false; out.packet = !!bits;
+  if (!art) return out;
+  const lines = bits ? 2 : 1, oneW = Math.max(tagWidth(`${name} ${speed}`, type), bits ? tagWidth(`${bits} · ${secs}`, type) : 0);
+  if (!overlaps(out.x, out.y, oneW, lines * type.line, art)) return out;
+  const linkW = Math.max(tagWidth(name, type), tagWidth(speed, type)), packetW = bits ? Math.max(tagWidth(bits, type), tagWidth(secs, type)) : 0;
+  for (const withPacket of bits ? [true, false] : [false]) {
+    const w = withPacket ? Math.max(linkW, packetW) : linkW, h = (withPacket ? 4 : 2) * type.line;
+    for (const x of [p.x + (phone ? 16 : 24), vp.x + f.lattice]) {
+      if (!overlaps(x, out.y, w, h, art)) { out.x = x; out.stacked = true; out.packet = withPacket; return out; }
+    }
+  }
+  return out;
 }
 /** One run of the cable: 4 art px wide on its centre line (inset 0 ink, 1 core, 2 shade). */
 function seg(g: CanvasRenderingContext2D, a: readonly [number, number], b: readonly [number, number], c: string, layer: number): void {

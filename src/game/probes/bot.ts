@@ -1,3 +1,4 @@
+import { capacity } from '../build/catalog/curves';
 import { amountCompare, amountToNumber } from '../amount';
 import {
   applyAction, quote, rackId, REGIONS, roomId, selectResearchTree, systemId,
@@ -166,6 +167,8 @@ export function candidateRequests(state: GameState): QuoteRequest[] {
       const rack = build.racks[id]!;
       reqs.push({ kind: 'tray', at: { level: 'rack', id: rackId(id) } });
       reqs.push({ kind: 'switch', sw: { kind: 'rack', id: rackId(id) } });
+      // D31: Power control (battery and smart start) in the fifth slot.
+      reqs.push({ kind: 'infra', unit: { kind: 'rack', id: rackId(id) }, slot: 'powerCtl' });
       reqs.push({ kind: 'routerQueue', unit: { kind: 'rack', id: rackId(id) } });
       const slot = rack.servers.indexOf(null);
       if (slot >= 0) reqs.push({ kind: 'add', parent: { kind: 'rack', id: rackId(id) }, slot });
@@ -208,6 +211,36 @@ function hasSibling(state: GameState, parent: ScopeRef): boolean {
   return false;
 }
 
+/**
+ * D31: Power control pays back in round-start energy its battery covers, billed instead at 25% at Return:
+ * per round, min(capacity, the rack's draw over the opening) × 0.75 × the price, over the round's length.
+ * Returns undefined for other actions, null when it carries nothing.
+ */
+const OPENING_S = 120;
+function powerCtlScore(state: GameState, a: GameAction, cost: number): number | null | undefined {
+  if ((a.type !== 'replacePart' && a.type !== 'upgradePart') || a.part.slot.kind !== 'powerCtl' || a.part.unit.kind !== 'rack') return undefined;
+  const r = a.part.unit.id, next = tryAction(state, a);
+  const cap = (s: GameState | null) => { const ctl = s?.build.racks[r]?.powerCtl; return ctl ? capacity(PARTS.powerCtl, ctl.gen, ctl.level) : 0; };
+  const last = state.round.reports.at(-1);
+  if (!next || !last || last.durationTicks <= 0) return null;
+  const servers = state.build.racks[r]?.servers.filter((x) => x !== null).length ?? 0;
+  if (servers < 2) return null;
+  const drawW = Math.max(state.hot.rack.drawW[r] ?? 0, amountToNumber(last.energy) / (last.durationTicks / 10) / ENERGY_PRICE);
+  const covered = (s: GameState | null) => Math.min(cap(s), drawW * OPENING_S);
+  const gain = (covered(next) - covered(state)) * 0.75 * ENERGY_PRICE / (last.durationTicks / 10);
+  return gain > 0 ? cost / gain : null;
+}
+/** A newly installed Power control starts one server and wakes the rest after a 2 s head wait. */
+function configurePowerCtl(state: GameState): GameState {
+  let s = state;
+  for (const id of firstIds(s.build.racks, SAMPLE)) {
+    const ctl = s.build.racks[id]!.powerCtl;
+    if (!ctl || ctl.startWith !== 1 || ctl.trigger.headWaitS !== 2 || ctl.order === 'fastest') continue;
+    s = tryAction(s, { type: 'setStartConfig', unit: { kind: 'rack', id: rackId(id) }, startWith: 1, headWaitS: 2, busyPct: ctl.gen >= 1 ? 75 : null, order: 'fastest' }) ?? s;
+  }
+  return s;
+}
+
 /** A gate costing one second of income ranks like a rate part that pays back in this many seconds. */
 const GATE_PAYBACK_S = 20;
 
@@ -220,6 +253,8 @@ const GATE_PAYBACK_S = 20;
 export function score(state: GameState, q: Quote): number | null {
   const cost = amountToNumber(q.cost);
   const a = q.action;
+  const battery = powerCtlScore(state, a, cost);
+  if (battery !== undefined) return battery;
   const rate = cpuTarget(a) !== null || a.type === 'upgradePort' || a.type === 'addUnit';
   if (a.type === 'addUnit' && a.source.kind === 'barebones' && hasSibling(state, a.parent)) return null;
   if (a.type === 'addUnit' && a.parent.kind === 'rack') {
@@ -599,7 +634,7 @@ function useFilters(state: GameState): GameState {
 export function decide(state: GameState, policy: Policy, log: BotEvent[]): GameState {
   let s = state;
   if (policy.researches) s = startResearch(s, log);
-  if (policy.buys) s = buyParts(useFilters(s), policy, log);
+  if (policy.buys) s = configurePowerCtl(buyParts(useFilters(s), policy, log));
   // D27: research holds threads and the market waits behind it, so a player lets a short project
   // finish between rounds before returning.
   if (s.round.phase !== 'running' && !(s.research.active !== null && !s.research.stoppedInsolvent && researchLeftS(s) <= RESEARCH_WAIT_S)) {

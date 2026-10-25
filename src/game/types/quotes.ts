@@ -29,7 +29,13 @@ export type QuoteRequest =
    * D25.7: the router's queue, one quote: `upgradeRouterQueue` to the next level, cost
    * lbQueueStep(L → L + 1), effect `slots` L → L + 1; locked (code 'cap') at 32.
    */
-  | { readonly kind: 'routerQueue'; readonly unit: ScopeRef };
+  | { readonly kind: 'routerQueue'; readonly unit: ScopeRef }
+  /**
+   * D31: a scope's optional power part (rack Power control, room start control on the UPS, global start
+   * control on the scheduler, site generation): one install per generation while the slot is empty;
+   * once installed, the level upgrade then a replace per other generation. Empty for a unit with no such slot.
+   */
+  | { readonly kind: 'power'; readonly unit: ScopeRef };
 
 export type Currency = 'credits' | 'data';
 export type LockCode = 'research' | 'ceiling' | 'cap' | 'fit' | 'roundState' | 'occupied';
@@ -40,7 +46,8 @@ export interface LockReason {
   /** Short copy, e.g. "Needs Rack water". */
   readonly text: string;
 }
-export type CapacityUnit = 'ops/s' | 'bits' | 'bit/s' | 'Hz' | 'W' | 'tasks/s' | 'lanes' | 'slots' | 'cores' | 'ports' | 'ops';
+/** 'J': energy (a Power control battery's capacity). */
+export type CapacityUnit = 'ops/s' | 'bits' | 'bit/s' | 'Hz' | 'W' | 'J' | 'tasks/s' | 'lanes' | 'slots' | 'cores' | 'ports' | 'ops';
 export interface EffectPreview {
   readonly capacityBefore: number;
   readonly capacityAfter: number;

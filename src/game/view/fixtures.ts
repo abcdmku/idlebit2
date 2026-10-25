@@ -1,5 +1,8 @@
 import { amountCompare, amountSubtract, type Amount } from '../amount';
-import { advanceGame } from '../core/advance';
+import { applyAction } from '../core/actions';
+import { advanceGame, advanceGameOwned } from '../core/advance';
+import { barebonesSpec } from '../core/defaults';
+import { defaultStartCtl } from '../build/startCtl';
 import { cloneCompiled, cloneHot } from '../core/buffers';
 import { FLEETS, topSystem } from '../testkit/fleets';
 import { SPLIT_FLEETS } from '../testkit/splitFixtures';
@@ -17,9 +20,27 @@ import { deriveRenderSnapshot, parentOf } from './snapshot';
  * the domains run. Test, harness and dev pages only (public entry: src/game/fixtures.ts).
  */
 
-export const FIXTURE_NAMES = ['chipBoot', 'chipTop', 'systemBoot', 'systemTop', 'rack', 'room', 'global', 'globalGroup', 'rackSplit', 'roomSplit', 'globalSplit', 'spillSystem', 'spillRack'] as const;
+export const FIXTURE_NAMES = ['chipBoot', 'chipTop', 'systemBoot', 'systemTop', 'rack', 'room', 'global', 'globalGroup', 'rackSplit', 'roomSplit', 'globalSplit', 'spillSystem', 'spillRack', 'powerRack'] as const;
 export type FixtureName = (typeof FIXTURE_NAMES)[number];
 export const FIXTURE_ROUNDS: readonly RoundPhase[] = ['running', 'ended', 'between'];
+
+/**
+ * D31 Power control at work: eight kHz servers, Power control (lead-acid, L1) set to "Start with 2 of
+ * 8", returned to market (which refills the battery and wakes 2), then 10 s of real play. Kept live.
+ * The one dressed value: the battery charge is set to 10 minutes of the rack's draw, so its
+ * "BAT m:ss left" reads in minutes (a full L1 battery lasts days at kHz draw); it drains live from there.
+ */
+function powerRack(): GameState {
+  const built = buildState({
+    seed: 42, sites: 1, zonesPerSite: 1, racksPerZone: 1, serversPerRack: 8, unlocks: 'max', round: 'between', credits: '1000000000',
+    system: (id, rack, slot) => ({ id, rack, slot, online: true, spec: barebonesSpec(1) }),
+    rack: (rack) => ({ ...rack, powerCtl: { ...defaultStartCtl(0, 1), startWith: 2 } }),
+  });
+  const s = advanceGameOwned(applyAction(built, { type: 'returnToMarket' }).state, 10_000).state;
+  const hot = cloneHot(s.hot);
+  hot.rack.batteryJ[0] = Math.max(1, hot.rack.drawW[0] ?? 0) * 600;
+  return { ...s, hot };
+}
 
 /** A one-server system with a top chip: 128 cores, full caches, scheduler, RAM and GPUs. */
 const topOne = (): GameState => buildState({ seed: 42, sites: 1, zonesPerSite: 1, racksPerZone: 1, serversPerRack: 1, unlocks: 'max', system: topSystem });
@@ -54,6 +75,8 @@ const DEFS: Readonly<Record<FixtureName, FixtureDef>> = {
   spillSystem: { base: SPILL_FLEETS.spillSystem, focus: { level: 'system', id: systemId(0) }, dress: quiet, live: true },
   /** D26: a Rack-era ECC rack taking windowed Rack-scale tasks through its LB queue. */
   spillRack: { base: SPILL_FLEETS.spillRack, focus: { level: 'rack', id: rackId(0) }, dress: quiet, live: true },
+  /** D31: a rack with Power control, a charged battery and smart start at "Start with 2 of 8", in a running round. */
+  powerRack: { base: powerRack, focus: { level: 'rack', id: rackId(0) }, dress: quiet, live: true },
 };
 
 const BASES = new Map<FixtureDef['base'], GameState>();

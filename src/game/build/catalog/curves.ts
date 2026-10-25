@@ -18,6 +18,8 @@ export const IDLE_SHARE = 0.1;
 
 /** The CSV progression (hardware-progression.md §2, §5): ×1.5 rate per level, ×1.7 price per level, 36 levels. */
 export const STEP_RATE = 1.5;
+/** Cooler load watts ∝ (level factor)^COOLER_LOAD_EXP (balance, 25 Oct: was 1.5). */
+export const COOLER_LOAD_EXP = 1.25;
 export const STEP_LEVEL_MAX = 36;
 
 export const levelFactor = (curve: Curve, level: number): number =>
@@ -80,7 +82,10 @@ export function partWatts(row: CatalogRow, g: number, level: number, rate?: { ra
     case 'idle': return { idle: (w.idle[g] ?? 0) * x ** 0.25, load: 0 };
     case 'cooler': {
       const qc = row.base[g]! * (w.wpw[g] ?? 0);
-      return { idle: 0.1 * qc * x ** 0.25, load: qc * x ** 1.5 };
+      // Load watts grow as capacity^COOLER_LOAD_EXP, so watts per watt removed grow as capacity^0.25:
+      // a levelled cooler still loses efficiency, but a filling rack's cooling stays near a third of its IT
+      // load (was ^1.5, which pushed it to about half and made net income fall past 8 servers; scripts/balance/fleet.ts).
+      return { idle: 0.1 * qc * x ** 0.25, load: qc * x ** COOLER_LOAD_EXP };
     }
     case 'supply': return NONE;
     case 'rate': return rate ? rateWatts(w.wPerUnit, rate.native, rate.rate) : rateWatts(w.wPerUnit, ratedRate(row, g, 1), ratedRate(row, g, level));

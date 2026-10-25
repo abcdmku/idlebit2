@@ -882,7 +882,7 @@ generic rate part (drive, switch port, uplink, data plane port, backbone link, l
   push    = max(1, rate / native)                          // rate = current rated rate at e = 1, factor 1
   idleW   = idleShare × wPerUnit × native × push^0.25      // idleShare = 0.1 (s)
   loadW   = wPerUnit × rate × push^0.3                     // so loadW grows as x^1.3, as in v2
-cooler:   idleW = 0.1 × wpw[g] × base[g] × x^0.25;  loadW = wpw[g] × base[g] × x^1.5
+cooler:   idleW = 0.1 × wpw[g] × base[g] × x^0.25;  loadW = wpw[g] × base[g] × x^1.25   (balance 25 Oct; was x^1.5, see docs/decisions.md D25.10 check)
 other parts (clock, caches, package, scheduler, row, frame): idleW = idle[g] × x^0.25, no load
 actualW = idleW × idleFactor + loadW × u × loadFactor
 ```

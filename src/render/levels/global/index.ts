@@ -86,7 +86,7 @@ export function createGlobalRenderer(registry: LevelRegistry): LevelRenderer<'gl
     /** The pipe enters at the top of the backbone hub beside the gateway (L2 D17). */
     entry(s, out) { hubRect(gatewayIndex(s), scratch); out.x = scratch.x + 5; out.y = scratch.y - 1; return out; },
     draw: (g, s, _view, f) => drawGlobal(g, s, f, ctx),
-    /** D31: the global start controller tag on the scheduler hub. */
+    /** D31: the global start controller's tag (sites on of those it controls). */
     labels: (s, _view, _frame, out) => globalStartTag(s, gatewayIndex(s), out),
     drawMini(g, s: GlobalSnapshot, r) {
       R(g, r.x, r.y, r.w, r.h, P.seaDeep);

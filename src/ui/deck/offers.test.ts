@@ -120,6 +120,13 @@ describe('rack Power control (D31.3)', () => {
     expect(extraOffer([set, add])).toBe(add);
     const rows = buildOffers('rack', null, null, [add, null]).rows;
     expect(rows.find(r => r.key === 'powerCtl')?.name).toMatch(/Power control$/);
-    expect(extraRequest({ level: 'rack', id: 2 } as never, EXTRA_ROWS.rack![0]!)).toEqual({ kind: 'infra', unit: { kind: 'rack', id: 2 }, slot: 'powerCtl' });
+    expect(extraRequest({ level: 'rack', id: 2 } as never, EXTRA_ROWS.rack![0]!)).toEqual({ kind: 'power', unit: { kind: 'rack', id: 2 } });
+  });
+});
+
+describe('start controller rows (D31.2)', () => {
+  it('an upgrade with no capacity effect reads its level step', () => {
+    const up = { ...offer(effect('slots', 0, 1)), effect: null, label: 'Room start control · L3', action: { type: 'upgradePart', part: { unit: { kind: 'room', id: roomId(0) }, slot: { kind: 'roomStart' } } } } as unknown as Quote;
+    expect(buildOffers('room', null, null, [null, up]).rows.find(r => r.key === 'roomStart')?.change).toBe('L2 → L3');
   });
 });

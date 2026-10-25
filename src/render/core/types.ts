@@ -105,6 +105,8 @@ export interface LevelRenderer<L extends LevelId = LevelId> {
    * row, world map); it is absent during zoom planning.
    */
   focus(snapshot: SnapshotOf<L>, viewport: Rect, out: Rect, form?: WorldForm, area?: RestArea): Rect;
+  /** Optional: the art the pipe tags keep clear of, in world px, when the focus frames more than the art (the rack's phone gutter). Default: the focus. */
+  tagClear?(snapshot: SnapshotOf<L>, out: Rect): Rect;
   /** Optional: the rect of this world that a parent's mini of it shows (CPU: its package). Defaults to `size`. */
   miniRect?(snapshot: SnapshotOf<L>, out: Rect, form?: WorldForm): Rect;
   /**

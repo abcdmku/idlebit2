@@ -8,7 +8,7 @@ import type { CapacityUnit, EffectPreview } from '../types/quotes';
 import type { GameState, Unlocks } from '../types/state';
 import { capacity, isLeveled, partWatts, PARTS, type LeveledPartId } from './catalog';
 import { compileSystem } from './compile';
-import { readPart } from './partAccess';
+import { POWER_SLOTS, readPart } from './partAccess';
 import { installedGpuStats } from './gpu';
 import type { AccelBuild } from '../types/gpu';
 
@@ -124,9 +124,12 @@ export function partEffect(state: GameState, ref: PartRef, after: BuildState, co
     return preview(fa[field], fb[field], unit, wa, wb, price, cost, gain);
   }
   const pa = readPart(state.build, ref), pb = readPart(after, ref);
-  if (!pa || !pb || !isLeveled(pa.id)) return null;
-  const row = PARTS[pa.id as LeveledPartId];
-  const unit: CapacityUnit = row.watts.kind === 'supply' || row.watts.kind === 'cooler' ? 'W' : 'tasks/s';
-  const wa = partWatts(row, pa.gen, pa.level).idle, wb = partWatts(row, pb.gen, pb.level).idle;
-  return preview(capacity(row, pa.gen, pa.level), capacity(row, pb.gen, pb.level), unit, wa, wb, price, cost, null);
+  // An optional D31 part may be installed into an empty slot: it starts from nothing.
+  if (!pb || !isLeveled(pb.id) || (!pa && !POWER_SLOTS.includes(ref.slot.kind))) return null;
+  // D31 start controllers have no capacity: their levels shorten the wake time.
+  if (pb.id === 'roomStart' || pb.id === 'globalStart') return null;
+  const row = PARTS[pb.id as LeveledPartId];
+  const unit: CapacityUnit = pb.id === 'powerCtl' ? 'J' : pb.id === 'generation' || row.watts.kind === 'supply' || row.watts.kind === 'cooler' ? 'W' : 'tasks/s';
+  const wa = pa ? partWatts(row, pa.gen, pa.level).idle : 0, wb = partWatts(row, pb.gen, pb.level).idle;
+  return preview(pa ? capacity(row, pa.gen, pa.level) : 0, capacity(row, pb.gen, pb.level), unit, wa, wb, price, cost, null);
 }

@@ -240,6 +240,8 @@ export interface ServerSlotView {
   /** Cores busy with tasks this tick, 0..cores. */
   readonly busyCores: number;
   readonly port: PortView | null;
+  /** D31: ms left while an asleep system is waking (its wake countdown), else null. Optional only until hand-built fixtures add it. */
+  readonly wakeMs?: number | null;
 }
 /** D31.2: a start controller (rack Power control, room on the UPS, global on the scheduler). */
 export interface StartCtlView {

@@ -49,14 +49,15 @@ export const UPS: CatalogRow = {
 };
 /**
  * D31.3 Power control, the fifth rack slot under the cooler: a battery (capacity J) and the rack start
- * controller, one part. L1 holds about 60 s of a fresh era rack at full draw (its PDU's L1 capacity);
- * capacity ×2 per level. Install ≈ 40 × capacity × the home price (0.01 Credits/J). Starting values **(s)**.
+ * controller, one part. L1 holds about 60 s of a filled era rack's measured draw (kHz: four Rack-era servers
+ * at about 1.7e8 W, scripts/balance/powerctl.ts); capacity ×2 per level. Install ≈ 40 × capacity × the home
+ * price (0.01 Credits/J), so a battery pays back in about 50 covered openings. Starting values **(s)**.
  */
 export const POWER_CTL: CatalogRow = {
   id: 'powerCtl', scope: 'rack', names: ['Lead-acid power control', 'Li-ion power control', 'LFP power control'],
   gates: [r('powerCtl'), r('powerCtlLiIon'), r('powerCtlLfp')], curve: 'flow',
-  base: [6e8, 1.2e11, 3e17], watts: { kind: 'idle', idle: [50, 500, 5000] },
-  price: [2.4e8, 4.8e10, 1.2e17], upgrade: [1.2e8, 2.4e10, 6e16],
+  base: [1e10, 2e12, 5e18], watts: { kind: 'idle', idle: [50, 500, 5000] },
+  price: [4e9, 8e11, 2e18], upgrade: [2e9, 4e11, 1e18],
 };
 /** D31.2 room start controller on the UPS: no capacity; linear levels L1–5 cut the rack power-on time. **(s)** */
 export const ROOM_START: CatalogRow = {

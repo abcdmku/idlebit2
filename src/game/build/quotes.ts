@@ -48,7 +48,15 @@ function quotesFor(state: GameState, r: QuoteRequest): Quote[] {
     case 'pipe': return pipeQuotes(state, r.system);
     case 'inbound': return inboundQuotes(state, r.at);
     case 'routerQueue': return routerQueueQuotes(state, r.unit);
+    case 'power': return powerQuotes(state, r.unit);
   }
+}
+
+/** D31: the scope's optional power part (Power control, room or global start control, site generation). */
+function powerQuotes(state: GameState, unit: ScopeRef): Quote[] {
+  const slot = unit.kind === 'rack' ? 'powerCtl' : unit.kind === 'room' ? 'roomStart' : unit.kind === 'global' ? 'globalStart'
+    : unit.kind === 'site' ? 'generation' : null;
+  return slot ? partQuotes(state, { unit, slot: { kind: slot } } as PartRef) : [];
 }
 
 /** D25.7: the router queue's next level, effect `slots` L → L + 1; locked ('cap') at 32. */
@@ -161,7 +169,7 @@ export function partQuotes(state: GameState, ref: PartRef): Quote[] {
     // An empty L2 / L3 chip slot offers its part (the slot the chip view shows).
     const k = ref.slot.kind;
     // D31: an empty power slot offers each generation's install.
-    if (POWER_SLOTS.includes(k)) return powerInstallPlans(state, ref).map(({ action, plan }) => toQuote(state, action, plan));
+    if (POWER_SLOTS.includes(k)) return powerInstallPlans(state, ref).map(({ action, plan }) => toQuote(state, action, plan, effectOf(state, ref, plan)));
     if (ref.unit.kind !== 'system' || (k !== 'l2' && k !== 'l3')) return [];
     const g = Math.max(0, newestGen(state.research.unlocks, k, PARTS[k].base.length));
     const action = { type: 'addPart' as const, system: ref.unit.id, kind: k, generation: g };
@@ -176,7 +184,8 @@ export function partQuotes(state: GameState, ref: PartRef): Quote[] {
   for (let g = 0; part.id !== 'gpu' && g < genCount(part.id); g += 1) {
     if (g === part.gen) continue;
     if (ladder) { out.push(toQuote(state, { type: 'replacePart', part: ref, generation: g, preserveCapacity: false }, planReplaceLadder(state, ref, g))); continue; }
-    for (const preserveCapacity of part.id === 'cpu' ? [false] : [false, true]) {
+    // A CPU package and the D31 parts have one replace per generation (no capacity-preserving level).
+    for (const preserveCapacity of part.id === 'cpu' || POWER_SLOTS.includes(ref.slot.kind) ? [false] : [false, true]) {
       const plan = planReplace(state, ref, g, preserveCapacity);
       out.push(toQuote(state, { type: 'replacePart', part: ref, generation: g, preserveCapacity }, plan, effectOf(state, ref, plan)));
     }

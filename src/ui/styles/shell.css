@@ -158,7 +158,7 @@ b, .b { font-weight: 700; }
 .t.wrap2 { white-space: normal; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; text-overflow: clip; }
 /* desktop: the four earnings on one row; the Return key stays in view while the report scrolls */
 .l-desktop .round-plate .rp-bottom { grid-template-columns: repeat(4, auto); justify-content: space-between; column-gap: 16px; }
-.l-desktop .round-plate .rp-bottom .v { margin-left: 8px; }
+.l-desktop .round-plate .rp-bottom .v { margin-left: 8px; white-space: nowrap; }
 .round-plate .keys { position: sticky; bottom: -12px; margin-bottom: -12px; padding: 8px 0 12px; background: #1b1437; z-index: 1; }
 /* the new-version banner: the reserved line, taller for its 48 px Reload key */
 .platform-line.version { pointer-events: auto; display: flex; align-items: center; gap: 16px; padding: 0 0 0 8px; color: var(--cyan); overflow: visible; }

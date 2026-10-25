@@ -2,6 +2,7 @@
 // scheduler). Three fixed controls: "Start with n", "Wake when the head waits X s" (plus "or busy ≥ Y %"
 // at generation 1, reserved and greyed before), and the order. Geometry never changes with state.
 import type { GameAction, ScopeRef, StartCtlView, StartOrder } from '../../game';
+import { wakeS } from './PowerKeys';
 
 /** Spec D31.2 ranges. */
 export const HEAD_WAIT_S = [1, 9] as const;
@@ -60,7 +61,7 @@ export function StartRow({ unit, scope, view: v, onAction }: StartRowProps) {
   const [one, many] = WORDS[scope], gen1 = v.generation >= 1;
   const busy = v.busyPct;
   return <div className="start-row" data-testid="start-row">
-    <p className="start-head"><b>Start</b><span>{startStatus(v, scope)}</span></p>
+    <p className="start-head"><b>Start · L{v.level} · wake in {wakeS(v.level)} s</b><span>{startStatus(v, scope)}</span></p>
     <Stepper label={`Start with, of ${v.total} ${v.total === 1 ? one : many}`} name="Start with" value={`${v.startWith} of ${v.total}`}
       lower="Start with fewer" raise="Start with more"
       onLower={v.startWith > 1 ? () => set({ startWith: v.startWith - 1 }) : null}

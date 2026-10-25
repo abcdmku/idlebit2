@@ -15,7 +15,7 @@ const GAP = 8;
 export function roomLabels(s: RoomSnapshot, frame: WorldFrame, out: LabelWriter): void {
   focusRect(s.rows, focus);
   if (frame.form !== 'phone') gutterTags(s, out);
-  upsTag(s, out);
+  upsTag(s, frame, out);
 }
 function gutterTags(s: RoomSnapshot, out: LabelWriter): void {
   const G = hallOf(s.rows), left = G.x - GAP;
@@ -26,7 +26,7 @@ function gutterTags(s: RoomSnapshot, out: LabelWriter): void {
   out.label('cooling', left, crac.y + 8, 'right', true).text('Cooling', 'name', true).text(`${whole(Math.round(s.tempF))}°F`, 'cyan')
     .leader(crac.x, crac.y + 12);
 }
-function upsTag(s: RoomSnapshot, out: LabelWriter): void {
+function upsTag(s: RoomSnapshot, frame: WorldFrame, out: LabelWriter): void {
   let usage = 0;
   for (const u of s.ups) usage = Math.max(usage, u.usage);
   const n = upsCabinets(s.ups);
@@ -36,6 +36,7 @@ function upsTag(s: RoomSnapshot, out: LabelWriter): void {
   out.label('ups', x, focus.y - 12, 'center', true).text('UPS', 'name', true).text(`${whole(Math.round(usage * 100))}%`, usage > 0.9 ? 'warn' : 'value');
   // D31: the room start controller on the UPS: racks powered now of those it controls
   const st = s.power?.start ?? null;
-  if (st) out.text('· Start', 'mute').text(`${whole(st.awake)}/${whole(st.total)} racks`, 'value');
+  // a phone keeps the tag narrow: the Start line goes under the UPS line
+  if (st) (frame.form === 'phone' ? out.br().text('Start', 'mute') : out.text('· Start', 'mute')).text(`${whole(st.awake)}/${whole(st.total)} racks`, 'value');
   out.leader(x, first.y);
 }

@@ -1,11 +1,13 @@
 // D31 at World: each site's off-grid generation (a kind icon and how much of its output the site
-// uses now) in the free top-right corner of its cell, and the global start controller's tag on
-// the scheduler hub ("Start 2/5 sites on"). Values are snapshot fields; nothing moves on its own.
+// uses now) in the free top-right corner of its cell, and the global start controller's tag
+// ("Start 2/5 sites on") just below the map under the scheduler hub, where it covers nothing and
+// stays in view on a phone (the phone pan keeps the gateway's hub on screen).
+// Values are snapshot fields; nothing moves on its own.
 import { P, R, mix, px, silk, silkWidth, whole } from '../../core';
 import type { LabelWriter, Rect } from '../../core';
 import type { GenerationView, GlobalSnapshot } from '../../../game';
 import { label } from '../rack/art';
-import { hubRect } from './layout';
+import { SIZE, hubRect } from './layout';
 
 type G = CanvasRenderingContext2D;
 const SUN = P.gold, BLADE = P.paper, CELL_C = P.cool, PLANT = mix(P.steel, P.ink, 0.1);
@@ -47,12 +49,10 @@ export function drawGeneration(g: G, b: Rect, gen: GenerationView | null | undef
 }
 
 const hub: Rect = { x: 0, y: 0, w: 0, h: 0 };
-/** The global start controller's tag above the map, with a leader down the ocean gap to the scheduler hub. */
+/** The global start controller's tag, centred under the scheduler hub just below the map. */
 export function globalStartTag(s: GlobalSnapshot, gateway: number, out: LabelWriter): void {
   const st = s.start ?? null;
   if (!st) return;
   hubRect(gateway, hub);
-  const x = hub.x + (hub.w >> 1);
-  out.label('start', x, -12, 'center', true).text('Start', 'name', true).text(`${whole(st.awake)}/${whole(st.total)} sites on`, 'value')
-    .leader(x, hub.y);
+  out.label('start', hub.x + (hub.w >> 1), SIZE.h + 3, 'center', true).text('Start', 'name', true).text(`${whole(st.awake)}/${whole(st.total)} sites on`, 'value');
 }

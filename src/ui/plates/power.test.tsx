@@ -19,7 +19,7 @@ const step = (label: string, which: 0 | 1) => m.host.querySelectorAll<HTMLButton
 describe('Start row (D31.2)', () => {
   it('three fixed steppers and the order, each sending the whole configuration', () => {
     m.render(<StartRow unit={rack} scope="rack" view={start()} onAction={onAction} />);
-    expect(m.host.querySelector('.start-head')?.textContent).toBe('Start1 / 12 awake');
+    expect(m.host.querySelector('.start-head')?.textContent).toBe('Start · L1 · wake in 2 s1 / 12 awake');
     click(step('Start with, of 12 systems', 1));
     click(step('Wake when the head waits', 0));
     click(m.host.querySelector('[role=radio][aria-checked=false]'));
@@ -47,7 +47,7 @@ describe('Start row (D31.2)', () => {
   it('each scope orders its own way', () => {
     m.render(<StartRow unit={{ kind: 'global' }} scope="global" view={start({ total: 3 })} onAction={onAction} />);
     expect([...m.host.querySelectorAll('[role=radio]')].map(b => b.textContent)).toEqual(['Slot', 'Cheapest', 'Nearest']);
-    expect(m.host.querySelector('.start-head')?.textContent).toBe('Start1 / 3 online');
+    expect(m.host.querySelector('.start-head')?.textContent).toBe('Start · L1 · wake in 2 s1 / 3 online');
   });
 });
 
@@ -85,5 +85,21 @@ describe('site generation and the round energy lines (D31.4, D31 report)', () =>
     expect(energyLines(e({ billed: '500' }))).toEqual([]);
     expect(energyLines(e({ billed: '500', fromBattery: '120', fuel: '3' })).map(l => l.key)).toEqual(['billed', 'fromBattery', 'fuel']);
     expect(energyLines(undefined)).toEqual([]);
+  });
+});
+
+describe('D31 power keys', () => {
+  it('an empty scope offers each install; an installed controller its upgrade by wake latency, then each replace', async () => {
+    const { PowerKeys, wakeS } = await import('./PowerKeys');
+    const { q, result } = await import('./testkit');
+    const ref = { unit: { kind: 'room', id: 0 }, slot: { kind: 'roomStart' } } as never;
+    const install = (g: number, label: string) => q({ type: 'replacePart', part: ref, generation: g, preserveCapacity: false }, 1000 * (g + 1), { label });
+    m.render(<PowerKeys quotes={result([install(0, 'Basic'), install(1, 'Predictive')])} installed={false} level={0} noun="Start controller" onAction={onAction} />);
+    expect([...m.host.querySelectorAll('.key')].map(k => k.textContent?.split('◆')[0])).toEqual(expect.arrayContaining([expect.stringContaining('Add Basic'), expect.stringContaining('Add Predictive')]));
+    m.render(<PowerKeys quotes={result([q({ type: 'upgradePart', part: ref }, 500), install(1, 'Predictive')])} installed level={2} wake noun="Start controller" onAction={onAction} />);
+    expect(m.host.textContent).toContain('Upgrade · L3');
+    expect(m.host.textContent).toContain('Wake in 1.5 s → 1 s');
+    expect(m.host.textContent).toContain('Replace · Predictive');
+    expect([wakeS(1), wakeS(4), wakeS(9)]).toEqual([2, 0.5, 0.25]);
   });
 });

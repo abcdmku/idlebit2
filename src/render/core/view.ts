@@ -38,6 +38,7 @@ export { reportRenderError } from './errors';
 export function createCanvasRenderer(canvas: HTMLCanvasElement, registry: LevelRegistry): CanvasRendererDebug {
   const g = context2d(canvas), viewport = rect(), ratio: PixelRatio = { x: 1, y: 1 };
   const cam = camera(), targetCam = camera(), oldTarget = camera(), framingFrom = camera(), localCam = camera();
+  const artRect = rect(), artSrc = rect(), artTl = { x: 0, y: 0 }, artBr = { x: 0, y: 0 };
   const focusRect = rect(), visible = rect(), entry = { x: 0, y: 0 }, corner = { x: 0, y: 0 }, scratch = rect(), hitOut = createHitTarget(), zoom = new ZoomTransition(), effects = createEffectPool(1), fb = new Feedback(), popClip = rect();
   const area: { w: number; h: number; scale: number } = { w: 0, h: 0, scale: 1 };
   const chain = new ZoomChain(), labels = new LabelBuffer();
@@ -182,8 +183,12 @@ export function createCanvasRenderer(canvas: HTMLCanvasElement, registry: LevelR
     fb.drawFlash(g, nowS, cam, viewport, ratio);
     if (!framing?.pipe) return;
     const at = entryOf(s) ?? { x: focusRect.x + focusRect.w / 2, y: focusRect.y };
+    // the focus art on screen (CSS px), which the pipe tags keep clear of
+    const art = lv.tagClear ? lv.tagClear(s, artSrc) : focusRect;
+    toScreen(cam, viewport, ratio, art.x, art.y, artTl); toScreen(cam, viewport, ratio, art.x + art.w, art.y + art.h, artBr);
+    artRect.x = artTl.x; artRect.y = artTl.y; artRect.w = artBr.x - artTl.x; artRect.h = artBr.y - artTl.y;
     toScreen(cam, viewport, ratio, at.x, at.y, corner);
-    drawPipe(g, snapshot!, frame!.timeMs, frame!.paused, framing, viewport, ratio, corner, type);
+    drawPipe(g, snapshot!, frame!.timeMs, frame!.paused, framing, viewport, ratio, corner, type, true, artRect);
   }
   function drawZoom(s: RenderSnapshot): boolean {
     const partner = s.partner;

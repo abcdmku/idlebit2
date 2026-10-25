@@ -5,8 +5,9 @@ import { RACK, RACK_RECTS } from '../room/layout';
 import { createRackRenderer } from '.';
 import { OFF, typeText } from './art';
 import { LCD_IDLE, drawServer, serverLook } from './sprites';
+import { awakeCount, batteryText } from './powerCtl';
 import { CASES, rackCase } from './fixtures';
-import { CAB_RECT, FOCUS, ROW_PITCH, ROW_W, SWITCH_RECT, UPLINK_JACK, WORLD, colX, portX } from './layout';
+import { CAB_RECT, FOCUS, POWER_CTL_RECT, ROW_PITCH, ROW_W, SWITCH_RECT, UPLINK_JACK, WORLD, colX, portX } from './layout';
 import { NEIGHBOUR_ALPHA } from './neighbour';
 import { clampScroll, createRowScroll, rackRowScroll } from './row';
 import { drillOf } from './world';
@@ -222,5 +223,31 @@ describe('between rounds: ready vs sitting out', () => {
     expect(s.servers.map(v => serverLook(s, v, true))).toEqual(['paused', 'paused', 'out', 'paused', 'paused', 'out', 'paused', 'paused', 'paused', 'out', 'paused', 'paused']);
     // during a round the same sleds keep the live looks
     expect(serverLook(s, { ...s.servers[2]!, state: 'onMarket' }, false)).toBe(s.servers[2]!.port ? 'live' : 'noport');
+  });
+});
+
+describe('D31 power control and sleep', () => {
+  it('reads the battery as time until billed, then GRID, and the awake count', () => {
+    expect(batteryText(252, 1000)).toBe('BAT 4:12');
+    expect(batteryText(1500, 1000)).toBe('BAT 25M');
+    expect(batteryText(7200, 1000)).toBe('BAT 2H');
+    expect(batteryText(0, 0)).toBe('GRID');
+    expect(awakeCount(4, 12)).toBe('4/12 ON');
+    expect(awakeCount(12, 12)).toBe('12/12');
+  });
+  it('dims asleep sleds, darkens standby ones, and taps the Power control U', () => {
+    const s = CASES.power!(0);
+    expect(s.servers.slice(0, 6).map(v => serverLook(s, v, false))).toEqual(['live', 'live', 'live', 'live', 'asleep', 'asleep']);
+    expect(serverLook(s, { ...s.servers[0]!, state: 'standby' }, false)).toBe('dark');
+    expect(serverLook(s, { ...s.servers[5]!, wakeMs: 1200 }, false)).toBe('waking');
+    expect(serverLook(s, { ...s.servers[5]!, wakeMs: null }, false)).toBe('asleep');
+    const out: HitTarget[] = Array.from({ length: 64 }, () => createHitTarget());
+    const n = rack.targets!(s, view, out, 0), t = out.slice(0, n).find(h => h.id === 'powerCtl');
+    expect(t?.rect.y).toBe(POWER_CTL_RECT.y);
+    expect(t?.unit).toEqual({ kind: 'rack', id: s.rackId });
+    expect(t?.part).toEqual({ unit: { kind: 'rack', id: s.rackId }, slot: { kind: 'powerCtl' } });
+    // empty slot (not installed): the same target
+    const e = CASES.overview!(0), m = rack.targets!(e, view, out, 0);
+    expect(out.slice(0, m).find(h => h.id === 'powerCtl')?.part?.slot).toEqual({ kind: 'powerCtl' });
   });
 });

@@ -191,7 +191,7 @@
 
 /* D31 Start row: three fixed steppers and the order; the busy stepper is reserved and greyed before gen 1 */
 .v3-plate .start-row { display: grid; gap: 4px; margin-top: 8px; padding-top: 8px; box-shadow: inset 0 2px 0 #29234b; }
-.v3-plate .start-head { display: flex; justify-content: space-between; gap: 8px; margin: 0; }
+.v3-plate .start-head { display: grid; gap: 2px; margin: 0; }
 .v3-plate .start-head span { color: #a99be6; }
 .v3-plate .start-step { margin-top: 0; grid-template-columns: 1fr 44px 72px 44px; }
 .v3-plate .start-step.off { color: var(--dim); }

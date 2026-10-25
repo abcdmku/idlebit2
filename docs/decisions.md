@@ -1286,6 +1286,13 @@ The user's words:
 3. **Views.** `ResearchNodeView` carries `dataCost` (`'0'` for Credits-only nodes) and a required `creditCost`; `needsCredits` compares `creditCost` with the wallet.
 4. **Balance (measured, real sim, 3 seeds, 9 h).** `rack` is W7 work (2.5e7 ops, about 28 min on one kHz thread) at 2.7e7 Data (2.7e8 Credits), so the Rack project no longer holds the single research slot for 3+ h. Results: System 0:20–0:21, kHz CPU 1:17–1:19, **Rack 6:17–6:34**; the D20 opening is unchanged (passive round 1 at 0:36–1:16, median 0:55). Longest pre-Rack gaps 34 / 35 / 47 min, from the kHz-package save (about 0:45 to 1:19) and the Rack Data and Credit save (about 5:20 to 6:10); the gap pass continues.
 
+**D25.10 check under D30, 25 Oct (balance).** Measured with `scripts/balance/fleet.ts`: 1, 2, 4, 8 and 12 copies of the bot's 9 h server (seed 42) in one rack, ports and uplinks at speed, filters on, PDU and cooler sized to the real draw, four full rounds each, 15 s between rounds.
+
+1. **Gross scales as D25.10 says:** about ×1.7–1.9 per doubling and +1 `I` per doubling (peak `I` 24.0 → 27.7).
+2. **Net did not:** with cooler load watts ∝ `x^1.5`, cooling grew from about 19% of the servers' draw at 1 server to 45% at 8, and net per hour fell past 8 servers (1.6e9 → 2.9e9 → 4.4e9 → 5.3e9 → 4.3e9).
+3. **Fix (constant):** cooler load watts ∝ `x^1.25` (`COOLER_LOAD_EXP`, `build/catalog/curves.ts`; spec §9.1). Levelled coolers still lose efficiency, as `x^0.25` per watt removed. Net per hour now rises with every size: 1.67e9, 3.05e9, 5.00e9, 6.62e9, 7.11e9 (energy share 43% → 70%). The D20 opening and the 3-seed pacing are unchanged.
+4. **Still open:** gross per server falls about 10–20% per doubling. The bigger fleet meets harder tasks (+1 `I`) on the same servers, so spill and the wall take a growing share; a player upgrades memory to answer it.
+
 ## 16. Shared rules for agents
 
 - **Shared checkout.** Other agents work in the same checkout at the same time. Edit only the files your brief gives you. Never revert someone else's edits. Run no git command that changes state.

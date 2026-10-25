@@ -7,7 +7,7 @@
 import { P, R, copyRect, partVersionOf, px, setRect } from '../../core';
 import type { LevelRegistry, LevelRenderer, Rect } from '../../core';
 import { createFanBank } from './art';
-import { CAB_RECT, FOCUS, PLINTH, ROW_W, U0, UP_X, WORLD, colX, serverRect } from './layout';
+import { CAB_RECT, FOCUS, PHONE_TAG_GUTTER, PLINTH, ROW_W, U0, UP_X, WORLD, colX, serverRect } from './layout';
 import { drawRackMini } from './mini';
 import { rackCol, rackRowScroll } from './row';
 import { rackChildren, rackTargets, rackPayoutAnchor, rackShardAnchor } from './targets';
@@ -32,10 +32,15 @@ export function createRackRenderer(registry: LevelRegistry): LevelRenderer<'rack
     id: 'rack', name: 'Rack',
     size: (_s, out) => setRect(out, 0, 0, ROW_W, WORLD.h),
     /** The active rack, shifted by the row scroll (clamped to the row's built racks). */
-    focus(s, _vp, out, _form, area) {
+    focus(s, _vp, out, form, area) {
       copyRect(FOCUS, out); out.x += colX(rackCol(s)) + rackRowScroll.apply(s, area);
+      // Phone: the rest also frames a gutter left of the cabinet, so the pipe tags beside the first
+      // drop never touch it (the cabinet rests right of centre; 174 art px still fits at 2).
+      if (form === 'phone') { out.x -= PHONE_TAG_GUTTER; out.w += PHONE_TAG_GUTTER; }
       return out;
     },
+    /** The pipe tags keep clear of the active cabinet itself, not the phone gutter beside it. */
+    tagClear(s, out) { copyRect(FOCUS, out); out.x += colX(rackCol(s)) + rackRowScroll.offset; return out; },
     /** The row snaps, and a tapped neighbour settles, in 0.15 s (A06). */
     restEaseS: () => 0.15,
     /** The pipe enters at the active rack's ceiling uplink (L2 D17: x 120, y 0). */

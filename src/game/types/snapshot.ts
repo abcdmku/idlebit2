@@ -260,6 +260,8 @@ export interface RackSnapshot {
    * D25: the rack uplink ('uplink': its first 4 × uplinks FIFO shards, sending first, then waiting with
    * bitsSent 0), then each port's front shard ('server'). At most 12 + uplinks × 4.
    */
+  /** D31: true until the `powerCtl` research is done; an open empty slot then draws as an empty bay. Optional only until hand-built fixtures add it. */
+  readonly powerCtlLocked?: boolean;
   readonly flows: readonly TransferView[];
 }
 

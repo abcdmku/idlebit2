@@ -8,7 +8,9 @@ import { BEZEL, OFF, ears, label, lcdChars, lcdText, typeText } from './art';
 type G = CanvasRenderingContext2D;
 /** Between rounds a sled is 'paused' (on market: it runs next round, LCD READY) or 'out' (its switch or an ancestor's is off: it sits out, LCD OFF). */
 /** D31: 'asleep' (S3, 0.03 × idle) dims with LCD SLEEP; a 'standby' system (its rack powered off by a start controller, 0 W) draws 'dark'. */
-export type ServerLook = 'live' | 'dark' | 'crash' | 'noport' | 'paused' | 'out' | 'offline' | 'boot' | 'asleep';
+export type ServerLook = 'live' | 'dark' | 'crash' | 'noport' | 'paused' | 'out' | 'offline' | 'boot' | 'asleep' | 'waking';
+/** D31: the base S3 wake (s3WakeS, 2 s); Power control levels only shorten it, so a wake lamp drains within it. */
+export const WAKE_MS = 2000;
 /** The sled is on market: its own and every ancestor's switch is on (a missing flag reads as on). */
 export const onMarket = (v: ServerSlotView): boolean => v.onMarket !== false;
 
@@ -21,7 +23,7 @@ export function serverLook(s: RackSnapshot, v: ServerSlotView, paused: boolean):
   if (paused) return onMarket(v) ? 'paused' : 'out';
   if (v.state === 'boot' || v.state === 'cold') return 'boot';
   if (v.state === 'offline' || v.state === 'goingOffline') return 'offline';
-  if (v.state === 'asleep') return 'asleep';
+  if (v.state === 'asleep') return (v.wakeMs ?? 0) > 0 ? 'waking' : 'asleep';
   if (v.port === null) return 'noport';
   return 'live';
 }
@@ -46,6 +48,7 @@ function lcdLine(v: ServerSlotView, look: ServerLook, max: number): string {
     case 'paused': return 'READY';
     case 'out': return 'OFF';
     case 'asleep': return 'SLEEP';
+    case 'waking': return label('WAKE ', Math.max(1, Math.ceil((v.wakeMs ?? 0) / 1000)));
     case 'boot': return label('BOOT ', Math.max(0, Math.ceil(v.timerS ?? 0)));
     default: break;
   }
@@ -67,7 +70,7 @@ export function drawServer(g: G, x: number, y: number, w: number, h: number, v: 
   // NIC jack with its link light (left ear): lit only while a real transfer runs on its port
   R(g, x + 2, y + 3, 3, 3, P.ink); px(g, x + 3, y + 4, P.substrateHi);
   px(g, x + 4, y + 2, live && v.port?.active ? P.net : OFF);
-  px(g, x + w - 4, y + 3, look === 'crash' ? P.fault : dark || look === 'offline' || look === 'out' ? OFF : look === 'boot' ? P.amber : look === 'asleep' ? SLEEP_LED : P.led);
+  px(g, x + w - 4, y + 3, look === 'crash' ? P.fault : dark || look === 'offline' || look === 'out' ? OFF : look === 'boot' || look === 'waking' ? P.amber : look === 'asleep' ? SLEEP_LED : P.led);
 
   // one LED column per core (up to 4), lit for the cores that are busy now
   const cols = Math.max(1, Math.min(4, v.cores)), busy = v.cores > 0 ? v.busyCores / v.cores : 0;
@@ -107,7 +110,8 @@ export function drawServer(g: G, x: number, y: number, w: number, h: number, v: 
   if (tier === 0) { for (let yy = y + 4; yy < y + h - 3; yy += 3) R(g, cx + 1, yy, vx1 - cx - 1, 1, lo); }
   else for (let yy = y + 3; yy < y + h - 3; yy += 2) for (let xx = cx + ((yy >> 1) & 1); xx < vx1; xx += 2) px(g, xx, yy, lo);
   // the server's online lamp: real mode, draining over a real boot or switch
-  if (!dark) drawUnitLamp(g, x + w - 14, y + 9, 6, look === 'out' ? 'offline' : lampState(v.state), (v.timerS ?? 0) * 1000, (v.timerTotalS ?? 0) * 1000, paused);
+  if (!dark) if (look === 'waking') drawUnitLamp(g, x + w - 14, y + 9, 6, 'switching', v.wakeMs ?? 0, Math.max(WAKE_MS, v.wakeMs ?? 0), paused);
+  else drawUnitLamp(g, x + w - 14, y + 9, 6, look === 'out' ? 'offline' : lampState(v.state), (v.timerS ?? 0) * 1000, (v.timerTotalS ?? 0) * 1000, paused);
 
   if (look === 'crash') { g.globalAlpha = alpha * 0.45; R(g, x + 1, y + 1, w - 2, h - 2, P.ink); g.globalAlpha = alpha; outline(g, x, y, w, h, HALT); }
   // Between rounds: a sled that sits out is clearly darker; a ready one is only slightly dimmed.

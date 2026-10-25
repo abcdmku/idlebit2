@@ -10,7 +10,7 @@ vi.setConfig({ testTimeout: 60_000 });
 const LEVEL_OF = {
   chipBoot: 'chip', chipTop: 'chip', systemBoot: 'system', systemTop: 'system',
   rack: 'rack', room: 'room', global: 'global', globalGroup: 'global',
-  rackSplit: 'rack', roomSplit: 'room', globalSplit: 'global', spillSystem: 'system', spillRack: 'rack',
+  rackSplit: 'rack', roomSplit: 'room', globalSplit: 'global', powerRack: 'rack', spillSystem: 'system', spillRack: 'rack',
 } as const;
 
 describe('snapshot fixtures', () => {

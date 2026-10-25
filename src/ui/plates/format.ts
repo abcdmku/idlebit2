@@ -1,4 +1,4 @@
-import { formatHertz, formatOps, formatSize } from '../../game';
+import { formatEnergy, formatHertz, formatOps, formatSize } from '../../game';
 import type { Amount, EffectPreview } from '../../game';
 
 /**
@@ -95,6 +95,7 @@ export function measureUnit(n: number, unit: EffectPreview['unit']): string {
     case 'bits': return formatSize(n);
     case 'bit/s': return formatHertz(n);
     case 'Hz': return formatHertz(n);
+    case 'J': return formatEnergy(n);
     case 'ops': return formatOps(n);
     case 'ops/s': return `${formatOps(n)}/s`;
     default: return COUNTS.has(unit) ? `${Math.round(n)} ${unit}` : quantity(n, unit);

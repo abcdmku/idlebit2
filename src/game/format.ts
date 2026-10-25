@@ -122,6 +122,11 @@ export function formatHertz(hz: number): string {
   const [num, prefix] = siParts(hz);
   return `${num} ${prefix}Hz`;
 }
+/** Energy: "600 MJ", "120 GJ" (a battery's capacity). */
+export function formatEnergy(joules: number): string {
+  const [num, prefix] = siParts(joules);
+  return `${num} ${prefix}J`;
+}
 /** Work, the prefix on the number (the queue cards' style): "1 op", "3 ops", "53.4k ops", "1.2M ops". */
 export function formatOps(n: number): string {
   const [num, prefix] = siParts(n);

@@ -25,6 +25,8 @@ export const SAVE_AT = { x: 9, y: 9 } as const;
 export const LAMP = { x: 9, y: 20, w: 7 } as const;
 /** The rest framing: roof to plinth, 1 px each side (the floor tile and the sky above may fall outside): 2× fits a phone. */
 export const FOCUS = rect(1, CAB.roofY - 1, 126, PLINTH.y + PLINTH.h + 1 - (CAB.roofY - 1));
+/** Art px the phone rest adds left of the cabinet for the pipe tags (core/pipe.ts stacks them there). */
+export const PHONE_TAG_GUTTER = 48;
 
 // The room row (D17.2). The rack world is the whole row: cabinet c stands at x = 120c, the
 // room's 15 px rack pitch at 1/8 (a room rack rect is this 128 × 240 world at 1/8).

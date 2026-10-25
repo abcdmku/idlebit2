@@ -1,4 +1,4 @@
-import { MAX_RACK_PORTS, MAX_UPLINKS, RACK_SLOTS_PER_ROW, RACKS_PER_ROOM, SERVERS_PER_RACK } from '../core/constants';
+import { MAX_RACK_PORTS, MAX_UPLINKS, RACK_SLOTS_PER_ROW, RACKS_PER_ROOM, SERVERS_PER_RACK, TICK_MS } from '../core/constants';
 import { familyId, systemId, type FamilyId, type NodeRef, type RackId } from '../types/ids';
 import type { RackSnapshot } from '../types/snapshot';
 import type { GameState } from '../types/state';
@@ -7,6 +7,7 @@ import { containerMode, coolerView, lbView, modeName, probeTimerS, rackProbe, ra
 import { rackFlows } from './flows';
 import { rackSlot } from './room';
 import { powerCtlView } from './power';
+import { genUnlocked } from '../build/research/unlocks';
 import { forEachRunning } from './tasks';
 
 export { systemLoad } from './common';
@@ -60,7 +61,7 @@ function serverSlot(state: GameState, rack: number, slot: number, sw: SwitchView
     state: modeName(h.mode[s]), load: systemLoad(state, s), running, admitted: running + (h.queueLen[s] ?? 0),
     family: runningFamily(state, s),
     ...systemCoreActivity(state, s),
-    reserved: h.reserved[s] ?? 0, timerS, timerTotalS: timerS === null ? null : ticksToS(state.research.unlocks.bootTicks), port,
+    reserved: h.reserved[s] ?? 0, wakeMs: (h.wakeTicks[s] ?? 0) > 0 ? (h.wakeTicks[s] ?? 0) * TICK_MS : null, timerS, timerTotalS: timerS === null ? null : ticksToS(state.research.unlocks.bootTicks), port,
   };
 }
 
@@ -91,7 +92,7 @@ export function rackSnapshot(state: GameState, id: RackId, parent: NodeRef | nul
       rebootTicks: h.pduRebootTicks[id] ?? 0, loss: c.pduLoss[id] ?? 0, capSwitch: (c.pduCapSwitch[id] ?? 0) === 1 && b.pdu.capped, capFactor: 1,
     }, siteEnergyPrice(state, state.compiled.room.site[c.room[id] ?? 0] ?? 0)),
     lb: lbView(state, b.lb, { kind: 0, id, strategy: c.lbStrategy[id] ?? 0, filters: c.lbFilters[id] ?? 0, routed: h.lbRouted[id] ?? 0, last: h.lbLast[id] ?? -1 }),
-    switch: sw, powerCtl: powerCtlView(state, id), servers,
+    switch: sw, powerCtl: powerCtlView(state, id), powerCtlLocked: !genUnlocked(state.research.unlocks, 'powerCtl', 0), servers,
     saveable: state.research.unlocks.rules.includes('configSave'),
     flows: rackFlows(state, id),
   };

@@ -1,8 +1,10 @@
 // D31.3 Power control: the rack battery and its start controller as one 1U unit, directly under
 // the cooler. Its face: a battery whose fill is the real charge (it drains at the rack's real draw
 // while the round runs), an LCD with the time until billed ("BAT 4:12", "GRID" once empty) and the
-// awake count ("4/12 ON"). An empty slot is a blanking plate with a lock until it is installed.
-import { P, R, mix, px } from '../../core';
+// awake count ("4/12 ON"). An empty slot is a blanking plate with a lock until `powerCtl` is
+// researched (`powerCtlLocked`), then an open bay with the add mark.
+import { P, R, drawGhost, mix, px } from '../../core';
+import type { GhostState } from '../../core';
 import type { RackSnapshot } from '../../../game';
 import { OFF, ears, label, lcdText } from './art';
 import { POWER_CTL_RECT } from './layout';
@@ -35,8 +37,15 @@ export function awakeCount(awake: number, total: number, maxChars = 7): string {
 }
 
 /** The Power control U. `dark`: the rack has no power; `quiet`: between rounds (steady lights). */
-export function drawPowerCtl(g: G, s: RackSnapshot, dark: boolean, quiet: boolean): void {
+export function drawPowerCtl(g: G, s: RackSnapshot, dark: boolean, quiet: boolean, ghost: GhostState = 'open'): void {
   const r = POWER_CTL_RECT, pc = s.powerCtl ?? null;
+  if (!pc && s.powerCtlLocked === false) {
+    // researched, not installed: an open bay with the add mark (the price lives on its plate)
+    const cx = r.x + (r.w >> 1), cy = r.y + (r.h >> 1);
+    drawGhost(g, r.x + 1, r.y + 1, r.w - 2, r.h - 2, ghost);
+    R(g, cx - 3, cy - 1, 7, 3, P.ink); R(g, cx - 1, cy - 3, 3, 7, P.ink); R(g, cx - 2, cy, 5, 1, P.paper); R(g, cx, cy - 2, 1, 5, P.paper);
+    return;
+  }
   if (!pc) {
     // The blanking plate (the shell's) with one small lock: Power control is not installed here.
     const lx = r.x + (r.w >> 1) - 3, ly = r.y + 2;
@@ -53,7 +62,8 @@ export function drawPowerCtl(g: G, s: RackSnapshot, dark: boolean, quiet: boolea
   // battery: body with its real charge as the fill, terminal on the right
   const bx = r.x + PWR_FACE.bat.dx, bw = PWR_FACE.bat.w, by = r.y + 3;
   R(g, bx, by, bw, 6, P.ink); R(g, bx + bw, by + 2, 1, 2, P.ink);
-  const fill = Math.round((bw - 2) * share), low = share < 0.25;
+  // any charge left shows at least one column: the bar never reads empty while the rack is still unbilled
+  const fill = b.chargeJ > 0 ? Math.max(1, Math.round((bw - 2) * share)) : 0, low = share < 0.25;
   R(g, bx + 1, by + 1, bw - 2, 4, mix(face, P.ink, 0.6));
   if (!dark && fill > 0) R(g, bx + 1, by + 1, fill, 4, low ? P.amber : P.led);
 

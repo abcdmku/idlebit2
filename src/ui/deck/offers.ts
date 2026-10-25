@@ -1,7 +1,7 @@
 // What the deck can buy: the build rows, the one Buy key and the callouts all read one offer list
 // built from quotes (A08). Prices, locks and effects come from the sim; this file only words them,
 // in one grammar (A14): name · change · a right column (price, "Research: <node>", "Max" or "At <place>").
-import type { EffectPreview, LevelId, NodeRef, PartSlotKind, Quote, QuoteRequest, RackId } from '../../game';
+import type { EffectPreview, LevelId, NodeRef, PartSlotKind, Quote, QuoteRequest, RackId, RoomId } from '../../game';
 import type { PartIconKind } from '../art/deckArt';
 import { measureUnit } from '../plates/format';
 
@@ -59,18 +59,29 @@ export const ROWS: Readonly<Record<LevelId, readonly [RowDef, RowDef, RowDef, Ro
 export const EXTRA_ROWS: Readonly<Partial<Record<LevelId, readonly RowDef[]>>> = {
   system: [row('psu', 'power', 'PSU', 'psu')],
   rack: [row('powerCtl', 'power', 'Power control'), row('lbQueue', 'lb', 'LB queue', 'lb')],
-  room: [row('lbQueue', 'lb', 'LB queue', 'roomLb')],
-  global: [row('lbQueue', 'lb', 'Scheduler queue', 'globalScheduler')],
+  room: [row('lbQueue', 'lb', 'LB queue', 'roomLb'), row('roomStart', 'power', 'Start control')],
+  global: [row('lbQueue', 'lb', 'Scheduler queue', 'globalScheduler'), row('globalStart', 'power', 'Start control')],
 };
 
-/** The quote an extra row sells: its upgrade or add, never a configuration or a replace. */
-const NOT_OFFERS: ReadonlySet<string> = new Set(['setStartConfig', 'replacePart', 'removePart', 'setSetpoint', 'setStrategy', 'setFilter']);
-export const extraOffer = (quotes: readonly Quote[] | undefined): Quote | null => quotes?.find(q => !NOT_OFFERS.has(q.action.type)) ?? null;
+/**
+ * The quote an extra row sells: its upgrade (or the router queue's next slot); with none, an empty D31
+ * part's first buildable install (`replacePart` from nothing), never a configuration.
+ */
+export function extraOffer(quotes: readonly Quote[] | undefined): Quote | null {
+  if (!quotes) return null;
+  const up = quotes.find(q => q.action.type === 'upgradePart' || q.action.type === 'upgradeRouterQueue');
+  if (up) return up;
+  const installs = quotes.filter(q => q.action.type === 'replacePart');
+  return installs.find(q => !q.locked) ?? installs[0] ?? null;
+}
 
 /** The part quote request behind an extra row at `at`. */
 export function extraRequest(at: NodeRef, def: RowDef): QuoteRequest | null {
   if (at.level === 'system' && def.slot === 'psu') return { kind: 'part', part: { unit: { kind: 'system', id: at.id }, slot: { kind: 'psu' } } };
-  if (at.level === 'rack' && def.key === 'powerCtl') return { kind: 'infra', unit: { kind: 'rack', id: at.id as RackId }, slot: 'powerCtl' };
+  // D31: each scope's optional power part (rack Power control, room and global start controllers).
+  if (at.level === 'rack' && def.key === 'powerCtl') return { kind: 'power', unit: { kind: 'rack', id: at.id as RackId } };
+  if (at.level === 'room' && def.key === 'roomStart') return { kind: 'power', unit: { kind: 'room', id: at.id as RoomId } };
+  if (at.level === 'global' && def.key === 'globalStart') return { kind: 'power', unit: { kind: 'global' } };
   if (def.key === 'lbQueue') {
     if (at.level === 'rack') return { kind: 'routerQueue', unit: { kind: 'rack', id: at.id } };
     if (at.level === 'room') return { kind: 'routerQueue', unit: { kind: 'room', id: at.id } };
@@ -125,7 +136,9 @@ export function offerOf(def: RowDef, q: Quote | undefined, link = def.key === 'l
   const credits = q.currency === 'credits', price = q.locked || !credits ? null : whole(q.cost);
   // At the top of a ladder the step is a no-op: show where it stands ("32 slots"), not "32 → 32".
   // A first add keeps its "Add RAM" name and shows what it gives ("0 → 2 slots"), as the board does (user).
-  const change = !e ? q.label : e.capacityBefore === e.capacityAfter ? measure(e.capacityBefore, e.unit) : changeText(e);
+  // A start controller's upgrade has no capacity effect (D31): its level step, from the quote's "… · L3".
+  const step = !e && q.action.type === 'upgradePart' ? /· L([0-9]+)$/.exec(q.label) : null;
+  const change = step ? `L${Number(step[1]) - 1} → L${step[1]}` : !e ? q.label : e.capacityBefore === e.capacityAfter ? measure(e.capacityBefore, e.unit) : changeText(e);
   return { ...def, name: first ? `Add ${def.name}` : def.name, change,
     quote: q, price, affordable: !q.locked && credits && q.affordable, lock: q.locked?.text ?? null, where: false, right: rightOf(q, price, false) };
 }
