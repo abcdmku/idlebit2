@@ -10,6 +10,7 @@ import type { Point, Rect } from './geom';
 import { LabelBuffer, drawLabels } from './labels';
 import type { Typography } from './labels';
 import { P } from './palette';
+import { bandColor } from './familyIcons';
 import { R, packet, pathAt } from './px';
 
 /** Shorter transfers flash at the entry instead of travelling (D12.4). */
@@ -107,7 +108,7 @@ export function drawPipe(g: CanvasRenderingContext2D, s: RenderSnapshot, timeMs:
   const seconds = t && t.speed > 0 ? t.bits / t.speed : 0;
   if (t && live && entry) {
     if (seconds >= MIN_VISIBLE_TRANSFER_S) {
-      pathAt(pts, transferProgress(t, s.simTimeMs, timeMs), at); packet(g, at.x, at.y, t.bits);
+      pathAt(pts, transferProgress(t, s.simTimeMs, timeMs), at); packet(g, at.x, at.y, t.bits, bandColor(t.family));
     } else { const e = pts[count - 1]; R(g, e[0] - 2, e[1] - 6, 4, 6, '#c6f7cf'); }
   }
   g.restore();

@@ -5,7 +5,7 @@ import {
 } from '../index';
 import { MAX_ACCELS, MAX_UPS } from '../core/constants';
 import { rqLen, rqLevel, rqRow } from '../core/routerQueue';
-import { energyRatio, PARTS, portSpeedPrice, ratedRate } from '../build/catalog';
+import { energyRatio, LADDERS, ladderSpeed, PARTS, portSpeedPrice, ratedRate } from '../build/catalog';
 import { researchDef } from '../build/research/tree';
 import type { GpuGeneration } from '../types/gpu';
 import type { Policy } from './policies';
@@ -108,7 +108,7 @@ function sampleSystems(state: GameState): number[] {
 }
 
 /** Native price of the cheapest generation-1 model; each generation costs 10× (spec §12.6). */
-const GPU_ENTRY_PRICE = 4e6;
+const GPU_ENTRY_PRICE = 1e6;
 function newestGpuGeneration(state: GameState): GpuGeneration | null {
   for (let g = 9; g >= 1; g -= 1) if (state.research.unlocks.gens.gpu & (1 << (g - 1))) return g as GpuGeneration;
   return null;
@@ -131,7 +131,7 @@ export function candidateRequests(state: GameState): QuoteRequest[] {
     for (const index of cards) reqs.push({ kind: 'part', part: { unit: { kind: 'system', id: system }, slot: { kind: 'gpu', index } } });
     // A model catalog quotes every model with a full-load power preview, which is costly: ask only
     // for the newest generation, on the weakest system, once the cheapest model is affordable.
-    if (n === 0 && gpuGen !== null && amountToNumber(state.wallet.credits) >= GPU_ENTRY_PRICE * 10 ** (gpuGen - 1)) {
+    if (n === 0 && gpuGen !== null && amountToNumber(state.wallet.credits) >= (gpuGen === 1 ? GPU_ENTRY_PRICE : 4e6 * 10 ** (gpuGen - 1))) {
       for (const index of [null, ...cards.slice(0, 1)]) reqs.push({ kind: 'gpuModels', system, index, generation: gpuGen });
     }
   });
@@ -214,7 +214,8 @@ export function score(state: GameState, q: Quote): number | null {
     // A copied server lands on a default port; a player steps that port to the original's speed.
     const from = a.source.from.id, pipe = state.compiled.sys.pipeSpeed[from] ?? 0;
     const gain = carried(state, from);
-    return gain > 0 && pipe > 0 ? (cost + Number(portSpeedPrice(1e3, pipe, 1))) / gain : null;
+    const base = ladderSpeed(LADDERS.switch.baseK[0]!);
+    return gain > 0 && pipe > 0 ? (cost + (pipe > base ? Number(portSpeedPrice(base, pipe, 1)) : 0)) / gain : null;
   }
   if (rate) {
     const next = tryAction(state, a);
@@ -286,6 +287,11 @@ function ramPastRatio(state: GameState, a: GameAction): boolean {
   if (!m) return false;
   const era = (PARTS.ram.watts as { era: readonly number[] }).era[m.gen] ?? 0;
   return energyRatio(era, ratedRate(PARTS.ram, m.gen, 1), ratedRate(PARTS.ram, m.gen, m.level + 1)) < RAM_MIN_RATIO;
+}
+/** The action answers a failure detail of one of the last few rounds. */
+function answersRecentWall(state: GameState, a: GameAction): boolean {
+  const details = gateDetail(a);
+  return details !== null && state.round.reports.slice(-3).some((r) => r.details.some((d) => details.includes(d.detail)));
 }
 const lastFailedOn = (state: GameState, details: readonly string[]): boolean =>
   state.round.reports.at(-1)?.details.some((d) => details.includes(d.detail)) ?? false;
@@ -371,8 +377,26 @@ function creditReserve(state: GameState): number {
   }
   // The first GPU is a save-up goal once GPU tasks block rounds: a player stops buying levels to afford it.
   const noGpu = !state.build.systems.some((x) => x?.spec.accels.some((a) => a.kind === 'gpu'));
+  // A new CPU generation that pays back within the hour comes first (the kHz package, D29); then the first GPU.
+  if (reserve === 0) {
+    const cpu = nextCpuSave(state);
+    if (cpu > 0) reserve = cpu;
+  }
   if (reserve === 0 && noGpu && (state.research.unlocks.gens.gpu & 1) !== 0 && state.round.reports.slice(-4).some((r) => r.details.some((d) => d.detail === 'gpu'))) reserve = GPU_ENTRY_PRICE;
   return reserve;
+}
+
+/** Cost of replacing the weakest system's CPU with the newest generation, when it is not affordable yet but pays back within an hour; else 0. */
+const CPU_SAVE_PAYBACK_S = 3600;
+function nextCpuSave(state: GameState): number {
+  const id = sampleSystems(state)[0];
+  if (id === undefined) return 0;
+  const q = quote(state, { kind: 'tray', at: { level: 'system', id: systemId(id) } }).quotes.find((x) => x.action.type === 'replaceCpu');
+  if (!q || q.affordable || q.locked !== null) return 0;
+  const cost = amountToNumber(q.cost);
+  const rich = tryAction({ ...state, wallet: { ...state.wallet, credits: q.cost } }, q.action);
+  const gain = rich ? income(rich) - income(state) : 0;
+  return gain > 0 && cost / gain <= CPU_SAVE_PAYBACK_S ? cost : 0;
 }
 
 function buyParts(state: GameState, policy: Policy, log: BotEvent[]): GameState {
@@ -384,7 +408,8 @@ function buyParts(state: GameState, policy: Policy, log: BotEvent[]): GameState 
     const credits = amountToNumber(s.wallet.credits);
     for (const q of buyable(s, quotes)) {
       // The reserve holds back gates and levels, not purchases that raise net income (a native CPU saves energy).
-      if (reserve > 0 && !q.gpu && cpuTarget(q.action) === null && credits - amountToNumber(q.cost) < reserve) continue;
+      // Nor purchases that answer a wall the recent rounds ended on (RAM, drives, cache): a player buys those while saving.
+      if (reserve > 0 && !q.gpu && cpuTarget(q.action) === null && !answersRecentWall(s, q.action) && credits - amountToNumber(q.cost) < reserve) continue;
       const v = score(s, q);
       if (v !== null && v < bestScore) { best = q; bestScore = v; }
     }

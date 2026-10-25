@@ -23,9 +23,23 @@ export function allocRecord(hot: HotBuffers): number {
 }
 
 /** The record must already be unlinked from every list and have released its resource holds. */
+/**
+ * Test and dev hook: freeRecord checks that a record is freed once and, once freed, is in no parent's
+ * sibling list. O(siblings) per free; never on in play.
+ */
+export const poolDebug = { verify: false };
+
 export function freeRecord(hot: HotBuffers, r: number): void {
   const rec = hot.rec;
-  if (rec.parent[r]! >= 0) dropSibling(hot, r);
+  // LOC.free also marks a record taken off every list before its free; count 0 marks a freed one.
+  if (poolDebug.verify && rec.count[r] === 0) throw new Error(`pool: record ${r} freed twice`);
+  const p = rec.parent[r]!;
+  if (p >= 0) dropSibling(hot, r);
+  if (poolDebug.verify && p >= 0) {
+    for (let q = hot.parent.head[p]!, n = 0; q >= 0 && n <= 256; q = rec.sib[q]!, n += 1) {
+      if (q === r) throw new Error(`pool: freed record ${r} is still in parent ${p}'s sibling list`);
+    }
+  }
   rec.loc[r] = LOC.free;
   rec.accelDomain[r] = -1;
   rec.count[r] = 0;

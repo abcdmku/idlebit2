@@ -107,9 +107,9 @@ describe('inbound link quote (R43)', () => {
   it('locks the pipe before Rack with where it upgrades', () => {
     const [q] = quote(FLEETS.boot(), { kind: 'inbound', at: { level: 'chip', id } }).quotes;
     expect(q!.action).toEqual({ type: 'upgradePort', sw: { kind: 'rack', id: 0 }, port: 0 });
-    expect(q!.label).toBe('Pipe · 1 kHz');
+    expect(q!.label).toBe('Pipe · 100 kHz');
     expect(q!.locked).toMatchObject({ code: 'research', text: PIPE_LOCK_TEXT });
-    expect(q!.effect).toMatchObject({ capacityBefore: 1_000, capacityAfter: 2_000, unit: 'Hz' });
+    expect(q!.effect).toMatchObject({ capacityBefore: 100_000, capacityAfter: 200_000, unit: 'Hz' });
   });
 
   it('steps all ports on a same-speed rack switch, and locks the rack uplink until a Room', () => {

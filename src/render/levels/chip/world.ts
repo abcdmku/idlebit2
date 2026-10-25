@@ -11,6 +11,7 @@ import { MAX_CORES, arrangementOf, coreSites, coreText, floorOf, queueWells } fr
 import type { CoreArrangement } from './layout';
 import { coreColor, drawGridPiece, drawShardGroups, remaining } from './shards';
 import { CLOCK_TRACE, bar, cacheBlock, clockBlock, coreBlock, coreGhost, drawMetal, lockedSite, pad, queueBlock, queueGhost, staticCpu } from './sprites';
+import type { Incoming } from './sprites';
 import { blockOf, createBlock, drawBlock } from './block';
 import { dimIfAsleep } from './speed';
 import type { Block } from './block';
@@ -19,6 +20,7 @@ type G = CanvasRenderingContext2D;
 const cycle = createRateAnimation();
 const centres: number[] = [];
 const NONE: readonly never[] = [];
+const incoming: Incoming = { count: 0, family: null, progress: 0 };
 
 export function isLive(chip: ChipSnapshot, frame: WorldFrame): boolean {
   return !frame.paused && (chip.online === 'onMarket' || chip.online === 'draining');
@@ -93,7 +95,14 @@ export function drawWorld(g: G, chip: ChipSnapshot, frame: WorldFrame, form: Wor
   drawMetal(g, f, centres);
 
   const sc = chip.scheduler, qOpen = !sc && queueOpen(chip);
-  if (sc) queueBlock(g, f.queue, queueWells(f, sc.q, form), live ? chip.queue : NONE);
+  if (sc) {
+    // Reserved wells hold tasks still on the pipe (one transfer at a time): the landing one shows its
+    // real progress, so a newly bought queue reads as filling at the pipe's rate, not ignored.
+    const t = live ? chip.pipe.transfer : null, s = frame.snapshot;
+    incoming.count = live ? sc.reserved : 0; incoming.family = t ? t.family : null;
+    incoming.progress = t ? transferProgress(t, s.simTimeMs, frame.timeMs) : 0;
+    queueBlock(g, f.queue, queueWells(f, sc.q, form), live ? chip.queue : NONE, incoming);
+  }
   else if (qOpen) queueGhost(g, f.queue); else lockedSite(g, f.queue);
   cacheBlock(g, f.cache, chip.cache.capacityBits, live ? chip.cache.usedBits : 0, live ? spilledOut(chip) : 0);
 

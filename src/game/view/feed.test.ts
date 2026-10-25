@@ -50,17 +50,18 @@ describe('the queue window and transfers (spec §16.2)', () => {
     const feed = feedSnapshot(s, null, false);
     expect(feed).toMatchObject({ timing: 'running', roundIndex: 1, headDeadlineTick: 99, blockedBy: null, transfers: [] });
     expect(feed.window.map((t) => [t.task.taskId, t.label, t.work, t.transferS, t.dismissible])).toEqual(
-      [1, 2, 3, 4, 5].map((id) => [id, 'Bit Flip', 1, 0.001, true]));
+      [1, 2, 3, 4, 5].map((id) => [id, 'Bit Flip', 1, 0.00001, true])); // D29: the 100 kHz pipe
   });
 
   it('publishes a pipe transfer with its bits sent, size and speed while it travels', () => {
     const base = createInitialState(42);
-    const head: QueuedTask = { ...base.market.window[0]!, size: 1500 };
+    // D29: 150,000 ops take 1.5 s on the 100 kHz pipe; 0.5 s in, a third has been sent.
+    const head: QueuedTask = { ...base.market.window[0]!, size: 150_000 };
     const s = advanceGame({ ...base, market: { ...base.market, window: [head, ...base.market.window.slice(1)] } }, 500).state;
     const feed = feedSnapshot(s, null, false);
     expect(feed.transfers).toEqual([{
-      taskId: 1, family: head.family, systemId: 0, link: 'pipe', bitsSent: 500, bits: 1500, speed: 1000,
-      shard: 0, shards: 1, units: 1500, from: null, to: { level: 'system', id: 0 }, key: 256,
+      taskId: 1, family: head.family, systemId: 0, link: 'pipe', bitsSent: 50_000, bits: 150_000, speed: 100_000,
+      shard: 0, shards: 1, units: 150_000, from: null, to: { level: 'system', id: 0 }, key: 256,
     }]);
     expect(feed.inTransfer).toBe(1);
     // Only one transfer at a time and the core waits: #2 is the head, untaken.

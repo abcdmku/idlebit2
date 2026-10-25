@@ -118,13 +118,13 @@ describe('the endless queue (program D10, spec §5.2)', () => {
   });
 
   it('returns cancelled transfers to the queue front, committed, as the head with a fresh 10 s', () => {
-    // A 1,000-op head is 1 s on the 1 kHz pipe.
-    const w = openWorld(withHead(marketState(), BIT_FLIP, 1000));
+    // A 100,000-op head is 1 s on the 100 kHz pipe (D29).
+    const w = openWorld(withHead(marketState(), BIT_FLIP, 100_000));
     runPhase(w);
     expect(w.hot.sys.pipeRec[0]).toBeGreaterThanOrEqual(0);
     w.tick = 3;
     killSubtree(w, { kind: 'system', id: systemId(0) }, 'swap');
-    const s = commitWorld(withHead(marketState(), BIT_FLIP, 1000), w, 0);
+    const s = commitWorld(withHead(marketState(), BIT_FLIP, 100_000), w, 0);
     expect(s.hot.g[G.frontLen]).toBe(1);
     expect(s.hot.rec.loc[s.hot.g[G.frontHead]!]).toBe(LOC.front);
     expect(s.market.headTick).toBe(3);

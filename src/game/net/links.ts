@@ -19,6 +19,11 @@ let chanFree = new Float64Array(8);
 const moving: number[] = [];
 /** Records that finished their last link this tick, in arrival order; the admit phase consumes them. */
 export const arrived: number[] = [];
+/** Takes record r off this tick's arrivals (it was aborted before the admit phase). */
+export function removeArrival(r: number): void {
+  const i = arrived.indexOf(r);
+  if (i >= 0) arrived.splice(i, 1);
+}
 
 /** Bits one record carries over each link: its tasks × the member payload. */
 export const transferBits = (w: World, r: number): number =>

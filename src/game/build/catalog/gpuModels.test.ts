@@ -58,7 +58,8 @@ describe('GPU model catalog', () => {
         const target = (generation: number) => generation <= 3 ? 6 : generation <= 6 ? 3 : 2;
         expect(next.efficiencyOpsPerJ / previous.efficiencyOpsPerJ)
           .toBeCloseTo(target(next.generation) / target(previous.generation), 12);
-        expect(gpuNativePrice(next.model)).toBe(gpuNativePrice(previous.model) * 10n);
+        // Generation 1 is the cheap System-era entry card (1e6); later generations step 10×.
+        expect(gpuNativePrice(next.model)).toBe(gpuNativePrice(previous.model) * (previous.generation === 1 ? 40n : 10n));
       }
     }
     expect(GENERATIONS.map((g) => evaluateGpu(id(g, 3, 30), 0).clockHz))
@@ -208,7 +209,7 @@ describe('exact GPU prices', () => {
     expect(gpuPriceToLevel('9990', 5)).toBe(1_676_800_000_000_000_000n);
     expect(gpuInstallPrice('9990', 7)).toBe(488_281_250_000_000_000n);
     expect(Array.from({ length: 8 }, (_, n) => gpuInstallPrice('1330', n)))
-      .toEqual([4_000_000n, 4_000_000n, 5_000_000n, 6_250_000n, 7_812_500n, 9_765_625n, 12_207_032n, 15_258_790n]);
+      .toEqual([1_000_000n, 1_000_000n, 1_250_000n, 1_562_500n, 1_953_125n, 2_441_407n, 3_051_758n, 3_814_698n]);
     for (const model of GPU_MODEL_IDS) for (let n = 0; n < 8; n++) {
       const e = BigInt(Math.max(0, n - 1));
       const numerator = gpuNativePrice(model) * 5n ** e, denominator = 4n ** e;

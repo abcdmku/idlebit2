@@ -656,8 +656,8 @@ Before Rack, income is capped by the 1 kHz pipe at about 700 Credits/s and about
 |---|---|
 | First purchase | under 30 s |
 | First round ends | 4–8 min |
-| System | 30–60 min |
-| Rack | **5–8 h** |
+| System | **20–30 min** (D19 amendment, 25 Oct) |
+| Rack | **5–7 h** (D19 amendment, 25 Oct) |
 | First data center (Room) | **2–4 days** |
 | Data center tier (zones) | about 1–2 weeks |
 | Multiple data centers (a second site, Regions) | **2–4 weeks** |
@@ -1036,7 +1036,7 @@ The user's words:
 3. **One at a time.** Only one project is in line or running.
 4. **The modes are retired.** No research shares, no idle-time research, and GPUs no longer research. Between rounds the market is paused but research still runs: every paused server takes it on all its threads.
 5. **The trade-off is the point.** While research holds a slot, the heads behind it wait: research costs SLA risk during a round and nothing between rounds. Work volumes are re-tuned to about N seconds of the era's typical hardware at unlock (`docs/research.md` §3.2): W1 20 ops (5–10 s at 2–4 Hz) up to W7 3e7. Data costs are unchanged. The D20 opening holds (round 1 without purchases ends at 0:55–1:07).
-6. **Implementation.** `hot.sys.researchThreads` per holder, `G.researchHolders` and `G.researchProject`; the take runs at the start of the route step (`exec/researchTask.ts`). A holder counts one slot and its threads as busy. **Amendment (balance owner, 25 Oct, for lead review):** during a round a holder keeps one thread per system, so research slows the market instead of stopping it (a mid-round take on an idle box otherwise held every thread until the project ended, and the rack queue filled with tasks that could not start); between rounds holders spread over every thread. `SAVE_VERSION` 9, pre-live reset. The feed carries `FeedSnapshot.research: ResearchQueueEntryView | null` beside the task `window`; task entries gain `kind: 'task'`.
+6. **Implementation.** `hot.sys.researchThreads` per holder, `G.researchHolders` and `G.researchProject`; the take runs at the start of the route step (`exec/researchTask.ts`). A holder counts one slot and its threads as busy. **Amendment (lead, 25 Oct):** during a round a holder keeps one thread per system, so research slows the market instead of stopping it (a mid-round take on an idle box otherwise held every thread until the project ended, and the rack queue filled with tasks that could not start); between rounds holders spread over every thread. `SAVE_VERSION` 9, pre-live reset. The feed carries `FeedSnapshot.research: ResearchQueueEntryView | null` beside the task `window`; task entries gain `kind: 'task'`.
 
 **D28, 25 Oct: SLA is a plain count ratio over a rolling window (user).** Binding. It supersedes D10.6 (work-weighted SLA with a grace prior).
 
@@ -1051,6 +1051,22 @@ The user's words:
 5. **Round report.** Keeps the whole round's met, failed and dismissed totals, and the met and failed work.
 6. **Tuning.** The D20 opening is re-tuned for counts: the ramp is `T(I) = min(250, 4.5 × 2^(I / 3.5))`, AND Mask opens at I 0.6 (weight 14) and Compare at 1.6 (weight 10). Round 1 without purchases ends at 0:38–1:18 (median 0:57) on Can't run · cache; an active round 1 at 4:23–5:10.
 7. **Fields.** `hud.sla`: `met` and `failed` (the window), `percent`, `checking` (10 resolved), `window` (50), `roundMet`, `roundFailed`. `deliveredWork`, `failedWork` and `grace` remain until the UI stops reading them. `SAVE_VERSION` 11 (the window lives in `hot.g`).
+
+**D29, 25 Oct: the default switch port is 100 kHz (user).** Binding. It amends D13 and D15.
+
+> we want the 1khz bottleneck to hit around the time you can upgrade the switch so you might need to scale to rack differently or maybe the network speed 100khz by default so when you start hitting the 100khz limit on systems you are getting close to unlocking mhz/racks
+
+1. **Default speed.** Switch generation 0's default port is **100 kHz** (k = 6). The lone system's pipe before Rack is that port, fixed until the Rack switch (D15 stands).
+2. **Rack-era ports** step up from 100 kHz into MHz at the clock-parity prices (D14), which keep them in MHz; switch generation 1 (`sw100k`) starts at 1 MHz. The generation tops stay where they were, because rack uplinks (room-switch speeds) are validated against them. D25's "an uplink must carry its ports combined" stands.
+3. **Pacing intent.** Compute climbs through Hz at the CPU level to about 1 kHz around System (20–30 min), through kHz across the System era, and reaches the 100 kHz pipe as Rack comes within reach (5–7 h). Before that, compute is the bottleneck, so kHz upgrades pay all through the System era.
+4. **Lead ruling on the climb (option a).** The CSV kHz clock climbs in about 15–60 s per level on a bare core, so the lane and core multipliers are Data-gated across the System era (2 → 4 → 8 at W5–W7, octaCore and outOfOrder at W7). The CSV clock prices stay.
+5. **Rack** is research tier W8 (12,000,000 Data), sized to the System era's income under the 100 kHz pipe.
+
+**D19 amendment, 25 Oct (user):**
+
+> system should be closer to 20-30 mins and rack at 5-7 hours is good
+
+System's band is **20–30 min** (was 30–60), and Rack's is **5–7 h**. `systemBoard` is research tier W3 (6,000 Data).
 
 ## 16. Shared rules for agents
 

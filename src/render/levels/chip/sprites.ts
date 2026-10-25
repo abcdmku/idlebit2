@@ -1,7 +1,7 @@
 ﻿// CPU art (layout-L2/art.js): board weave, package and die, and the die blocks. Static parts are
 // cached per form; per-frame blocks draw only what state changes.
-import type { ChipQueueEntryView } from '../../../game';
-import { P, R, SPR, brackets, cached, dotted, drawFamilyIcon, frame, hash, mix, prism, px, shadow, stamp } from '../../core';
+import type { ChipQueueEntryView, FamilyId } from '../../../game';
+import { P, R, SPR, bandColor, brackets, cached, dotted, drawFamilyIcon, frame, hash, mix, prism, px, shadow, stamp } from '../../core';
 import type { Rect, WorldForm } from '../../core';
 import type { Floor } from './layout';
 
@@ -129,12 +129,32 @@ export function queueGhost(g: G, r: Rect): void {
   dotted(g, r.x, r.y, r.w, r.h, P.silkLo, 0, 1, 2); brackets(g, r.x, r.y, r.w, r.h, P.silk, 3);
 }
 /** The scheduler's queue: its wells, left to right; well i holds the i-th oldest waiting task, by its family icon. */
-export function queueBlock(g: G, r: Rect, wells: readonly Rect[], queue: readonly ChipQueueEntryView[]): void {
+/** Wells reserved for tasks still on the pipe: how many, and the one landing now (its family and progress). */
+export interface Incoming { count: number; family: FamilyId | null; progress: number }
+/**
+ * The scheduler's queue: landed tasks first, oldest left, each as its family icon. After them, the
+ * wells reserved for tasks still in transit ("incoming"): the one on the pipe now shows its icon dimmed
+ * with a thin bar at the transfer's real progress in its type colour; the rest wait as dim outlines.
+ * Empty wells stay empty.
+ */
+export function queueBlock(g: G, r: Rect, wells: readonly Rect[], queue: readonly ChipQueueEntryView[], incoming: Incoming | null = null): void {
   prism(g, r.x, r.y + 3, r.w, r.h - 3, 3, { top: P.logicLo, front: mix(P.logicLo, P.ink, 0.4) });
+  const reserved = incoming ? Math.min(incoming.count, Math.max(0, wells.length - queue.length)) : 0;
   for (let i = 0; i < wells.length; i++) {
     const w = wells[i]!, e = queue[i];
     R(g, w.x - 1, w.y - 1, w.w + 2, w.h + 2, P.ink); R(g, w.x, w.y, w.w, w.h, mix(P.logicLo, P.ink, 0.45));
-    if (!e) continue;
-    if (w.w >= 16) drawFamilyIcon(g, e.family, w.x, w.y - 2); else R(g, w.x, w.y, w.w, w.h, P.bitLo);
+    if (e) { if (w.w >= 16) drawFamilyIcon(g, e.family, w.x, w.y - 2); else R(g, w.x, w.y, w.w, w.h, P.bitLo); continue; }
+    const k = i - queue.length;
+    if (k >= reserved) continue;
+    // Incoming: the first reserved well is the task on the pipe now (its icon, dimmed, and its progress).
+    const landing = k === 0 && incoming!.family !== null;
+    brackets(g, w.x, w.y, w.w, w.h, mix(P.silk, P.ink, 0.35), 2);
+    if (!landing) continue;
+    const a = g.globalAlpha, colour = bandColor(incoming!.family!);
+    // Its icon dimmed on a wide well; a narrow well (16 slots) is tinted in the task's type colour instead.
+    g.globalAlpha = a * 0.35;
+    if (w.w >= 16) drawFamilyIcon(g, incoming!.family!, w.x, w.y - 2); else R(g, w.x, w.y, w.w, w.h - 2, colour);
+    g.globalAlpha = a;
+    R(g, w.x, w.y + w.h - 2, Math.round(w.w * Math.max(0, Math.min(1, incoming!.progress))), 2, colour);
   }
 }

@@ -1,10 +1,11 @@
-import { describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { advanceGame, advanceGameOwned, copyGameState } from '../core/advance';
 import { G } from '../core/buffers';
 import { nextInt, seedRng } from '../core/rng';
 import { createInitialState } from '../core/state';
 import { deserializeSave, serializeSave } from '../save/serialize';
 import { SPILL_FLEETS } from '../testkit/spillFixtures';
+import { poolDebug } from '../core/pool';
 import type { GameState } from '../types/state';
 
 /**
@@ -27,6 +28,9 @@ const MINUTE = 60_000;
 const usedDisk = (s: GameState) => Array.from(s.hot.sys.usedDisk).reduce((a, b) => a + b, 0);
 
 describe('memory hierarchy and windows on a spill rack (D26)', () => {
+  // Every free on this split, windowed rack is checked: once, and out of every sibling list.
+  beforeAll(() => { poolDebug.verify = true; });
+  afterAll(() => { poolDebug.verify = false; });
   it('starts mid-spill: shards on disk and windowed tasks taken', () => {
     const s = rack();
     expect(usedDisk(s)).toBeGreaterThan(0);

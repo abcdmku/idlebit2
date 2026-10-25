@@ -18,8 +18,8 @@ describe('D12 link catalog re-base', () => {
     for (const top of BACKBONE.topK) expect(ladderSpeed(top)).toBeGreaterThanOrEqual(3 * 288 * server(3));
   });
 
-  it('keeps the starter rack at 1 kHz and rack, data-plane and backbone spans at 1,000', () => {
-    expect(ladderSpeed(SWITCH.baseK[0]!)).toBe(1_000);
+  it('defaults the starter rack to 100 kHz (D29) and keeps rack, data-plane and backbone spans at 1,000', () => {
+    expect(ladderSpeed(SWITCH.baseK[0]!)).toBe(100_000);
     for (const row of [SWITCH, ROOM_SWITCH, DATA_PLANE, BACKBONE]) {
       expect(row.baseK).toHaveLength(row.names.length);
       expect(row.topK).toHaveLength(row.names.length);
@@ -28,7 +28,7 @@ describe('D12 link catalog re-base', () => {
         expect(base).toBeGreaterThanOrEqual(0);
         expect(Number.isInteger(row.topK[g])).toBe(true);
         expect(row.topK[g]!).toBeGreaterThanOrEqual(base);
-        if (row === ROOM_SWITCH || (row === SWITCH && g === 0)) return;
+        if (row === ROOM_SWITCH || (row === SWITCH && g <= 1)) return;
         expect(ladderSpeed(row.topK[g]!) / ladderSpeed(base)).toBeCloseTo(1_000, 9);
       });
     }
@@ -47,7 +47,7 @@ describe('D12 link catalog re-base', () => {
 
 describe('D13 upstream port defaults', () => {
   it('matches the A.3 default-speed table and data-plane/backbone spans', () => {
-    expect(SWITCH.baseK).toEqual([0, 20, 28, 31, 38, 41, 44]);
+    expect(SWITCH.baseK).toEqual([6, 9, 28, 31, 38, 41, 44]);
     expect(ROOM_SWITCH.baseK).toEqual([21, 24, 32, 35, 42, 45, 48]);
     expect(DATA_PLANE.baseK).toEqual([50, 53, 56]);
     expect(DATA_PLANE.topK).toEqual([59, 62, 65]);

@@ -30,7 +30,7 @@ function addEffect(state: GameState, plan: Plan & { ok: true }, system: number, 
   if (!base || kind === 'scheduler') return base;
   const count = (s: typeof spec) => kind === 'core' ? s.cpu?.cores.length ?? 0 : kind === 'socket' ? s.cpu ? s.cpuCount : 0
     : kind === 'ram' ? s.ram.length : s.drives.length;
-  return { ...base, capacityBefore: count(spec), capacityAfter: count(next), unit: 'slots' };
+  return { ...base, capacityBefore: count(spec), capacityAfter: count(next), unit: kind === 'core' ? 'cores' : 'slots' };
 }
 
 const linkPreview = (state: GameState, ref: PartRef, before: number, after: number, wBefore: number, wAfter: number, cost: bigint): EffectPreview =>

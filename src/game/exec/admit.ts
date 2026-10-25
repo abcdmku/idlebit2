@@ -14,16 +14,13 @@ import { canAdmit, noteAdmit, noteAdmitted } from './slots';
  * happened when the task was taken. The lone system's pipe lands inside the run phase.
  */
 
-const order: number[] = [];
-
 export function admitPhase(w: World): void {
   if (arrived.length === 0) return;
   const rec = w.hot.rec;
-  order.length = 0;
-  for (const r of arrived) order.push(r);
-  arrived.length = 0;
-  order.sort((a, b) => rec.target[a]! - rec.target[b]!);
-  for (const r of order) deliver(w, r);
+  arrived.sort((a, b) => rec.target[a]! - rec.target[b]!);
+  // Delivered from the live list: a misroute that fails a split task aborts its siblings, and an
+  // aborted arrival leaves the list (outcome.abortRecord), so it is never delivered or freed twice.
+  while (arrived.length > 0) deliver(w, arrived.shift()!);
 }
 
 function deliver(w: World, r: number): void {

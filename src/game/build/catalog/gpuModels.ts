@@ -95,8 +95,14 @@ export function evaluateGpu(
   return stats(native.generation, native.series, native.tier, upgrades, technology, energy);
 }
 
+/**
+ * Generation 1 is the System-era entry card (balance, 25 Oct): 1,000,000 Credits, about half an hour of
+ * System-era net income, so the first GPU answers its wall instead of a two-hour save. Later generations keep 4e6 × 10^(g−1).
+ */
+const genBase = (generation: number): bigint => (generation === 1 ? 1_000_000n : 4_000_000n * 10n ** BigInt(generation - 1));
+
 function nativePrice(native: GpuModelDefinition): bigint {
-  return 4_000_000n * 10n ** BigInt(native.generation - 1) * (native.series === 9 ? 4n : 1n)
+  return genBase(native.generation) * (native.series === 9 ? 4n : 1n)
     * TIER_PRICES[TIERS.indexOf(native.tier)];
 }
 

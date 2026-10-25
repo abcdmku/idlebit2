@@ -18,7 +18,7 @@ import type { AccelBuild } from '../types/gpu';
  * the extra rate the part adds at the current load (1 Credit per unit of work, D2) minus the
  * extra energy; null means "No payback at this load".
  */
-interface SysFigures { rate: number; mem: number; cache: number; gpu: number; store: number; psu: number; slots: number; idle: number; load: number }
+interface SysFigures { rate: number; mem: number; cache: number; gpu: number; store: number; psu: number; queue: number; idle: number; load: number }
 
 /** Figures are pure in (spec, unlocks), both immutable, and a tray re-asks them every frame. */
 const figureMemo = new WeakMap<SystemSpec, WeakMap<Unlocks, SysFigures>>();
@@ -38,13 +38,13 @@ function compileFigures(spec: SystemSpec, u: Unlocks): SysFigures {
   for (let r = 0; r < 4; r += 1) { idle += c.idleW[r]!; load += c.loadW[r]!; }
   return {
     rate: c.threadRate[0]! * c.cores[0]! * c.etaCfg[0]!, mem: c.ramCap[0]!, cache: c.cacheBits[0]!, gpu: c.gpuOps[0]!,
-    store: c.storageCap[0]!, psu: c.psuCapW[0]!, slots: c.slots[0]!, idle, load,
+    store: c.storageCap[0]!, psu: c.psuCapW[0]!, queue: c.Q[0]!, idle, load,
   };
 }
 
 const CAPACITY: Record<string, [keyof SysFigures, CapacityUnit, boolean]> = {
   cpu: ['rate', 'Hz', true], core: ['rate', 'ops/s', true], clock: ['rate', 'Hz', true],
-  l1: ['cache', 'bits', false], l2: ['cache', 'bits', false], l3: ['cache', 'bits', false], scheduler: ['slots', 'slots', false],
+  l1: ['cache', 'bits', false], l2: ['cache', 'bits', false], l3: ['cache', 'bits', false], scheduler: ['queue', 'slots', false],
   ram: ['mem', 'bits', false], gpu: ['gpu', 'ops/s', true], npu: ['gpu', 'ops/s', true], drive: ['store', 'bits', false], psu: ['psu', 'W', false],
 };
 /**

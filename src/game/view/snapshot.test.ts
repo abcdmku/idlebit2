@@ -90,10 +90,10 @@ describe('deriveRenderSnapshot', () => {
     expect(snap.feed).toMatchObject({ timing: 'running', roundIndex: 1, headDeadlineTick: 109, blockedBy: null, failBin: null, taken: 2, dismissed: 0 });
     expect(snap.feed.window).toMatchObject(state.market.window.map((t) => ({
       task: { epoch: state.epoch, roundIndex: state.round.index, taskId: t.taskId },
-      family: t.family, committed: false, dismissible: true, work: 1, transferS: 0.001,
+      family: t.family, committed: false, dismissible: true, work: 1, transferS: 0.00001, // D29: 100 kHz pipe
     })));
     expect(snap.feed.window.map((t) => t.task.taskId)).toEqual([3, 4, 5, 6, 7]);
-    if (snap.focus.level === 'chip') expect(snap.focus.pipe).toMatchObject({ speed: 1000, transfer: null, waiting: false });
+    if (snap.focus.level === 'chip') expect(snap.focus.pipe).toMatchObject({ speed: 100_000, transfer: null, waiting: false });
     expect(snap.round).toMatchObject({ index: 1, state: 'running', canReturn: false });
     if (snap.focus.level !== 'chip') throw new Error('chip');
     expect(snap.focus.cores).toHaveLength(1);

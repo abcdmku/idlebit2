@@ -83,6 +83,9 @@ export interface RoundSummary {
   readonly racks: number;
   readonly late: number;
   readonly diskShare: number;
+  /** Fleet CPU compute at the round end, ops/s (threads × thread rate × configuration efficiency), and the fastest pipe. */
+  readonly computeOps: number;
+  readonly pipe: number;
 }
 
 export interface CampaignResult {
@@ -107,6 +110,17 @@ export interface CampaignResult {
 const seconds = (tick: number) => (tick * TICK_MS) / 1000;
 const MILESTONE_RESEARCH = new Set(['systemBoard', 'fabKhz', 'rack', 'fabMhz', 'room', 'fabGhz', 'dataCenter', 'regions', 'intercontinental']);
 
+function fleetRates(state: GameState): { computeOps: number; pipe: number } {
+  const c = state.compiled.sys;
+  let computeOps = 0, pipe = 0;
+  for (let s = 0; s < c.len; s += 1) {
+    if (c.alive[s] !== 1) continue;
+    computeOps += (c.threadRate[s] ?? 0) * (c.threads[s] ?? 0) * (c.etaCfg[s] ?? 1);
+    pipe = Math.max(pipe, c.pipeSpeed[s] ?? 0);
+  }
+  return { computeOps, pipe };
+}
+
 function summarize(r: RoundReport, state: GameState): RoundSummary {
   const causes = Object.entries(r.failedByCause) as [FailCause, number][];
   const failed = causes.reduce((sum, [, n]) => sum + n, 0);
@@ -118,6 +132,7 @@ function summarize(r: RoundReport, state: GameState): RoundSummary {
     peakIntensity: r.peakIntensity, gross: r.gross, energy: r.energy, data: r.data,
     systems: state.build.systems.filter((x) => x !== null).length, racks: state.build.racks.filter((x) => x?.opened).length,
     late: r.failedByCause.late, diskShare: r.deliveredWork > 0 ? r.spill.diskWork / r.deliveredWork : 0,
+    ...fleetRates(state),
   };
 }
 

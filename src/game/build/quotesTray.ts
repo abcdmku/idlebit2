@@ -53,7 +53,13 @@ function chipTray(state: GameState, id: SystemId): Item[] {
   const at = (slot: PartRef['slot']): PartRef => ({ unit, slot });
   const coreGen = cpu?.cores[0]?.gen ?? 0;
   const core: Item = { action: { type: 'addPart', system: id, kind: 'core', generation: coreGen }, plan: planAdd(state, id, 'core', coreGen), capText: 'Core limit reached' };
-  const caches = cheapest(state, (['l1', 'l2', 'l3'] as const).filter((k) => cpu?.[k]).map((kind) => at({ kind, socket: 0 })));
+  // The cache item: the cheapest upgrade of a built cache, or adding an unbuilt L2 / L3 once researched (their chip slots).
+  const adds: Option[] = cpu ? (['l2', 'l3'] as const).filter((k) => !cpu[k]).map((kind): Option => {
+    const g = Math.max(0, newestGen(state.research.unlocks, kind, PARTS[kind].base.length));
+    return [{ type: 'addPart', system: id, kind, generation: g }, planAdd(state, id, kind, g)];
+  }) : [];
+  const caches = [...cheapest(state, (['l1', 'l2', 'l3'] as const).filter((k) => cpu?.[k]).map((kind) => at({ kind, socket: 0 }))), ...adds]
+    .sort(([, x], [, y]) => Number((x.ok ? 0n : 1n) - (y.ok ? 0n : 1n)) || Number((planPrice(x) ?? 0n) - (planPrice(y) ?? 0n)));
   const sched = state.build.systems[id]?.spec.scheduler;
   const sg = Math.max(0, newestGen(state.research.unlocks, 'scheduler', 4));
   const scheduler: Option[] = sched ? [upgrade(state, at({ kind: 'scheduler' }))] : [[{ type: 'addPart', system: id, kind: 'scheduler', generation: sg }, planAdd(state, id, 'scheduler', sg)]];

@@ -265,3 +265,17 @@ describe('D26 cache spill', () => {
     expect(draw(mid, 2000).some(q => q.c === P.ram)).toBe(false);
   });
 });
+
+describe('CPU incoming queue wells', () => {
+  it('shows wells reserved for tasks on the pipe: the landing one dimmed with its real progress in its type colour', () => {
+    const mid = chipScene('mid'), t = mid.pipe.transfer ?? { taskId: 9, family: familyId(2), systemId: mid.systemId, link: 'pipe' as const, bitsSent: 500, bits: 1000, speed: 1000, shard: 0, shards: 1, units: 1, from: null, to: { level: 'system' as const, id: mid.systemId }, key: 9 * 256 };
+    const chip = { ...mid, scheduler: { ...mid.scheduler!, reserved: 1 }, pipe: { ...mid.pipe, transfer: { ...t, bitsSent: t.bits / 2 } } };
+    const f = floorOf('desktop'), wells = queueWells(f, chip.scheduler.q, 'desktop'), w = wells[chip.queue.length]!;
+    const fills = draw(chip, mid.pipe.transfer ? 2000 : 0);
+    const bar = fills.find(q => q.y === w.y + w.h - 2 && q.x === w.x && q.h === 2 && q.c === bandColor(t.family));
+    expect(bar).toBeDefined();
+    expect(bar!.w).toBeGreaterThan(0); expect(bar!.w).toBeLessThan(w.w);
+    const empty = wells[chip.queue.length + 1]!;
+    expect(fills.some(q => q.y === empty.y + empty.h - 2 && q.x === empty.x && q.h === 2 && q.c === bandColor(t.family))).toBe(false);
+  });
+});

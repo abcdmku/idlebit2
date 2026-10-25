@@ -96,7 +96,7 @@ export function networkStepsBetween(row: NetworkLadderDef, fromK: number, toK: n
  * Shared port/uplink tops carry 12 servers at Rack, 288 at Room; later gens add at least 10×.
  * D13 defaults come from the upstream port: room ports carry about 12 rack references;
  * data plane and backbone defaults carry a full room. Their tops are default × 1,000.
- * Rack bases are top / 1,000, except the starter rack stays at 1 kHz. Its widened top also fits
+ * Rack bases are top / 1,000, except the starter rack's switch defaults to 100 kHz (D29). Its widened top also fits
  * uplinks, superseding A.3's proposed 1 GHz starter top. Ports share that headroom for now.
  * D14 prices speed steps at native clock parity. Link power follows linkWatts (D18.5).
  */
@@ -105,7 +105,10 @@ const SW_GATES = [r('rack'), r('sw100k'), r('sw1M'), r('sw10M'), r('sw100M'), r(
 
 export const SWITCH: NetworkLadderDef = {
   id: 'switch', scope: 'rack', names: SW_NAMES.map((n) => `${n} switch`), gates: SW_GATES,
-  baseK: [0, 20, 28, 31, 38, 41, 44], topK: [26, 29, 37, 40, 47, 50, 53], latency: SW_NAMES.map(() => 0),
+  // D29: generation 0 defaults to 100 kHz (k 6): the pre-Rack pipe, fixed until the Rack switch (D15). Rack-era ports
+  // step up into MHz at clock-parity prices (D14), which keep them there; generation 1 (sw100k) starts at 1 MHz. The tops
+  // stay high because the rack uplinks (room-switch speeds) are validated against them. Later generations as before.
+  baseK: [6, 9, 28, 31, 38, 41, 44], topK: [26, 29, 37, 40, 47, 50, 53], latency: SW_NAMES.map(() => 0),
   minPorts: 4, portCeiling: 'rackPorts', wPerUnit: 0.01,
   price: [2.4e6, 1.2e7, 4.3e11, 4.8e11, 3.7e14, 3.3e15, 9.1e15], streams: 1, uplinkStreams: 12,
   portAdd: [2.4e5, 1.2e6, 4.3e10, 4.8e10, 3.7e13, 3.3e14, 9.1e14], portAddGrowth: 1.25,

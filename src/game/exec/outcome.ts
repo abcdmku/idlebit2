@@ -12,6 +12,7 @@ import { FAIL_CAUSES, FAIL_DETAILS, NO_DETAIL, type FailCause } from '../types/e
 import { dueAt } from '../core/deadlines';
 import { tierTraffic } from './memory';
 import { addTransit, leaveLink } from '../net/fifo';
+import { removeArrival } from '../net/links';
 import { returnToFront } from '../market/queue';
 import { queueUnlink } from './lists';
 import { hasRule } from './rules';
@@ -120,6 +121,9 @@ export function abortRecord(w: World, r: number): void {
       const s = rec.target[r]!;
       if (rec.owner[r]! >= 0) leaveLink(w.hot, r);
       else if (h.pipeRec[s] === r) { h.pipeRec[s] = -1; h.pipeLeft[s] = 0; }
+      // Arrived this tick and waiting for the admit phase: it leaves that list too, or admit would deliver a
+      // freed (or already reused) record and free it twice, corrupting the record pool and parent sibling lists.
+      else removeArrival(r);
       addTransit(w.hot, -k);
       releaseReservation(w, s, k, r);
       break;

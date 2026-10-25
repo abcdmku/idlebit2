@@ -39,7 +39,7 @@ export interface LockReason {
   /** Short copy, e.g. "Needs Rack water". */
   readonly text: string;
 }
-export type CapacityUnit = 'ops/s' | 'bits' | 'bit/s' | 'Hz' | 'W' | 'tasks/s' | 'lanes' | 'slots' | 'ports' | 'ops';
+export type CapacityUnit = 'ops/s' | 'bits' | 'bit/s' | 'Hz' | 'W' | 'tasks/s' | 'lanes' | 'slots' | 'cores' | 'ports' | 'ops';
 export interface EffectPreview {
   readonly capacityBefore: number;
   readonly capacityAfter: number;

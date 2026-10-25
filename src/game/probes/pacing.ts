@@ -22,8 +22,8 @@ const MILESTONE_TARGETS: readonly [string, keyof Milestones, number, number][] =
   ['First purchase', 'firstPurchaseS', 0, 30],
   ['First round ends', 'firstRoundEndS', 4 * M, 8 * M],
   // Program D19 from System on.
-  ['System unlocked', 'systemS', 30 * M, 60 * M],
-  ['Rack unlocked', 'rackS', 5 * H, 8 * H],
+  ['System unlocked', 'systemS', 20 * M, 30 * M],
+  ['Rack unlocked', 'rackS', 5 * H, 7 * H],
   ['Room unlocked', 'roomS', 2 * D, 4 * D],
   ['Data center (zones)', 'dataCenterS', 7 * D, 14 * D],
   ['Regions', 'regionsS', 14 * D, 28 * D],

@@ -8,7 +8,9 @@ import type { GameState } from '../types/state';
 import { genCount, isLadder } from './catalog';
 import { partEffect } from './effect';
 import { readPart } from './partAccess';
-import { planRemove, planReplace, planUpgrade } from './partPlans';
+import { planAdd, planRemove, planReplace, planUpgrade } from './partPlans';
+import { PARTS } from './catalog';
+import { newestGen } from './research/unlocks';
 import { isCold, planPrice, type Plan } from './plan';
 import { quoteEffect } from './quotesEffect';
 import { planAddPort, planAddUplink, planReplaceLadder, planSameSpeed, planUpgradePort, planUpgradeUplink, switchAt } from './ports';
@@ -152,7 +154,14 @@ const effectOf = (state: GameState, ref: PartRef, plan: Plan): EffectPreview | n
 /** Part plate: upgrade, then replace (L1 and capacity-preserving) per other generation, then remove. */
 export function partQuotes(state: GameState, ref: PartRef): Quote[] {
   const part = readPart(state.build, ref);
-  if (!part) return [];
+  if (!part) {
+    // An empty L2 / L3 chip slot offers its part (the slot the chip view shows).
+    const k = ref.slot.kind;
+    if (ref.unit.kind !== 'system' || (k !== 'l2' && k !== 'l3')) return [];
+    const g = Math.max(0, newestGen(state.research.unlocks, k, PARTS[k].base.length));
+    const action = { type: 'addPart' as const, system: ref.unit.id, kind: k, generation: g };
+    return [toQuote(state, action, planAdd(state, ref.unit.id, k, g))];
+  }
   const out: Quote[] = [];
   const ladder = isLadder(part.id);
   if (!(part.id === 'switch' || part.id === 'roomSwitch')) {
