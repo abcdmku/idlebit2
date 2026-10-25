@@ -110,14 +110,14 @@ export const SAVED_CONFIGS_PER_KIND = 32;
 
 /** Regions (spec §3.3), REGION_IDS order. Site 0 is the gateway in us-east. */
 export const REGIONS: readonly RegionDef[] = [
-  { id: 'us-east', continent: 'americas', opensWith: 'start', outsideF: 70, energyPrice: 0.01 },
-  { id: 'us-west', continent: 'americas', opensWith: 'regions', outsideF: 75, energyPrice: 0.012 },
-  { id: 'eu-west', continent: 'europe', opensWith: 'regions', outsideF: 60, energyPrice: 0.014 },
-  { id: 'eu-north', continent: 'europe', opensWith: 'intercontinental', outsideF: 45, energyPrice: 0.009 },
-  { id: 'sa-east', continent: 'americas', opensWith: 'intercontinental', outsideF: 85, energyPrice: 0.008 },
-  { id: 'af-south', continent: 'africa', opensWith: 'intercontinental', outsideF: 90, energyPrice: 0.007 },
-  { id: 'ap-southeast', continent: 'asiaPacific', opensWith: 'regions', outsideF: 88, energyPrice: 0.011 },
-  { id: 'ap-northeast', continent: 'asiaPacific', opensWith: 'intercontinental', outsideF: 65, energyPrice: 0.016 },
+  { id: 'us-east', continent: 'americas', opensWith: 'start', outsideF: 70, energyPrice: 0.01, sun: 1.0, wind: 1.0 },
+  { id: 'us-west', continent: 'americas', opensWith: 'regions', outsideF: 75, energyPrice: 0.012, sun: 1.3, wind: 0.9 },
+  { id: 'eu-west', continent: 'europe', opensWith: 'regions', outsideF: 60, energyPrice: 0.014, sun: 0.8, wind: 1.2 },
+  { id: 'eu-north', continent: 'europe', opensWith: 'intercontinental', outsideF: 45, energyPrice: 0.009, sun: 0.5, wind: 1.5 },
+  { id: 'sa-east', continent: 'americas', opensWith: 'intercontinental', outsideF: 85, energyPrice: 0.008, sun: 1.3, wind: 0.8 },
+  { id: 'af-south', continent: 'africa', opensWith: 'intercontinental', outsideF: 90, energyPrice: 0.007, sun: 1.5, wind: 1.0 },
+  { id: 'ap-southeast', continent: 'asiaPacific', opensWith: 'regions', outsideF: 88, energyPrice: 0.011, sun: 1.2, wind: 0.7 },
+  { id: 'ap-northeast', continent: 'asiaPacific', opensWith: 'intercontinental', outsideF: 65, energyPrice: 0.016, sun: 0.9, wind: 1.0 },
 ];
 export const DEFAULT_SEED = 0x1d1eb17;
 

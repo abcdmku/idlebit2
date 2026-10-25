@@ -11,6 +11,7 @@ import {
 } from './settings';
 import { planAddRow, planAddUnit, planRemoveUnit } from './units';
 import { planInstallGpu } from './gpuPlans';
+import { planStartConfig } from './startCtl';
 
 /** Part, unit, configuration, port, setting and research actions (architecture §4). Every handler re-plans and re-prices. */
 export const buildHandlers: HandlerMap = {
@@ -37,6 +38,7 @@ export const buildHandlers: HandlerMap = {
   addUplink: (s, a) => commitPlan(s, planAddUplink(s, a.sw)),
   setStrategy: (s, a) => commitPlan(s, planStrategy(s, a.unit, a.strategy)),
   setFilter: (s, a) => commitPlan(s, planFilter(s, a.unit, a.filter, a.on)),
+  setStartConfig: (s, a) => commitPlan(s, planStartConfig(s, a.unit, a.startWith, a.headWaitS, a.busyPct, a.order)),
   upgradeRouterQueue: (s, a) => commitPlan(s, planRouterQueue(s, a.unit)),
   setSetpoint: (s, a) => commitPlan(s, planSetpoint(s, a.unit, a.setpointF)),
   setPowerCap: (s, a) => commitPlan(s, planPowerCap(s, a.part, a.on)),

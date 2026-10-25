@@ -113,6 +113,7 @@ export function report(edit: Partial<RoundReport> = {}): RoundReport {
     failDetail: { timeout: null, cantRun: 'ram', misroute: null, power: null, heat: null, swap: null, late: null },
     details: [{ cause: 'cantRun', detail: 'ram', count: 387 }],
     peakIntensity: 4.12, dismissed: 0, deliveredWork: 28_400, failedWork: 7_129, gross: amount(2_710_000), data: amount(30_100), energy: amount(0), net: amount(2_710_000), researchOps: 0, byType: [], spill: { ramWork: 0, diskWork: 0 },
+    energyBreakdown: { billed: amount(0), fromBattery: amount(0), batteryRefill: amount(0), fromGeneration: amount(0), fuel: amount(0) },
     ...edit,
   };
 }

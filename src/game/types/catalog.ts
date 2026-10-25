@@ -24,7 +24,14 @@ export interface RegionDef {
   readonly outsideF: number;
   /** Credits per joule, float64 (spec §3.3). */
   readonly energyPrice: number;
+  /** D31.4: off-grid output factors for solar and wind generation. */
+  readonly sun: number;
+  readonly wind: number;
 }
+
+/** D31: rack infrastructure slots in draw order, top to bottom (the fifth, Power control, sits under the cooling). */
+export const RACK_INFRA_SLOTS = ['cooling', 'powerCtl', 'power', 'lb', 'switch'] as const;
+export type InfraSlot = (typeof RACK_INFRA_SLOTS)[number];
 
 /** Task stage resources (spec §5.1, D26.3): compute ops, mem bits touched (the old RAM stream and storage IO), GPU ops. */
 export const RESOURCES = ['compute', 'mem', 'gpu'] as const;
@@ -40,6 +47,8 @@ export const PART_IDS = [
   'ram', 'gpu', 'npu', 'storage', 'storageNode',
   'rackCooler', 'pdu', 'lb', 'switch', 'roomCooler', 'ups', 'row', 'roomLb', 'roomSwitch',
   'dataPlane', 'grid', 'zone', 'site', 'backbone', 'globalScheduler', 'rack', 'acceleratorBoard',
+  // D31: rack Power control (battery + smart start), room and global start controllers, site generation.
+  'powerCtl', 'roomStart', 'globalStart', 'generation',
 ] as const;
 export type PartId = (typeof PART_IDS)[number];
 /** `step`: the CSV progression for clocks and RAM (hardware-progression.md): ×1.5 per level, 36 levels, prices ×1.7. */

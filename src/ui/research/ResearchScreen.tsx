@@ -3,7 +3,7 @@
 // jumps to its project, switching tab when needed. D27: Start puts a project at the front of the
 // market line; one project at a time.
 import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
-import { selectContextualResearchTree, selectResearchTree, type GameAction, type LevelId, type RenderSnapshot, type ResearchId,
+import { selectContextualResearchTree, selectResearchTree, type GameAction, type LevelId, type NodeRef, type RenderSnapshot, type ResearchId,
   type ResearchTabId, type ResearchTreeView } from '../../game';
 import { ArtCanvas } from '../art/ArtCanvas';
 import { drawMiniIcon } from '../art/deckArt';
@@ -128,9 +128,9 @@ export function ResearchView(p: ResearchViewProps) {
     {phone && tabs}
     <div ref={treeRef} className="lab-tree" role="tabpanel" aria-label={TAB_NAMES[model.tab]}>
       {model.parts.length === 0 && !model.next && <p className="lab-empty">Nothing to research here yet.</p>}
-      {model.parts.map(g => <PartSection key={g.part} g={g} iconN={iconN} open={unfolded.has(`${model.tab}:${g.part}`)}
+      {model.parts.map(g => <PartSection key={g.part} g={g} spec={tree.parts[g.part]?.spec ?? ''} iconN={iconN} open={unfolded.has(`${model.tab}:${g.part}`)}
         onFold={() => fold(`${model.tab}:${g.part}`)} {...tree$} />)}
-      {model.next && <PartSection g={model.next} iconN={iconN} open={false} onFold={() => undefined} {...tree$} />}
+      {model.next && <PartSection g={model.next} spec="" iconN={iconN} open={false} onFold={() => undefined} {...tree$} />}
     </div>
     {phone ? <DetailSheet {...detail} open={sheetOpen} onToggle={() => setSheetOpen(o => !o)} height={sheetH} /> : <DetailPanel {...detail} />}
   </section>;
@@ -147,10 +147,11 @@ const lineOf = (s: RenderSnapshot, tree: ResearchTreeView, stopped: boolean): Li
 export function ResearchScreen() {
   const v = useViewState();
   if (v.sheet !== 'research') return null;
-  return <OpenResearch project={v.researchProject} />;
+  return <OpenResearch project={v.researchProject} at={v.focus} />;
 }
 
-function OpenResearch({ project }: { project: ResearchId | null }) {
+/** `at`: the focused node; part specs read from its system (or rack). */
+function OpenResearch({ project, at }: { project: ResearchId | null; at: NodeRef }) {
   const shell = useShell(), L = useLayout();
   // Hardware changes can reveal projects even when the research badge is unchanged.
   const key = useGameSelector(s => `${s.epoch}|${shell.store.getState().build.revision}|${s.research.active}|${Math.floor(s.research.progress * 100)}|`
@@ -159,9 +160,9 @@ function OpenResearch({ project }: { project: ResearchId | null }) {
   const level = useGameSelector(s => s.focus.level);
   const { tree, visible } = useMemo(() => {
     const state = shell.store.getState();
-    return { tree: selectResearchTree(state), visible: new Set(selectContextualResearchTree(state, project).nodes.map(n => n.id)) };
+    return { tree: selectResearchTree(state, at), visible: new Set(selectContextualResearchTree(state, project, at).nodes.map(n => n.id)) };
     // eslint-disable-next-line react-hooks/exhaustive-deps -- `key` is the value identity of what the trees read
-  }, [shell.store, key, project]);
+  }, [shell.store, key, project, at.level, at.id]);
   const s = shell.store.getSnapshot();
   return <ResearchView L={L} tree={tree} visible={visible} unlocked={s.unlocked} level={level} focusProject={project}
     wallet={{ credits: s.hud.credits, data: s.hud.data }} line={lineOf(s, tree, s.research.stoppedInsolvent)} between={s.hud.roundState !== 'running'}

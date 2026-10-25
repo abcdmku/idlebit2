@@ -52,13 +52,15 @@ export function ResearchRow({ n, ctx, selected, onPick, onJump }: TreeProps & { 
   </li>;
 }
 
-export function PartSection({ g, iconN, open, onFold, ...p }: TreeProps & { g: PartGroup; iconN: 2 | 3; open: boolean; onFold: () => void }) {
+/** One part: its icon, name and current spec ("4 cores · 2 lanes"), the done count (opens the finished list), and its rows. */
+export function PartSection({ g, spec, iconN, open, onFold, ...p }: TreeProps & { g: PartGroup; spec: string; iconN: 2 | 3; open: boolean; onFold: () => void }) {
   const next = g.part === 'structure';
   const count = `${g.done.length} of ${g.total} done`;
   return <section className={`lp${next ? ' next' : ''}`} aria-label={PART_NAMES[g.part]}>
     {next ? <h3 className="lp-rule">Next level</h3> : <header className="lp-head">
       <span className="lp-ico"><ArtCanvas w={16} h={16} n={iconN} artKey={`rp:${g.part}`} draw={c => drawPartIcon(c, PART_ICON[g.part])} /></span>
       <h3>{PART_NAMES[g.part]}</h3>
+      <span className="lp-spec">{spec === 'none' ? '' : spec}</span>
       {g.done.length ? <button type="button" className="lp-done" data-qa-target aria-expanded={open} onClick={onFold}>
         <span>{count}</span><i className={`chev${open ? ' up' : ''}`} /></button> : <span className="lp-done none">{count}</span>}
     </header>}

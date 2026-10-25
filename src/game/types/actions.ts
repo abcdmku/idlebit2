@@ -1,4 +1,4 @@
-import type { BoardKind } from './build';
+import type { BoardKind, StartOrder } from './build';
 import type { FilterId, QueueStrategyId, RouteStrategyId } from './catalog';
 import type { PartRef, RackId, ResearchId, RoomId, ScopeRef, SwitchRef, SystemId, UnitKind, UnitRef } from './ids';
 import type { GameState, TaskRef } from './state';
@@ -44,6 +44,8 @@ export type GameAction =
   | { readonly type: 'addUplink'; readonly sw: SwitchRef }
   | { readonly type: 'setStrategy'; readonly unit: ScopeRef; readonly strategy: QueueStrategyId | RouteStrategyId }
   | { readonly type: 'setFilter'; readonly unit: ScopeRef; readonly filter: FilterId; readonly on: boolean }
+  /** D31.2: a start controller's configuration (hot), validated against the part's generation. Rack, room or global. */
+  | { readonly type: 'setStartConfig'; readonly unit: ScopeRef; readonly startWith: number; readonly headWaitS: number; readonly busyPct: number | null; readonly order: StartOrder }
   /** D25.7: one more router queue slot (L → L + 1, at most 32). Hot. */
   | { readonly type: 'upgradeRouterQueue'; readonly unit: ScopeRef }
   | { readonly type: 'setSetpoint'; readonly unit: { readonly kind: 'rack'; readonly id: RackId } | { readonly kind: 'room'; readonly id: RoomId }; readonly setpointF: number }

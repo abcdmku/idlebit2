@@ -1,6 +1,6 @@
 import { RESEARCH, researchDef } from '../build/research/tree';
 import type { PartId, ResearchDef } from '../types/catalog';
-import type { LevelId, ResearchId } from '../types/ids';
+import type { LevelId, NodeRef, ResearchId } from '../types/ids';
 import type { GameState } from '../types/state';
 import type { ResearchTreeView } from '../types/views';
 import { researchTree } from './research';
@@ -88,8 +88,8 @@ function relevant(def: ResearchDef, hardware: ReturnType<typeof inventory>): boo
  * Dialog discovery only. Keep researchTree's full catalog for model pickers and
  * unlock lookup. Prerequisite closure keeps real names and explicit focus reachable.
  */
-export function contextualResearchTree(state: GameState, focus: ResearchId | null = null): ResearchTreeView {
-  const tree = researchTree(state), hardware = inventory(state);
+export function contextualResearchTree(state: GameState, focus: ResearchId | null = null, at: NodeRef | null = null): ResearchTreeView {
+  const tree = researchTree(state, at), hardware = inventory(state);
   const done = new Set(state.research.completed), visible = new Set<ResearchId>();
   const include = (id: ResearchId) => {
     if (visible.has(id)) return;

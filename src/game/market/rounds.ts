@@ -1,7 +1,7 @@
 import { G } from '../core/buffers';
 import { ROUND_REPORTS_KEPT, TICK_MS } from '../core/constants';
 import { pushEvent, roundDetails } from '../core/events';
-import { resetRoundTotals, roundTotals } from '../core/ledger';
+import { energyBreakdown, resetRoundTotals, roundTotals } from '../core/ledger';
 import { MODE, restingMode, setUnitMode } from '../core/timers';
 import type { World } from '../core/world';
 import type { RoundEndedBy, RoundReport } from '../types/report';
@@ -71,7 +71,7 @@ function freezeReport(w: World, endTick: number, endedBy: RoundEndedBy): RoundRe
     met: g[G.met]!, failedByCause: failCounts(w), ...roundDetails(w.hot.detailRound), peakIntensity: r.peakIntensity,
     dismissed: g[G.dismissed]!, deliveredWork: g[G.deliveredWork]!, failedWork: g[G.failedWork]!,
     spill: { ramWork: g[G.ramWork]!, diskWork: g[G.diskWork]! },
-    ...roundTotals(w), researchOps: r.researchOps,
+    ...roundTotals(w), researchOps: r.researchOps, energyBreakdown: energyBreakdown(w),
   };
 }
 

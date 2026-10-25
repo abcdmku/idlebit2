@@ -28,7 +28,7 @@ function withRouter(build: BuildState, unit: ScopeRef, lb: RouterBuild): BuildSt
     case 'rack': return { ...build, racks: at(build.racks, unit.id, (r) => ({ ...r, lb })) };
     case 'room': return { ...build, rooms: at(build.rooms, unit.id, (z) => ({ ...z, lb })) };
     case 'site': return { ...build, sites: at(build.sites, unit.id, (s) => ({ ...s, dataPlane: { ...s.dataPlane, router: lb } })) };
-    default: return { ...build, global: { scheduler: lb } };
+    default: return { ...build, global: { ...build.global, scheduler: lb } };
   }
 }
 const editRouter = (state: GameState, unit: ScopeRef, f: (lb: RouterBuild) => RouterBuild, label: string): Plan => {

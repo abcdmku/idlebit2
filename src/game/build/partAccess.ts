@@ -131,7 +131,7 @@ export function writePart(build: BuildState, ref: PartRef, gen: number, level: n
     return null;
   }
   const g = build.global.scheduler;
-  return slot.kind === 'globalScheduler' && g ? { ...build, global: { scheduler: setLevel(g, gen, level) } } : null;
+  return slot.kind === 'globalScheduler' && g ? { ...build, global: { ...build.global, scheduler: setLevel(g, gen, level) } } : null;
 }
 
 /** The unit a cold change of this part takes down (spec §4.5). Global parts have none. */

@@ -76,6 +76,19 @@ export interface SwitchBuild {
   readonly uplinks: readonly number[];
   readonly sameSpeed: boolean;
 }
+/** D31.2: the start controller's wake order. Rack: slot or fastest; room: slot or coolest; global: slot, cheapest or nearest. */
+export type StartOrder = 'slot' | 'fastest' | 'coolest' | 'cheapest' | 'nearest';
+/** D31.2: wake when the head has waited headWaitS (1–9 s), or (generation 1) the awake units' 10 s busy fraction reaches busyPct (50–95). */
+export interface StartTrigger { readonly headWaitS: number; readonly busyPct: number | null }
+/**
+ * D31.2 start controller: generation, level (wake latency; at the rack also battery capacity) and its saved
+ * configuration. startWith: units awake or powered at Return to market (1 … the unit count).
+ */
+export interface StartCtl extends PartLevel {
+  readonly startWith: number;
+  readonly trigger: StartTrigger;
+  readonly order: StartOrder;
+}
 export interface CoolerBuild extends PartLevel {
   /** Only used with rackSetpoint / roomSetpoint; default 70. */
   readonly setpointF: number;
@@ -95,6 +108,8 @@ export interface RackBuild extends ContainerBuild {
   readonly pdu: SupplyBuild;
   readonly lb: RouterBuild;
   readonly switch: SwitchBuild;
+  /** D31.3: Power control, the fifth infrastructure slot under the cooling: battery plus smart start (gen 0–2). */
+  readonly powerCtl: StartCtl | null;
 }
 export interface RoomBuild extends ContainerBuild {
   readonly id: RoomId;
@@ -109,6 +124,8 @@ export interface RoomBuild extends ContainerBuild {
   readonly cooler: CoolerBuild;
   /** One UPS, two with dualFeed. */
   readonly ups: readonly SupplyBuild[];
+  /** D31.2: the room start controller on the UPS (`roomStart`): which racks are powered at round start. */
+  readonly start: StartCtl | null;
 }
 export interface DataPlaneBuild { readonly gen: number; readonly k: number; readonly router: RouterBuild }
 export interface LinkBuild { readonly gen: number; readonly k: number }
@@ -120,10 +137,14 @@ export interface SiteBuild extends ContainerBuild {
   readonly grid: SupplyBuild;
   /** Link to the gateway; null for the gateway (site 0). */
   readonly backbone: LinkBuild | null;
+  /** D31.4: off-grid generation, gen 0–3 = solar, wind, fuel cell, own plant. */
+  readonly generation: PartLevel | null;
 }
 export interface GlobalBuild {
   /** Exists from the `regions` research. */
   readonly scheduler: RouterBuild | null;
+  /** D31.2: the global start controller on the scheduler (`globalStart`): which sites come online at round start. */
+  readonly start: StartCtl | null;
 }
 
 export interface BuildState {

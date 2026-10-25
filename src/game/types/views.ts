@@ -1,3 +1,4 @@
+import type { StartOrder } from './build';
 import type { Amount } from '../amount';
 import type { CoolTech, Era, FilterId, MemTier, RegionId, ResearchCategory, Resource, RouteStrategyId, WorkTier } from './catalog';
 import type { FailCause, FailDetail, SupplyKind } from './events';
@@ -67,7 +68,8 @@ export interface ShardDoneView {
  * System modes (spec §4.3), plus `empty` for a slot with no unit. MODE_IDS index = the u8 in
  * hot `sys.mode`. `draining` = going offline with gracefulDrain, still running its tasks.
  */
-export const UNIT_MODES = ['empty', 'onMarket', 'asleep', 'boot', 'goingOffline', 'draining', 'offline', 'paused', 'cold', 'crashed', 'dark'] as const;
+/** D31: `standby` = powered off by a start controller (0 W, not a split candidate); appended so saved mode codes keep their indexes. */
+export const UNIT_MODES = ['empty', 'onMarket', 'asleep', 'boot', 'goingOffline', 'draining', 'offline', 'paused', 'cold', 'crashed', 'dark', 'standby'] as const;
 export type UnitMode = (typeof UNIT_MODES)[number];
 
 export interface SupplyView {
@@ -239,6 +241,44 @@ export interface ServerSlotView {
   readonly busyCores: number;
   readonly port: PortView | null;
 }
+/** D31.2: a start controller (rack Power control, room on the UPS, global on the scheduler). */
+export interface StartCtlView {
+  readonly generation: number;
+  readonly level: number;
+  readonly startWith: number;
+  readonly headWaitS: number;
+  /** Generation 1 only; null at generation 0 or when unset. */
+  readonly busyPct: number | null;
+  readonly order: StartOrder;
+  /** Units awake (systems) or powered (racks, sites) under this controller now, of total. */
+  readonly awake: number;
+  readonly total: number;
+  /** Time until the controller's next wake lands, or null when none is pending. */
+  readonly nextWakeInMs: number | null;
+}
+/** D31.3: rack Power control: the battery (time until billed) and the rack's start controller. */
+export interface PowerCtlView {
+  readonly generation: number;
+  readonly level: number;
+  readonly battery: {
+    readonly capacityJ: number;
+    readonly chargeJ: number;
+    /** chargeJ ÷ current PDU input; null when the rack draws nothing. */
+    readonly secondsLeft: number | null;
+    /** True while the round runs, the rack is powered and the battery is not empty. */
+    readonly discharging: boolean;
+  };
+  readonly start: StartCtlView;
+}
+/** D31.4: a site's off-grid generation. */
+export interface GenerationView {
+  readonly kind: 'solar' | 'wind' | 'fuelCell' | 'ownPlant';
+  readonly level: number;
+  readonly outputW: number;
+  readonly usedW: number;
+  /** Credits per joule at the margin: 0 for renewables with headroom, the fuel price, or the region price. */
+  readonly marginalPrice: number;
+}
 export interface RackSlotView {
   readonly rackId: RackId | null;
   readonly state: UnitMode;
@@ -253,6 +293,12 @@ export interface RackSlotView {
    * optional only until hand-built fixtures add it.
    */
   readonly serversOnMarket?: Uint8Array;
+  /**
+   * D31: false while a room start controller holds the rack in standby; wakeMs counts down a power-on in
+   * progress. Always set by the view; optional only until hand-built fixtures add them.
+   */
+  readonly powered?: boolean;
+  readonly wakeMs?: number | null;
 }
 export interface ZoneView {
   readonly roomId: RoomId | null;
@@ -261,6 +307,9 @@ export interface ZoneView {
   readonly tempF: number;
   readonly load: number;
   readonly upsUsage: number;
+  /** D31: false while the global start controller holds the zone in standby (optional until fixtures add it). */
+  readonly powered?: boolean;
+  readonly wakeMs?: number | null;
 }
 export interface LinkView {
   readonly siteId: SiteId;
@@ -282,6 +331,11 @@ export interface SiteView {
   readonly hottestF: number;
   /** Seconds left in boot / goingOffline / cold, else null. */
   readonly timerS: number | null;
+  /** D31: false while the global start controller holds the site in standby (optional until fixtures add it). */
+  readonly powered?: boolean;
+  readonly wakeMs?: number | null;
+  /** D31.4: off-grid generation, or null (optional until fixtures add it). */
+  readonly generation?: GenerationView | null;
 }
 
 export interface TaskRequirementsView {
@@ -404,6 +458,8 @@ export type ResearchPartId =
   | 'netRack' | 'roomCooling' | 'ups'
   | 'dataPlane' | 'backbone' | 'site' | 'globalScheduler'
   | 'structure';
+/** A research root's current spec, as a heading line ("4 cores · 2 lanes", "657 Hz"; "none" when not owned). */
+export interface ResearchPartView { readonly spec: string }
 /** The hardware level a part belongs to: the research tab, whatever era the node unlocks in. */
 export type ResearchTabId = 'cpu' | 'system' | 'rack' | 'room' | 'global';
 /** A node's concrete before → after on the part it upgrades, as display strings ("Cores per CPU", "1", "2"). */
@@ -448,6 +504,8 @@ export interface LenderView {
 }
 export interface ResearchTreeView {
   readonly nodes: readonly ResearchNodeView[];
+  /** Each root's current spec at the focused system (and its rack, room, site); "none" for parts not owned yet. */
+  readonly parts: Readonly<Record<ResearchPartId, ResearchPartView>>;
   /**
    * Round-time income for ETAs, per second: this round's Data and net Credits (gross − energy) over
    * its elapsed time while it runs; else the last report's over its duration. 0 until 10 s have elapsed.

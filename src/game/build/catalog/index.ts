@@ -1,7 +1,7 @@
 import type { PartId } from '../../types/catalog';
 import { RAM, GPU, NPU, PSU, STORAGE } from './board';
 import { CLOCK, CORE, CPU, L1, L2, L3, SCHEDULER } from './chip';
-import { LB, PDU, RACK_COOLER, ROOM_COOLER, ROOM_LB, ROW, UPS } from './infra';
+import { GENERATION, GLOBAL_START, LB, PDU, POWER_CTL, RACK_COOLER, ROOM_COOLER, ROOM_LB, ROOM_START, ROW, UPS } from './infra';
 import { BACKBONE, DATA_PLANE, ROOM_SWITCH, SWITCH } from './network';
 import { GLOBAL_SCHEDULER, GRID } from './site';
 
@@ -20,6 +20,7 @@ export const PARTS = {
   ram: RAM, gpu: GPU, npu: NPU, storage: STORAGE, psu: PSU,
   rackCooler: RACK_COOLER, pdu: PDU, lb: LB, roomLb: ROOM_LB, row: ROW, roomCooler: ROOM_COOLER, ups: UPS,
   grid: GRID, globalScheduler: GLOBAL_SCHEDULER,
+  powerCtl: POWER_CTL, roomStart: ROOM_START, globalStart: GLOBAL_START, generation: GENERATION,
 } as const satisfies Partial<Record<PartId, CatalogRow>>;
 export type LeveledPartId = keyof typeof PARTS;
 

@@ -47,3 +47,41 @@ export const UPS: CatalogRow = {
   curve: 'flow', base: [5e10, 2e11, 5e14], watts: { kind: 'supply', loss: [0.12, 0.06, 0.03], lossPerLevel: 0.005 },
   price: [9.5e10, 2.9e11, 6.7e15], upgrade: [7e10, 7e10, 3.7e14],
 };
+/**
+ * D31.3 Power control, the fifth rack slot under the cooler: a battery (capacity J) and the rack start
+ * controller, one part. L1 holds about 60 s of a fresh era rack at full draw (its PDU's L1 capacity);
+ * capacity ×2 per level. Install ≈ 40 × capacity × the home price (0.01 Credits/J). Starting values **(s)**.
+ */
+export const POWER_CTL: CatalogRow = {
+  id: 'powerCtl', scope: 'rack', names: ['Lead-acid power control', 'Li-ion power control', 'LFP power control'],
+  gates: [r('powerCtl'), r('powerCtlLiIon'), r('powerCtlLfp')], curve: 'flow',
+  base: [6e8, 1.2e11, 3e17], watts: { kind: 'idle', idle: [50, 500, 5000] },
+  price: [2.4e8, 4.8e10, 1.2e17], upgrade: [1.2e8, 2.4e10, 6e16],
+};
+/** D31.2 room start controller on the UPS: no capacity; linear levels L1–5 cut the rack power-on time. **(s)** */
+export const ROOM_START: CatalogRow = {
+  id: 'roomStart', scope: 'room', names: ['Room start control', 'Predictive room start'], gates: [r('roomStart'), r('startPredict')],
+  curve: 'linear', levelMax: 5, base: [1, 1], watts: { kind: 'idle', idle: [200, 200] },
+  price: [5e10, 2e11], upgrade: [2e10, 2e10],
+};
+/** D31.2 global start controller on the scheduler: no capacity; linear levels L1–5 cut the site online time. **(s)** */
+export const GLOBAL_START: CatalogRow = {
+  id: 'globalStart', scope: 'global', names: ['Global start control', 'Predictive global start'], gates: [r('globalStart'), r('startPredict')],
+  curve: 'linear', levelMax: 5, base: [1, 1], watts: { kind: 'idle', idle: [1000, 1000] },
+  price: [1e15, 4e15], upgrade: [5e14, 5e14],
+};
+/**
+ * D31.4 site generation (W output): solar and wind × the region's sun and wind factors; fuel cell and own
+ * plant constant, with fuel at 0.4 and 0.25 × the region price. L1 is 10% of the gen-0 grid feed; ×2 per
+ * level. Install ≈ 4 h × output × the home price; renewables 1.5× the fuel kinds. Starting values **(s)**.
+ */
+export const GENERATION: CatalogRow = {
+  id: 'generation', scope: 'site', names: ['Solar farm', 'Wind farm', 'Fuel cell', 'Own plant'],
+  gates: [r('solarFarm'), r('windFarm'), r('fuelCell'), r('ownPlant')], curve: 'flow',
+  base: [1e14, 1e14, 1e14, 4e14], watts: { kind: 'idle', idle: [0, 0, 0, 0] },
+  price: [2.16e16, 2.16e16, 1.44e16, 5.76e16], upgrade: [1.08e16, 1.08e16, 7.2e15, 2.88e16],
+};
+/** D31.4: generation fuel as a share of the region price (renewables burn none). */
+export const GENERATION_FUEL = [0, 0, 0.4, 0.25] as const;
+/** D31.2: wake latency by controller level (s): L1–5 give 2, 1.5, 1, 0.5, 0.25; above L5 0.25. */
+export const wakeLatencyS = (level: number): number => [2, 1.5, 1, 0.5, 0.25][Math.min(5, Math.max(1, level)) - 1]!;

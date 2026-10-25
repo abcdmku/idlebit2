@@ -60,7 +60,7 @@ export const topSite = (site: SiteBuild): SiteBuild => ({
 export const MAX_FLEET: FleetSpec = {
   seed: 42, sites: 8, zonesPerSite: 3, racksPerZone: 24, serversPerRack: 12, unlocks: 'max',
   system: topSystem, rack: topRack, room: topRoom, site: topSite,
-  global: { scheduler: { ...topRouter, gen: 0, level: 11, strategy: 'latency', filters: ['region', 'capability', 'health'] } },
+  global: { scheduler: { ...topRouter, gen: 0, level: 11, strategy: 'latency', filters: ['region', 'capability', 'health'] }, start: null },
 };
 
 /**

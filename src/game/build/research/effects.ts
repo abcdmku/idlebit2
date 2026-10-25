@@ -81,6 +81,6 @@ export function openContainers(build: BuildState, unlocks: Unlocks): BuildState 
   open(build.racks, 'racks', unlocks.levels.rack);
   open(build.rooms, 'rooms', unlocks.levels.room);
   open(build.sites, 'sites', unlocks.levels.global);
-  if (!next.global.scheduler && (unlocks.gens.site & 1) !== 0) next = { ...next, global: { scheduler: baseRouter(0) } };
+  if (!next.global.scheduler && (unlocks.gens.site & 1) !== 0) next = { ...next, global: { ...next.global, scheduler: baseRouter(0) } };
   return next === build ? build : { ...next, revision: build.revision + 1 };
 }

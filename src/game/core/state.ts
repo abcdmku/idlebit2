@@ -49,7 +49,7 @@ export function bootBuild(): BuildState {
     racks: [{ ...rack, servers: rack.servers.map((s, i) => (i === 0 ? systemId(0) : s)) }],
     rooms: [{ ...room, racks: room.racks.map((r, i) => (i === 0 ? rackId(0) : r)) }],
     sites: [{ ...site, zones: site.zones.map((z, i) => (i === 0 ? roomId(0) : z)) }],
-    global: { scheduler: null },
+    global: { scheduler: null, start: null },
     revision: 0,
   };
 }

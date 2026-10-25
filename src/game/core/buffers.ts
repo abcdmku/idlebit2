@@ -135,20 +135,31 @@ const LUMP = {
   coolerDuty: f64, coolerW: f64, heatW: f64, drawW: f64, failedTick: neg1,
 } as const;
 const ROUTER_HOT = { lbCursor: i32, lbRouted: u32, lbLast: neg1 } as const;
+/**
+ * D31.2 start controller state on a powered scope: `powered` 0 while a parent controller holds the unit in
+ * standby; `wakeTicks` counts down a power-on; `ctlBusy` is the awake children's busy fraction (10 s EMA);
+ * `ctlTriggerTick` is the first tick the trigger held (-1 none).
+ */
+const START_HOT = { powered: { t: 'u8', fill: 1 }, wakeTicks: i32, ctlBusy: f64, ctlTriggerTick: neg1 } as const;
 export const RACK_HOT = {
   ...LUMP, eff: { t: 'f64', fill: 1 }, effClock: f64, throttled: u8,
   pduUsage: f64, pduOverTicks: i32, pduRebootTicks: i32, pduFailed: u8, capFactor: { t: 'f64', fill: 1 },
   nextDue: { t: 'f64', fill: Infinity }, dirty: u8, freeSlots: u16, admitted: u32, estS: f64, researchRate: f64,
   ...ROUTER_HOT, wrr: { t: 'f64', stride: SERVERS_PER_RACK },
+  /** D31.3: Power control battery charge (J), unbilled draw left this round. */
+  ...START_HOT, batteryJ: f64,
 } as const satisfies Layout;
 export const ROOM_HOT = {
   ...LUMP, upsUsage: { t: 'f64', stride: MAX_UPS }, upsOverTicks: { t: 'i32', stride: MAX_UPS },
   upsRebootTicks: { t: 'i32', stride: MAX_UPS }, upsFailed: { t: 'u8', stride: MAX_UPS }, rideTicks: i32,
   freeSlots: u32, admitted: u32, estS: f64, ...ROUTER_HOT, wrr: { t: 'f64', stride: RACKS_PER_ROOM },
+  ...START_HOT,
 } as const satisfies Layout;
 export const SITE_HOT = {
   drawW: f64, gridUsage: f64, gridOverTicks: i32, gridRebootTicks: i32, gridFailed: u8, failedTick: neg1,
   freeSlots: u32, admitted: u32, estS: f64, ...ROUTER_HOT, wrr: { t: 'f64', stride: MAX_ZONES_PER_SITE },
+  /** D31.4: generation output used this tick (W). */
+  ...START_HOT, genUsedW: f64,
 } as const satisfies Layout;
 /** `backlog`: queued, unsent bits on the link (first-link room, spec §7.4). */
 export const LINK_HOT = { head: neg1, tail: neg1, qlen: i32, backlog: f64, busyS: f64, bitClock: f64 } as const satisfies Layout;
@@ -268,8 +279,12 @@ export const G = {
    * in bit 0, exact in a float64 below 2^53), how many it holds, and how many of them were met.
    */
   slaRing: 45, slaLen: 46, slaMet: 47,
+  /** D31.2: the global start controller's busy EMA and first trigger tick (-1 none). */
+  startBusy: 48, startTriggerTick: 49,
+  /** D31: this round's energy lines in Credits (float sums, exact below 2^53): from batteries, refills, from generation, fuel. */
+  roundFromBattery: 50, roundBatteryRefill: 51, roundFromGeneration: 52, roundFuel: 53,
 } as const;
-export const G_SIZE = 48;
+export const G_SIZE = 54;
 
 export interface CompiledBuffers {
   readonly sys: Table<typeof SYS_COMPILED>;
@@ -324,7 +339,7 @@ export function allocHot(size: FleetSize, records = 8): HotBuffers {
   const g = new Float64Array(G_SIZE);
   g[G.nextTaskId] = 1;
   g[G.frontHead] = -1; g[G.frontTail] = -1; g[G.recFree] = -1; g[G.parentFree] = -1;
-  g[G.rqSites] = size.sites; g[G.rqRooms] = size.rooms; g[G.researchProject] = -1;
+  g[G.rqSites] = size.sites; g[G.rqRooms] = size.rooms; g[G.researchProject] = -1; g[G.startTriggerTick] = -1;
   return {
     g, rng: new Uint32Array(4),
     sys: allocTable(SYS_HOT, size.systems, size.systems),

@@ -4,12 +4,13 @@ import { G } from '../core/buffers';
 import { MODE } from '../core/timers';
 import { TICK_MS, TICKS_PER_SECOND } from '../core/constants';
 import type { ResearchDef } from '../types/catalog';
-import type { LevelId } from '../types/ids';
+import type { LevelId, NodeRef } from '../types/ids';
 import type { ResearchBadge } from '../types/snapshot';
 import type { GameState, ResearchState } from '../types/state';
 import type { ResearchNodeState, ResearchNodeView, ResearchTreeView } from '../types/views';
 import { researchChange } from './researchChange';
 import { researchRoot } from './researchParts';
+import { researchPartSpecs } from './researchSpecs';
 import { researchCreditsPerMinute, researchLenders } from './lenders';
 import { answerTypes } from '../market/taskTypes';
 
@@ -127,7 +128,8 @@ export const researchHorizon = (state: GameState): LevelId =>
  * The research wafer (mockup core/research-wafer.js): every node in tree order with its die state,
  * plus the fab line. Nodes whose mechanic has not landed stay hidden (architecture §8).
  */
-export function researchTree(state: GameState): ResearchTreeView {
+/** `at`: the node the part specs are read at (default: the player's first system). */
+export function researchTree(state: GameState, at: NodeRef | null = null): ResearchTreeView {
   const r = state.research;
   const done = new Set<string>(r.completed);
   const nodes: ResearchNodeView[] = [];
@@ -151,7 +153,7 @@ export function researchTree(state: GameState): ResearchTreeView {
   }
   const slots = r.unlocks.ceilings.researchQueue;
   return {
-    nodes, income: roundIncome(state), active: r.active, opsPerSec: researchOpsPerSec(state), holdOpsPerSec: holdOpsPerSec(state), takenOpsPerSec: takenOpsPerSec(state), queue: r.queue,
+    nodes, parts: researchPartSpecs(state, at), income: roundIncome(state), active: r.active, opsPerSec: researchOpsPerSec(state), holdOpsPerSec: holdOpsPerSec(state), takenOpsPerSec: takenOpsPerSec(state), queue: r.queue,
     queueSlots: slots > 1 ? slots : 0, horizon: researchHorizon(state),
     lenders: researchLenders(state), creditsPerMinute: researchCreditsPerMinute(state),
   };

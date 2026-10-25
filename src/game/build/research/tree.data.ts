@@ -20,6 +20,7 @@ export const CREDITS_ONLY: readonly string[] = [
   "roomAir2", "roomVarSpeed", "thermalThrottle", "autoReturn", "configSave", "cronTuning", "fastBoot", "gracefulDrain",
   "hotPlug", "hotSwap", "offline12", "offline24", "offline48", "researchQueue", "rollingUpgrade", "telemetry",
   "warmBoot", "lowVoltRam",
+  "powerCtl", "powerCtlLiIon", "powerCtlLfp", "roomStart", "startPredict", "globalStart", "solarFarm", "windFarm", "fuelCell", "ownPlant",
 ];
 export const MILESTONE_DATA_FACTOR = 3;
 export const MILESTONE_IDS: readonly string[] = ["systemBoard", "fabKhz", "rack", "fabMhz", "room", "fabGhz", "dataCenter", "regions", "intercontinental"];
@@ -166,6 +167,16 @@ export const TREE_ROWS: readonly TreeRow[] = [
   n("upsLithium", "Lithium UPS", "power", ["upsOnline", "dataCenter"], "global", "ghz", 13, 4e8, [gen("ups", 2), rule("lossFraction", { ups: 0.03 }), rule("upsRideThrough", { seconds: 30 })], ["overload", "multiAz"]),
   n("substation", "Substation", "power", ["dataCenter"], "global", "ghz", 13, 4e8, [gen("grid", 1), rule("lossFraction", { grid: 0.03 }), rule("supplyCapacity", { grid: 8 })], ["overload"]),
   n("hvIntake", "HV intake", "power", ["substation", "regions"], "global", "ghz", 14, 3e9, [gen("grid", 2), rule("lossFraction", { grid: 0.02 }), rule("supplyCapacity", { grid: 8 })], ["overload"]),
+  n("powerCtl", "Power control", "power", ["s3Sleep", "meteredPdu"], "rack", "khz", 8, 2.7e6, [gen("powerCtl", 0)], ["energy"]),
+  n("powerCtlLiIon", "Li-ion power control", "power", ["powerCtl", "fabMhz"], "rack", "mhz", 10, 4e7, [gen("powerCtl", 1)], ["energy"]),
+  n("powerCtlLfp", "LFP power control", "power", ["powerCtlLiIon", "fabGhz"], "rack", "ghz", 12, 2e8, [gen("powerCtl", 2)], ["energy"]),
+  n("roomStart", "Room start control", "power", ["powerCtl", "room"], "room", "mhz", 11, 6e7, [gen("roomStart", 0)], ["energy"]),
+  n("startPredict", "Predictive start", "power", ["roomStart", "telemetry"], "room", "mhz", 11, 6e7, [gen("roomStart", 1), gen("globalStart", 1)], ["energy"]),
+  n("globalStart", "Global start control", "power", ["roomStart", "regions"], "global", "ghz", 14, 3e9, [gen("globalStart", 0)], ["energy"]),
+  n("solarFarm", "Solar farm", "power", ["dataCenter"], "global", "ghz", 12, 2e8, [gen("generation", 0)], ["energy"]),
+  n("windFarm", "Wind farm", "power", ["solarFarm", "regions"], "global", "ghz", 13, 4e8, [gen("generation", 1)], ["energy"]),
+  n("fuelCell", "Fuel cell", "power", ["solarFarm", "substation"], "global", "ghz", 13, 4e8, [gen("generation", 2)], ["energy"]),
+  n("ownPlant", "Own plant", "power", ["fuelCell", "hvIntake"], "global", "ghz", 14, 3e9, [gen("generation", 3)], ["energy"]),
   n("thermalThrottle", "Thermal throttle", "cooling", ["rack"], "rack", "khz", 8, 2.7e6, [rule("thermalThrottle", { atF: 95, untilF: 90, clock: 0.5 })], ["heat"]),
   n("rackVarSpeed", "Fan control", "cooling", ["rack", "telemetry"], "rack", "khz", 8, 2.7e6, [rule("rackSetpoint", { minF: 55, maxF: 80 })], ["energy"]),
   n("rackAir2", "High-flow air", "cooling", ["rack"], "rack", "khz", 8, 2.7e6, [gen("rackCooler", 1)], ["heat"]),

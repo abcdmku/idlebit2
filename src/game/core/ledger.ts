@@ -1,3 +1,4 @@
+import type { EnergyBreakdown } from '../types/report';
 import { type Amount } from '../amount';
 import type { GameState, LedgerSample } from '../types/state';
 import { MAX_FAMILIES, NET_WINDOW_TICKS, REGIONS, DT_S, TICKS_PER_SECOND } from './constants';
@@ -99,6 +100,15 @@ export function roundTotals(w: World): { gross: Amount; data: Amount; energy: Am
   const l = w.ledger;
   return { gross: toAmount(l.roundGross), data: toAmount(l.roundData), energy: toAmount(l.roundEnergy), net: toAmount(l.roundGross - l.roundEnergy) };
 }
+
+/**
+ * D31 round energy lines. Until rack batteries and site generation land, every joule is imported and
+ * billed: billed equals the round's energy and the other lines are 0.
+ */
+export function energyBreakdown(w: World): EnergyBreakdown {
+  return { billed: toAmount(w.ledger.roundEnergy), fromBattery: ZERO, batteryRefill: ZERO, fromGeneration: ZERO, fuel: ZERO };
+}
+const ZERO = '0' as Amount;
 
 export function resetRoundTotals(w: World): void {
   w.ledger.roundGross = 0n; w.ledger.roundData = 0n; w.ledger.roundEnergy = 0n;

@@ -24,7 +24,8 @@ const node = (id: string, state: ResearchNodeView['state'], over: Partial<Resear
   answers: [], part: 'cores', tab: 'cpu', ...over });
 const tree = (nodes: ResearchNodeView[], over: Partial<ResearchTreeView> = {}): ResearchTreeView => ({
   nodes, income: { dataPerSec: 1, creditsPerSec: 10 }, active: null, opsPerSec: 0, holdOpsPerSec: 100, takenOpsPerSec: 100, queue: [], queueSlots: 0,
-  horizon: 'chip', lenders: [], creditsPerMinute: '0' as Amount, ...over });
+  horizon: 'chip', lenders: [], creditsPerMinute: '0' as Amount, parts: SPECS, ...over });
+const SPECS = { cores: { spec: '1 core · 1 lane' }, clock: { spec: '1 Hz' }, cache: { spec: '1 b' }, queue: { spec: 'none' } } as unknown as ResearchTreeView['parts'];
 const CPU_ONLY = { chip: true, system: false, rack: false, room: false, global: false };
 const rich = { credits: '1000000' as Amount, data: '1000000' as Amount };
 
@@ -63,6 +64,8 @@ describe('truthful states', () => {
     // No part header claims "Nothing to start" over a startable row, and no dangling "N more later".
     expect(m.host.textContent).not.toMatch(/Nothing to start|more later/);
     expect([...m.host.querySelectorAll('.lp-done')].map(e => e.textContent)).toEqual(['0 of 2 done', '1 of 3 done', '0 of 1 done', '1 of 1 done']);
+    // Each part heading shows the part's current spec; a part not owned yet shows none.
+    expect([...m.host.querySelectorAll('.lp-spec')].map(e => e.textContent)).toEqual(['1 core · 1 lane', '1 Hz', '1 b', '']);
     view(early());
     expect(rowText('dualCore')).toBe('Ready');
     expect(tabNames()).toEqual(['CPU, 2 ready', 'System, locked']);

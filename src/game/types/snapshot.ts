@@ -6,6 +6,7 @@ import type { LevelId, NodeRef, RackId, ResearchId, RoomId, SiteId, SystemId } f
 import type { RoundReport } from './report';
 import type { RoundPhase } from './state';
 import type {
+  PowerCtlView, StartCtlView,
   BuildSlotView, ChipQueueEntryView, ResearchQueueEntryView, CompletionView, CoolerView, FailureView, LbView, LinkView, MemTierView, OutcomeView, PartView, QueueEntryView, RackSlotView,
   ServerSlotView, ShardDoneView, SiteView, SupplyView, SwitchView, TaskView, TransferView, UnitMode,
 } from './views';
@@ -250,6 +251,8 @@ export interface RackSnapshot {
   readonly pdu: SupplyView;
   readonly lb: LbView;
   readonly switch: SwitchView;
+  /** D31.3: the fifth infrastructure slot, under the cooler; null when not installed (optional until fixtures add it). */
+  readonly powerCtl?: PowerCtlView | null;
   /** Always 12. */
   readonly servers: readonly ServerSlotView[];
   readonly saveable: boolean;
@@ -276,6 +279,8 @@ export interface RoomSnapshot {
   readonly crashed: boolean;
   readonly cooler: CoolerView;
   readonly ups: readonly SupplyView[];
+  /** D31.2: the room start controller on the UPS, or null (optional until fixtures add it). */
+  readonly power?: { readonly start: StartCtlView | null };
   readonly network: { readonly switch: SwitchView; readonly lb: LbView };
   readonly rows: number;
   readonly maxRows: number;
@@ -292,6 +297,8 @@ export interface GlobalSnapshot {
   readonly sites: readonly SiteView[];
   readonly backbone: { readonly links: readonly LinkView[] };
   readonly scheduler: LbView | null;
+  /** D31.2: the global start controller on the scheduler, or null (optional until fixtures add it). */
+  readonly start?: StartCtlView | null;
   readonly regionsOpen: number;
   readonly gateway: RegionId;
   /**

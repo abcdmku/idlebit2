@@ -171,6 +171,7 @@ export function fixtureReport(index: number, durationTicks: number): RoundReport
     failDetail: { timeout: 'link', cantRun: 'ram', misroute: 'cache', power: 'psu', heat: null, swap: 'cold', late: null },
     details: [{ cause: 'timeout', detail: 'link', count: 150 }, { cause: 'cantRun', detail: 'ram', count: 61 }],
     peakIntensity: 6.4, dismissed: 4, deliveredWork: 128_400, failedWork: 27_500, spill: { ramWork: 0, diskWork: 0 }, gross: amount(18_420), data: amount(212), energy: amount(1_310), net: amount(17_110), researchOps: 48_000,
+    energyBreakdown: { billed: amount(1_310), fromBattery: amount(0), batteryRefill: amount(0), fromGeneration: amount(0), fuel: amount(0) },
   };
 }
 

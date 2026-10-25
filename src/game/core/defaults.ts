@@ -47,7 +47,7 @@ export function barebonesRack(id: RackId, room: RoomId, slot: number, opened = t
   return {
     id, room, slot, online: true, opened,
     servers: Array<SystemId | null>(SERVERS_PER_RACK).fill(null),
-    cooler: cooler(0), pdu: supply(0), lb: baseRouter(), switch: rackSwitch(),
+    cooler: cooler(0), pdu: supply(0), lb: baseRouter(), switch: rackSwitch(), powerCtl: null,
   };
 }
 
@@ -55,7 +55,7 @@ export function barebonesRoom(id: RoomId, site: SiteId, zone: number, opened = t
   return {
     id, site, zone, online: true, opened, rows,
     racks: Array<RackId | null>(rows * RACK_SLOTS_PER_ROW).fill(null),
-    switch: roomSwitch(), lb: baseRouter(), cooler: cooler(0), ups: [supply(0)],
+    switch: roomSwitch(), lb: baseRouter(), cooler: cooler(0), ups: [supply(0)], start: null,
   };
 }
 
@@ -65,6 +65,6 @@ export function barebonesSite(id: SiteId, region: RegionId, opened = true): Site
     id, region, online: true, opened,
     zones: Array<RoomId | null>(MAX_ZONES_PER_SITE).fill(null),
     dataPlane: { gen: 0, k: DATA_PLANE.baseK[0]!, router: baseRouter() }, grid: supply(0),
-    backbone: id === 0 ? null : { gen: 0, k: BACKBONE.baseK[0]! },
+    backbone: id === 0 ? null : { gen: 0, k: BACKBONE.baseK[0]! }, generation: null,
   };
 }

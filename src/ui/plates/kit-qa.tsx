@@ -128,7 +128,7 @@ const scenes: Record<string, { level: LevelId; plate: ReactNode }> = {
 
 function ResearchKit({ phase, focus }: { phase: 'running' | 'between'; focus: ReturnType<typeof researchId> | null }) {
   const t = tree(phase);
-  return <ResearchView L={shellLayout(W, H)} tree={{ ...t, income: { dataPerSec: 40, creditsPerSec: 400 }, takenOpsPerSec: 6400 }} visible={new Set(t.nodes.map(n => n.id))} unlocked={{ chip: true, system: true, rack: false, room: false, global: false }}
+  return <ResearchView L={shellLayout(W, H)} tree={{ ...t, income: { dataPerSec: 40, creditsPerSec: 400 }, takenOpsPerSec: 6400, parts: {} as never }} visible={new Set(t.nodes.map(n => n.id))} unlocked={{ chip: true, system: true, rack: false, room: false, global: false }}
     level="system" focusProject={focus} wallet={{ credits: '1000000' as Amount, data: '100000' as Amount }}
     line={{ id: researchId('fabKhz'), name: 'kHz fab', running: phase === 'running', progress: 0.4 }} between={phase === 'between'} onAction={act} onClose={noop} />;
 }

@@ -28,7 +28,8 @@ export function lampState(mode: UnitMode): LampState {
     case 'onMarket': case 'asleep': case 'paused': return 'online';
     case 'boot': case 'goingOffline': case 'draining': case 'cold': return 'switching';
     case 'crashed': case 'dark': return 'fault';
-    case 'offline': case 'empty': return 'offline';
+    // D31: standby (powered off by a start controller) reads as off.
+    case 'offline': case 'empty': case 'standby': return 'offline';
   }
 }
 /** A w×2 lamp: green online, dark offline, steady red on a fault, and amber draining in

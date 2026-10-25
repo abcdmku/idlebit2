@@ -26,6 +26,8 @@ const GEN: Readonly<Record<string, ResearchPartId>> = {
   switch: 'switch', lb: 'lb', rackCooler: 'rackCooling', pdu: 'rackPower',
   roomCooler: 'roomCooling', ups: 'ups', dataPlane: 'dataPlane', backbone: 'backbone', grid: 'site',
   cpu: 'structure', row: 'structure', zone: 'structure', site: 'structure',
+  // D31: Power control sits with rack power; room and global start controllers on the UPS and scheduler; generation at the site.
+  powerCtl: 'rackPower', roomStart: 'ups', globalStart: 'globalScheduler', generation: 'site',
 };
 /** Ceilings: the part whose slots or levels they raise. */
 const CEILING: Readonly<Record<string, ResearchPartId>> = {

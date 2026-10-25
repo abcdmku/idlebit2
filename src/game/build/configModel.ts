@@ -81,11 +81,11 @@ const rackSwitch: SwitchBuild = starterRackSwitch(0, 4);
 const roomSwitch: SwitchBuild = starterRoomSwitch(0, 4);
 
 export const barebonesRackConfig = (): RackConfig =>
-  ({ online: true, cooler, pdu: supply, lb: router, switch: rackSwitch, servers: Array(12).fill(null) });
+  ({ online: true, cooler, pdu: supply, lb: router, switch: rackSwitch, powerCtl: null, servers: Array(12).fill(null) });
 export const barebonesRoomConfig = (): RoomConfig =>
-  ({ online: true, rows: 2, switch: roomSwitch, lb: router, cooler, ups: [supply], racks: Array(16).fill(null) });
+  ({ online: true, rows: 2, switch: roomSwitch, lb: router, cooler, ups: [supply], start: null, racks: Array(16).fill(null) });
 export const barebonesSiteConfig = (): SiteConfig =>
-  ({ online: true, dataPlane: { gen: 0, k: LADDERS.dataPlane.baseK[0]!, router }, grid: supply, zones: [barebonesRoomConfig(), null, null] });
+  ({ online: true, dataPlane: { gen: 0, k: LADDERS.dataPlane.baseK[0]!, router }, grid: supply, generation: null, zones: [barebonesRoomConfig(), null, null] });
 
 /* ---------- Locks (spec §13.3): the first missing item ---------- */
 

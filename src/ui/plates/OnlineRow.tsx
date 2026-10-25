@@ -12,7 +12,8 @@ export function onlineState(mode: UnitMode, added = false): OnlineState {
     case 'goingOffline': case 'draining': return 'going-offline';
     case 'cold': return 'cold';
     case 'crashed': case 'dark': return 'crashed';
-    case 'offline': case 'empty': return 'offline';
+    // D31: standby (held off by a start controller) reads as offline until its controller wakes it.
+    case 'offline': case 'empty': case 'standby': return 'offline';
   }
 }
 

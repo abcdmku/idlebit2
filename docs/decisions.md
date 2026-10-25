@@ -1232,6 +1232,14 @@ The user's words:
   6. A site with a 30% generator imports only draw above its output, and its racks' refills cost 0.
   7. Configuration copy and save round-trip `StartCtl`.
 
+*Types as landed (sim, 25 Oct), where they differ from the text above:*
+- `StartCtl extends PartLevel { startWith, trigger: { headWaitS, busyPct | null }, order }` (`types/build.ts`). The rack part is `RackBuild.powerCtl: StartCtl | null`: one generation and level serve the battery and the controller. The room's is `RoomBuild.start` (on the UPS) and the global one `GlobalBuild.start` (on the scheduler), so `RouterBuild` stays shared. `SiteBuild.generation: PartLevel | null`.
+- `UNIT_MODES` appends `standby`, so saved mode codes keep their indexes. `RACK_INFRA_SLOTS = ['cooling', 'powerCtl', 'power', 'lb', 'switch']` and `InfraSlot` live in `types/catalog.ts`; `QuoteRequest.infra.slot` is an `InfraSlot`.
+- `RoundReport.energy` stays the billed Amount; the lines are `RoundReport.energyBreakdown: { billed, fromBattery, batteryRefill, fromGeneration, fuel }`.
+- Views: `StartCtlView`, `PowerCtlView` and `GenerationView` in `types/views.ts`; `RackSnapshot.powerCtl`, `RoomSnapshot.power.start`, `GlobalSnapshot.start` (not `scheduler.start`), `powered` and `wakeMs` on `RackSlotView`, `ZoneView` and `SiteView`, and `SiteView.generation`. The view always sets them; they are optional in the type only until hand-built render and UI fixtures add them.
+- Hot: racks, rooms and sites get `powered` (u8, default 1), `wakeTicks`, `ctlBusy` and `ctlTriggerTick`; racks `batteryJ`; sites `genUsedW`; `G.startBusy`, `G.startTriggerTick` and the round energy lines. `SAVE_VERSION` 12.
+- Catalog rows `POWER_CTL`, `ROOM_START`, `GLOBAL_START` and `GENERATION` (`build/catalog/infra.ts`), and the ten nodes in the tree (Credits-only under D32). `setStartConfig` is live (`build/startCtl.ts`).
+
 *Render (`src/render/**`):*
 - `ServerSlotView.state`: draw `asleep` dim and `standby` dark, with a wake pulse during `wakeT`.
 - `RackSlotView` (room) and `ZoneView` / `SiteView` (global) get `powered: boolean` and `wakeMs: number | null`.

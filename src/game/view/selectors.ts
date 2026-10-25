@@ -1,4 +1,4 @@
-import type { ResearchId, SystemId, UnitKind, UnitRef } from '../types/ids';
+import type { NodeRef, ResearchId, SystemId, UnitKind, UnitRef } from '../types/ids';
 import type { GameState } from '../types/state';
 import type { QueuePage, ResearchTreeView, SavedConfigsView } from '../types/views';
 import { unitLabel } from './labels';
@@ -8,10 +8,11 @@ import { queuedTasks } from './tasks';
 
 /** Lazy selectors: called by plates and the wafer while open, never inside the snapshot. */
 
-export const selectResearchTree = (state: GameState): ResearchTreeView => researchTree(state);
+/** `at`: the node the part specs (ResearchTreeView.parts) are read at; default the player's first system. */
+export const selectResearchTree = (state: GameState, at: NodeRef | null = null): ResearchTreeView => researchTree(state, at);
 
-export const selectContextualResearchTree = (state: GameState, focus: ResearchId | null = null): ResearchTreeView =>
-  contextualResearchTree(state, focus);
+export const selectContextualResearchTree = (state: GameState, focus: ResearchId | null = null, at: NodeRef | null = null): ResearchTreeView =>
+  contextualResearchTree(state, focus, at);
 
 export const selectSavedConfigs = (state: GameState, kind: UnitKind): SavedConfigsView =>
   ({ kind, names: state.configs[kind].map((c) => c.name) });

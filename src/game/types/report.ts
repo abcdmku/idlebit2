@@ -45,6 +45,23 @@ export interface RoundReport {
   readonly energy: Amount;
   readonly net: Amount;
   readonly researchOps: number;
+  /**
+   * D31: where the round's energy came from. billed = energy (imported and fuel, plus the battery refill);
+   * fromBattery and fromGeneration are joules-worth of Credits not billed at the region price.
+   */
+  readonly energyBreakdown: EnergyBreakdown;
+}
+/** D31 round energy lines, whole Credits. */
+export interface EnergyBreakdown {
+  readonly billed: Amount;
+  /** Unbilled: drawn from rack batteries, at the region price. */
+  readonly fromBattery: Amount;
+  /** Billed at Return: rack battery refills at 25% of the site marginal price. */
+  readonly batteryRefill: Amount;
+  /** Unbilled at the region price: met by site generation. */
+  readonly fromGeneration: Amount;
+  /** Billed: generation fuel. */
+  readonly fuel: Amount;
 }
 
 export interface AdvanceReport {

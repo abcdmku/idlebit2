@@ -1,3 +1,4 @@
+import type { InfraSlot } from '../types/catalog';
 import { amount, amountCompare } from '../amount';
 import { MAX_ACCELS, TICK_MS } from '../core/constants';
 import type { GameAction } from '../types/actions';
@@ -206,9 +207,11 @@ const INFRA_SLOT = {
 } as const;
 
 /** Rack and room infrastructure plates (R13). */
-export function infraQuotes(state: GameState, unit: { kind: 'rack' | 'room'; id: number }, slot: 'cooling' | 'power' | 'lb' | 'switch'): Quote[] {
+export function infraQuotes(state: GameState, unit: { kind: 'rack' | 'room'; id: number }, slot: InfraSlot): Quote[] {
   const scope = unit as ScopeRef & { kind: 'rack' | 'room' };
   if (slot === 'switch') return switchQuotes(state, scope as SwitchRef);
+  // D31: Power control quotes land with the part (install, levels, start configuration).
+  if (slot === 'powerCtl') return [];
   const kind = INFRA_SLOT[unit.kind][slot];
   const ref: PartRef = { unit: scope, slot: kind === 'ups' ? { kind, index: 0 } : { kind } as PartSlot };
   if (slot !== 'lb') {

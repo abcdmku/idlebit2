@@ -7,6 +7,7 @@ import type { GameState } from '../types/state';
 import type { LinkView, SiteView, ZoneView } from '../types/views';
 import { containerMode, lbView, ladderHz, probeTimerS, roomProbe, siteProbe, supplyView } from './common';
 import { globalFlows } from './flows';
+import { generationView, globalStartView, sitePowerFields, zonePowerFields } from './power';
 import { roomDark } from './room';
 
 const linkActive = (state: GameState, link: number): boolean => link >= 0 && (state.hot.link.head[link] ?? -1) >= 0;
@@ -17,7 +18,7 @@ const linkActive = (state: GameState, link: number): boolean => link >= 0 && (st
  */
 function zoneView(state: GameState, room: number, zone: number): ZoneView & { hottestF: number } {
   const c = state.compiled.room, h = state.hot.room;
-  if (room < 0 || c.alive[room] !== 1) return { roomId: null, zone, state: 'empty', tempF: 0, load: 0, upsUsage: 0, hottestF: 0 };
+  if (room < 0 || c.alive[room] !== 1) return { roomId: null, zone, state: 'empty', tempF: 0, load: 0, upsUsage: 0, hottestF: 0, powered: false, wakeMs: null };
   let load = 0, n = 0, hottest = h.tempF[room] ?? 70;
   for (let i = 0; i < RACKS_PER_ROOM; i += 1) {
     const r = c.racks[room * RACKS_PER_ROOM + i] ?? -1;
@@ -32,6 +33,7 @@ function zoneView(state: GameState, room: number, zone: number): ZoneView & { ho
     roomId: roomId(room), zone,
     state: containerMode(state, c.alive[room], c.intent[room], roomDark(state, room), (h.crashed[room] ?? 0) === 1, roomProbe(state, room)),
     tempF: h.tempF[room] ?? 70, load: n > 0 ? load / n : 0, upsUsage: ups, hottestF: hottest,
+    ...zonePowerFields(state, room),
   };
 }
 
@@ -39,7 +41,7 @@ function siteView(state: GameState, regionIndex: number, site: number): SiteView
   const region = REGIONS[regionIndex]!;
   if (site < 0) {
     return { siteId: null, region: region.id, open: false, online: 'empty', zones: [], grid: null, dataPlane: null,
-      energyPrice: region.energyPrice, outsideF: region.outsideF, hottestF: region.outsideF, timerS: null };
+      energyPrice: region.energyPrice, outsideF: region.outsideF, hottestF: region.outsideF, timerS: null, powered: false, wakeMs: null, generation: null };
   }
   const b = state.build.sites[site]!;
   const c = state.compiled.site, h = state.hot.site;
@@ -67,6 +69,7 @@ function siteView(state: GameState, regionIndex: number, site: number): SiteView
       latencyMs: (c.dpLatencyTicks[site] ?? 0) * TICK_MS, active: dpActive,
     },
     energyPrice: region.energyPrice, outsideF: region.outsideF, hottestF: hottest,
+    ...sitePowerFields(state, site), generation: generationView(state, site),
   };
 }
 
@@ -104,6 +107,7 @@ export function globalSnapshot(state: GameState): GlobalSnapshot {
     scheduler: sched ? lbView(state, sched, {
       kind: 3, id: 0, strategy: g.lbStrategy[0] ?? 0, filters: g.lbFilters[0] ?? 0, routed: state.hot.g[G.globalRouted] ?? 0, last: state.hot.g[G.globalLast] ?? -1,
     }) : null,
+    start: globalStartView(state),
     regionsOpen, gateway: REGION_IDS[0],
     flows: globalFlows(state),
   };

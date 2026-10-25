@@ -1,4 +1,5 @@
 import type { Amount } from '../amount';
+import type { InfraSlot } from './catalog';
 import type { GameAction } from './actions';
 import type { NodeRef, PartRef, RackId, ResearchId, RoomId, ScopeRef, SwitchRef, SystemId } from './ids';
 import type { GpuGeneration, GpuStats } from './gpu';
@@ -13,7 +14,7 @@ export type QuoteRequest =
   | { readonly kind: 'add'; readonly parent: ScopeRef; readonly slot: number }
   /** Per-port and all-port speed, port count, uplinks. */
   | { readonly kind: 'switch'; readonly sw: SwitchRef }
-  | { readonly kind: 'infra'; readonly unit: { readonly kind: 'rack'; readonly id: RackId } | { readonly kind: 'room'; readonly id: RoomId }; readonly slot: 'cooling' | 'power' | 'lb' | 'switch' }
+  | { readonly kind: 'infra'; readonly unit: { readonly kind: 'rack'; readonly id: RackId } | { readonly kind: 'room'; readonly id: RoomId }; readonly slot: InfraSlot }
   | { readonly kind: 'research'; readonly project: ResearchId }
   /** D13, D15: the system's pipe, its rack-switch port: the next speed step, locked until Rack ("Upgrade at the Rack switch"). */
   | { readonly kind: 'pipe'; readonly system: SystemId }

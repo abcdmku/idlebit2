@@ -391,6 +391,16 @@ Network scopes (rack load balancer, then room, site and backbone):
 | `upsLithium` | Lithium UPS | upsOnline, dataCenter | Global | GHz W13 | UPS gen 2, loss 3%. If the site grid fails, rooms on it ride through on battery for 30 s, so the grid's 10 s reboot costs no work. | Lithium UPS: 30 s ride-through | `overload`, `multiAz` |
 | `substation` | Substation | dataCenter | Global | GHz W13 | Grid gen 1: 8× capacity, loss 3%. | Substation: 8× grid, 3% loss | `overload` |
 | `hvIntake` | HV intake | substation, regions | Global | GHz W14 | Grid gen 2: 8× capacity, loss 2%. | HV intake: 8× grid, 2% loss | `overload` |
+| `powerCtl` | Power control | s3Sleep, meteredPdu | Rack | kHz W8 | Power control gen 0 in the fifth rack slot, under the cooler: a lead-acid battery that powers the rack unbilled at the start of a round, and a rack start controller (Start with, head-wait trigger, slot or fastest order). | Battery and smart start for a rack | `energy` |
+| `powerCtlLiIon` | Li-ion power control | powerCtl, fabMhz | Rack | MHz W10 | Power control gen 1: more battery per level; adds the busy trigger and batch waking (a quarter of the awake servers per second). | Bigger battery, predictive wake | `energy` |
+| `powerCtlLfp` | LFP power control | powerCtlLiIon, fabGhz | Rack | GHz W12 | Power control gen 2: the largest battery per level. | Largest rack battery | `energy` |
+| `roomStart` | Room start control | powerCtl, room | Room | MHz W11 | Room start controller on the UPS: racks start in standby (0 W) and power on by trigger in slot or coolest order. | Rooms power racks on as load rises | `energy` |
+| `startPredict` | Predictive start | roomStart, telemetry | Room | MHz W11 | Room and global start controllers gen 1: the busy trigger and batch waking. | Wake ahead of the load | `energy` |
+| `globalStart` | Global start control | roomStart, regions | Global | GHz W14 | Global start controller on the scheduler: sites and their zones start in standby and come online by trigger in slot, cheapest or nearest order. | Bring data centers online as needed | `energy` |
+| `solarFarm` | Solar farm | dataCenter | Global | GHz W12 | Site generation gen 0: output times the region sun factor, no fuel. Met draw is not billed. | Free power from the sun | `energy` |
+| `windFarm` | Wind farm | solarFarm, regions | Global | GHz W13 | Site generation gen 1: output times the region wind factor, no fuel. | Free power from the wind | `energy` |
+| `fuelCell` | Fuel cell | solarFarm, substation | Global | GHz W13 | Site generation gen 2: constant output; fuel at 0.4 times the region price. | Steady on-site power | `energy` |
+| `ownPlant` | Own plant | fuelCell, hvIntake | Global | GHz W14 | Site generation gen 3: large constant output; fuel at 0.25 times the region price. | Your own power station | `energy` |
 
 ### 5.8 Cooling (14)
 
@@ -601,13 +611,15 @@ export const CREDITS_ONLY = [
   "roomAir2", "roomVarSpeed", "thermalThrottle", "autoReturn", "configSave", "cronTuning", "fastBoot", "gracefulDrain",
   "hotPlug", "hotSwap", "offline12", "offline24", "offline48", "researchQueue", "rollingUpgrade", "telemetry",
   "warmBoot", "lowVoltRam",
+  "powerCtl", "powerCtlLiIon", "powerCtlLfp", "roomStart", "startPredict", "globalStart", "solarFarm", "windFarm", "fuelCell", "ownPlant",
 ];
 
 export type PartId =
   | "core" | "clock" | "l1" | "l2" | "l3" | "scheduler" | "cpu" | "psu"
   | "ram" | "gpu" | "npu" | "storage" | "storageNode"
   | "rackCooler" | "pdu" | "lb" | "switch" | "roomCooler" | "ups" | "row"
-  | "dataPlane" | "grid" | "zone" | "site" | "backbone";
+  | "dataPlane" | "grid" | "zone" | "site" | "backbone"
+  | "powerCtl" | "roomStart" | "globalStart" | "generation";
 
 export type CeilingId =
   | "coreSites" | "lanesPerCore" | "threadsPerCore" | "cpuSockets"
@@ -826,6 +838,17 @@ export const RESEARCH_V3: readonly ResearchNode[] = [
   n("upsLithium", "Lithium UPS", "power", ["upsOnline", "dataCenter"], "global", "ghz", 13, 4e8, [gen("ups", 2), rule("lossFraction", { ups: 0.03 }), rule("upsRideThrough", { seconds: 30 })], ["overload", "multiAz"]),
   n("substation", "Substation", "power", ["dataCenter"], "global", "ghz", 13, 4e8, [gen("grid", 1), rule("lossFraction", { grid: 0.03 }), rule("supplyCapacity", { grid: 8 })], ["overload"]),
   n("hvIntake", "HV intake", "power", ["substation", "regions"], "global", "ghz", 14, 3e9, [gen("grid", 2), rule("lossFraction", { grid: 0.02 }), rule("supplyCapacity", { grid: 8 })], ["overload"]),
+  // D31: power at scale (Credits-only, D32).
+  n("powerCtl", "Power control", "power", ["s3Sleep", "meteredPdu"], "rack", "khz", 8, 2.7e6, [gen("powerCtl", 0)], ["energy"]),
+  n("powerCtlLiIon", "Li-ion power control", "power", ["powerCtl", "fabMhz"], "rack", "mhz", 10, 4e7, [gen("powerCtl", 1)], ["energy"]),
+  n("powerCtlLfp", "LFP power control", "power", ["powerCtlLiIon", "fabGhz"], "rack", "ghz", 12, 2e8, [gen("powerCtl", 2)], ["energy"]),
+  n("roomStart", "Room start control", "power", ["powerCtl", "room"], "room", "mhz", 11, 6e7, [gen("roomStart", 0)], ["energy"]),
+  n("startPredict", "Predictive start", "power", ["roomStart", "telemetry"], "room", "mhz", 11, 6e7, [gen("roomStart", 1), gen("globalStart", 1)], ["energy"]),
+  n("globalStart", "Global start control", "power", ["roomStart", "regions"], "global", "ghz", 14, 3e9, [gen("globalStart", 0)], ["energy"]),
+  n("solarFarm", "Solar farm", "power", ["dataCenter"], "global", "ghz", 12, 2e8, [gen("generation", 0)], ["energy"]),
+  n("windFarm", "Wind farm", "power", ["solarFarm", "regions"], "global", "ghz", 13, 4e8, [gen("generation", 1)], ["energy"]),
+  n("fuelCell", "Fuel cell", "power", ["solarFarm", "substation"], "global", "ghz", 13, 4e8, [gen("generation", 2)], ["energy"]),
+  n("ownPlant", "Own plant", "power", ["fuelCell", "hvIntake"], "global", "ghz", 14, 3e9, [gen("generation", 3)], ["energy"]),
 
   // Cooling
   n("thermalThrottle", "Thermal throttle", "cooling", ["rack"], "rack", "khz", 8, 2.7e6, [rule("thermalThrottle", { atF: 95, untilF: 90, clock: 0.5 })], ["heat"]),
@@ -948,9 +971,9 @@ CPU-tab nodes per era (fabs excluded):
 
 **Runtime gap found:** `stacked3d` grants L3 generation 4, but the L3 catalog row has only four generations (`build/catalog/chip.ts`), so the node currently unlocks nothing. Spec A.1 lists generation 4 (2^39 bits, gen-3 watts); the catalog needs that fifth entry.
 
-### D31 proposed nodes (power at scale), not yet in §5, §9 or the tree data
+### D31 nodes (power at scale), now in §5.7, §9 and the tree data
 
-The sim agent adds these after the current CPU-content pass. Tiers use the §3 Data and work tables; nothing existing changes tier. With them the tree has 172 nodes.
+Added with D31; Credits-only under D32. Tiers use the §3 Data and work tables; nothing existing changes tier. With them the tree has 172 nodes.
 
 | id | Name | Tab / part | Level | Era / tier | Requires | Effect | Text |
 |---|---|---|---|---|---|---|---|

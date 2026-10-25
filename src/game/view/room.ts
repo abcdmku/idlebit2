@@ -5,13 +5,14 @@ import type { RoomSnapshot } from '../types/snapshot';
 import type { GameState } from '../types/state';
 import type { RackSlotView, SupplyView } from '../types/views';
 import { roomFlows } from './flows';
+import { rackPowerFields, roomStartView } from './power';
 import { containerMode, coolerView, lbView, outsideF, probeTimerS, rackProbe, roomProbe, siteEnergyPrice, supplyView, switchPorts, systemLoad, ticksToS } from './common';
 
 /** One rack in a room grid slot: mode, load, °F, PDU usage and its 12 server mode codes. */
 export function rackSlot(state: GameState, rack: number): RackSlotView {
   const c = state.compiled.rack, h = state.hot.rack;
   const servers = new Uint8Array(SERVERS_PER_RACK), serversOnMarket = new Uint8Array(SERVERS_PER_RACK);
-  if (rack < 0 || c.alive[rack] !== 1) return { rackId: null, state: 'empty', load: 0, tempF: 0, pduUsage: 0, servers, serversOnMarket };
+  if (rack < 0 || c.alive[rack] !== 1) return { rackId: null, state: 'empty', load: 0, tempF: 0, pduUsage: 0, servers, serversOnMarket, powered: false, wakeMs: null };
   let load = 0, n = 0;
   for (let slot = 0; slot < SERVERS_PER_RACK; slot += 1) {
     const s = c.servers[rack * SERVERS_PER_RACK + slot] ?? -1;
@@ -25,6 +26,7 @@ export function rackSlot(state: GameState, rack: number): RackSlotView {
   return {
     rackId: rackId(rack), state: containerMode(state, c.alive[rack], c.intent[rack], failed, (h.crashed[rack] ?? 0) === 1, rackProbe(state, rack)),
     load: n > 0 ? load / n : 0, tempF: h.tempF[rack] ?? 70, pduUsage: failed ? 0 : (h.pduUsage[rack] ?? 0), servers, serversOnMarket,
+    ...rackPowerFields(state, rack),
   };
 }
 
@@ -70,6 +72,7 @@ export function roomSnapshot(state: GameState, id: RoomId, parent: NodeRef | nul
     tempF: h.tempF[id] ?? 70, outsideF: out, crashS: ticksToS(h.crashTicks[id] ?? 0), crashed,
     cooler: coolerView(c, h, id, b.cooler, out),
     ups: roomUps(state, id),
+    power: { start: roomStartView(state, id, Array.from({ length: RACKS_PER_ROOM }, (_, i) => c.racks[id * RACKS_PER_ROOM + i] ?? -1)) },
     network: {
       switch: { generation: b.switch.gen, topHz, sameSpeed: b.switch.sameSpeed, portCeiling: state.research.unlocks.ceilings.roomPorts, ports, uplinks },
       lb: lbView(state, b.lb, { kind: 1, id, strategy: c.lbStrategy[id] ?? 0, filters: c.lbFilters[id] ?? 0, routed: h.lbRouted[id] ?? 0, last: h.lbLast[id] ?? -1 }),
