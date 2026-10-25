@@ -1,4 +1,4 @@
-import type { CSSProperties } from 'react';
+import type { CSSProperties, ReactNode } from 'react';
 import type { FilterId, LbView, Quote, RouteStrategyId, ScopeRef } from '../../game';
 import { typeColor, typeOf } from '../../render/core';
 import { useWindowLeft } from '../hooks/headClock';
@@ -92,15 +92,16 @@ export function lbStatus(view: LbView) {
   return { text: `${Math.round(view.routedPerSec)} routing decisions a second`, progress: view.routedPerSec > 0 ? 1 : 0 };
 }
 
-export interface LbPlateProps extends PlateCommon { unit: ScopeRef; view: LbView; child?: LbChild; title?: string; queueQuote?: Quote | null }
+export interface LbPlateProps extends PlateCommon { unit: ScopeRef; view: LbView; child?: LbChild; title?: string; queueQuote?: Quote | null; children?: ReactNode }
 
 /** The rack load balancer plate (mockup rack/econ.js lbSpec): its strategy, filters and queue. */
-export function LbPlate({ unit, view, child = 'server', title = 'Load balancer', queueQuote, quotes, onAction, onResearch, researchName, ...frame }: LbPlateProps) {
+export function LbPlate({ unit, view, child = 'server', title = 'Load balancer', queueQuote, quotes, onAction, onResearch, researchName, children, ...frame }: LbPlateProps) {
   const st = lbStatus(view);
   return <PlateFrame {...frame} title={title} sub={`${ROUTE_NAMES[view.strategy].name} · queue ${view.queue.level}/${QUEUE_MAX}`} className="lb">
     <Status text={st.text} progress={st.progress} />
     <Lines lines={lbLines(view, child)} slots={2} />
     <LbBody unit={unit} view={view} child={child} quotes={quotes} queueQuote={queueQuote}
       onAction={onAction} onResearch={onResearch} researchName={researchName} />
+    {children}
   </PlateFrame>;
 }

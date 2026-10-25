@@ -1,5 +1,5 @@
 import { useCallback, useMemo, useState } from 'react';
-import { selectSavedConfigs, type GameAction, type SupplyView, type LevelSnapshot, type QuoteRequest, type ResearchId, type ScopeRef, type UnitRef } from '../../game';
+import { researchId, selectSavedConfigs, type GameAction, type SupplyView, type LevelSnapshot, type QuoteRequest, type ResearchId, type ScopeRef, type UnitRef } from '../../game';
 import type { HitTarget, Rect } from '../../render/core';
 import { useGameSelector, useQuote, useShell, useViewState } from '../storeHooks';
 import { ConfigPlate } from './ConfigPlate';
@@ -17,6 +17,10 @@ import { GpuPlate } from './GpuPlate';
 import { partFacts } from './partFacts';
 import { nextDefaultName, SavePrompt } from './SavePrompt';
 import { SupplyPlate } from './SupplyPlate';
+import { PowerCtlPlate } from './PowerCtlPlate';
+import { isPowerCtl } from './targets';
+import { StartRow } from './StartRow';
+import { GenerationRow } from './GenerationRow';
 import { SwitchPlate } from './SwitchPlate';
 import type { PlateCommon } from './types';
 import { ServerPlate, UnitPlate } from './UnitPlate';
@@ -42,6 +46,8 @@ export function configKind(owner: LevelSnapshot['level'], parent: ScopeRef): Con
 
 /** The quote request a selected target's plate needs. Pure, so tests can check the routing. */
 export function plateRequest(t: HitTarget, focus: LevelSnapshot): QuoteRequest | null {
+  // D31.3: the rack's fifth infrastructure slot, under the cooler.
+  if (isPowerCtl(t) && focus.level === 'rack') return { kind: 'infra', unit: { kind: 'rack', id: focus.rackId }, slot: 'powerCtl' };
   if (t.kind === 'part' && t.part?.slot.kind === 'core') return null;
   if (t.kind === 'slot' && t.slot !== null) {
     if (focus.level === 'chip' || focus.level === 'system') return t.part ? { kind: 'part', part: t.part } : { kind: 'tray', at: t.owner };
@@ -123,6 +129,10 @@ function TargetPlate({ target: t, focus }: { target: HitTarget; focus: LevelSnap
       installed={installed} tasks={focus.running} />;
   }
 
+  if (isPowerCtl(t) && focus.level === 'rack') {
+    const researched = shell.store.getState().research.completed.includes(researchId('powerCtl'));
+    return <PowerCtlPlate {...common} quotes={quotes} rack={focus.rackId} view={focus.powerCtl ?? null} research={researched ? null : researchId('powerCtl')} />;
+  }
   if (t.kind === 'save' && t.unit) {
     const unit = t.unit, taken = selectSavedConfigs(shell.store.getState(), unit.kind).names;
     return <SavePrompt unit={unit} bounds={surface.plateBounds} defaultName={nextDefaultName(defaultBase(unit, focus), taken)} taken={taken}
@@ -154,7 +164,10 @@ function TargetPlate({ target: t, focus }: { target: HitTarget; focus: LevelSnap
     const psu: SupplyView | undefined = focus.level === 'system' || focus.level === 'chip' ? focus.psu : undefined;
     if (s.kind === 'psu' && psu) return <SupplyPlate {...common} quotes={quotes} supply={psu} />;
     if (s.kind === 'pdu' && focus.level === 'rack') return <SupplyPlate {...common} quotes={quotes} supply={focus.pdu} />;
-    if (s.kind === 'ups' && focus.level === 'room' && focus.ups[s.index]) return <SupplyPlate {...common} quotes={quotes} supply={focus.ups[s.index]} />;
+    if (s.kind === 'ups' && focus.level === 'room' && focus.ups[s.index]) return <SupplyPlate {...common} quotes={quotes} supply={focus.ups[s.index]}>
+      {/* D31.2: the room start controller lives on the UPS: which racks are powered at round start. */}
+      {focus.power?.start && <StartRow unit={{ kind: 'room', id: focus.roomId }} scope="room" view={focus.power.start} onAction={common.onAction} />}
+    </SupplyPlate>;
     if (s.kind === 'grid' && focus.level === 'global' && t.part.unit.kind === 'site') {
       const id = t.part.unit.id, site = focus.sites.find((x) => x.siteId === id);
       if (site?.grid) return <SupplyPlate {...common} quotes={quotes} supply={site.grid} />;
@@ -170,7 +183,9 @@ function TargetPlate({ target: t, focus }: { target: HitTarget; focus: LevelSnap
       quotes={s.kind === 'roomSwitch' ? quotes : null} lbQuotes={s.kind === 'roomLb' ? quotes : roomLb} queueQuote={queueQuote} initialView={s.kind === 'roomLb' ? 'lb' : 'ports'}
       room={focus.roomId} zone={focus.zone} network={focus.network} racks={focus.racks.filter((r) => r.rackId !== null).length} />;
     if (s.kind === 'globalScheduler' && focus.level === 'global' && focus.scheduler) return <LbPlate {...common} quotes={quotes} queueQuote={queueQuote}
-      unit={{ kind: 'global' }} view={focus.scheduler} child="site" title="Global scheduler" />;
+      unit={{ kind: 'global' }} view={focus.scheduler} child="site" title="Global scheduler">
+      {focus.start && <StartRow unit={{ kind: 'global' }} scope="global" view={focus.start} onAction={common.onAction} />}
+    </LbPlate>;
     const facts = partFacts(focus, s);
     if (facts && s.kind === 'core') return <PlateFrame {...common} title={facts.title} sub={facts.sub} className="part core">
       <Status text={facts.status} />
@@ -240,7 +255,9 @@ function unitPlate(unit: UnitRef, focus: LevelSnapshot, all: Omit<PlateCommon, '
     const site = focus.sites.find((s) => s.siteId === unit.id);
     if (!site) return null;
     return <UnitPlate {...common} unit={unit} title={regionName(site.region)} sub={`${site.zones.length} ${site.zones.length === 1 ? 'zone' : 'zones'}`}
-      status={`${fahrenheit(site.outsideF)} outside · hottest ${fahrenheit(site.hottestF)}`} mode={site.online} timerS={site.timerS} onSave={saveKey(site.open)} saveLabel="Save this site" />;
+      status={`${fahrenheit(site.outsideF)} outside · hottest ${fahrenheit(site.hottestF)}`} mode={site.online} timerS={site.timerS} onSave={saveKey(site.open)} saveLabel="Save this site">
+      <GenerationRow generation={site.generation ?? null} />
+    </UnitPlate>;
   }
   return null;
 }

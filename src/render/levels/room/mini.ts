@@ -27,11 +27,14 @@ const exhaustCol = (tempF: number): string => tempF >= 100 ? P.fault : tempF > 9
 
 export function drawRoomMini(g: G, z: ZoneView, r: Rect): void {
   m.k = Math.min(r.w / W, r.h / H); m.ox = r.x + (r.w - W * m.k) / 2; m.oy = r.y + (r.h - H * m.k) / 2;
-  const dark = z.state === 'dark' || z.state === 'offline' || z.state === 'empty', crashed = z.state === 'crashed';
+  // D31: a standby zone (the global start controller has not brought it online) draws 0 W: dark.
+  const dark = z.state === 'dark' || z.state === 'offline' || z.state === 'empty' || z.state === 'standby' || z.powered === false, crashed = z.state === 'crashed';
   const ox = X(HX), oy = Y(HY), ow = Math.max(1, X(HX + HW) - ox), oh = Math.max(1, Y(HY + HH) - oy);
   if (ow >= 10) box(g, HX - 6, IY - 34, HW + 12, HALL.ib + 12 - (IY - 34), APRON);
   R(g, ox - 1, oy - 1, ow + 2, oh + 2, P.ink);
   R(g, ox, oy, ow, oh, FACADE);
+  // a zone powering on: one steady amber line along its facade until it is up (real wakeMs)
+  if (z.wakeMs != null && z.wakeMs > 0) R(g, ox, oy, ow, 1, P.amber);
   if (ow < 10) { R(g, ox + 1, oy + 1, Math.max(1, ow - 2), Math.max(1, oh - 2), dark ? P.ink : crashed ? P.fault : P.wafer); return; }
   box(g, HALL.ix, IY, HALL.iw, HALL.ib - IY, dark ? mix(P.wafer, P.ink, 0.5) : P.wafer);
   box(g, NET_FOOT.x, IY - 18, 16, 28, CAB);

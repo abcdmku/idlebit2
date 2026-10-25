@@ -31,7 +31,9 @@ export function setUnitMode(w: World, sys: number, mode: number, timerTicks = 0)
 export function restingMode(w: World, sys: number): number {
   if (w.compiled.sys.alive[sys] !== 1) return MODE.empty;
   if (w.round.phase !== 'running') return MODE.paused;
-  return w.compiled.sys.intent[sys] === 1 ? MODE.onMarket : MODE.offline;
+  if (w.compiled.sys.intent[sys] !== 1) return MODE.offline;
+  // D31: a rack a start controller holds powered off keeps its systems in standby.
+  return w.hot.rack.powered[w.compiled.sys.rack[sys]!] === 0 ? MODE.standby : MODE.onMarket;
 }
 
 /** Starts the one boot time (D1.8) on a system: online boot, going offline, or a cold change. */

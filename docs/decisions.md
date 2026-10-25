@@ -1239,6 +1239,15 @@ The user's words:
 - Views: `StartCtlView`, `PowerCtlView` and `GenerationView` in `types/views.ts`; `RackSnapshot.powerCtl`, `RoomSnapshot.power.start`, `GlobalSnapshot.start` (not `scheduler.start`), `powered` and `wakeMs` on `RackSlotView`, `ZoneView` and `SiteView`, and `SiteView.generation`. The view always sets them; they are optional in the type only until hand-built render and UI fixtures add them.
 - Hot: racks, rooms and sites get `powered` (u8, default 1), `wakeTicks`, `ctlBusy` and `ctlTriggerTick`; racks `batteryJ`; sites `genUsedW`; `G.startBusy`, `G.startTriggerTick` and the round energy lines. `SAVE_VERSION` 12.
 - Catalog rows `POWER_CTL`, `ROOM_START`, `GLOBAL_START` and `GENERATION` (`build/catalog/infra.ts`), and the ten nodes in the tree (Credits-only under D32). `setStartConfig` is live (`build/startCtl.ts`).
+- **Runtime as landed** (`phys/start.ts`, the power phase, Return and round end):
+  - Install and generation changes are `replacePart` on the D31 slot (an empty slot installs at L1), levels `upgradePart`; all hot. A rack configuration copies Power control and its Start settings, priced like any part.
+  - Asleep and standby systems never admit (`exec/slots.ts`). `restingMode` gives `standby` under an unpowered rack, so reboots and transitions respect it.
+  - The start sub-phase runs first in the route step: power-on countdowns (rack 2 s at L1, site 5 s), the global, room and rack triggers top-down (first wake on the tick the trigger holds, then every second), demand wake, then back-to-standby (racks after 30 s asleep, sites after 60 s off, never below "Start with").
+  - **Demand wake** is global and simple: while the head waits and no powered rack has a free slot, the lowest-index asleep system wakes (2 s), one at a time. A minimum split's member shortage waits for the next wakes; it is not counted separately.
+  - Busy is each rack's running ÷ running limit over its awake systems, a 10 s EMA; rooms and the global controller average their powered racks and sites. `nearest` orders by backbone latency.
+  - Batteries discharge in the power phase at the rack's PDU input (servers, cooler, switch, LB, loss), only while the round runs and the rack is powered; the upstream UPS and grid loss on that share is skipped too. Generation then meets the site's input up to its output; fuel bills at its share of the region price. A battery bought mid-round starts empty and fills at the next Return.
+  - At Return every battery refills, billed through the energy meter at 25% of the site marginal price; at round end every unit is powered again (hardware pauses; research may run).
+  - Tests: `phys/start.test.ts` (the seven contract tests) and `build/startCtl.test.ts`. The D20 opening and the 3-seed campaign are unchanged (the bot does not reach Power control within 9 h).
 
 *Render (`src/render/**`):*
 - `ServerSlotView.state`: draw `asleep` dim and `standby` dark, with a wake pulse during `wakeT`.

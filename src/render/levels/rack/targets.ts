@@ -4,7 +4,7 @@ import { copyRect, resetHitTarget, saveIconRect, setRect } from '../../core';
 import type { ChildView, Completion, HitTarget, NodeRef, Rect } from '../../core';
 import type { PartRef, RackId, RackSnapshot, SwitchRef, SystemId, UnitRef } from '../../../game';
 import {
-  CAB_RECT, HEADER_Y, LAMP, LB_RECT, PLINTH, ROOF_RECT, ROW_COLS, SAVE_AT, SERVER_SLOTS, STRIP_RECT, SWITCH_RECT, UPLINK_JACK, UP_X,
+  CAB_RECT, HEADER_Y, LAMP, LB_RECT, PLINTH, POWER_CTL_RECT, ROOF_RECT, ROW_COLS, SAVE_AT, SERVER_SLOTS, STRIP_RECT, SWITCH_RECT, UPLINK_JACK, UP_X,
   childRect, colX, portX, serverRect,
 } from './layout';
 import { isNeighbour, rackCol, rowViews } from './row';
@@ -78,6 +78,8 @@ export function rackTargets(s: RackSnapshot, out: HitTarget[], from: number): nu
   }
   sink.ax = colX(rackCol(s));
   let t = put('cooler', 'part', ROOF_RECT); if (t) t.part = refs.cooler;
+  // D31: Power control (empty, locked or installed). PartSlot has no 'powerCtl' kind yet: the id and unit name it.
+  t = put('powerCtl', 'part', POWER_CTL_RECT); if (t) t.unit = refs.unit;
   t = put('pdu', 'part', STRIP_RECT); if (t) t.part = refs.pdu;
   t = put('plinth', 'part', PLINTH); if (t) t.part = refs.pdu;
   t = put('lb', 'part', LB_RECT); if (t) t.part = refs.lb;

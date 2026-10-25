@@ -1,3 +1,4 @@
+import { startPhase } from '../phys/start';
 import { researchPhase } from '../build';
 import { admitPhase, runPhase } from '../exec';
 import { latePhase } from '../exec/outcome';
@@ -30,6 +31,8 @@ export function timersStep(w: World): void {
  * fresh 10 s), then routing.
  */
 export function routeStep(w: World): void {
+  // D31.2: start controllers and demand wake, top-down, before the research take and dispatch.
+  startPhase(w);
   if (researchTakePhase(w) && w.round.phase === 'running') promoteHead(w);
   routePhase(w);
 }

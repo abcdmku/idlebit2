@@ -1,6 +1,6 @@
 // Rack world (mockup levels/rack/world.js), now the whole room row (D17.2): every rack of the
 // row at its true column, the neighbours darkened, the active rack drawn in full on top.
-// The active rack: cabinet, the four infrastructure slots, servers, patch cables and the
+// The active rack: cabinet, the five infrastructure slots (D31 Power control under the cooler), servers, patch cables and the
 // uplink entering from the top, real transfers, the next-slot ghost, the save icon and lamp,
 // and the sled that slides out on a drill into a server.
 import { BG, P, R, createZoomLink, drawGhost, drawSaveIcon, drawUnitLamp, glowBit, keyOf, lampState, pathAt, sledOut, zoomLink } from '../../core';
@@ -11,6 +11,7 @@ import { fanAt } from './art';
 import type { FanBank } from './art';
 import { drawClips, drawPatch, drawUplink, shell, sledInterior } from './cabinet';
 import { drawCooler, drawLB, drawPdu, drawSwitch } from './infra';
+import { drawPowerCtl } from './powerCtl';
 import { drawNeighbour } from './neighbour';
 import { drawRackFlows } from './flows';
 import { rackCol, rowViews } from './row';
@@ -75,6 +76,7 @@ function drawActive(g: G, s: RackSnapshot, view: ViewPresentation, frame: WorldF
   shell(g);
   const off = rackDark(s), quiet = off || frame.paused, heat = Math.max(0, Math.min(1, (s.tempF - 70) / 30));
   drawCooler(g, s, ctx.fans, frame.timeMs, quiet, frame.reducedMotion);
+  drawPowerCtl(g, s, off, frame.paused);
   drawSwitch(g, s, quiet);
   drawLB(g, s, quiet);
   const d = drillOf(s, frame);

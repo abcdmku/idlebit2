@@ -1,7 +1,7 @@
 // What the deck can buy: the build rows, the one Buy key and the callouts all read one offer list
 // built from quotes (A08). Prices, locks and effects come from the sim; this file only words them,
 // in one grammar (A14): name · change · a right column (price, "Research: <node>", "Max" or "At <place>").
-import type { EffectPreview, LevelId, NodeRef, PartSlotKind, Quote, QuoteRequest } from '../../game';
+import type { EffectPreview, LevelId, NodeRef, PartSlotKind, Quote, QuoteRequest, RackId } from '../../game';
 import type { PartIconKind } from '../art/deckArt';
 import { measureUnit } from '../plates/format';
 
@@ -52,19 +52,25 @@ export const ROWS: Readonly<Record<LevelId, readonly [RowDef, RowDef, RowDef, Ro
 };
 
 /**
- * What a level sells beyond the tray, each from its own quote (A08): the System's PSU, and each
- * router's queue (D25.7), which is what tapping the load balancer offers.
+ * What a level sells beyond the tray, each from its own quote (A08): the System's PSU, the rack's
+ * Power control (D31.3, its fifth infrastructure slot), and each router's queue (D25.7), which is what
+ * tapping the load balancer offers. At most two per level.
  */
 export const EXTRA_ROWS: Readonly<Partial<Record<LevelId, readonly RowDef[]>>> = {
   system: [row('psu', 'power', 'PSU', 'psu')],
-  rack: [row('lbQueue', 'lb', 'LB queue', 'lb')],
+  rack: [row('powerCtl', 'power', 'Power control'), row('lbQueue', 'lb', 'LB queue', 'lb')],
   room: [row('lbQueue', 'lb', 'LB queue', 'roomLb')],
   global: [row('lbQueue', 'lb', 'Scheduler queue', 'globalScheduler')],
 };
 
+/** The quote an extra row sells: its upgrade or add, never a configuration or a replace. */
+const NOT_OFFERS: ReadonlySet<string> = new Set(['setStartConfig', 'replacePart', 'removePart', 'setSetpoint', 'setStrategy', 'setFilter']);
+export const extraOffer = (quotes: readonly Quote[] | undefined): Quote | null => quotes?.find(q => !NOT_OFFERS.has(q.action.type)) ?? null;
+
 /** The part quote request behind an extra row at `at`. */
 export function extraRequest(at: NodeRef, def: RowDef): QuoteRequest | null {
   if (at.level === 'system' && def.slot === 'psu') return { kind: 'part', part: { unit: { kind: 'system', id: at.id }, slot: { kind: 'psu' } } };
+  if (at.level === 'rack' && def.key === 'powerCtl') return { kind: 'infra', unit: { kind: 'rack', id: at.id as RackId }, slot: 'powerCtl' };
   if (def.key === 'lbQueue') {
     if (at.level === 'rack') return { kind: 'routerQueue', unit: { kind: 'rack', id: at.id } };
     if (at.level === 'room') return { kind: 'routerQueue', unit: { kind: 'room', id: at.id } };

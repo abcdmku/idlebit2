@@ -4,6 +4,7 @@ import { formatHertz, LEVEL_NAMES, type LevelSnapshot, type NodeRef, type PartSl
 import type { HitTarget, Rect } from '../../render/core';
 import { rackLetter, regionName, SLOT_TITLE, zoneLetter } from '../plates/copy';
 import { changeText, type Offer, type Offers } from '../deck/offers';
+import { isPowerCtl } from '../plates/targets';
 
 const clamp = (v: number, a: number, b: number) => Math.max(a, Math.min(b, v));
 
@@ -57,6 +58,7 @@ export function slotSite(t: HitTarget, focus: LevelSnapshot): { name: string; ro
 const BOARD_NAME: Partial<Record<PartSlotKind, string>> = { l1: 'Cache', scheduler: 'Queue' };
 
 export function targetName(t: HitTarget, focus: LevelSnapshot): string {
+  if (isPowerCtl(t)) return 'Power control';
   const site = t.unit?.kind === 'site' && focus.level === 'global' ? focus.sites.find(s => s.siteId === t.unit!.id) : undefined;
   if (site) return regionName(site.region);
   if (t.drill && (t.kind === 'child' || t.kind === 'unit')) return nodeName(t.drill, focus);
@@ -109,7 +111,9 @@ export function calloutModel(t: HitTarget, focus: LevelSnapshot, quotes: QuoteRe
   // An empty site reads as what you'd add there ("Add queue", "Add Core 2", "Add RAM") and its deck row's offer.
   const site = t.kind === 'slot' ? slotSite(t, focus) : null;
   const siteRow = site?.row && offers ? offers.rows.find(r => r.key === site.row && r.quote) ?? null : null;
-  const row = own ?? siteRow ?? (kind && offers ? offers.rows.find(r => r.slot === kind) ?? null : null);
+  // D31.3: the Power control slot reads its own deck row (the rack's fifth infrastructure item).
+  const ctl = isPowerCtl(t) && offers ? offers.rows.find(r => r.key === 'powerCtl') ?? null : null;
+  const row = own ?? siteRow ?? ctl ?? (kind && offers ? offers.rows.find(r => r.slot === kind) ?? null : null);
   if (site && siteRow) {
     // The deck row says "Add RAM" with no change; here the effect line shows what the add gives ("0 → 2 slots").
     offer = siteRow; change = siteRow.quote?.effect ? changeText(siteRow.quote.effect) : siteRow.change;

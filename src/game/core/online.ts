@@ -9,7 +9,7 @@ import { writeTopology } from './topology';
 import { commitWorld, openWorld } from './world';
 
 /** Modes an online/offline switch acts on. dark, crashed and cold resolve through restingMode later. */
-const SWITCHABLE = new Set<number>([MODE.onMarket, MODE.asleep, MODE.boot, MODE.goingOffline, MODE.draining, MODE.offline, MODE.paused]);
+const SWITCHABLE = new Set<number>([MODE.onMarket, MODE.asleep, MODE.boot, MODE.goingOffline, MODE.draining, MODE.offline, MODE.paused, MODE.standby]);
 
 function withOnline(build: BuildState, unit: UnitRef, online: boolean): BuildState | null {
   const patch = <T extends { online: boolean }>(list: readonly (T | null)[], id: number): (T | null)[] | null => {

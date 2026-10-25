@@ -27,8 +27,8 @@ const server: Mut<ServerSlotView> = {
 };
 const route = createRoute();
 const lookOf = (mode: UnitMode, rack: RackSlotView, paused: boolean, market: boolean): ServerLook =>
-  rack.state === 'dark' || mode === 'dark' ? 'dark' : rack.state === 'crashed' || mode === 'crashed' ? 'crash' : paused ? (market ? 'paused' : 'out')
-    : mode === 'offline' || mode === 'goingOffline' ? 'offline' : mode === 'boot' || mode === 'cold' ? 'boot' : 'live';
+  rack.state === 'dark' || rack.state === 'standby' || rack.powered === false || mode === 'dark' || mode === 'standby' ? 'dark' : rack.state === 'crashed' || mode === 'crashed' ? 'crash' : paused ? (market ? 'paused' : 'out')
+    : mode === 'offline' || mode === 'goingOffline' ? 'offline' : mode === 'boot' || mode === 'cold' ? 'boot' : mode === 'asleep' ? 'asleep' : 'live';
 
 /** Plates with no lights: a neighbour's switch and LB faces at their real positions. */
 const plates = {
@@ -62,7 +62,7 @@ export function drawNeighbour(g: G, v: RackSlotView, x: number, paused: boolean)
   g.restore(); g.globalAlpha = alpha;
 }
 function drawBody(g: G, v: RackSlotView, paused: boolean): void {
-  const on = v.state !== 'dark' && v.state !== 'empty' && !paused;
+  const on = v.state !== 'dark' && v.state !== 'empty' && v.state !== 'standby' && v.powered !== false && !paused;
   shell(g);
   for (let i = 0; i < 3; i++) fan(g, 27 + i * 24, CAB.roofY + 11, 6, 0, false);
   R(g, READOUT.x, READOUT.y, READOUT.w, READOUT.h, P.ink);

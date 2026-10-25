@@ -33,8 +33,8 @@ describe('L2 shell geometry', () => {
     expect(L.rungs.map(r => [r.x, r.w, r.h])).toEqual([[8, 48, 48], [56, 48, 48], [104, 48, 48], [152, 48, 48], [200, 48, 48]]);
     expect([L.wallet, L.sla, L.endKey]).toEqual([{ x: 256, y: 8, w: 112, h: 48 }, { x: 8, y: 56, w: 280, h: 48 }, { x: 296, y: 56, w: 80, h: 48 }]);
     expect(L.strip).toEqual({ x: 8, y: 104, w: 368, h: 64 });
-    expect(L.headSlot).toEqual({ x: 8, y: 104, w: 112, h: 64 });
-    expect(L.cards.map(c => [c.x, c.w])).toEqual([[120, 64], [184, 64], [248, 64], [312, 64]]);
+    expect(L.headSlot).toEqual({ x: 8, y: 104, w: 144, h: 64 });
+    expect(L.cards.map(c => [c.x, c.w])).toEqual([[152, 56], [208, 56], [264, 56], [320, 56]]);
     expect(L.now).toEqual({ x: 8, y: 616, w: 368, h: 80 });
     expect(L.dismiss).toEqual({ x: 264, y: 632, w: 96, h: 48 });
     expect(L.kind === 'phone' && L.build).toEqual({ x: 8, y: 704, w: 80, h: 64 });
@@ -46,6 +46,11 @@ describe('L2 shell geometry', () => {
     for (const [w, h] of [[1440, 900], [1920, 1080], [1280, 720], [1200, 760], [1100, 700], [1366, 768]] as const) {
       const L = shellLayout(w, h), text = 'Replicated Write restarting'.length * 0.56 * L.body;
       expect(L.headSlot.w - (L.lat + 16 * L.N + 8) - 8, `${w}x${h}`).toBeGreaterThanOrEqual(text);
+    }
+    // phone: the name has its own line under the icon and state
+    for (const [w, h] of [[390, 780], [375, 667], [430, 932]] as const) {
+      const L = shellLayout(w, h);
+      expect(L.headSlot.w - 16, `${w}x${h}`).toBeGreaterThanOrEqual('Replicated Write'.length * 0.56 * L.body);
     }
   });
   it('N = 3 from 1200 × 760 (A01); smaller desktops drop to N = 2; narrow screens use the phone deck', () => {

@@ -13,6 +13,9 @@ export const isChipSlot = (ref: PartRef): boolean => CHIP.includes(ref.slot.kind
 
 const at = (id: PartId, p: PartLevel | null | undefined): PartAt | null => (p ? { id, gen: p.gen, level: p.level } : null);
 
+/** D31 part slots: optional, installed into an empty slot by a replace, and hot. */
+export const POWER_SLOTS: readonly string[] = ['powerCtl', 'roomStart', 'globalStart', 'generation'];
+
 export function readPart(build: BuildState, ref: PartRef): PartAt | null {
   const { unit, slot } = ref;
   if (unit.kind === 'system') {
@@ -43,6 +46,7 @@ export function readPart(build: BuildState, ref: PartRef): PartAt | null {
     if (slot.kind === 'pdu') return at('pdu', rack.pdu);
     if (slot.kind === 'lb') return at('lb', rack.lb);
     if (slot.kind === 'switch') return { id: 'switch', gen: rack.switch.gen, level: 0 };
+    if (slot.kind === 'powerCtl') return at('powerCtl', rack.powerCtl);
     return null;
   }
   if (unit.kind === 'room') {
@@ -52,6 +56,7 @@ export function readPart(build: BuildState, ref: PartRef): PartAt | null {
     if (slot.kind === 'roomLb') return at('roomLb', room.lb);
     if (slot.kind === 'roomSwitch') return { id: 'roomSwitch', gen: room.switch.gen, level: 0 };
     if (slot.kind === 'ups') return at('ups', room.ups[slot.index]);
+    if (slot.kind === 'roomStart') return at('roomStart', room.start);
     return null;
   }
   if (unit.kind === 'site') {
@@ -60,8 +65,10 @@ export function readPart(build: BuildState, ref: PartRef): PartAt | null {
     if (slot.kind === 'grid') return at('grid', site.grid);
     if (slot.kind === 'dataPlane') return { id: 'dataPlane', gen: site.dataPlane.gen, level: site.dataPlane.k };
     if (slot.kind === 'backbone') return site.backbone ? { id: 'backbone', gen: site.backbone.gen, level: site.backbone.k } : null;
+    if (slot.kind === 'generation') return at('generation', site.generation);
     return null;
   }
+  if (slot.kind === 'globalStart') return at('globalStart', build.global.start);
   return slot.kind === 'globalScheduler' ? at('globalScheduler', build.global.scheduler) : null;
 }
 
@@ -112,6 +119,7 @@ export function writePart(build: BuildState, ref: PartRef, gen: number, level: n
   if (unit.kind === 'rack') {
     const rack = build.racks[unit.id];
     if (!rack) return null;
+    if (slot.kind === 'powerCtl') return rack.powerCtl ? { ...build, racks: replaceAt(build.racks, unit.id, { ...rack, powerCtl: setLevel(rack.powerCtl, gen, level) }) } : null;
     const key = slot.kind === 'rackCooler' ? 'cooler' : slot.kind === 'pdu' ? 'pdu' : slot.kind === 'lb' ? 'lb' : null;
     return key && { ...build, racks: replaceAt(build.racks, unit.id, { ...rack, [key]: setLevel(rack[key], gen, level) }) };
   }
@@ -119,6 +127,7 @@ export function writePart(build: BuildState, ref: PartRef, gen: number, level: n
     const room = build.rooms[unit.id];
     if (!room) return null;
     if (slot.kind === 'ups') return room.ups[slot.index] ? { ...build, rooms: replaceAt(build.rooms, unit.id, { ...room, ups: replaceAt(room.ups, slot.index, setLevel(room.ups[slot.index]!, gen, level)) }) } : null;
+    if (slot.kind === 'roomStart') return room.start ? { ...build, rooms: replaceAt(build.rooms, unit.id, { ...room, start: setLevel(room.start, gen, level) }) } : null;
     const key = slot.kind === 'roomCooler' ? 'cooler' : slot.kind === 'roomLb' ? 'lb' : null;
     return key && { ...build, rooms: replaceAt(build.rooms, unit.id, { ...room, [key]: setLevel(room[key], gen, level) }) };
   }
@@ -128,8 +137,10 @@ export function writePart(build: BuildState, ref: PartRef, gen: number, level: n
     if (slot.kind === 'grid') return { ...build, sites: replaceAt(build.sites, unit.id, { ...site, grid: setLevel(site.grid, gen, level) }) };
     if (slot.kind === 'dataPlane') return { ...build, sites: replaceAt(build.sites, unit.id, { ...site, dataPlane: { ...site.dataPlane, gen, k: level } }) };
     if (slot.kind === 'backbone' && site.backbone) return { ...build, sites: replaceAt(build.sites, unit.id, { ...site, backbone: { gen, k: level } }) };
+    if (slot.kind === 'generation') return site.generation ? { ...build, sites: replaceAt(build.sites, unit.id, { ...site, generation: { gen, level } }) } : null;
     return null;
   }
+  if (slot.kind === 'globalStart') return build.global.start ? { ...build, global: { ...build.global, start: setLevel(build.global.start, gen, level) } } : null;
   const g = build.global.scheduler;
   return slot.kind === 'globalScheduler' && g ? { ...build, global: { ...build.global, scheduler: setLevel(g, gen, level) } } : null;
 }
@@ -137,6 +148,8 @@ export function writePart(build: BuildState, ref: PartRef, gen: number, level: n
 /** The unit a cold change of this part takes down (spec §4.5). Global parts have none. */
 export function coldScope(ref: PartRef): UnitRef | null {
   if (ref.unit.kind === 'global') return null;
+  // D31 parts are hot: a battery, a start controller or a generator changes nothing that runs.
+  if (POWER_SLOTS.includes(ref.slot.kind)) return null;
   if (ref.slot.kind === 'backbone') return null;
   return ref.unit;
 }

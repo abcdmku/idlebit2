@@ -2,7 +2,8 @@
 // contract fixture; only the fields the global renderer reads vary.
 import { LEVEL_FIXTURES } from '../../../game/fixtures';
 import { REGIONS, roomId, siteId } from '../../../game';
-import type { GlobalSnapshot, LbView, LinkView, SiteView, ZoneView } from '../../../game';
+import type { GenerationView, GlobalSnapshot, LbView, LinkView, SiteView, ZoneView } from '../../../game';
+import { startView } from '../rack/fixtures';
 import { FAM, flowAt, queueOf } from '../rack/flowFixtures';
 import type { FlowCase } from '../rack/flowFixtures';
 
@@ -11,7 +12,7 @@ const BASE = LEVEL_FIXTURES.global;
 const ACTIVE_BUILD = ['us-east', 'eu-west', 'us-west', 'ap-southeast'];
 
 function zone(site: number, z: number, load: number, tempF = 72): ZoneView {
-  return { roomId: roomId(site * 3 + z), zone: z, state: 'onMarket', tempF, load, upsUsage: 0.4 };
+  return { roomId: roomId(site * 3 + z), zone: z, state: 'onMarket', tempF, load, upsUsage: 0.4, powered: true, wakeMs: null };
 }
 function site(i: number, zones: number, o: Partial<Mut<SiteView>> = {}): SiteView {
   const b = BASE.sites[i]!;
@@ -20,14 +21,14 @@ function site(i: number, zones: number, o: Partial<Mut<SiteView>> = {}): SiteVie
     zones: Array.from({ length: zones }, (_, z) => zone(i, z, z === 2 ? 0 : 0.6)),
     grid: { ...(BASE.sites[0]!.grid!), usage: 0.3 + 0.08 * zones, deliveredW: 80_000 * zones },
     dataPlane: { generation: 0, bitsPerSec: 1e6, latencyMs: 200, active: zones > 1 },
-    hottestF: 74, ...o,
+    hottestF: 74, powered: true, wakeMs: null, generation: null, ...o,
   };
 }
-const closed = (i: number): SiteView => ({ ...BASE.sites[i]!, open: false, online: 'empty', siteId: null, zones: [], grid: null, dataPlane: null });
+const closed = (i: number): SiteView => ({ ...BASE.sites[i]!, open: false, online: 'empty', siteId: null, zones: [], grid: null, dataPlane: null, powered: false, wakeMs: null, generation: null });
 const link = (i: number, active: boolean, generation = 1): LinkView => ({ siteId: siteId(i), speedHz: 1e9, latencyMs: 40, active, generation });
 const SCHEDULER: LbView = { ...LEVEL_FIXTURES.rack.lb, generation: 1, level: 2, strategy: 'firstFit', filters: [], routedPerSec: 900, misroutesThisRound: 0, lastTarget: 1, queue: queueOf(4, [FAM.region]) };
 function world(sites: SiteView[], links: LinkView[], regionsOpen: number, scheduler = false, flows: readonly FlowCase[] = [], timeMs = 0): GlobalSnapshot {
-  return { ...BASE, sites, regionsOpen, backbone: { links }, scheduler: scheduler ? SCHEDULER : null, flows: flows.map(f => flowAt(f, timeMs)) };
+  return { ...BASE, sites, regionsOpen, backbone: { links }, scheduler: scheduler ? SCHEDULER : null, flows: flows.map(f => flowAt(f, timeMs)), start: null };
 }
 const room = (site: number, z: number): FlowCase['to'] => ({ level: 'room', id: roomId(site * 3 + z) });
 const idx = (id: string) => REGIONS.findIndex(r => r.id === id);
@@ -74,6 +75,22 @@ export const CASES: Readonly<Record<string, (timeMs: number) => GlobalSnapshot>>
       return { ...s, zones: s.zones.map(z => ({ ...z, state: i === usw ? 'offline' as const : 'paused' as const, load: 0 })) };
     });
     return world(sites, [...built].filter(i => i !== 0).map(i => link(i, false, 2)), 4, true);
+  },
+  /** D31: five sites under the global start controller (2 on, eu-north waking, the rest standby) with off-grid generation. */
+  power: () => {
+    const built = new Set([...ACTIVE_BUILD, 'eu-north'].map(idx)), on = new Set(['us-east', 'eu-west'].map(idx)), waking = idx('eu-north');
+    const gens: Partial<Record<number, GenerationView>> = {
+      [idx('us-east')]: { kind: 'solar', level: 2, outputW: 50_000, usedW: 30_000, marginalPrice: 0 },
+      [idx('eu-west')]: { kind: 'wind', level: 1, outputW: 40_000, usedW: 40_000, marginalPrice: 0.0001 },
+      [idx('us-west')]: { kind: 'fuelCell', level: 1, outputW: 30_000, usedW: 0, marginalPrice: 0.0002 },
+      [idx('ap-southeast')]: { kind: 'ownPlant', level: 1, outputW: 90_000, usedW: 0, marginalPrice: 0.0001 },
+    };
+    const sites = REGIONS.map((_, i) => {
+      if (!built.has(i)) return closed(i);
+      const up = on.has(i), s = site(i, i === 0 ? 3 : 2, { online: up ? 'onMarket' : 'standby', powered: up, wakeMs: i === waking ? 3000 : null, generation: gens[i] ?? null });
+      return up ? s : { ...s, zones: s.zones.map(z => ({ ...z, state: 'standby' as const, powered: false, load: 0 })) };
+    });
+    return { ...world(sites, [...built].filter(i => i !== 0).map(i => link(i, on.has(i), 2)), 5, true), start: startView(2, 5, 1, 'cheapest') };
   },
   /** Zone B crashed on heat; zone A runs hot. */
   crash: () => {

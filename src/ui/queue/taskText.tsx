@@ -29,7 +29,7 @@ export function needShort(task: QueueEntryView, tiny = false): string {
     case 'gpu': return tiny ? 'GPU' : task.tensor ? 'tensor' : 'GPU';
     case 'gpuCores': return tiny ? 'GPU' : `${task.gpuCoresMin} cores`;
     case 'members': return tiny ? `${task.members} sys` : `${task.members} systems`;
-    case 'zones': return `${task.minZones} zones`;
+    case 'zones': return tiny ? `${task.minZones} AZ` : `${task.minZones} zones`;
     default: return (blockedText(task) ?? '').replace(/^Needs /, '');
   }
 }

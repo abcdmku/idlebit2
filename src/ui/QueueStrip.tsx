@@ -64,7 +64,7 @@ function Tag({ L, t, slot, running, risk, waiting = false }: { L: ShellLayout; t
   } else {
     body = <>
       <span className="aic" style={{ left: Math.round((rect.w - icon) / 16) * 8, top: 8 }}><TaskIcon task={t} n={n} /></span>
-      <T x={8} y={40} w={rect.w - 16} className={!running ? 'dim' : blocked ? 'warn' : 'gold'}>{blocked ? needShort(t, true) : payoutShort(t)}</T>
+      <T x={8} y={40} w={rect.w - 8} className={!running ? 'dim' : blocked ? 'warn' : 'gold'}>{blocked ? needShort(t, true) : payoutShort(t)}</T>
     </>;
   }
   return <div className={`tag${head ? ' is-head' : ''}${blocked ? ' blocked' : ''}`} style={{ left: 0, top: 0, width: rect.w, height: rect.h, ...taskTypeStyle(t.family) }}

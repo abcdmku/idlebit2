@@ -3,7 +3,7 @@
 import { BG, P, R, frame, mix, prism, px, trace } from '../../core';
 import type { PrismStyle } from '../../core';
 import { cableOf, disc, drawBlank, drawLayer, fan } from './art';
-import { CAB, CHAN, HEADER_Y, NU, OPEN, PLINTH, SLED, U, U0, UPLINK_X, UP_X, WORLD, unitRect } from './layout';
+import { CAB, CHAN, HEADER_Y, NU, OPEN, PLINTH, SLED, SWITCH_RECT, U, U0, UPLINK_X, UP_X, WORLD, unitRect } from './layout';
 import type { Route } from './layout';
 
 type G = CanvasRenderingContext2D;
@@ -16,8 +16,8 @@ const scratch = { x: 0, y: 0, w: 0, h: 0 };
 
 function drawFloor(g: G): void {
   const ty = CAB.ground + 3;
-  R(g, 9, ty, 110, 13, TILE); frame(g, 9, ty, 110, 13, mix(TILE, P.ink, 0.35));
-  for (let y = ty + 2; y < ty + 12; y += 3) for (let x = 12 + ((y / 3) & 1); x < 117; x += 3) px(g, x, y, mix(TILE, P.ink, 0.45));
+  R(g, 9, ty, 110, 12, TILE); frame(g, 9, ty, 110, 12, mix(TILE, P.ink, 0.35));
+  for (let y = ty + 2; y < ty + 11; y += 3) for (let x = 12 + ((y / 3) & 1); x < 117; x += 3) px(g, x, y, mix(TILE, P.ink, 0.45));
 }
 function drawShell(g: G): void {
   const ground = CAB.ground;
@@ -65,7 +65,8 @@ export function drawUplink(g: G, hz: number, lit: boolean): void {
   for (let y = 0; y < HEADER_Y; y++) { g.globalAlpha = alpha * Math.min(1, (y + 1) / 10); R(g, UP_X - 1, y, 3, 1, P.ink); px(g, UP_X, y, col); }
   g.globalAlpha = alpha;
   R(g, UPLINK_X - 1, HEADER_Y - 1, UP_X - UPLINK_X + 2, 3, P.ink); R(g, UPLINK_X, HEADER_Y, UP_X - UPLINK_X + 1, 1, col);
-  R(g, UPLINK_X - 1, HEADER_Y, 3, U0 + 3 - HEADER_Y, P.ink); R(g, UPLINK_X, HEADER_Y, 1, U0 + 3 - HEADER_Y, col);
+  const jy = SWITCH_RECT.y + 3;
+  R(g, UPLINK_X - 1, HEADER_Y, 3, jy - HEADER_Y, P.ink); R(g, UPLINK_X, HEADER_Y, 1, jy - HEADER_Y, col);
 }
 
 /** The server sled pulled out: tray, PSUs with fans at the server's real fan state, fan wall, drive cage. */

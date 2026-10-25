@@ -33,6 +33,9 @@ function upsTag(s: RoomSnapshot, out: LabelWriter): void {
   if (!n) return;
   const first = UPS_HITS[upsIndex(0, n)]!, last = UPS_HITS[upsIndex(n - 1, n)]!;
   const x = Math.round((first.x + last.x + last.w) / 2);
-  out.label('ups', x, focus.y - 12, 'center', true).text('UPS', 'name', true).text(`${whole(Math.round(usage * 100))}%`, usage > 0.9 ? 'warn' : 'value')
-    .leader(x, first.y);
+  out.label('ups', x, focus.y - 12, 'center', true).text('UPS', 'name', true).text(`${whole(Math.round(usage * 100))}%`, usage > 0.9 ? 'warn' : 'value');
+  // D31: the room start controller on the UPS: racks powered now of those it controls
+  const st = s.power?.start ?? null;
+  if (st) out.text('· Start', 'mute').text(`${whole(st.awake)}/${whole(st.total)} racks`, 'value');
+  out.leader(x, first.y);
 }

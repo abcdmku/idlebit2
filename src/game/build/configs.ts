@@ -9,7 +9,7 @@ import { rackConfig, rackLock, roomConfig, siteConfig, systemConfig, systemLock 
 import { withSpec } from './partAccess';
 import { coldScopes, fail, locked, planned, type Plan } from './plan';
 import { cpuLanes, cpuPrice, partFromNothing } from './pricing';
-import { ruleLock } from './locks';
+import { ruleLock, genLock } from './locks';
 import { findSaved } from './units';
 import { mergeAccels } from './configAccels';
 import { lbQueueStepsTo } from './catalog/network';
@@ -143,7 +143,13 @@ export function planApplyConfig(state: GameState, unit: UnitRef, name: string): 
     const row = LADDERS.switch;
     const ports = sw.ports.map((k, i) => Math.max(k, want.switch.ports[i] ?? k));
     for (let i = 0; i < ports.length; i += 1) m.price += networkStepsBetween(row, sw.ports[i]!, ports[i]!);
-    let build: BuildState = { ...state.build, racks: state.build.racks.map((r, i) => (i === unit.id && r ? { ...r, cooler, pdu, lb: { ...want.lb, gen: lbPart.gen, level: lbPart.level, queueLevel }, switch: { ...sw, ports, sameSpeed: want.switch.sameSpeed } } : r)) };
+    // D31: Power control copies hot (a battery and controller change nothing running), with its Start settings.
+    const hotMerge: Merge = { price: 0n, cold: false };
+    const powerCtl = want.powerCtl ? { ...want.powerCtl, ...mergePart(PARTS.powerCtl, rack.powerCtl, want.powerCtl, hotMerge)! } : rack.powerCtl;
+    m.price += hotMerge.price;
+    const ctlLock = want.powerCtl ? genLock(u, 'powerCtl', want.powerCtl.gen) : null;
+    if (ctlLock) return locked(ctlLock, saved.name, m.price);
+    let build: BuildState = { ...state.build, racks: state.build.racks.map((r, i) => (i === unit.id && r ? { ...r, cooler, pdu, lb: { ...want.lb, gen: lbPart.gen, level: lbPart.level, queueLevel }, switch: { ...sw, ports, sameSpeed: want.switch.sameSpeed }, powerCtl } : r)) };
     const cold = new Set<number>();
     const kill: UnitRef[] = [];
     const inventoryChangedSystems: number[] = [];

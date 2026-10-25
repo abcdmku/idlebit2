@@ -15,7 +15,8 @@ export const SAVE_SCHEMA = 'bitrouge-v3' as const;
 // Pre-live reset: v10 adopts the CSV clock and RAM progression (36 levels, ×1.5 per level): saved levels change meaning.
 // Pre-live reset: v11 is D28 (SLA is a count ratio over the last 50 resolved tasks): the window in hot.g.
 // Pre-live reset: v12 is D31 (start controllers, rack batteries, site generation): build parts, start hot state, the standby mode.
-export const SAVE_VERSION = 12;
+// Pre-live reset: v13 adds the D31 runtime's back-to-standby clock (offSinceTick).
+export const SAVE_VERSION = 13;
 
 export interface SaveEnvelope {
   readonly schema: typeof SAVE_SCHEMA;

@@ -82,16 +82,16 @@ describe('room targets', () => {
     const door = out.slice(0, n).find(t => t.id === 'door');
     expect(door?.drill).toEqual({ level: 'room', id: 0 });
   });
-  it('maps each rack zoom over its whole row (the 968 × 232 rack row at 1/8), and taps on its own 16 × 29 slot', () => {
+  it('maps each rack zoom over its whole row (the 968 × 240 rack row at 1/8), and taps on its own 16 × 30 slot', () => {
     const s = CASES.overview(0), n = room.children(s, kids);
     expect(n).toBe(6);
     expect(kids[0].ref).toEqual({ level: 'rack', id: 0 });
     const world = kids[0].world!;
-    expect([world.w * 8, world.h * 8]).toEqual([968, 232]);
+    expect([world.w * 8, world.h * 8]).toEqual([968, 240]);
     expect(kids[4].world!.x).toBe(world.x);
     // rack 9 (row 1, column 1): taps on its own slot, one 15 px pitch into its row's span
     expect(kids[5].ref).toEqual({ level: 'rack', id: 9 });
-    expect([kids[5].rect.w * 8, kids[5].rect.h * 8]).toEqual([128, 232]);
+    expect([kids[5].rect.w * 8, kids[5].rect.h * 8]).toEqual([128, 240]);
     expect(kids[5].rect.x - kids[5].world!.x).toBe(15);
     expect(kids[5].world!.y).toBe(kids[5].rect.y);
   });

@@ -1,3 +1,4 @@
+import { planPowerPart } from './powerParts';
 import type { BoardPartKind } from '../types/actions';
 import { GENERAL_MAX_GPUS, MAX_ACCELS } from '../core/constants';
 import type { CpuBuild, PartLevel, SystemSpec } from '../types/build';
@@ -8,7 +9,7 @@ import {
   scalePrice, upgradePrice, upgradesBetween, gpuModel, type LeveledPartId,
 } from './catalog';
 import { ceilingLock, genLock, levelLock, maxLevel, ruleLock } from './locks';
-import { coldScope, cpuCount, readPart, withSpec, writePart } from './partAccess';
+import { coldScope, cpuCount, readPart, withSpec, writePart, POWER_SLOTS } from './partAccess';
 import { coldScopes, fail, locked, planned, type Plan } from './plan';
 import { cpuLanes, cpuPrice, extraFactor } from './pricing';
 import { newestGen } from './research/unlocks';
@@ -66,6 +67,7 @@ export function planUpgrade(state: GameState, ref: PartRef): Plan {
  * level whose primary capacity holds the current one, priced as install plus the upgrades to it.
  */
 export function planReplace(state: GameState, ref: PartRef, g: number, preserveCapacity: boolean): Plan {
+  if (POWER_SLOTS.includes(ref.slot.kind)) return planPowerPart(state, ref, g);
   const part = readPart(state.build, ref);
   if (!part) return fail('invalid', 'No such part');
   if (part.id === 'gpu') return fail('invalid', 'Choose a GPU model');

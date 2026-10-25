@@ -1,7 +1,8 @@
 // Rack level (v3, D17.2): the whole room row of racks, each at its true column. The active
 // rack (the focus) is drawn in full; its neighbours are darkened and a tap makes one active.
 // The view scrolls along the row (row.ts, rackRowScroll); the camera rests on the active rack.
-// Inside the active rack: four infrastructure slots (cooling roof, switch, load balancer, PDU)
+// Inside the active rack: five infrastructure slots (cooling roof, Power control under it, switch,
+// load balancer, PDU)
 // and up to twelve servers; tap a server and its sled slides out into the System board.
 import { P, R, copyRect, partVersionOf, px, setRect } from '../../core';
 import type { LevelRegistry, LevelRenderer, Rect } from '../../core';
@@ -54,6 +55,7 @@ export function createRackRenderer(registry: LevelRegistry): LevelRenderer<'rack
         case 'pdu': case 'plinth': return partVersionOf(s.pdu);
         case 'lb': return partVersionOf(s.lb);
         case 'switch': return partVersionOf(s.switch);
+        case 'powerCtl': return s.powerCtl ? partVersionOf(s.powerCtl) : null;
         default: return null;
       }
     },

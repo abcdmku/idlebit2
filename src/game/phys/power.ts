@@ -1,11 +1,12 @@
 import { G } from '../core/buffers';
-import { MAX_UPS } from '../core/constants';
+import { DT_S, MAX_UPS } from '../core/constants';
 import { MODE, setUnitMode } from '../core/timers';
 import { touchSystem } from '../core/touch';
 import type { World } from '../core/world';
 import { CAP_STEPS_MAX, CSTATES, S3_AFTER_TICKS, S3_WAKE_TICKS } from './constants';
 import { DRAW_NONE, capTenths, drawKind, publishClockFactor, systemDraw, updateCState, updatePStates } from './draw';
-import { billSite, billUtility, linkWatts, routerW } from './energy';
+import { billSite, billUtility, linkWatts, routerW, sitePrice } from './energy';
+import { generationFuelShare, siteGenerationW } from './start';
 import { forRackSystems, syncMode, zoneDark } from './modes';
 import { collectSteps, noteDue, noteUnstable, powerCache, recordInputs, refreshRackContexts, resumRack, type PowerCache } from './powerCache';
 import { scratch } from './scratch';
@@ -53,6 +54,9 @@ export function powerPhase(w: World): void {
 
   /* Rack PDUs: system inputs plus cooler, switch and load balancer (spec §9.2). */
   const roomIn = scratch('roomIn', c.room.len), roomHeat = scratch('roomHeat', c.room.len), roomAny = scratch('roomAny', c.room.len);
+  // D31.3: watts each room's racks drew from their batteries this tick (not billed).
+  const roomBat = scratch('roomBat', c.room.len), roundOn = w.round.phase === 'running';
+  const battery = hr0(h), rackPowered = h.rack.powered;
   let pduFails: number[] | null = null;
   {
     // Hoisted: tables are dictionary-mode objects (built by computed keys), so a per-row column lookup is a hash probe.
@@ -85,6 +89,13 @@ export function powerPhase(w: World): void {
       }
       drawW[r] = delivered;
       pduUsage[r] = usage;
+      // D31.3: while the round runs and the rack is powered, its PDU input comes from the battery first.
+      const charge = battery[r]!;
+      if (roundOn && charge > 0 && rackPowered[r] === 1 && delivered + loss > 0) {
+        const covered = Math.min(charge, (delivered + loss) * DT_S);
+        battery[r] = charge - covered;
+        roomBat[room] = roomBat[room]! + covered / DT_S;
+      }
       heatW[r] = opened ? k.rackCompute[r]! / eff[r]! + k.rackPlain[r]! + loss + switchW + lbW : 0;
       roomIn[room] = roomIn[room]! + delivered + loss;
       roomHeat[room] = roomHeat[room]! + coolerW;
@@ -93,7 +104,7 @@ export function powerPhase(w: World): void {
     }
   }
   /* Zone UPSs: rack inputs plus network rack and room cooling, split across live UPSs (dualFeed). */
-  const siteIn = scratch('siteIn', c.site.len), siteAny = scratch('siteAny', c.site.len);
+  const siteIn = scratch('siteIn', c.site.len), siteAny = scratch('siteAny', c.site.len), siteBat = scratch('siteBat', c.site.len);
   const upsFails: number[] = [];
   for (let m = 0; m < c.room.len; m += 1) {
     if (c.room.alive[m] !== 1) continue;
@@ -107,6 +118,8 @@ export function powerPhase(w: World): void {
     h.room.drawW[m] = delivered;
     h.room.heatW[m] = opened ? roomHeat[m]! + networkW + loss : 0;
     siteIn[site] = siteIn[site]! + delivered + loss;
+    // Battery watts skip the UPS loss on their share too.
+    if (roomBat[m]! > 0) siteBat[site] = siteBat[site]! + (delivered > 0 ? roomBat[m]! * (delivered + loss) / delivered : roomBat[m]!);
     if (delivered > 0 || h.room.crashed[m] === 1) siteAny[site] = 1;
   }
 
@@ -126,7 +139,7 @@ export function powerPhase(w: World): void {
     h.site.gridOverTicks[s] = stepOverload(h.site.gridOverTicks[s]!, usage);
     h.site.drawW[s] = delivered;
     h.site.gridUsage[s] = usage;
-    billSite(w, s, delivered + loss);
+    billSiteInput(w, s, delivered, loss, siteBat[s]!);
     if (overloadFailed(h.site.gridOverTicks[s]!)) (gridFails ??= []).push(s);
   }
   billUtility(w, links.utility, anyPowered);
@@ -137,6 +150,29 @@ export function powerPhase(w: World): void {
   if (pduFails) for (const r of pduFails) failPdu(w, r);
   for (const i of upsFails) failUps(w, Math.floor(i / MAX_UPS), i % MAX_UPS);
   if (gridFails) for (const s of gridFails) failGrid(w, s);
+}
+
+const hr0 = (h: World['hot']): Float64Array => h.rack.batteryJ;
+
+/**
+ * D31: a site's input is met first by rack batteries (their share, with the grid loss on it), then by
+ * site generation up to its output; only the rest is imported at the region price. Generation fuel is
+ * billed at its share of that price. The round's energy lines collect each part in Credits.
+ */
+function billSiteInput(w: World, s: number, delivered: number, loss: number, batteryW: number): void {
+  const total = delivered + loss;
+  const fromBattery = Math.min(total, delivered > 0 ? batteryW * total / delivered : batteryW);
+  const rest = total - fromBattery;
+  const genW = siteGenerationW(w, s);
+  const fromGen = Math.min(rest, genW);
+  w.hot.site.genUsedW[s] = fromGen;
+  const fuel = fromGen > 0 ? generationFuelShare(w, s) : 0;
+  billSite(w, s, rest - fromGen + fromGen * fuel);
+  if (fromBattery === 0 && fromGen === 0) return;
+  const g = w.hot.g, credits = DT_S * sitePrice(w, s);
+  g[G.roundFromBattery] = g[G.roundFromBattery]! + fromBattery * credits;
+  g[G.roundFromGeneration] = g[G.roundFromGeneration]! + fromGen * credits;
+  g[G.roundFuel] = g[G.roundFuel]! + fromGen * fuel * credits;
 }
 
 /** One zone's UPS step. Returns the summed loss; reports UPS indices that reached 10 s. */
@@ -237,7 +273,7 @@ function sleepStep(w: World, s: number, settings: PhysSettings): number {
     return SLEEP_CHANGED;
   }
   // Paused systems are left untouched so quiescent ticks change nothing; the round start bounds the wait instead.
-  if (mode === MODE.paused || mode === MODE.empty) return SLEEP_NONE;
+  if (mode === MODE.paused || mode === MODE.empty || mode === MODE.standby) return SLEEP_NONE;
   const holding = h.running[s]! + h.queueLen[s]! + h.reserved[s]! + h.researchThreads[s]! > 0;
   if (mode !== MODE.onMarket || holding) { h.emptySinceTick[s] = w.tick; return SLEEP_STAMP; }
   if (!settings.s3Sleep || w.compiled.rack.opened[w.compiled.sys.rack[s]!] !== 1) return SLEEP_NONE;
@@ -246,7 +282,7 @@ function sleepStep(w: World, s: number, settings: PhysSettings): number {
   return SLEEP_CHANGED;
 }
 
-/** A route to an asleep system wakes it: it is on market 2 s later (spec §9.3). Net calls this. */
-export function wakeSystem(w: World, s: number): void {
-  if (w.hot.sys.mode[s] === MODE.asleep && w.hot.sys.wakeTicks[s] === 0) { w.hot.sys.wakeTicks[s] = S3_WAKE_TICKS; touchSystem(w, s); }
+/** Wakes an asleep system: on market `ticks` later (2 s by demand, the controller's latency otherwise; D31). */
+export function wakeSystem(w: World, s: number, ticks = S3_WAKE_TICKS): void {
+  if (w.hot.sys.mode[s] === MODE.asleep && w.hot.sys.wakeTicks[s] === 0) { w.hot.sys.wakeTicks[s] = Math.max(1, ticks); touchSystem(w, s); }
 }

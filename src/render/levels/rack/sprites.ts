@@ -7,19 +7,21 @@ import { BEZEL, OFF, ears, label, lcdChars, lcdText, typeText } from './art';
 
 type G = CanvasRenderingContext2D;
 /** Between rounds a sled is 'paused' (on market: it runs next round, LCD READY) or 'out' (its switch or an ancestor's is off: it sits out, LCD OFF). */
-export type ServerLook = 'live' | 'dark' | 'crash' | 'noport' | 'paused' | 'out' | 'offline' | 'boot';
+/** D31: 'asleep' (S3, 0.03 × idle) dims with LCD SLEEP; a 'standby' system (its rack powered off by a start controller, 0 W) draws 'dark'. */
+export type ServerLook = 'live' | 'dark' | 'crash' | 'noport' | 'paused' | 'out' | 'offline' | 'boot' | 'asleep';
 /** The sled is on market: its own and every ancestor's switch is on (a missing flag reads as on). */
 export const onMarket = (v: ServerSlotView): boolean => v.onMarket !== false;
 
-/** The rack has no power: its PDU failed or the unit is dark. */
-export const rackDark = (s: RackSnapshot): boolean => s.online === 'dark' || s.pdu.failed;
+/** The rack has no power: its PDU failed, the unit is dark, or a room start controller holds it in standby (D31, 0 W). */
+export const rackDark = (s: RackSnapshot): boolean => s.online === 'dark' || s.online === 'standby' || s.pdu.failed;
 
 export function serverLook(s: RackSnapshot, v: ServerSlotView, paused: boolean): ServerLook {
-  if (rackDark(s) || v.state === 'dark') return 'dark';
+  if (rackDark(s) || v.state === 'dark' || v.state === 'standby' || s.online === 'standby') return 'dark';
   if (s.crashed || v.state === 'crashed') return 'crash';
   if (paused) return onMarket(v) ? 'paused' : 'out';
   if (v.state === 'boot' || v.state === 'cold') return 'boot';
   if (v.state === 'offline' || v.state === 'goingOffline') return 'offline';
+  if (v.state === 'asleep') return 'asleep';
   if (v.port === null) return 'noport';
   return 'live';
 }
@@ -34,7 +36,7 @@ const LW = [26, 30, 34, 38], BAYS = [2, 3, 4, 4];
 const LCD_BG = [mix(P.ledOff, P.ink, 0.4), mix(P.sramLo, P.ink, 0.35)], LCD_FG = [P.led, P.cacheOn];
 /** Idle and offline lines: the lit segment colour at 60% over the LCD, readable but quiet (A19). */
 export const LCD_IDLE = [mix(LCD_FG[0]!, LCD_BG[0]!, 0.4), mix(LCD_FG[1]!, LCD_BG[1]!, 0.4)];
-const HALT = mix(P.fault, P.ink, 0.25), box = { x: 0, y: 0, w: 0, h: 0 };
+const HALT = mix(P.fault, P.ink, 0.25), SLEEP_LED = mix(P.led, P.ink, 0.55), box = { x: 0, y: 0, w: 0, h: 0 };
 
 function lcdLine(v: ServerSlotView, look: ServerLook, max: number): string {
   switch (look) {
@@ -43,6 +45,7 @@ function lcdLine(v: ServerSlotView, look: ServerLook, max: number): string {
     case 'offline': return 'OFFLINE';
     case 'paused': return 'READY';
     case 'out': return 'OFF';
+    case 'asleep': return 'SLEEP';
     case 'boot': return label('BOOT ', Math.max(0, Math.ceil(v.timerS ?? 0)));
     default: break;
   }
@@ -64,7 +67,7 @@ export function drawServer(g: G, x: number, y: number, w: number, h: number, v: 
   // NIC jack with its link light (left ear): lit only while a real transfer runs on its port
   R(g, x + 2, y + 3, 3, 3, P.ink); px(g, x + 3, y + 4, P.substrateHi);
   px(g, x + 4, y + 2, live && v.port?.active ? P.net : OFF);
-  px(g, x + w - 4, y + 3, look === 'crash' ? P.fault : dark || look === 'offline' || look === 'out' ? OFF : look === 'boot' ? P.amber : P.led);
+  px(g, x + w - 4, y + 3, look === 'crash' ? P.fault : dark || look === 'offline' || look === 'out' ? OFF : look === 'boot' ? P.amber : look === 'asleep' ? SLEEP_LED : P.led);
 
   // one LED column per core (up to 4), lit for the cores that are busy now
   const cols = Math.max(1, Math.min(4, v.cores)), busy = v.cores > 0 ? v.busyCores / v.cores : 0;
@@ -85,7 +88,7 @@ export function drawServer(g: G, x: number, y: number, w: number, h: number, v: 
       lcdText(g, cx + 8, y + 3, typeText(type, (lw - 8) >> 2), LCD_FG[hiLcd]!, cx + 1, cx + lw - 1);
     } else {
       const line = lcdLine(v, look, lcdChars(lw));
-      const c = look === 'crash' ? HALT : look === 'noport' ? P.amber : look === 'offline' || look === 'out' || line === 'IDLE' ? LCD_IDLE[hiLcd]! : LCD_FG[hiLcd]!;
+      const c = look === 'crash' ? HALT : look === 'noport' ? P.amber : look === 'offline' || look === 'out' || look === 'asleep' || line === 'IDLE' ? LCD_IDLE[hiLcd]! : LCD_FG[hiLcd]!;
       lcdText(g, cx + 2, y + 3, line, c, cx + 1, cx + lw - 1);
     }
     // a task landing over its port: the line is the transfer's real progress
@@ -108,8 +111,8 @@ export function drawServer(g: G, x: number, y: number, w: number, h: number, v: 
 
   if (look === 'crash') { g.globalAlpha = alpha * 0.45; R(g, x + 1, y + 1, w - 2, h - 2, P.ink); g.globalAlpha = alpha; outline(g, x, y, w, h, HALT); }
   // Between rounds: a sled that sits out is clearly darker; a ready one is only slightly dimmed.
-  else if (look === 'noport' || look === 'offline' || look === 'out' || look === 'paused') {
-    g.globalAlpha = alpha * (look === 'out' ? 0.55 : look === 'paused' ? 0.15 : 0.3); R(g, x + 1, y + 1, w - 2, h - 2, P.ink); g.globalAlpha = alpha;
+  else if (look === 'noport' || look === 'offline' || look === 'out' || look === 'paused' || look === 'asleep') {
+    g.globalAlpha = alpha * (look === 'out' ? 0.55 : look === 'paused' ? 0.15 : look === 'asleep' ? 0.35 : 0.3); R(g, x + 1, y + 1, w - 2, h - 2, P.ink); g.globalAlpha = alpha;
   }
   else if (live && heat > 0.6) { g.globalAlpha = alpha * Math.min(0.85, (heat - 0.6) * 2.5); R(g, x + 6, y + 1, w - 12, 1, P.heat); g.globalAlpha = alpha; }
 }

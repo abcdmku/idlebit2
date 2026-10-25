@@ -52,7 +52,9 @@ export type PartSlot =
   | { readonly kind: 'roomCooler' | 'roomLb' | 'roomSwitch' }
   | { readonly kind: 'ups'; readonly index: number }
   | { readonly kind: 'dataPlane' | 'grid' | 'backbone' }
-  | { readonly kind: 'globalScheduler' };
+  | { readonly kind: 'globalScheduler' }
+  /** D31: rack Power control, room and global start controllers, site generation. */
+  | { readonly kind: 'powerCtl' | 'roomStart' | 'globalStart' | 'generation' };
 export type PartSlotKind = PartSlot['kind'];
 
 /** Board parts and drives belong to a system; rack infra to a rack; room parts to a room;

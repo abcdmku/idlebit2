@@ -138,9 +138,9 @@ const ROUTER_HOT = { lbCursor: i32, lbRouted: u32, lbLast: neg1 } as const;
 /**
  * D31.2 start controller state on a powered scope: `powered` 0 while a parent controller holds the unit in
  * standby; `wakeTicks` counts down a power-on; `ctlBusy` is the awake children's busy fraction (10 s EMA);
- * `ctlTriggerTick` is the first tick the trigger held (-1 none).
+ * `ctlTriggerTick` is the first tick the trigger held (-1 none); `offSinceTick` when it last went idle (back to standby).
  */
-const START_HOT = { powered: { t: 'u8', fill: 1 }, wakeTicks: i32, ctlBusy: f64, ctlTriggerTick: neg1 } as const;
+const START_HOT = { powered: { t: 'u8', fill: 1 }, wakeTicks: i32, ctlBusy: f64, ctlTriggerTick: neg1, offSinceTick: neg1 } as const;
 export const RACK_HOT = {
   ...LUMP, eff: { t: 'f64', fill: 1 }, effClock: f64, throttled: u8,
   pduUsage: f64, pduOverTicks: i32, pduRebootTicks: i32, pduFailed: u8, capFactor: { t: 'f64', fill: 1 },

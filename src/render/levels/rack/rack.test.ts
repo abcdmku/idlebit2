@@ -49,7 +49,7 @@ describe('rack row positions', () => {
     expect([RACK.w * 8, RACK.h * 8]).toEqual([WORLD.w, WORLD.h]);
     for (let c = 0; c < 8; c++) expect((RACK_RECTS[c].x - RACK_RECTS[0].x) * 8).toBe(colX(c));
     expect(ROW_PITCH).toBe(120);
-    expect(rack.size(CASES.overview(0), rect())).toEqual(rect(0, 0, ROW_W, 232));
+    expect(rack.size(CASES.overview(0), rect())).toEqual(rect(0, 0, ROW_W, 240));
   });
   it('frames the active rack in its own column and puts its parts and servers there', () => {
     rackRowScroll.reset();
@@ -177,9 +177,9 @@ describe('rack core hooks', () => {
     expect(rack.entry!(s, { x: 0, y: 0 })).toEqual({ x: colX(2) + 120, y: 0 });
     const kids: ChildView[] = Array.from({ length: 32 }, () => ({ ref: { level: 'chip', id: 0 } as NodeRef, rect: rect(), world: null }));
     rack.children(s, kids);
-    // server 0 at row 2 (y 55): tap on its row, System on the 75 × 96 board 16 px above it
-    expect(kids[0].rect).toEqual(rect(colX(2) + 13, 55, 100, 12));
-    expect(kids[0].world).toEqual(rect(colX(2) + 16, 39, 75, 96));
+    // server 0 at row 3 (y 67, under Power control, switch and LB): tap on its row, System on the 75 × 96 board 16 px above it
+    expect(kids[0].rect).toEqual(rect(colX(2) + 13, 67, 100, 12));
+    expect(kids[0].world).toEqual(rect(colX(2) + 16, 51, 75, 96));
   });
   it('lets the camera follow the row only while the UI reports a drag', () => {
     const s = CASES.overview(0);

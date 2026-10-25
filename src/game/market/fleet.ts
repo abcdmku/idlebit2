@@ -31,7 +31,7 @@ export const detailIndex = (code: number): number => {
 
 /** The static capability set: modes that accept work within one boot time (spec §4.3). */
 const ELIGIBLE = new Uint8Array(32);
-ELIGIBLE[MODE.onMarket] = 1; ELIGIBLE[MODE.asleep] = 1; ELIGIBLE[MODE.boot] = 1; ELIGIBLE[MODE.cold] = 1;
+ELIGIBLE[MODE.onMarket] = 1; ELIGIBLE[MODE.asleep] = 1; ELIGIBLE[MODE.standby] = 1; ELIGIBLE[MODE.boot] = 1; ELIGIBLE[MODE.cold] = 1;
 export const isEligibleMode = (mode: number): boolean => ELIGIBLE[mode] === 1;
 
 /**

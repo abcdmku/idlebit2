@@ -1,3 +1,5 @@
+import { POWER_SLOTS } from './partAccess';
+import { powerInstallPlans } from './powerParts';
 import type { InfraSlot } from '../types/catalog';
 import { amount, amountCompare } from '../amount';
 import { MAX_ACCELS, TICK_MS } from '../core/constants';
@@ -158,6 +160,8 @@ export function partQuotes(state: GameState, ref: PartRef): Quote[] {
   if (!part) {
     // An empty L2 / L3 chip slot offers its part (the slot the chip view shows).
     const k = ref.slot.kind;
+    // D31: an empty power slot offers each generation's install.
+    if (POWER_SLOTS.includes(k)) return powerInstallPlans(state, ref).map(({ action, plan }) => toQuote(state, action, plan));
     if (ref.unit.kind !== 'system' || (k !== 'l2' && k !== 'l3')) return [];
     const g = Math.max(0, newestGen(state.research.unlocks, k, PARTS[k].base.length));
     const action = { type: 'addPart' as const, system: ref.unit.id, kind: k, generation: g };
@@ -210,12 +214,14 @@ const INFRA_SLOT = {
 export function infraQuotes(state: GameState, unit: { kind: 'rack' | 'room'; id: number }, slot: InfraSlot): Quote[] {
   const scope = unit as ScopeRef & { kind: 'rack' | 'room' };
   if (slot === 'switch') return switchQuotes(state, scope as SwitchRef);
-  // D31: Power control quotes land with the part (install, levels, start configuration).
-  if (slot === 'powerCtl') return [];
+  // D31: Power control (install, levels and generations); its Start settings use setStartConfig.
+  if (slot === 'powerCtl') return partQuotes(state, { unit: scope, slot: { kind: 'powerCtl' } });
   const kind = INFRA_SLOT[unit.kind][slot];
   const ref: PartRef = { unit: scope, slot: kind === 'ups' ? { kind, index: 0 } : { kind } as PartSlot };
   if (slot !== 'lb') {
     const out = partQuotes(state, ref).filter((q) => q.action.type !== 'removePart');
+    // D31: the room start controller sits on the UPS plate.
+    if (slot === 'power' && unit.kind === 'room') out.push(...partQuotes(state, { unit: scope, slot: { kind: 'roomStart' } }));
     if (slot === 'cooling') {
       const setpointF = unit.kind === 'rack' ? state.build.racks[unit.id]?.cooler.setpointF ?? 70 : state.build.rooms[unit.id]?.cooler.setpointF ?? 70;
       out.push(toQuote(state, { type: 'setSetpoint', unit: scope as never, setpointF }, planSetpoint(state, scope as never, setpointF)));

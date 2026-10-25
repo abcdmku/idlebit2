@@ -1,3 +1,4 @@
+import { applyStart, refillBatteries, resetPower } from '../phys/start';
 import { G } from '../core/buffers';
 import { ROUND_REPORTS_KEPT, TICK_MS } from '../core/constants';
 import { pushEvent, roundDetails } from '../core/events';
@@ -58,6 +59,11 @@ export function startRound(w: World): void {
   resetRoundTotals(w);
   resetCounters(w);
   settleModes(w);
+  // D31: start controllers apply their "Start with"; batteries refill, billed at 25% of the marginal price.
+  applyStart(w);
+  const refill = refillBatteries(w);
+  w.ledger.energyMeter += refill;
+  w.hot.g[G.roundBatteryRefill] = refill;
   w.research.stoppedInsolvent = false;
   pushEvent(w, { kind: 'roundStarted', round: r.index });
 }
@@ -99,6 +105,7 @@ export function endRound(w: World, endedBy: RoundEndedBy = 'sla'): void {
   w.report.roundsEnded.push(report);
   const unlocks = w.research.unlocks;
   r.autoReturnTick = r.autoReturnOn && unlocks.rules.includes('autoReturn') ? r.endTick + unlocks.autoReturnDelayTicks : null;
+  resetPower(w);
   settleModes(w);
   pushEvent(w, { kind: 'roundEnded', round: r.index });
 }

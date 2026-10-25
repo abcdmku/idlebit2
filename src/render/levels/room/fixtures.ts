@@ -2,6 +2,7 @@
 // advance with `timeMs` so packets move in the harness; nothing here runs the sim.
 import { LEVEL_FIXTURES } from '../../../game/fixtures';
 import { FAM, flowAt, queueOf } from '../rack/flowFixtures';
+import { startView } from '../rack/fixtures';
 import type { FlowCase } from '../rack/flowFixtures';
 import { UNIT_MODES, rackId, roomId } from '../../../game';
 import type { CoolTech, LbView, PortView, RackSlotView, RoomSnapshot, SupplyView, UnitMode } from '../../../game';
@@ -19,6 +20,8 @@ export interface RoomCase {
   flows?: readonly FlowCase[]; queue?: LbView['queue'];
   /** Between rounds: racks rest 'paused'; racks in `off` are off market ('offline'); `out` maps a rack slot to its sleds that sit out. */
   between?: boolean; off?: readonly number[]; out?: Readonly<Record<number, readonly number[]>>;
+  /** D31: the room start controller: racks in `standby` are unpowered, `waking` powers on, `sleepy` racks keep 3 systems awake. */
+  start?: { standby: readonly number[]; waking?: number; sleepy?: readonly number[] };
 }
 const supply = (u: SupplyView, o: RoomCase): SupplyView => ({
   ...u, generation: o.upsGen ?? 1, level: 2, usage: o.upsUsage ?? 0.27, deliveredW: u.capacityW * (o.upsUsage ?? 0.27),
@@ -33,14 +36,15 @@ export function roomCase(o: RoomCase, timeMs: number): RoomSnapshot {
   const rows = o.rows ?? 2, built = new Set(o.built ?? [0, 1, 2, 3, 8, 9]), crashed = !!o.crashed;
   const racks: RackSlotView[] = Array.from({ length: rows * 8 }, (_, i) => {
     const on = built.has(i), n = on ? Math.max(1, (o.servers ?? 12) - (i % 5)) : 0, servers = new Uint8Array(12), serversOnMarket = new Uint8Array(12);
-    const off = !!o.off?.includes(i), out = o.out?.[i] ?? [];
+    const off = !!o.off?.includes(i), out = o.out?.[i] ?? [], standby = !!o.start?.standby.includes(i), sleepy = !!o.start?.sleepy?.includes(i);
     for (let k = 0; k < n; k++) {
-      servers[k] = mode(o.dark ? 'dark' : crashed ? 'crashed' : o.between ? 'paused' : 'onMarket');
+      servers[k] = mode(o.dark ? 'dark' : crashed ? 'crashed' : standby ? 'standby' : o.between ? 'paused' : sleepy && k >= 3 ? 'asleep' : 'onMarket');
       serversOnMarket[k] = off || out.includes(k) ? 0 : 1;
     }
     return {
-      rackId: on ? rackId(i) : null, state: !on ? 'empty' : o.dark ? 'dark' : crashed ? 'crashed' : off ? 'offline' : o.between ? 'paused' : 'onMarket',
-      load: on && !o.between ? Math.max(0.1, 0.9 - (i % 8) * 0.12) : 0, tempF: on ? (o.rackTempF ?? (o.tempF ?? 75) + 4) : 70, pduUsage: on ? 0.5 : 0, servers, serversOnMarket,
+      rackId: on ? rackId(i) : null, state: !on ? 'empty' : o.dark ? 'dark' : crashed ? 'crashed' : off ? 'offline' : standby ? 'standby' : o.between ? 'paused' : 'onMarket',
+      load: on && !o.between && !standby ? Math.max(0.1, 0.9 - (i % 8) * 0.12) * (sleepy ? 0.3 : 1) : 0,
+      powered: on && !standby, wakeMs: o.start?.waking === i ? 1200 : null, tempF: on ? (o.rackTempF ?? (o.tempF ?? 75) + 4) : 70, pduUsage: on ? 0.5 : 0, servers, serversOnMarket,
     };
   });
   const active = new Set(o.active ?? [0, 2]), t = timeMs / 1000;
@@ -60,6 +64,7 @@ export function roomCase(o: RoomCase, timeMs: number): RoomSnapshot {
     },
     flows: (o.flows ?? []).map(f => flowAt(f, timeMs)),
     rows, maxRows: 3, racks,
+    power: { start: o.start ? startView(built.size - o.start.standby.length, built.size, 1, 'coolest') : null },
   };
   return s;
 }
@@ -90,6 +95,8 @@ export const CASES: Readonly<Record<string, (timeMs: number) => RoomSnapshot>> =
   azB: t => roomCase({ zone: 1, zones: [0, 1, null], built: [0, 1, 2] }, t),
   empty: t => roomCase({ built: [] }, t),
   paused: t => roomCase({}, t),
+  /** D31: the room start controller: racks 3 and 9 in standby, rack 8 powering on, racks 1 and 2 mostly asleep. */
+  power: t => roomCase({ start: { standby: [3, 9], waking: 8, sleepy: [1, 2] } }, t),
   /** Between rounds: rack 2 is off market; rack 1 has three sleds sitting out. Use with ?paused. */
   sitout: t => roomCase({ between: true, off: [2], out: { 1: [0, 4, 7] } }, t),
   flows: t => roomCase({ active: [0, 1, 2, 3, 4], uplink: true, flows: SPLIT_FLOWS, queue: queueOf(8, [FAM.memory, FAM.cluster, FAM.parallel]) }, t),

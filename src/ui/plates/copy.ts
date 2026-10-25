@@ -37,6 +37,7 @@ export const SLOT_TITLE: Readonly<Record<PartSlotKind, string>> = {
   ram: 'RAM', gpu: 'GPU', drive: 'Storage', rackCooler: 'Rack cooling', pdu: 'Rack PDU', lb: 'Load balancer', switch: 'Switch',
   roomCooler: 'Room cooling', roomLb: 'Room load balancer', roomSwitch: 'Network rack', ups: 'UPS', dataPlane: 'Data plane', grid: 'Site grid',
   backbone: 'Backbone link', globalScheduler: 'Global scheduler',
+  powerCtl: 'Power control', roomStart: 'Room start control', globalStart: 'Global start control', generation: 'Generation',
 };
 
 /** Noun for "New …" and "Add …" on the configuration plate. */

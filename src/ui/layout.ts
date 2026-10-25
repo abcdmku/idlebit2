@@ -157,7 +157,8 @@ function phone(aw: number, ah: number, safe: SafeInsets): PhoneLayout {
   const band0 = rungs(band, rungRow, 0), walletX = band0[4].x + band0[4].w + 8;
   // The strip: the head first, then the next 4.
   const strip = r(U, band.y + band.h, world.w, 64);
-  const headSlot = r(U, strip.y, 112, 64);
+  // The head keeps room for the longest task name on its own line ("Replicated Write"); the next 4 share the rest.
+  const headSlot = r(U, strip.y, 144, 64);
   const cardW = Math.floor((world.w - headSlot.w) / 4 / U) * U;
   const card = (i: number) => r(headSlot.x + headSlot.w + i * cardW, strip.y, i === 3 ? world.w - headSlot.w - 3 * cardW : cardW, 64);
   const top = strip.y + strip.h;

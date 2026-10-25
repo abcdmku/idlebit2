@@ -3,7 +3,7 @@
 // `row` follow R36 (RackSnapshot).
 import { LEVEL_FIXTURES } from '../../../game/fixtures';
 import { UNIT_MODES, familyId, rackId, systemId } from '../../../game';
-import type { CoolTech, LbView, PortView, RackSlotView, RackSnapshot, ServerSlotView, UnitMode } from '../../../game';
+import type { CoolTech, LbView, PortView, RackSlotView, RackSnapshot, ServerSlotView, UnitMode, StartCtlView } from '../../../game';
 import { FAM, flowAt, queueOf } from './flowFixtures';
 import type { FlowCase } from './flowFixtures';
 
@@ -19,6 +19,12 @@ export interface RackCase {
   flows?: readonly FlowCase[]; queue?: LbView['queue'];
   /** Between rounds: every sled rests 'paused'; the slots in `out` sit out the next round (off market). */
   between?: boolean; out?: readonly number[];
+  /** D31: Power control installed (battery charge share, seconds left, awake systems); the rest of the sleds sleep. */
+  power?: { gen?: number; charge: number; secondsLeft: number | null; awake: number };
+}
+/** D31: a start controller view (rack, room or global). */
+export function startView(awake: number, total: number, generation = 0, order: StartCtlView['order'] = 'slot'): StartCtlView {
+  return { generation, level: 2, startWith: 1, headWaitS: 2, busyPct: generation >= 1 ? 75 : null, order, awake, total, nextWakeInMs: awake < total ? 600 : null };
 }
 const port = (peer: number | null, active: boolean, progress: number, rung: number): PortView => ({
   speedHz: [1e3, 2e3, 5e3, 1e4, 2e4, 5e4, 1e5, 2e5, 5e5, 1e6][Math.min(9, rung)], rung, peer, active, family: null, progress: active ? progress : 0, queued: 0,
@@ -29,20 +35,20 @@ function neighbour(id: number, servers: number, load: number, tempF: number, bet
     modes[k] = UNIT_MODES.indexOf(between ? 'paused' : k === 5 ? 'offline' : 'onMarket');
     market[k] = out.has(k) || (!between && k === 5) ? 0 : 1;
   }
-  return { rackId: rackId(id), state: between ? 'paused' : 'onMarket', load: between ? 0 : load, tempF, pduUsage: 0.2 + load * 0.5, servers: modes, serversOnMarket: market };
+  return { rackId: rackId(id), state: between ? 'paused' : 'onMarket', load: between ? 0 : load, tempF, pduUsage: 0.2 + load * 0.5, servers: modes, serversOnMarket: market, powered: true, wakeMs: null };
 }
-const EMPTY_SLOT: RackSlotView = { rackId: null, state: 'empty', load: 0, tempF: 0, pduUsage: 0, servers: new Uint8Array(12), serversOnMarket: new Uint8Array(12) };
+const EMPTY_SLOT: RackSlotView = { rackId: null, state: 'empty', load: 0, tempF: 0, pduUsage: 0, servers: new Uint8Array(12), serversOnMarket: new Uint8Array(12), powered: false, wakeMs: null };
 
 /** A rack at room slot `slot` (row-major), with racks in `built` columns of its row. */
 export function rackCase(o: RackCase, timeMs: number): RackRowSnapshot {
   const id = o.id ?? 0, slot = o.slot ?? 2, col = slot % 8, rowBase = slot - col, n = o.servers ?? 9, t = timeMs / 1000;
   const nPorts = o.ports ?? 12, active = new Set(o.between ? [] : o.active ?? [0, 3, 6]), crashed = !!o.crashed, dark = !!o.dark;
-  const between = !!o.between, out = new Set(o.out ?? []);
+  const between = !!o.between, out = new Set(o.out ?? []), pw = o.power;
   const ports = Array.from({ length: nPorts }, (_, i) =>
     port(i < n ? i : null, i < n && active.has(i) && !dark && !crashed, (t * 0.6 + i * 0.29) % 1, Math.min(9, Math.floor(i / 2))));
   const servers: ServerSlotView[] = Array.from({ length: 12 }, (_, i) => {
     if (i >= n) return { ...BASE.servers[11], systemId: null, kind: null, state: 'empty', onMarket: false, port: ports[i] ?? null, load: 0, running: 0, cores: 0, busyCores: 0 };
-    const mode: UnitMode = o.modes?.[i] ?? (dark ? 'dark' : crashed ? 'crashed' : between ? 'paused' : 'onMarket'), cores = o.cores ?? [1, 4, 8, 16, 32, 64][i % 6];
+    const mode: UnitMode = o.modes?.[i] ?? (dark ? 'dark' : crashed ? 'crashed' : between ? 'paused' : pw && i >= pw.awake ? 'asleep' : 'onMarket'), cores = o.cores ?? [1, 4, 8, 16, 32, 64][i % 6];
     const busy = mode === 'onMarket' ? Math.round(cores * ((i * 37) % 10) / 10) : 0;
     return {
       systemId: systemId(id * 12 + i), kind: i === 8 ? 'storageNode' : 'server', state: mode, onMarket: !out.has(i) && mode !== 'offline' && mode !== 'goingOffline', load: cores ? busy / cores : 0,
@@ -64,6 +70,11 @@ export function rackCase(o: RackCase, timeMs: number): RackRowSnapshot {
     flows: (o.flows ?? []).map(f => flowAt(f, timeMs)),
     switch: { ...BASE.switch, generation: 1, ports, uplinks: [port(null, !!o.uplink && !dark, (t * 0.45) % 1, 6)] },
     servers, saveable: true, slot, row,
+    powerCtl: pw ? {
+      generation: pw.gen ?? 0, level: 2,
+      battery: { capacityJ: 120_000, chargeJ: 120_000 * pw.charge, secondsLeft: pw.secondsLeft, discharging: pw.charge > 0 && !between },
+      start: startView(pw.awake, n, pw.gen ?? 0, 'fastest'),
+    } : null,
   };
   return s;
 }
@@ -94,6 +105,10 @@ export const CASES: Readonly<Record<string, (timeMs: number) => RackRowSnapshot>
   water: t => rackCase({ tech: 'water', gen: 2, tempF: 66 }, t),
   noport: t => rackCase({ servers: 10, ports: 8, modes: { 2: 'boot', 4: 'offline' } }, t),
   paused: t => rackCase({}, t),
+  /** D31: Power control on battery (BAT 4:12), 4 of 12 systems awake, the rest asleep. */
+  power: t => rackCase({ servers: 12, power: { gen: 1, charge: 0.7, secondsLeft: 252, awake: 4 } }, t),
+  /** D31: the battery is empty (GRID); 9 of 11 awake. */
+  grid: t => rackCase({ servers: 11, power: { charge: 0, secondsLeft: 0, awake: 9 } }, t),
   /** Between rounds: slots 2, 5 and 9 sit out the next round (On market off); the rest are ready. Use with ?paused. */
   sitout: t => rackCase({ servers: 12, between: true, out: [2, 5, 9] }, t),
   flows: t => rackCase({ servers: 12, active: [0, 2, 3, 9, 10], uplink: true, flows: SPLIT_FLOWS, queue: queueOf(8, [FAM.storage, FAM.parallel, FAM.cluster]) }, t),

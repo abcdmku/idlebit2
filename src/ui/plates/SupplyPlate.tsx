@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react';
 import type { SupplyView } from '../../game';
 import { genName } from './copy';
 import { percent, watts } from './format';
@@ -20,11 +21,11 @@ export function supplyLines(s: SupplyView): Line[] {
   return lines;
 }
 
-export interface SupplyPlateProps extends PlateCommon { supply: SupplyView; title?: string; maxLevel?: number }
+export interface SupplyPlateProps extends PlateCommon { supply: SupplyView; title?: string; maxLevel?: number; children?: ReactNode }
 
-export function SupplyPlate({ supply: s, title, maxLevel, ...common }: SupplyPlateProps) {
+export function SupplyPlate({ supply: s, title, maxLevel, children, ...common }: SupplyPlateProps) {
   return <PartPlate {...common} className="supply" title={title ?? TITLE[s.kind]} sub={`${genName(s.kind, s.generation)} · L${s.level}`}
     level={s.level} pips={maxLevel ? [s.level, maxLevel] : undefined}
     status={`${watts(s.deliveredW)} / ${watts(s.capacityW)} · ${percent(s.usage)}`}
-    statusTone={s.failed || s.usage > 1 ? 'warn' : ''} progress={Math.min(1, s.usage)} lines={supplyLines(s)} />;
+    statusTone={s.failed || s.usage > 1 ? 'warn' : ''} progress={Math.min(1, s.usage)} lines={supplyLines(s)}>{children}</PartPlate>;
 }

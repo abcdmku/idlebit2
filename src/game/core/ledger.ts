@@ -1,3 +1,4 @@
+import { G } from './buffers';
 import type { EnergyBreakdown } from '../types/report';
 import { type Amount } from '../amount';
 import type { GameState, LedgerSample } from '../types/state';
@@ -102,14 +103,19 @@ export function roundTotals(w: World): { gross: Amount; data: Amount; energy: Am
 }
 
 /**
- * D31 round energy lines. Until rack batteries and site generation land, every joule is imported and
- * billed: billed equals the round's energy and the other lines are 0.
+ * D31 round energy lines (Credits at the region price): billed is the ledger's round energy, which
+ * includes the refill and fuel; fromBattery and fromGeneration were not billed.
  */
 export function energyBreakdown(w: World): EnergyBreakdown {
-  return { billed: toAmount(w.ledger.roundEnergy), fromBattery: ZERO, batteryRefill: ZERO, fromGeneration: ZERO, fuel: ZERO };
+  const g = w.hot.g, whole = (x: number): Amount => String(Math.max(0, Math.round(x))) as Amount;
+  return {
+    billed: toAmount(w.ledger.roundEnergy), fromBattery: whole(g[G.roundFromBattery]!), batteryRefill: whole(g[G.roundBatteryRefill]!),
+    fromGeneration: whole(g[G.roundFromGeneration]!), fuel: whole(g[G.roundFuel]!),
+  };
 }
-const ZERO = '0' as Amount;
 
 export function resetRoundTotals(w: World): void {
+  const g = w.hot.g;
+  g[G.roundFromBattery] = 0; g[G.roundBatteryRefill] = 0; g[G.roundFromGeneration] = 0; g[G.roundFuel] = 0;
   w.ledger.roundGross = 0n; w.ledger.roundData = 0n; w.ledger.roundEnergy = 0n;
 }

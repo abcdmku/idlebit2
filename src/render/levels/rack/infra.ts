@@ -6,7 +6,7 @@ import type { RackSnapshot } from '../../../game';
 import { ROOF } from './cabinet';
 import { LB_SHORT, OFF, disc, ears, fan, fanAt, label, lcdText, lcdWidth, tempCol, unitCol } from './art';
 import type { FanBank } from './art';
-import { CAB, LB_RECT, LB_WELLS, NU, OPEN, PLINTH, READOUT, SERVER_SLOTS, STRIP, SWITCH_RECT, U, U0, UPLINK_JACK, portX, slotY } from './layout';
+import { CAB, LB_RECT, LB_WELLS, NU, OPEN, PLINTH, PWR_U, READOUT, SERVER_SLOTS, SRV_U0, STRIP, SWITCH_RECT, U, U0, UPLINK_JACK, portX, slotY } from './layout';
 
 type G = CanvasRenderingContext2D;
 const ROOF_FAN = mix(ROOF, P.steel, 0.25);
@@ -116,7 +116,9 @@ export function drawPdu(g: G, s: RackSnapshot, quiet: boolean): void {
   const x = STRIP.x - 1, h = NU * U, off = s.online === 'dark' || s.pdu.failed;
   R(g, x, U0, STRIP.w + 1, h, P.ink); R(g, x + 1, U0 + 1, STRIP.w - 1, h - 2, P.steelLo);
   for (let u = 0; u < NU; u++) {
-    const oy = slotY(u) + 4, v = u >= 2 ? s.servers[u - 2] : null, used = u < 2 || (!!v && v.systemId !== null);
+    // Row 0 (Power control) has no outlet: the uplink drops past it along the right post.
+    if (u === PWR_U) continue;
+    const oy = slotY(u) + 4, v = u >= SRV_U0 ? s.servers[u - SRV_U0] : null, used = u < SRV_U0 || (!!v && v.systemId !== null);
     R(g, x + 1, oy, 3, 3, P.ink); px(g, x + 2, oy + 1, used ? P.steel : P.steelLo);
     const on = !off && used && !(v && s.crashed);
     px(g, x + 5, oy + 1, on ? (v && v.load > 0.05 && !quiet ? P.amber : P.led) : OFF);

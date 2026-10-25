@@ -8,7 +8,7 @@ import { wakeRouters } from '../core/routerQueue';
 
 /**
  * Room and free-slot summaries (spec §4.3, architecture §1.3). A system **can admit now** when it
- * is a live server in `onMarket` or `asleep`, has a link (a switch port once its rack is opened)
+ * is a live server in `onMarket`, has a link (a switch port once its rack is opened)
  * and `admitted + reserved < slots`. rack/room/site `freeSlots` count the systems below that can
  * admit now, so routers never scan the fleet. rack `admitted` sums admitted + reserved tasks.
  */
@@ -18,7 +18,7 @@ export const STORAGE_NODE = 1;
 
 const ADMIT_MODE = new Uint8Array(32);
 ADMIT_MODE[MODE.onMarket] = 1;
-ADMIT_MODE[MODE.asleep] = 1;
+// D31.1: asleep and standby systems are never split targets; they wake by demand (phys/start.ts).
 
 /** Modes in which a system runs its admitted tasks (spec §4.3). */
 const RUN_MODE = new Uint8Array(32);

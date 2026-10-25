@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { createInitialState, quote, rackId, roomId, systemId, type EffectPreview, type NodeRef, type Quote } from '../../game';
-import { buildOffers, changeText, linkRequest } from './offers';
+import { buildOffers, changeText, EXTRA_ROWS, extraOffer, extraRequest, linkRequest } from './offers';
 
 const nodes: readonly NodeRef[] = [
   { level: 'chip', id: systemId(0) }, { level: 'system', id: systemId(0) },
@@ -94,10 +94,10 @@ describe('one grammar and one list (A08, A14)', () => {
 describe('router queue offers (D25.7)', () => {
   it('the rack sells its LB queue as a row the LB callout reads, locked as Max at 32', () => {
     const next = { ...offer(effect('slots', 1, 2)), action: { type: 'upgradeRouterQueue', unit: { kind: 'rack', id: rackId(0) } } } as Quote;
-    const row = buildOffers('rack', null, null, [next]).rows.find(r => r.key === 'lbQueue')!;
+    const row = buildOffers('rack', null, null, [null, next]).rows.find(r => r.key === 'lbQueue')!;
     expect([row.name, row.change, row.slot, row.price]).toEqual(['LB queue', '1 → 2 slots', 'lb', 12]);
     const top = { ...next, effect: effect('slots', 32, 32), locked: { code: 'cap' as const, node: null, text: 'Queue at 32/32' } };
-    const max = buildOffers('rack', null, null, [top]).rows.find(r => r.key === 'lbQueue')!;
+    const max = buildOffers('rack', null, null, [null, top]).rows.find(r => r.key === 'lbQueue')!;
     expect([max.change, max.right]).toEqual(['32 slots', { kind: 'max' }]);
   });
 });
@@ -110,5 +110,16 @@ describe('cache levels', () => {
     expect(buildOffers('chip', tray(cacheQuote('l1', 1, 2)), null).rows[1]).toMatchObject({ name: 'Cache', change: '1 → 2 b', slot: 'l1' });
     expect(buildOffers('chip', tray(cacheQuote('l2', 65_536, 131_072)), null, [], { cacheLevels: 2 }).rows[1])
       .toMatchObject({ name: 'L2 cache', change: '65.5 → 131 kb', slot: 'l2' });
+  });
+});
+
+describe('rack Power control (D31.3)', () => {
+  it('sells Power control as the rack\'s fifth infrastructure row from its own quote, never a start setting', () => {
+    const add = { ...offer(effect('slots', 0, 1)), label: 'Lead-acid', action: { type: 'upgradePart', part: { unit: { kind: 'rack', id: rackId(0) }, slot: { kind: 'pdu' } } } } as Quote;
+    const set = { ...add, action: { type: 'setStartConfig', unit: { kind: 'rack', id: rackId(0) }, startWith: 1, headWaitS: 2, busyPct: null, order: 'slot' } } as Quote;
+    expect(extraOffer([set, add])).toBe(add);
+    const rows = buildOffers('rack', null, null, [add, null]).rows;
+    expect(rows.find(r => r.key === 'powerCtl')?.name).toMatch(/Power control$/);
+    expect(extraRequest({ level: 'rack', id: 2 } as never, EXTRA_ROWS.rack![0]!)).toEqual({ kind: 'infra', unit: { kind: 'rack', id: 2 }, slot: 'powerCtl' });
   });
 });

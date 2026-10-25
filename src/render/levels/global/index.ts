@@ -8,6 +8,7 @@ import { siteId as toSiteId } from '../../../game';
 import type { GlobalSnapshot, PartRef, RoomId, SiteId, UnitRef } from '../../../game';
 import { CELLS, SIGN_H, SIZE, TILES, hubRect, landing } from './layout';
 import { drawGlobal, gatewayIndex, regionOfSite } from './world';
+import { globalStartTag } from './power';
 import { WORLD_SNAP, worldCentre, worldFocus } from './pan';
 export { worldPan } from './pan';
 
@@ -85,6 +86,8 @@ export function createGlobalRenderer(registry: LevelRegistry): LevelRenderer<'gl
     /** The pipe enters at the top of the backbone hub beside the gateway (L2 D17). */
     entry(s, out) { hubRect(gatewayIndex(s), scratch); out.x = scratch.x + 5; out.y = scratch.y - 1; return out; },
     draw: (g, s, _view, f) => drawGlobal(g, s, f, ctx),
+    /** D31: the global start controller tag on the scheduler hub. */
+    labels: (s, _view, _frame, out) => globalStartTag(s, gatewayIndex(s), out),
     drawMini(g, s: GlobalSnapshot, r) {
       R(g, r.x, r.y, r.w, r.h, P.seaDeep);
       for (let i = 0; i < s.sites.length && i < CELLS.length; i++) if (s.sites[i].siteId !== null) {

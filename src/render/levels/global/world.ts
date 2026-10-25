@@ -8,6 +8,7 @@ import { REGIONS, REGION_IDS } from '../../../game';
 import type { GlobalSnapshot, LinkView, SiteView } from '../../../game';
 import { drawLayer } from '../rack/art';
 import { drawGlobalFlows, drawGlobalForks } from './flows';
+import { drawGeneration } from './power';
 import { CELLS, CLIMATE, REGION_SIGNS, SIGN_H, SIZE, TILES, climateOf, hubRect, landing, mapPixel } from './layout';
 
 type G = CanvasRenderingContext2D;
@@ -59,6 +60,8 @@ const PIP_READY = mix(P.led, P.ink, 0.5);
 function pip(site: SiteView, paused: boolean): string {
   if (!site.open) return P.ink;
   if (site.siteId === null) return P.ledOff;
+  // D31: a site powering on (the global start controller woke it) is amber until it is up
+  if (site.wakeMs != null && site.wakeMs > 0) return P.amber;
   switch (lampState(site.online)) {
     // between rounds: dim green when the site runs next round; an off-market site reads 'offline' (lampOff)
     case 'online': return paused ? PIP_READY : P.led;
@@ -121,8 +124,11 @@ export function drawGlobal(g: G, s: GlobalSnapshot, frame: WorldFrame, ctx: Glob
     if (!site.open) { const a = g.globalAlpha; g.globalAlpha = a * 0.5; R(g, b.x, b.y, b.w, b.h, P.ink); g.globalAlpha = a; }
     drawSign(g, i, site, frame.paused);
     if (site.siteId !== null) drawSite(g, i, site, frame, ctx, live);
-    // Between rounds an off-market site (it sits out the next round) is clearly darker.
-    if (frame.paused && site.siteId !== null && site.online === 'offline') { const a = g.globalAlpha; g.globalAlpha = a * 0.45; R(g, b.x, b.y, b.w, b.h, P.ink); g.globalAlpha = a; }
+    // Between rounds an off-market site (it sits out the next round) is clearly darker, and so is a
+    // site the global start controller holds in standby (D31: 0 W) at any time.
+    const standby = site.siteId !== null && (site.online === 'standby' || site.powered === false);
+    if (standby || (frame.paused && site.siteId !== null && site.online === 'offline')) { const a = g.globalAlpha; g.globalAlpha = a * 0.45; R(g, b.x, b.y, b.w, b.h, P.ink); g.globalAlpha = a; }
+    if (site.siteId !== null) drawGeneration(g, b, site.generation, standby);
   }
   if (live) drawGlobalForks(g, s);
   // the scheduler hub beside the gateway: one LED per backbone link, lit while it carries a transfer

@@ -1,14 +1,14 @@
 // Room world (mockup levels/datacenter/layout.js, v3.js): one AZ hall in 3/4 view.
 // Coordinates are the mockup's hall 1 at 1:1, so the approved art lines up. Racks
-// stand 15 apart in rows of 8; the rack world (128 × 232) maps exactly onto each
-// 16 × 29 rack rect at 1/8. The network rack sits in the top-left corner, outside
+// stand 15 apart in rows of 8; the rack world (128 × 240) maps exactly onto each
+// 16 × 30 rack rect at 1/8. The network rack sits in the top-left corner, outside
 // the 24-slot grid. Everything here is computed once at import: no runtime allocation.
 import { MAX_ROWS, RACK_SLOTS_PER_ROW } from '../../../game';
 import type { PixelPath, Rect } from '../../core';
 
 export const COLS = RACK_SLOTS_PER_ROW;
 export const ROWS_MAX = MAX_ROWS;
-export const RACK = { w: 16, h: 29, pitch: 15, top: 27 } as const;
+export const RACK = { w: 16, h: 30, pitch: 15, top: 28 } as const;
 export const CRAC = { w: 16, d: 14, z: 24 } as const;
 export const BOH = { d: 8, z: 18 } as const;
 export const SPINE = { w: 16, d: 8, z: 20 } as const;

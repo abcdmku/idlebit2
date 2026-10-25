@@ -5,7 +5,7 @@
 // Return to market key. Closing it dismisses the report; the head's key then returns.
 import { useContext, useEffect, useRef, type CSSProperties } from 'react';
 import { FAIL_CAUSES, formatOps } from '../game';
-import type { FailCause, FailDetail, RoundReport, RoundTypeTally } from '../game';
+import type { EnergyBreakdown, FailCause, FailDetail, RoundReport, RoundTypeTally } from '../game';
 import { P, drawCause, typeColor, typeName } from '../render/core';
 import { ArtCanvas } from './art/ArtCanvas';
 import { drawMiniIcon } from './art/deckArt';
@@ -158,10 +158,29 @@ export function RoundReportPlate({ report, percent, onReturn, onClose }: {
       {energy !== null && <li><span>Energy</span><span className="v mute" data-testid="rp-energy">−<CurrencyIcon kind="credits" n={n} />{amountText(energy)}</span></li>}
       {net !== null && <li><span>Net</span><span className="v gold" data-testid="rp-net"><CurrencyIcon kind="credits" n={n} />{amountText(net)}</span></li>}
     </ul>
+    {/* D31: where the energy came from. Unbilled lines read as saved; billed ones as spent. */}
+    {energyLines(report.energyBreakdown).length > 0 && <ul className="p-list rp-bottom rp-energy" data-testid="rp-energy-lines">
+      {energyLines(report.energyBreakdown).map(l => <li key={l.key} data-line={l.key}><span>{l.label}</span>
+        <span className={`v ${l.paid ? 'mute' : 'ben'}`}>{l.paid ? '−' : ''}<CurrencyIcon kind="credits" n={n} />{amountText(report.energyBreakdown[l.key])}{l.paid ? '' : ' saved'}</span></li>)}
+    </ul>}
     <div className="keys">
       <button type="button" className="key go" data-testid="rp-return" onClick={onReturn}>Return to market</button>
     </div>
   </section>;
+}
+
+/** D31 energy lines: billed and paid (−), unbilled (saved by batteries and generation). */
+const ENERGY_LINES: readonly { key: keyof EnergyBreakdown; label: string; paid: boolean }[] = [
+  { key: 'billed', label: 'Billed', paid: true }, { key: 'fromBattery', label: 'From battery', paid: false },
+  { key: 'batteryRefill', label: 'Battery refill', paid: true }, { key: 'fromGeneration', label: 'From generation', paid: false },
+  { key: 'fuel', label: 'Fuel', paid: true },
+];
+
+/** The non-zero lines; none when the bill is the only one (the Energy line already says it). */
+export function energyLines(e: EnergyBreakdown | null | undefined): typeof ENERGY_LINES {
+  if (!e) return [];
+  const lines = ENERGY_LINES.filter(l => Number(e[l.key]) !== 0);
+  return lines.length === 1 && lines[0]!.key === 'billed' ? [] : lines;
 }
 
 /** Mounted by the shell: shows while the round state is `ended`. */
