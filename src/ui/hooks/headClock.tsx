@@ -36,7 +36,7 @@ export function useHeadSeconds(): number | null {
  * The head's 10 s along the top inside edge of its panel (L2 rimBar): `w` CSS px wide, filled in
  * whole art px, coloured by what is left. Width is written per frame, never through React.
  */
-export function RimClock({ w, n, blocked }: { w: number; n: number; blocked: boolean }) {
+export function RimClock({ w, n, blocked, top }: { w: number; n: number; blocked: boolean; /** Where the bar sits; the top inside edge unless given (the strip head uses its bottom edge). */ top?: number }) {
   const { surface } = useShell();
   const deadline = useGameSelector(s => s.feed.headDeadlineTick);
   const ref = useRef<HTMLElement>(null);
@@ -55,7 +55,7 @@ export function RimClock({ w, n, blocked }: { w: number; n: number; blocked: boo
     surface.frameListeners.add(listener);
     return () => { surface.frameListeners.delete(listener); };
   }, [surface, deadline, w, n, blocked]);
-  return <i className="rim-track" data-free="art" style={{ left: n, top: n, width: w - 2 * n, height: 2 * n }} aria-hidden="true">
+  return <i className="rim-track" data-free="art" style={{ left: n, top: top ?? n, width: w - 2 * n, height: 2 * n }} aria-hidden="true">
     <b ref={ref} className="rim-fill" style={{ height: 2 * n }} /></i>;
 }
 

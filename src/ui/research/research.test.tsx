@@ -46,7 +46,7 @@ describe('research drawer', () => {
       frameListeners: new Set(), buildQuotes: null, drawCount: 0 });
     view.dispatch({ type: 'openResearch' });
     m.render(<ShellContext.Provider value={shell}><LayoutContext.Provider value={layout}><ResearchDrawer /></LayoutContext.Provider></ShellContext.Provider>);
-    expect(m.host.querySelector<HTMLElement>('[data-testid=research-drawer]')!.style.cssText).toContain('left: 744px');
+    expect(m.host.querySelector<HTMLElement>('[data-testid=research-drawer]')!.style.cssText).toContain('left: 720px');
     // the sheet shows only the relevant few; "All research" opens every contextual project
     expect(m.host.querySelectorAll('[data-project]').length).toBeLessThanOrEqual(3);
     click(button(m.host, 'All research'));

@@ -626,6 +626,7 @@ Before Rack, income is capped by the 1 kHz pipe at about 700 Credits/s and about
 > move global queue to the top since all scene have the tasks arrive form the top. rack view can show other racks (make sure the position in the rows are correct) and you can horizontally scroll. active rack is normal and other are darkened to focus on the correct rack. implement this to the real game and finish building out anything else to ship this then push to a new github repo called idlebit2 and clean up the codebase to only have this game and no other junk in it
 
 1. **Global task queue at the top.** The queue (the next tasks) sits at the top of the L2 shell, under the HUD band, because tasks enter every level from the top. The pipe descends from the queue into the world. The bottom-right phone thumb zone keeps the actions: the head task's Dismiss, Buy, and Research.
+   - *Note (user, 25 Oct):* the head task's big card moved back below, above the deck, and SLA moved to the centre of the HUD with the currencies stacked at the top right; the strip's cards no longer slide.
 2. **Rack row view.**
    - The Rack level shows the whole row of racks, each at its true position in the room's row.
    - The view scrolls horizontally along the row, with a drag on phone and the wheel or a drag on desktop.

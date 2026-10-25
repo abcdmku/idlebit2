@@ -1,4 +1,4 @@
-// Phone: the build rows as a sheet anchored to the deck, sized to its rows (L2 syncSheet 'build', A30).
+// Phone: the build rows as a sheet anchored above the head card, sized to its rows (L2 syncSheet "build", A30).
 // An affordable row carries its own Buy key; the rest show why not in the right column.
 import type { PhoneLayout } from '../layout';
 import { CloseKey } from '../shell/CloseKey';
@@ -11,8 +11,9 @@ const HEAD = 64, ROW = 48, KEY_W = 96;
 
 export function BuildSheet({ L, offers }: { L: PhoneLayout; offers: Offers }) {
   const { view } = useShell(), tap = useTapOffer(), pad = 16;
-  const h = Math.min(HEAD + ROW * offers.rows.length + 8, L.build.y - 8 - L.view.y);
-  const s = { x: L.drawer.x, y: L.build.y - 8 - h, w: L.drawer.w, h };
+  // Anchored above the head card, which sits on top of the deck row.
+  const h = Math.min(HEAD + ROW * offers.rows.length + 8, L.now.y - 8 - L.view.y);
+  const s = { x: L.drawer.x, y: L.now.y - 8 - h, w: L.drawer.w, h };
   return <section className="panel sheet" style={box(s)} data-k="sheet" role="dialog" aria-label="Build" data-testid="build-sheet">
     <T x={pad} y={pad} className="head">Build</T>
     <CloseKey L={L} w={s.w} onClose={() => view.dispatch({ type: 'cancel' })} />

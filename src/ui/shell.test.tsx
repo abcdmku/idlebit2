@@ -43,103 +43,90 @@ describe('band', () => {
   });
 });
 
-describe('queue strip (D10, D17.1): the head leads at the top', () => {
-  // the tasks in line, not the ones leaving
-  const head = () => $('.tag.is-head:not([class*=left-])');
-  const cards = () => [...mounted!.host.querySelectorAll<HTMLElement>('.tag:not(.is-head):not([class*=left-])')];
+describe('queue strip (D10, D17.1): five cards, the head first, updated in place', () => {
+  const headTag = () => $('.head-slot .tag');
+  const cards = () => [...mounted!.host.querySelectorAll<HTMLElement>('.slot .tag')];
   it.each([{ width: 1440, height: 900, n: 3 }, { width: 390, height: 780, n: 2 }])
     ('keeps type accents and rims through family changes and blocking at $width px', size => {
       const store = fakeStore();
       mounted = mount(<QueueStrip />, store, size);
-      const fixed = ['.head-slot', '.slots', '[data-testid=dismiss]'];
+      const fixed = ['.head-slot', '.slots'];
       const geometry = fixed.map(rectOf);
       for (const type of TASK_TYPES) {
         const family = FAMILIES.find(f => typeOf(f.id) === type)!.id;
         act(() => store.set({ feed: { window: [entry(1, family), entry(2, family)] } }));
-        for (const tag of [head()!, cards()[0]!]) {
+        for (const tag of [headTag()!, cards()[0]!]) {
           const stripe = tag.querySelector<HTMLElement>('.task-accent')!;
           expect(tag.style.getPropertyValue('--task-color')).toBe(typeColor(type));
           expect(stripe.style.width).toBe(`${size.n}px`);
-          expect([stripe.style.left, stripe.style.top, stripe.style.bottom]).toEqual(['0px', '0px', '0px']);
           expect(tag.style.color).toBe('');
         }
         expect($('.head-slot')!.style.getPropertyValue('--rim')).toBe(typeColor(type));
         act(() => store.set({ feed: { window: store.getSnapshot().feed.window.map(t => ({ ...t, blockedBy: 'cache' })) } }));
-        for (const el of [$('.head-slot')!, head()!, cards()[0]!]) expect(el.classList.contains('blocked')).toBe(true);
+        for (const el of [$('.head-slot')!, headTag()!, cards()[0]!]) expect(el.classList.contains('blocked')).toBe(true);
         expect(fixed.map(rectOf)).toEqual(geometry);
       }
       act(() => store.set({ feed: { window: [] } }));
       expect(mounted.host.querySelectorAll('.task-accent')).toHaveLength(0);
-      expect($('.head-slot')!.style.getPropertyValue('--rim')).toBe('');
     });
-  it('reads the head with its values and real 10 s clock, then the next 4 (no task numbers)', () => {
+  it('marks the head by its state: its seconds, blocked, or after Return; the next 4 read payout', () => {
     const store = fakeStore();
-    mounted = mount(<QueueStrip />, store, { width: 390, height: 780 });
-    expect(head()!.textContent).toContain('Bit Flip');
-    expect(head()!.textContent).toContain('1 op · 1 b');
-    expect(head()!.textContent).not.toContain('#');
+    mounted = mount(<QueueStrip />, store, DESKTOP);
+    expect(headTag()!.textContent).toContain('Bit Flip');
+    expect(text('[data-testid=strip-state]')).toBe('10 s');
+    mounted.frame(3000);
+    expect(text('[data-testid=strip-state]')).toBe('7 s');
+    expect($('.head-slot .rim-fill')!.style.width).toBe(`${Math.round((240 / 3 - 2) * 0.7) * 3}px`);
+    expect(cards().map(c => c.dataset.task)).toEqual(['1:1:2', '1:1:3', '1:1:4', '1:1:5']);
+    expect(cards()[0]!.textContent).toContain('+1');
+    act(() => store.set({ feed: { window: store.getSnapshot().feed.window.map((t, i) => (i ? t : { ...t, blockedBy: 'cache' })) } }));
+    expect(text('[data-testid=strip-state]')).toBe('blocked');
+    act(() => store.set({ round: { state: 'between' }, feed: { timing: 'onReturn', headDeadlineTick: null } }));
+    expect(headTag()!.textContent).toContain('next');
+    expect(mounted.host.querySelectorAll('.blocked')).toHaveLength(0);
+  });
+  it('updates in place: a taken head just leaves its slot, nothing slides (user, 25 Oct)', () => {
+    const store = fakeStore();
+    mounted = mount(<QueueStrip />, store, DESKTOP);
+    act(() => store.set({ feed: { window: [2, 3, 4, 5, 6].map(i => entry(i)), taken: 1 } }));
+    expect(headTag()!.dataset.task).toBe('1:1:2');
+    expect(mounted.host.querySelectorAll('.tag')).toHaveLength(5);
+    expect(cards().map(c => c.dataset.task)).toEqual(['1:1:3', '1:1:4', '1:1:5', '1:1:6']);
+  });
+});
+
+describe('head card (user, 25 Oct: the main task below, above the deck)', () => {
+  const card = (store: FakeStore, size = DESKTOP) => mount(<OffersScope><Deck /></OffersScope>, store, size);
+  it('reads the head with its values and real 10 s clock; Dismiss is free and dismisses it', () => {
+    const store = fakeStore();
+    mounted = card(store);
+    expect(text('[data-testid=now]')).toContain('Bit Flip');
+    expect(text('[data-testid=now]')).toContain('1 op · 1 b');
+    expect(text('[data-testid=now]')).not.toContain('#');
     expect(text('[data-testid=head-clock]')).toBe('10 s to take');
     mounted.frame(3000);
     expect(text('[data-testid=head-clock]')).toBe('7 s to take');
-    mounted.unmount();
-    mounted = mount(<QueueStrip />, store, DESKTOP);
-    expect($('.head-slot .rim-fill')!.style.width).toBe(`${(432 / 3 - 2) * 3}px`);
-    mounted.frame(5000);
-    expect($('.head-slot .rim-fill')!.style.width).toBe(`${71 * 3}px`);
-    expect(cards().map(c => c.dataset.task)).toEqual(['1:1:2', '1:1:3', '1:1:4', '1:1:5']);
-    expect(cards()[0]!.textContent).toContain('+1');
-    // a 1 ms transfer is a single flash on the pipe (D12.4): the card doesn't print it (A18)
-    expect(cards()[0]!.textContent).not.toContain('ms');
-    act(() => store.set({ feed: { window: store.getSnapshot().feed.window.map(t => ({ ...t, transferS: 1.25 })) } }));
-    expect(cards()[0]!.textContent).toContain('lands 1.25 s');
-  });
-  it('Dismiss is free and dismisses the head; returned work cannot be dismissed', () => {
-    const store = fakeStore();
-    mounted = mount(<QueueStrip />, store, DESKTOP);
     act(() => $('[data-testid=dismiss]')!.click());
     expect(store.actions).toEqual([{ type: 'dismissTask', task: store.getSnapshot().feed.window[0]!.task }]);
-    const feed = store.getSnapshot().feed;
-    act(() => store.set({ feed: { window: [{ ...entry(20, 0, true), workingSetBits: 2, blockedBy: 'cache' }, ...feed.window.slice(1)] } }));
-    expect(head()!.textContent).toContain('Needs 2 b cache');
-    // taken work back at the front has no clock (D25.7)
+  });
+  it('a blocked head says what it needs; returned work has no clock and cannot be dismissed', () => {
+    const store = fakeStore(), feed = store.getSnapshot().feed;
+    store.set({ feed: { window: [{ ...entry(20, 0, true), workingSetBits: 2, blockedBy: 'cache' }, ...feed.window.slice(1)] } });
+    mounted = card(store);
+    expect(text('[data-testid=now]')).toContain('Needs 2 b cache');
     expect(text('[data-testid=head-clock]')).toBe('In LB queue');
     expect(($('[data-testid=dismiss]') as HTMLButtonElement).disabled).toBe(true);
   });
-  it('between rounds the same key returns to market, in the same place', () => {
+  it('between rounds the same key reads Return, in the same place', () => {
     const store = fakeStore();
-    mounted = mount(<QueueStrip />, store, DESKTOP);
-    expect(rectOf('[data-testid=dismiss]')).toBe('336px 96px 96px 48px');
+    mounted = card(store);
+    expect(rectOf('[data-testid=dismiss]')).toBe('552px 24px 96px 48px');
     act(() => store.set({ round: { state: 'between', canReturn: true }, feed: { timing: 'onReturn', headDeadlineTick: null } }));
     expect($('[data-testid=dismiss]')).toBeNull();
-    expect(rectOf('[data-testid=return]')).toBe('336px 96px 96px 48px');
-    expect(head()!.textContent).toContain('Starts after Return');
-    // the next round's queue is frozen and nothing reads as blocked (A03)
-    expect(mounted.host.querySelectorAll('.blocked')).toHaveLength(0);
+    expect(rectOf('[data-testid=return]')).toBe('552px 24px 96px 48px');
+    expect(text('[data-testid=now]')).toContain('Starts after Return');
     act(() => $('[data-testid=return]')!.click());
     expect(store.actions).toEqual([{ type: 'returnToMarket' }]);
-  });
-  it('slides forward: a taken head stays until its exit ends, the rest move up, the new task joins the back', () => {
-    vi.useFakeTimers();
-    try {
-      const store = fakeStore();
-      mounted = mount(<QueueStrip />, store, DESKTOP);
-      const second = cards()[0]!;
-      act(() => store.set({ feed: { window: [2, 3, 4, 5, 6].map(i => entry(i)), taken: 1 } }));
-      // the promoted task rises onto the head's own belt (it never crosses the cards or Dismiss)
-      expect(second.isConnected).toBe(false);
-      expect(head()!.dataset.task).toBe('1:1:2');
-      expect(head()!.parentElement!.dataset.belt).toBe('head');
-      expect(rectOf('.tag.is-head:not([class*=left-])')).toBe('0px 0px 304px 96px');
-      expect($('.tag.left-taken')!.dataset.task).toBe('1:1:1');
-      expect(cards().map(c => c.dataset.task)).toEqual(['1:1:3', '1:1:4', '1:1:5', '1:1:6']);
-      act(() => { vi.advanceTimersByTime(300); });
-      expect($('.tag.left-taken')).toBeNull();
-      // reduced motion: a leaving task drops at once
-      act(() => mounted!.shell.view.setReducedMotion(true));
-      act(() => store.set({ feed: { window: [3, 4, 5, 6, 7].map(i => entry(i)), dismissed: 1 } }));
-      expect($('.tag.left-dismissed')).toBeNull();
-      expect(head()!.dataset.task).toBe('1:1:3');
-    } finally { vi.useRealTimers(); }
   });
 });
 
@@ -148,24 +135,24 @@ function deck(store: FakeStore, size = DESKTOP) {
 }
 
 describe('deck', () => {
-  it('controls never move: the deck keeps its geometry across states', () => {
+  it('controls never move: the head card over Buy, the build rows over Research', () => {
     const store = fakeStore();
     mounted = deck(store);
-    const keys = ['[data-testid=buy]', '[data-testid=build-rows]', '[data-testid=research-key]'];
+    const keys = ['[data-testid=now]', '[data-testid=buy]', '[data-testid=build-rows]', '[data-testid=research-key]'];
     const before = keys.map(rectOf);
-    expect(before).toEqual(['1104px 744px 312px 120px', '24px 744px 720px 120px', '768px 744px 312px 120px']);
+    expect(before).toEqual(['24px 696px 672px 120px', '24px 816px 672px 48px', '720px 696px 696px 120px', '720px 816px 696px 48px']);
     act(() => store.set({ round: { state: 'between', canReturn: true }, feed: { timing: 'onReturn', headDeadlineTick: null } }));
     expect(keys.map(rectOf)).toEqual(before);
     act(() => store.set({ research: { active: 'fabKhz' as never, name: 'kHz fab', progress: 0.5, opsPerSec: 1200, queued: 2 } }));
     expect(keys.map(rectOf)).toEqual(before);
     mounted.unmount();
     mounted = deck(store);
-    expect(text('[data-testid=research-key]')).toBe('Research50%kHz fab1.2k ops/s · 2 queued');
+    expect(text('[data-testid=research-key]')).toBe('Research · kHz fab 1.2k ops/s · 2 queued50%');
   });
   it('the Buy key says how far off the next buy is', () => {
     const store = fakeStore();
     mounted = deck(store);
-    expect(text('[data-testid=buy]')).toMatch(/Saving up · \d+ to go/);
+    expect(text('[data-testid=buy]')).toMatch(/· \d+ to go/);
   });
   it('builds five rows from the sim quotes: x → x, prices, and where the pipe upgrades', () => {
     const store = fakeStore();
@@ -176,11 +163,12 @@ describe('deck', () => {
     expect(rows[2]!.textContent).toMatch(/1 → 2 Hz/);
     expect(rows[1]!.textContent).toMatch(/1 → 2 b/);
   });
-  it('phone: Research and Buy sit in the bottom-right thumb zone; Build opens a sheet', () => {
+  it('phone: the head card spans the width above Build · Research · Buy; Build opens a sheet', () => {
     const store = fakeStore();
     mounted = deck(store, { width: 390, height: 780 });
-    expect([rectOf('[data-testid=build-key]'), rectOf('[data-testid=research-key]'), rectOf('[data-testid=buy]')])
-      .toEqual(['8px 704px 80px 64px', '96px 704px 112px 64px', '216px 704px 160px 64px']);
+    expect([rectOf('[data-testid=now]'), rectOf('[data-testid=build-key]'), rectOf('[data-testid=research-key]'), rectOf('[data-testid=buy]')])
+      .toEqual(['8px 616px 368px 80px', '8px 704px 80px 64px', '96px 704px 112px 64px', '216px 704px 160px 64px']);
+    expect(rectOf('[data-testid=dismiss]')).toBe('256px 16px 96px 48px');
     act(() => $('[data-testid=build-key]')!.click());
     expect($('[data-testid=build-sheet]')).not.toBeNull();
   });

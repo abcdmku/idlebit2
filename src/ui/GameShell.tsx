@@ -128,7 +128,7 @@ export function GameShell({ store, registry, level, view, size, children }: Game
     r: () => shell.view.dispatch({ type: 'toggleSheet', sheet: 'research' }),
   });
 
-  const vars = { '--body': `${layout.body}px`, '--lh': `${layout.lh}px`, '--big': `${layout.big}px`,
+  const vars = { '--body': `${layout.body}px`, '--lh': `${layout.lh}px`, '--big': `${layout.big}px`, '--mid': `${layout.mid}px`,
     '--head': `${layout.body + 2}px`, '--n': `${layout.N}px` } as CSSProperties;
   return <ShellContext.Provider value={shell}>
     <LayoutContext.Provider value={layout}>

@@ -1,21 +1,32 @@
-// Task icons (D23, set F). Every family belongs to a player-facing task type (derived from its
-// catalog band), and shows its type's icon in the type's colour: family glyphs are retired, the
-// family name is text on the card. Icons are 16×16 art cells with a baked 1 px ink outline,
-// pixel-exact at any integer scale N; the sled LCD uses the 5×5 minis.
+// Task icons (D23). Every family belongs to a player-facing task type (derived from its catalog
+// band). Each type has one colour and a frame silhouette; a family icon is its type's frame with
+// the family's glyph on the frame's dark plate. Icons are 16×16 art cells with a baked 1 px ink
+// outline, pixel-exact at any integer scale N. Data is generated from ./art (generate.mjs).
 import { FAMILIES, familyKey } from '../../../game';
 import type { BandId, FamilyId } from '../../../game';
-import { TYPE_ICONS, TYPE_MINI } from './setF';
-import { BAND_NAME, BAND_ORDER, BAND_TYPE, PIPS, TYPE } from './types';
+import { ICONS as ACCEL } from './icons-accel';
+import { ICONS as CLUSTER } from './icons-cluster';
+import { ICONS as COMPUTE } from './icons-compute';
+import { ICONS as MEMORY } from './icons-memory';
+import { ICONS as PARALLEL } from './icons-parallel';
+import { ICONS as REGION } from './icons-region';
+import { ICONS as STORAGE } from './icons-storage';
+import { ICONS as ZONES } from './icons-zones';
+import { BAND_NAME, BAND_ORDER, BAND_TYPE, TYPE, TYPE_ICONS } from './types';
 import type { TaskType, TypeStyle } from './types';
+import { TYPE_MINI } from './minis';
+export { TYPE_MINI } from './minis';
 
-export { BAND_ORDER, BAND_TYPE, PIPS, TASK_TYPES, TYPE } from './types';
+export { BAND_ORDER, BAND_TYPE, TASK_TYPES, TYPE } from './types';
 export type { TaskType, TypeStyle } from './types';
 /** The icon silhouette (14) and the cell it sits in (16, the outline fills the 1 px margin). */
 export const FAMILY_ICON = 14, FAMILY_CELL = 16;
 /** 'type': the type's colours; 'fail': the same art in the fault ramp. */
 export type IconTone = 'type' | 'fail';
 
-export { TYPE_ICONS, TYPE_MINI } from './setF';
+const BY_TYPE: Readonly<Record<TaskType, Readonly<Record<string, readonly string[]>>>> = {
+  compute: COMPUTE, parallel: PARALLEL, memory: MEMORY, accel: ACCEL, storage: STORAGE, cluster: CLUSTER, zones: ZONES, region: REGION,
+};
 const INK = '#0e0b1c', WHITE = '#f6f3ff';
 const FAIL: Readonly<Record<string, string>> = { o: INK, k: '#3a1420', l: '#ff8a7a', a: '#ff3b3b', d: '#8a2430', w: '#ffc9c0' };
 
@@ -35,8 +46,7 @@ export const typeColor = (type: TaskType): string => TYPE[type].a;
 export const typeName = (type: TaskType): string => TYPE[type].name;
 /** The family's type colour (since D23 a band shows its type's colour). */
 export const bandColor = (family: FamilyId | string): string => typeColor(typeOf(family));
-/** True for a catalog family (every family shows its type's icon). */
-export const hasFamilyIcon = (family: FamilyId | string): boolean => !!FAMILY[keyOf(family)];
+export const hasFamilyIcon = (family: FamilyId | string): boolean => !!BY_TYPE[typeOf(family)][keyOf(family)];
 
 type Run = readonly [x: number, y: number, len: number, ch: string];
 const runCache = new Map<readonly string[], readonly Run[]>();
@@ -67,26 +77,18 @@ function drawRows(g: CanvasRenderingContext2D, rows: readonly string[], pal: Rea
   for (const [rx, ry, len, ch] of runsOf(rows)) { g.fillStyle = pal[ch]!; g.fillRect(x + rx * n, y + ry * n, len * n, n); }
 }
 
-/** Draw a family's icon (its type's icon, set F) in the 16×16 cell whose top-left is (x, y), each art pixel `scale` px. */
+/** Draw a family's icon in the 16×16 cell whose top-left is (x, y), each art pixel `scale` px. */
 export function drawFamilyIcon(g: CanvasRenderingContext2D, family: FamilyId | string, x: number, y: number, scale = 1, tone: IconTone = 'type'): void {
-  const type = typeOf(family);
-  drawRows(g, TYPE_ICONS[type], palette(type, tone), x, y, scale);
+  const type = typeOf(family), rows = BY_TYPE[type][keyOf(family)];
+  if (rows) drawRows(g, rows, palette(type, tone), x, y, scale);
 }
 /** Draw a task type's 5×5 mini (the sled LCD) at (x, y), no outline. */
 export function drawTypeMini(g: CanvasRenderingContext2D, type: TaskType, x: number, y: number, scale = 1): void {
   drawRows(g, TYPE_MINI[type], palette(type, 'type'), x, y, scale);
 }
-/** Draw a task type's icon in the 16×16 cell at (x, y). */
+/** Draw a task type's icon (its frame and emblem) in the 16×16 cell at (x, y). */
 export function drawTypeIcon(g: CanvasRenderingContext2D, type: TaskType, x: number, y: number, scale = 1, tone: IconTone = 'type'): void {
   drawRows(g, TYPE_ICONS[type], palette(type, tone), x, y, scale);
-}
-/** Draw requirement pip `req` (a PIPS key), 5×5 art px (or 3×3 when `mini`), at (x, y). */
-export function drawPip(g: CanvasRenderingContext2D, req: string, x: number, y: number, scale = 1, mini = false): void {
-  const p = PIPS[req];
-  if (!p) return;
-  const rows = mini ? p.mini : p.px, n = rows.length;
-  g.fillStyle = p.c;
-  for (let j = 0; j < n; j++) for (let i = 0; i < n; i++) if (rows[j]![i] === 'w') g.fillRect(x + i * scale, y + j * scale, scale, scale);
 }
 
 function paint(canvas: HTMLCanvasElement, scale: number, dpr: number, draw: (g: CanvasRenderingContext2D, n: number) => void): void {

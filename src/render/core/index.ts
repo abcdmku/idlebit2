@@ -12,8 +12,8 @@ export type { ZoomLink } from './choreo';
 export { DESKTOP_TYPE, PHONE_TYPE, LabelBuffer, TONE, drawLabels, MAX_LABELS } from './labels';
 export type { LabelAlign, LabelTone, LabelWriter, Typography } from './labels';
 export * from './format';
-export { BAND, BAND_ORDER, BAND_TYPE, FAMILY, FAMILY_CELL, FAMILY_ICON, PIPS, TASK_TYPES, TYPE, bandColor, drawFamilyIcon,
-  drawTypeIcon, drawTypeMini, drawPip, familyBand, familyName, hasFamilyIcon, paintFamilyIcon, paintTypeIcon, typeOf, typeColor, typeName } from './familyIcons';
+export { BAND, BAND_ORDER, BAND_TYPE, FAMILY, FAMILY_CELL, FAMILY_ICON, TASK_TYPES, TYPE, bandColor, drawFamilyIcon,
+  drawTypeIcon, drawTypeMini, familyBand, familyName, hasFamilyIcon, paintFamilyIcon, paintTypeIcon, typeOf, typeColor, typeName } from './familyIcons';
 export type { BandStyle, IconTone, TaskType, TypeStyle } from './familyIcons';
 export { drawPipe, inbound, transferProgress, MIN_VISIBLE_TRANSFER_S } from './pipe';
 export type { Inbound } from './pipe';

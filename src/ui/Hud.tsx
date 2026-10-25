@@ -1,7 +1,8 @@
-// The band: the level ladder (and its name on desktop), Data and Credits around the payout coin, SLA
-// with its 60–100% meter and the round number and clock (L2 syncBand). It overlays the world's top
-// edge. Every element keeps its box while its text updates in place; currencies are whole numbers
-// (D2.2, D3.3). On phone the pressed rung names the level and the icons name the currencies.
+// The band: the level ladder at the left (and its name on desktop), SLA in the centre at the big size
+// with its 60–100% meter and the round clock, and Data over Credits stacked at the right (user, 25 Oct:
+// SLA is very important). It overlays the world's top edge. Every element keeps its box while its text
+// updates in place; currencies are whole numbers (D2.2, D3.3). On phone the pressed rung names the
+// level and the icons name the currencies.
 import { ORDER, SPR } from '../render/core';
 import type { LevelId } from '../game';
 import { ArtCanvas } from './art/ArtCanvas';
@@ -51,23 +52,25 @@ function useSpent(): number | null {
   return spent;
 }
 
+/** Data over Credits at the band's right (user, 25 Oct), the same size; right-aligned, so nothing shifts. */
 function Wallet() {
-  const L = useLayout(), spent = useSpent();
+  const L = useLayout(), spent = useSpent(), d = L.kind === 'desktop';
   const w = useGameSelector(s => ({ credits: s.hud.credits, data: s.hud.data }), shallowEqual, 100);
-  const row = L.creditsRow, d = L.kind === 'desktop', gap = d ? L.gutter : 16, coin = 8 * L.N;
+  const box0 = L.wallet, rowH = box0.h / 2;
   const credits = amountText(w.credits), data = amountText(w.data);
+  const row = (i: number) => ({ right: L.w - (box0.x + box0.w), top: box0.y + i * rowH, height: rowH });
   return <div className="wallet" role="group" aria-label="Wallet">
-    <span className="figrow r" style={{ right: L.w - (L.creditX - gap), top: row.y, height: row.h }} aria-label={`${data} Data`}>
-      <CurrencyIcon kind="data" n={L.N} /><b className="fig big data" data-testid="data">{data}</b>{d && <span className="mute">Data</span>}
+    <span className="figrow r" style={row(0)} aria-label={`${data} Data`}>
+      <CurrencyIcon kind="data" n={L.N} /><b className="fig mid data" data-testid="data">{data}</b>{d && <span className="mute">Data</span>}
     </span>
-    <span className="hud-coin" data-free="art" style={{ left: L.creditX - coin / 2, top: row.y + (row.h - coin) / 2 }}><CurrencyIcon kind="credits" n={L.N} /></span>
-    <span className="figrow" style={{ left: L.creditX + gap, top: row.y, height: row.h }} aria-label={`${credits} Credits`}>
-      <b className="fig big gold" data-testid="credits">{credits}</b>{d && <span className="mute">Credits</span>}
+    <span className="figrow r" style={row(1)} aria-label={`${credits} Credits`}>
       <span className="dim" data-testid="spent">{spent ? `−${wholeText(spent)}` : ''}</span>
+      <CurrencyIcon kind="credits" n={L.N} /><b className="fig mid gold" data-testid="credits">{credits}</b>{d && <span className="mute">Credits</span>}
     </span>
   </div>;
 }
 
+/** SLA in the HUD's centre at the big size with its 60–100% meter (the 80% tick) and the round clock. */
 function Sla() {
   const L = useLayout(), d = L.kind === 'desktop', n = L.N;
   const g = useGameSelector(s => ({ phase: s.round.state, percent: s.hud.sla.percent, round: s.hud.roundIndex,
@@ -75,13 +78,13 @@ function Sla() {
   const tone = g.percent >= 90 ? 'ok' : g.percent >= 80 ? 'warn' : 'bad';
   const when = g.phase === 'running' ? clockText(g.seconds * 1000) : g.phase === 'ended' ? 'round over' : 'between rounds';
   // Reserved widths: "100.0%" and "R99 · 1:59:59", so the meter never moves while the numbers change.
-  return <span className="figrow r sla" role="status" aria-label={`SLA ${slaText(g.percent)}, round ${g.round}, ${when}`} data-testid="sla-gauge"
-    style={{ right: L.w - L.slaRight, top: L.band.y, height: L.rungRow }}>
+  return <span className="figrow sla" role="status" aria-label={`SLA ${slaText(g.percent)}, round ${g.round}, ${when}`} data-testid="sla-gauge"
+    style={{ left: L.sla.x, top: L.sla.y, width: L.sla.w, height: L.sla.h, justifyContent: 'center' }}>
     <span className="mute">SLA</span>
-    <span className={tone} data-testid="sla" style={{ minWidth: d ? 7 * L.body / 2 : 0, textAlign: 'right' }}>{slaText(g.percent)}</span>
-    {d && <i className="g-meter hud-meter" data-free="art" aria-hidden="true" title="80% ends the round" style={{ flex: 'none', width: 40 * n, height: 2 * n }}>
-      <b style={{ width: `${slaFill(g.percent).toFixed(1)}%` }} /><em style={{ top: -n, height: 4 * n, width: n }} /></i>}
-    <span className="dim" data-testid="round" style={{ width: d ? 8 * L.body : 3 * L.body }}>{d ? `R${g.round} · ${when}` : `R${g.round}`}</span>
+    <b className={`fig big ${tone}`} data-testid="sla" style={{ minWidth: 3.4 * L.big, textAlign: 'right' }}>{slaText(g.percent)}</b>
+    <i className="g-meter hud-meter" data-free="art" aria-hidden="true" title="80% ends the round" style={{ flex: 'none', width: (d ? 40 : 32) * n, height: 2 * n }}>
+      <b style={{ width: `${slaFill(g.percent).toFixed(1)}%` }} /><em style={{ top: -n, height: 4 * n, width: n }} /></i>
+    <span className="dim" data-testid="round" style={{ width: d ? 7 * L.body : 3 * L.body }}>{d ? `R${g.round} · ${when}` : `R${g.round}`}</span>
   </span>;
 }
 
@@ -90,7 +93,7 @@ export function Hud() {
   return <header className="band" aria-label="Status">
     <div className="band-bg" style={box(L.band)} />
     <Ladder />
-    <Wallet />
     <Sla />
+    <Wallet />
   </header>;
 }

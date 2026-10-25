@@ -12,6 +12,7 @@ import type { DesktopLayout, PhoneLayout } from '../layout';
 import { box, T, useLayout } from '../shell/geometry';
 import { shallowEqual, useGameSelector, useShell, useViewState } from '../storeHooks';
 import { BuildSheet } from './BuildSheet';
+import { NowCard } from './NowCard';
 import type { Offers } from './offers';
 import { offerAction, PriceText, RightText, useTapOffer } from './offerUi';
 import { useShellOffers } from './useOffers';
@@ -29,18 +30,21 @@ function BuyButton({ offers }: { offers: Offers }) {
     disabled={!nx && !unlock} title={nx ? `${nx.name}: ${nx.change} for ${wholeText(nx.price ?? 0)} Credits` : unlock ? `Research ${unlock.right.kind === 'research' ? unlock.right.node : ''}` : 'Nothing to buy here'}
     onClick={() => { if (nx && can) tap(nx); else if (!nx && unlock) tap(unlock); }}>
     {!shown ? <T x={pad} y={pad} className="dim">Nothing to buy here</T> : <>
-      <span className="aic" style={{ left: L.lat, top: L.lat }}>
+      <span className="aic" style={{ left: L.lat, top: d ? (b.h - 16 * n) / 2 : L.lat }}>
         <ArtCanvas w={16} h={16} n={n} artKey={`${shown.icon}:${can}`} draw={g => drawPartIcon(g, shown.icon, !can)} />
       </span>
-      {!nx && unlock ? <>
+      {!nx && unlock ? (d ? <>
+        <T x={tx} y={0} h={b.h} w={b.w - tx - 120}><b>Next: {unlock.right.kind === 'research' ? unlock.right.node : unlock.name}</b> <span className="mute">{unlock.name}</span></T>
+        <T right={L.lat} y={0} h={b.h} className="rnd">Research</T>
+      </> : <>
         <T x={tx} y={pad} w={b.w - tx - 8}><b>Next: {unlock.right.kind === 'research' ? unlock.right.node : unlock.name}</b></T>
         <T x={tx} y={pad + L.lh} w={b.w - tx - 8} className="mute">{unlock.name}{unlock.change ? ` ${unlock.change}` : ''}</T>
-        <T x={d ? tx : 8} y={pad + 2 * L.lh} className="rnd">Research</T>
-      </> : nx && (d ? <>
-        <T x={tx} y={L.lat} w={b.w - tx - PRICE_W}><b>{nx.name}</b></T>
-        <T right={L.lat} y={L.lat}><PriceText offer={nx} n={n} /></T>
-        <T x={tx} y={L.lat + L.lh} w={b.w - tx - L.lat} className={can ? '' : 'mute'}>{nx.change}</T>
-        <T x={tx} y={L.lat + 2 * L.lh} w={b.w - tx - L.lat} className={can ? 'gold' : 'dim'}><b>{can ? 'Buy' : `Saving up · ${wholeText(short)} to go`}</b></T>
+        <T x={8} y={pad + 2 * L.lh} className="rnd">Research</T>
+      </>) : nx && (d ? <>
+        {/* One 48 px line: the buy, what it changes, how far off it is, and its price. */}
+        <T x={tx} y={0} h={b.h} w={b.w - tx - PRICE_W}><b>{nx.name}</b> <span className={can ? '' : 'mute'}>{nx.change}</span>
+          {!can && short > 0 && <span className="dim"> · {wholeText(short)} to go</span>}</T>
+        <T right={L.lat} y={0} h={b.h}><PriceText offer={nx} n={n} /></T>
       </> : <>
         {/* The name has its own line (it never shares one with the price); the price sits by the call to buy. */}
         <T x={tx} y={8} w={b.w - tx - 8}><b>{nx.name}</b></T>
@@ -117,15 +121,13 @@ function ResearchKey() {
     onClick={() => view.dispatch({ type: 'toggleSheet', sheet: 'research' })}>
     <i className="rim-track" data-free="art" style={{ left: n, top: n, width: k.w - 2 * n, height: 2 * n }}>
       <b className="rim-fill" data-tone="rnd" style={{ height: 2 * n, width: Math.round((k.w / n - 2) * r.progress) * n }} /></i>
-    <span className="aic" style={{ left: L.lat, top: L.lat }}><ArtCanvas w={16} h={16} n={n} artKey="flask" draw={drawFlask} /></span>
+    <span className="aic" style={{ left: L.lat, top: d ? (k.h - 16 * n) / 2 : L.lat }}><ArtCanvas w={16} h={16} n={n} artKey="flask" draw={drawFlask} /></span>
     {d ? <>
-      <T x={tx} y={L.lat} w={k.w - tx - L.lat - (r.active ? 56 : 0)}><b>Research</b>{!r.active && ready > 0 && <span className="gold"> · {ready} ready</span>}</T>
-      <T right={L.lat} y={L.lat} className="rnd">{pct}</T>
-      <T x={tx} y={L.lat + L.lh} w={k.w - tx - L.lat}>{r.active ? <b>{r.active}</b>
-        : ready ? <span className="mute">Tap to start one</span> : idle}</T>
-      <T x={tx} y={L.lat + 2 * L.lh} w={k.w - tx - L.lat}>{r.stopped ? <span className="warn">Stopped · no Credits</span>
-        : r.active ? <span className="mute">{formatOps(r.rate)}/s{r.queued ? ` · ${r.queued} queued` : ''}</span>
-        : <span className="dim">{ready ? '' : 'Choose a project'}</span>}</T>
+      {/* One 48 px line: the project and its rate, or how many are ready; the % at the right. */}
+      <T x={tx} y={0} h={k.h} w={k.w - tx - L.lat - (r.active ? 56 : 0)}><b>Research</b>{r.stopped ? <span className="warn"> · stopped, no Credits</span>
+        : r.active ? <> <b>· {r.active}</b> <span className="mute">{formatOps(r.rate)}/s{r.queued ? ` · ${r.queued} queued` : ''}</span></>
+        : <> <span className={ready ? 'gold' : 'dim'}>· {ready ? `${ready} ready` : r.needsData ? 'Needs Data' : 'Idle'}</span></>}</T>
+      <T right={L.lat} y={0} h={k.h} className="rnd">{pct}</T>
     </> : <>
       <T x={48} y={8} w={k.w - 52}><b>Research</b></T>
       <T x={8} y={40} w={k.w - 16}>{r.active ? <><span className="rnd">{pct}</span> <span className="mute">{r.stopped ? 'stopped' : r.active}</span></> : idle}</T>
@@ -136,6 +138,7 @@ function ResearchKey() {
 export function Deck() {
   const L = useLayout(), offers = useShellOffers(), sheet = useViewState().sheet;
   return <div className="deck" onPointerDown={e => e.stopPropagation()}>
+    <NowCard />
     {L.kind === 'desktop' ? <BuildRows L={L} offers={offers} /> : <BuildKey L={L} offers={offers} />}
     <ResearchKey />
     <BuyButton offers={offers} />

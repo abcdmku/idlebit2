@@ -78,6 +78,11 @@ export interface RoundSummary {
   readonly gross: string;
   readonly energy: string;
   readonly data: string;
+  /** Systems and racks owned when the round ended; tasks failed late; share of delivered work spilled to disk. */
+  readonly systems: number;
+  readonly racks: number;
+  readonly late: number;
+  readonly diskShare: number;
 }
 
 export interface CampaignResult {
@@ -102,7 +107,7 @@ export interface CampaignResult {
 const seconds = (tick: number) => (tick * TICK_MS) / 1000;
 const MILESTONE_RESEARCH = new Set(['systemBoard', 'fabKhz', 'rack', 'fabMhz', 'room', 'fabGhz', 'dataCenter', 'regions', 'intercontinental']);
 
-function summarize(r: RoundReport): RoundSummary {
+function summarize(r: RoundReport, state: GameState): RoundSummary {
   const causes = Object.entries(r.failedByCause) as [FailCause, number][];
   const failed = causes.reduce((sum, [, n]) => sum + n, 0);
   const top = causes.filter(([, n]) => n > 0).sort((a, b) => b[1] - a[1])[0];
@@ -111,6 +116,8 @@ function summarize(r: RoundReport): RoundSummary {
     index: r.index, startS: seconds(r.startTick), lengthS: seconds(r.durationTicks),
     met: r.met, failed, topCause, topDetail: topCause ? r.failDetail[topCause] : null,
     peakIntensity: r.peakIntensity, gross: r.gross, energy: r.energy, data: r.data,
+    systems: state.build.systems.filter((x) => x !== null).length, racks: state.build.racks.filter((x) => x?.opened).length,
+    late: r.failedByCause.late, diskShare: r.deliveredWork > 0 ? r.spill.diskWork / r.deliveredWork : 0,
   };
 }
 
@@ -154,7 +161,7 @@ export function runCampaign(options: CampaignOptions = {}): CampaignResult {
       state = next;
       left -= piece;
       for (const r of report.roundsEnded) {
-        rounds.push(summarize(r));
+        rounds.push(summarize(r, state));
         mark('firstRoundEndS', r.startTick + r.durationTicks, true);
       }
       if (report.roundsEnded.length > 0 && state.round.phase !== 'running') { wait = policy.cadenceTicks; left = 0; }

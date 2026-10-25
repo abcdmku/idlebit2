@@ -4,6 +4,7 @@ import {
   type GameAction, type GameState, type Quote, type QuoteRequest, type ResearchNodeView, type ScopeRef,
 } from '../index';
 import { MAX_ACCELS, MAX_UPS } from '../core/constants';
+import { rqLen, rqLevel, rqRow } from '../core/routerQueue';
 import { portSpeedPrice } from '../build/catalog';
 import type { GpuGeneration } from '../types/gpu';
 import type { Policy } from './policies';
@@ -76,6 +77,29 @@ const carried = (state: GameState, id: number): number => {
 const income = (state: GameState): number =>
   state.build.systems.reduce((sum, s, id) => sum + (s === null ? 0 : carried(state, id)), 0);
 
+/** Gross Credits per second over the last round, or the carried estimate before any round ended. */
+function grossRate(state: GameState): number {
+  const r = state.round.reports.at(-1);
+  return r && r.durationTicks > 0 ? amountToNumber(r.gross) / (r.durationTicks / 10) : Math.max(1, income(state));
+}
+
+/** Full-load watts of a rack's servers against its PDU capacity (opened racks only). */
+function rackLoad(state: GameState, rack: number): { loadW: number; capW: number; perServerW: number } {
+  const ids = (state.build.racks[rack]?.servers ?? []).filter((s): s is NonNullable<typeof s> => s !== null);
+  let loadW = 0, top = 0;
+  for (const id of ids) { const w = fullLoadW(state, id); loadW += w.idle + w.load; top = Math.max(top, w.idle + w.load); }
+  return { loadW, capW: state.compiled.rack.pduCapW[rack] ?? 0, perServerW: top };
+}
+/** A server may join a rack only with a free switch port and PDU headroom for one more at full load. */
+const PDU_HEADROOM = 0.9;
+function rackHasRoom(state: GameState, rack: number): { port: boolean; power: boolean } {
+  const r = state.build.racks[rack];
+  if (!r) return { port: false, power: false };
+  const servers = r.servers.filter((s) => s !== null).length;
+  const { loadW, capW, perServerW } = rackLoad(state, rack);
+  return { port: servers < r.switch.ports.length, power: loadW + perServerW <= PDU_HEADROOM * capW };
+}
+
 /** The systems the bot looks at: the weakest first, so a rack is upgraded evenly. */
 function sampleSystems(state: GameState): number[] {
   const ids = state.build.systems.flatMap((s, id) => (s === null ? [] : [id]));
@@ -114,6 +138,8 @@ export function candidateRequests(state: GameState): QuoteRequest[] {
     for (const id of firstIds(build.racks, SAMPLE)) {
       const rack = build.racks[id]!;
       reqs.push({ kind: 'tray', at: { level: 'rack', id: rackId(id) } });
+      reqs.push({ kind: 'switch', sw: { kind: 'rack', id: rackId(id) } });
+      reqs.push({ kind: 'routerQueue', unit: { kind: 'rack', id: rackId(id) } });
       const slot = rack.servers.indexOf(null);
       if (slot >= 0) reqs.push({ kind: 'add', parent: { kind: 'rack', id: rackId(id) }, slot });
     }
@@ -162,6 +188,24 @@ export function score(state: GameState, q: Quote): number | null {
   const a = q.action;
   const rate = cpuTarget(a) !== null || a.type === 'upgradePort' || a.type === 'addUnit';
   if (a.type === 'addUnit' && a.source.kind === 'barebones' && hasSibling(state, a.parent)) return null;
+  if (a.type === 'addUnit' && a.parent.kind === 'rack') {
+    const room = rackHasRoom(state, a.parent.id);
+    if (!room.port || !room.power) return null;
+  }
+  if (a.type === 'addPorts') {
+    // A port is the gate for one more server: wanted when the rack has a free slot and every port is taken.
+    const r = a.sw.kind === 'rack' ? state.build.racks[a.sw.id] : null;
+    if (!r || !r.servers.includes(null) || r.servers.filter((s) => s !== null).length < r.switch.ports.length) return null;
+    return GATE_PAYBACK_S * cost / Math.max(1, grossRate(state));
+  }
+  if (a.type === 'upgradeRouterQueue') {
+    // D25.7: a deeper queue only helps when entries wait in it and heads still time out.
+    if (a.unit.kind !== 'rack') return null;
+    const full = rqLen(state.hot, rqRow(state.hot, 0, a.unit.id)) >= rqLevel(state.compiled, 0, a.unit.id);
+    const last = state.round.reports.at(-1);
+    if (!full || !last || last.failedByCause.timeout === 0) return null;
+    return GATE_PAYBACK_S * cost / Math.max(1, grossRate(state));
+  }
   if (a.type === 'addUnit' && a.source.kind === 'copy' && a.source.from.kind === 'system') {
     // A copied server lands on a default port; a player steps that port to the original's speed.
     const from = a.source.from.id, pipe = state.compiled.sys.pipeSpeed[from] ?? 0;
@@ -225,7 +269,8 @@ function supplyNeeded(state: GameState, a: GameAction): boolean {
   switch (slot.kind) {
     case 'psu': return unit.kind === 'system' && ((h.sys.psuUsage[unit.id] ?? 0) > SUPPLY_USE
       || (state.research.unlocks.gens.gpu !== 0 && !state.build.systems[unit.id]?.spec.accels.some((c) => c.kind === 'gpu')));
-    case 'pdu': return unit.kind === 'rack' && (h.rack.pduUsage[unit.id] ?? 0) > SUPPLY_USE;
+    case 'pdu': return unit.kind === 'rack' && ((h.rack.pduUsage[unit.id] ?? 0) > SUPPLY_USE
+      || (rackHasRoom(state, unit.id).port && !rackHasRoom(state, unit.id).power && (state.build.racks[unit.id]?.servers.includes(null) ?? false)));
     case 'rackCooler': return unit.kind === 'rack' && (h.rack.tempF[unit.id] ?? 0) > HOT_F;
     case 'roomCooler': return unit.kind === 'room' && (h.room.tempF[unit.id] ?? 0) > HOT_F;
     case 'ups': return unit.kind === 'room' && (h.room.upsUsage[unit.id * MAX_UPS] ?? 0) > SUPPLY_USE;
@@ -283,14 +328,17 @@ function tryAction(state: GameState, action: GameAction): GameState | null {
  * Credits to keep for research that has its Data but waits on a Credit fee (GPU generations):
  * a sensible player saves for the essential node rather than spending on parts.
  */
+const RESERVE_HORIZON_S = 1800;
 function creditReserve(state: GameState): number {
   const tree = selectResearchTree(state);
+  // A fee more than half an hour of gross income away is a goal, not a reason to stop building.
+  const horizon = RESERVE_HORIZON_S * grossRate(state);
   let reserve = 0;
   for (const n of tree.nodes) {
     if (n.state !== 'available' || !ESSENTIAL.includes(n.id) || !n.creditCost) continue;
     if (amountCompare(n.dataCost, state.wallet.data) > 0) continue;
     const fee = amountToNumber(n.creditCost);
-    if (fee > 0 && (reserve === 0 || fee < reserve)) reserve = fee;
+    if (fee > 0 && fee <= horizon && (reserve === 0 || fee < reserve)) reserve = fee;
   }
   return reserve;
 }
@@ -328,7 +376,7 @@ function buyParts(state: GameState, policy: Policy, log: BotEvent[]): GameState 
 const byDataCost = (a: ResearchNodeView, b: ResearchNodeView) => amountCompare(a.dataCost, b.dataCost) || a.workOps - b.workOps;
 
 /** Off-path research that unblocks income; a sensible player takes it as soon as the budget allows. */
-const ESSENTIAL = ['fifoSched', 'dualCore', 'memController', 'psu80', 'gpuGen1', 'storageCtl', 'octaCore', 'outOfOrder', 'sw100k', 'gddr6', 'gpuGen2', 'lbCapability'];
+const ESSENTIAL = ['fifoSched', 'dualCore', 'memController', 'psu80', 'gpuGen1', 'storageCtl', 'octaCore', 'outOfOrder', 'lbCapability', 'portExpansion', 'sw100k', 'gddr6', 'gpuGen2', 'densePorts', 'meteredPdu'];
 /** Off-path research since the last milestone started may spend this share of the next milestone path's Data. */
 const OFF_PATH_SHARE = 0.25;
 

@@ -137,12 +137,12 @@ Work pays on the component that ran it. Nothing flows out to the deck or the HUD
 - `pops.ts`: `PayoutPops`, `completionMs`, the `Completion` shape (see Payouts).
 - `feed.ts`: `drawCart`, `drawFamilyGlyph` (by `FamilyId`), `drawReq`, `drawCause`, `deadlineMs`.
 - `pipe.ts`: `drawPipe`, `inbound`, `transferProgress`.
-- `familyIcons/` (task types and their icons, D23, set F, for the canvas and the UI shell):
-  - Task types group the catalog bands; each has one colour ramp (`TYPE`: name, bands, `a` colour, `d` shade, `l` light, `k` plate) and one icon. Compute, Parallel, Memory, Accelerated, Storage, Distributed, Multi-zone, Regional.
-  - **Every family shows its type's icon** in its type colour (set F, `setF.ts`): family glyphs are retired, and the family name is text on the card. Icons are 16×16 art cells, a 14×14 silhouette with a 1 px ink ring baked into the margin, so they read on the void, the cards, the purple core tile and the LCD.
-  - `drawFamilyIcon(g, family, x, y, N = 1, tone = 'type' | 'fail')` and `drawTypeIcon(g, type, x, y, N, tone)` draw the icon at integer scale N; `paintFamilyIcon` and `paintTypeIcon` paint it into a DOM canvas (16N × 16N CSS px at `dpr`, pixelated). `drawTypeMini(g, type, x, y, N)` draws the 5×5 mini the sled LCD uses.
-  - `typeOf(family)`, `typeColor`, `typeName`, `TASK_TYPES`, `BAND_TYPE`, `bandColor`, `BAND`, `familyName`, `familyBand`, `FAMILY`, `FAMILY_CELL` (16), `FAMILY_ICON` (14). Requirement pips: `drawPip(g, req, x, y, N, mini)` and `PIPS`.
-  - The matrices are literal (`setF.ts`, from `artifacts/icons/index.html`); there is no generator.
+- `familyIcons/` (task types and family icons, D23, for the canvas and the UI shell; the first release's icons, restored at the user's request):
+  - Task types group the catalog bands; each has one colour ramp (`TYPE`: name, bands, `a` colour, `d` shade, `l` light, `k` plate) and one frame silhouette.
+  - A family icon is its type's frame with the family's own glyph on the frame's dark plate, so a type's families read as a set. Every icon is a 16×16 art cell: a 14×14 silhouette with a 1 px ink outline baked into the margin.
+  - `drawFamilyIcon(g, family, x, y, N = 1, tone = 'type' | 'fail')`, `drawTypeIcon(g, type, x, y, N, tone)`, `paintFamilyIcon` and `paintTypeIcon` (DOM, 16N × 16N CSS px at `dpr`, pixelated). The sled LCD's 6 px window can't hold a 16 px icon, so it uses the type's 5×5 mini: `drawTypeMini(g, type, x, y, N)` (`minis.ts`).
+  - `typeOf(family)`, `typeColor`, `typeName`, `TASK_TYPES`, `BAND_TYPE`, `bandColor`, `BAND`, `familyName`, `familyBand`, `hasFamilyIcon`, `FAMILY`, `FAMILY_CELL` (16), `FAMILY_ICON` (14).
+  - The art lives in `familyIcons/art/`; regenerate the data with `node src/render/core/familyIcons/generate.mjs`.
 - Task numbers are never drawn (user): a task shows as its family icon and name.
 - `px.ts`, `palette.ts`, `glyphs.ts`, `sprites.ts`, `decoration.ts`: pixel primitives, one palette, the 3×5 glyphs, the sprite cache and state overlays.
 
