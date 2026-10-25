@@ -2,6 +2,8 @@ import { accelNeed, readAccelDomain } from '../core/accelerators';
 import { LOC } from '../core/buffers';
 import { ACCEL_CLOCKS, ACCEL_DOMAINS, DT_S, GENERAL_MAX_GPUS, MAX_ACCELS } from '../core/constants';
 import { FAMILIES } from '../market/families';
+import { partClock } from '../exec/memory';
+import { shapeOf } from '../exec/shape';
 import { evaluateGpu, gpuModel } from '../build/catalog/gpuModels';
 import { installedGpuStats } from '../build/gpu';
 import type { GameState } from '../types/state';
@@ -75,8 +77,8 @@ export function validateAccelRuntime(state: GameState, fail: Reject): void {
   const seen = new Uint8Array(rec.len), sums = new Float64Array(holds.length);
   const demand = (r: number) => {
     const f = FAMILIES[rec.family[r]!];
-    if (!f || rec.stage[r]! >= f.stages.length || !nonnegative(rec.scale[r]!)) fail(`hot.rec[${r}]`, 'invalid family, stage or scale');
-    return { family: f, need: accelNeed(f, rec.scale[r]!) };
+    if (!f || rec.stage[r]! >= f.stages.length || !nonnegative(rec.units[r]!)) fail(`hot.rec[${r}]`, 'invalid family, stage or scale');
+    return { family: f, need: accelNeed(f, rec.units[r]!) };
   };
   const list = (sys: number, head: number, resource: number, domain = -1, tensor = false): number => {
     let count = 0, prev = -1, finish = -Infinity;
@@ -85,7 +87,8 @@ export function validateAccelRuntime(state: GameState, fail: Reject): void {
       seen[r] = 1;
       if (rec.loc[r] !== LOC.running || rec.owner[r] !== sys || rec.prev[r] !== prev) fail(`hot.rec[${r}]`, 'run-list ownership mismatch');
       const { family } = demand(r);
-      if (family.stages[rec.stage[r]!]!.resource !== ['cpu', 'ram', 'gpu', 'io'][resource]) fail(`hot.rec[${r}]`, 'wrong resource list');
+      // D26.2: the record's current stage part names its clock (a mem stage's RAM and disk parts).
+      if (rec.part[r]! > 2 || partClock(shapeOf(rec.family[r]!), rec.stage[r]!, rec.part[r]!) !== resource) fail(`hot.rec[${r}]`, 'wrong resource list');
       if (resource === 2 && (rec.accelDomain[r] !== domain || family.tensor !== tensor)) fail(`hot.rec[${r}].accelDomain`, 'wrong accelerator clock');
       const waitingIo = resource === 3 && rec.start[r] === Infinity && rec.finish[r] === Infinity;
       // Linking rebases in-flight work onto a new clock; completed work can put its start below zero.
@@ -155,9 +158,10 @@ export function validateAccelRuntime(state: GameState, fail: Reject): void {
       continue;
     }
     const d = readAccelDomain(c, sys, domain);
-    if (!d || (d.kind === 'npu' && (!family.tensor || need.gpuCores > 0)) || d.gpuCores < need.gpuCores || d.vramBits < need.vramBits || !((family.tensor ? d.tensorOpsPerS : d.opsPerS) > 0)) fail(`hot.rec.accelDomain[${r}]`, 'incompatible accelerator assignment');
+    if (!d || (d.kind === 'npu' && (!family.tensor || need.gpuCores > 0)) || d.gpuCores < need.gpuCores || d.vramBits + s.unifiedBits[sys]! < need.vramBits || !((family.tensor ? d.tensorOpsPerS : d.opsPerS) > 0)) fail(`hot.rec.accelDomain[${r}]`, 'incompatible accelerator assignment');
     const at = sys * ACCEL_DOMAINS + domain;
-    holds[at] = holds[at]! + rec.count[r]! * need.vramBits;
+    // With unifiedMemory part of the need sits in RAM and on disk (D26.4).
+    holds[at] = holds[at]! + rec.count[r]! * Math.max(0, need.vramBits - rec.vramR[r]! - rec.vramD[r]!);
     holders[at] = holders[at]! + rec.count[r]!;
     sums[at] = sums[at]! + 1;
   }

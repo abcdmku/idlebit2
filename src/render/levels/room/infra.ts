@@ -1,6 +1,7 @@
 // Room pieces over the approved floor (the room mockup): the network rack
 // (room switch + built-in load balancer), thermostat, zone sign with save icon and lamp,
 // the door to the next zone, UPS bank, cooling plumbing and the site data plane.
+import { drawWells } from '../rack/flowkit';
 import { P, R, drawSaveIcon, drawUnitLamp, glowBit, lampState, mix, pathAt, prism, px, rateAnimation, createRateAnimation, silk, silkWidth } from '../../core';
 import type { Point, PrismStyle } from '../../core';
 import type { RoomSnapshot, SupplyView } from '../../../game';
@@ -47,8 +48,12 @@ export function drawNetRack(g: G, s: RoomSnapshot, live: boolean, powered: boole
     const p = sw.ports[i], x = t.x + 1 + (i % 7) * 2, y = fy + 8 + Math.floor(i / 7) * 2;
     px(g, x, y, live && p.active ? P.net : p.peer !== null && powered ? mix(P.net, P.ink, 0.7) : P.ink);
   }
+  // D25.7: the room LB's queue wells, in the band under the port lights
+  drawWells(g, lb.queue, t.x, fy + LB_WELLS_DY, t.w, z - 2 - LB_WELLS_DY, powered && !s.crashed);
   R(g, t.x + 1, fy + z - 2, t.w - 2, 1, P.ink);
 }
+/** The wells sit 15 px down the network rack's front: under its 4 rows of port lights. */
+export const LB_WELLS_DY = 15;
 
 /** The zone's real temperature on the back wall; HALT while crashed, a red bar while crash time builds. */
 export function drawThermo(g: G, s: RoomSnapshot, quiet: boolean, powered: boolean): void {

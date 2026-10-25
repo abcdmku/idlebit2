@@ -2,22 +2,16 @@
 // feed-view.js). Credits and Data are whole numbers (D2.2, D3.3): nothing here ever prints
 // a fractional currency.
 import type { Amount } from '../../game/amount';
+import { compactWhole } from '../plates/format';
 
 const MINUS = '−';
-const BANDS: readonly (readonly [number, string])[] = [[1e15, 'Q'], [1e12, 'T'], [1e9, 'B'], [1e6, 'M'], [1e3, 'k']];
 
-/** A whole count: grouped below 10,000, then 41.2k, 1.48M, 413M. Rounds to a whole first. */
+/** A whole count: grouped below 10,000, then 41.2k, 1.48M, 413M … Dc, then 1.80e36 (A13). Rounds to a whole first. */
 export function wholeText(value: number): string {
   if (!Number.isFinite(value)) return '0';
   const n = Math.round(value), a = Math.abs(n), sign = n < 0 ? MINUS : '';
   if (a < 1e4) return sign + a.toLocaleString('en-US');
-  for (const [scale, suffix] of BANDS) {
-    if (a < scale) continue;
-    const x = a / scale;
-    const body = x >= 100 ? x.toFixed(0) : x >= 10 ? x.toFixed(1) : x.toFixed(2);
-    return sign + body.replace(/\.?0+$/, '') + suffix;
-  }
-  return sign + String(a);
+  return sign + compactWhole(a);
 }
 
 /** A whole Amount. Exact strings are parsed only for display. */

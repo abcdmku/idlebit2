@@ -41,16 +41,6 @@ export function upgradeFx(g: G, x: number, y: number, w: number, h: number, ageS
     if (k > 2) px(g, cx + dx * (k - 2), cy + dy * (k - 2), P.goldLo);
   }
 }
-const sparkleX = [-6, 6, -3, 4], sparkleY = [-2, -4, -7, 3];
-/** A coin hopping out of a real payout. `ageS` = present time − payout time. False when done. */
-export function coinPop(g: G, x: number, y: number, ageS: number, dir = 0): boolean {
-  if (isReducedMotion() || ageS < 0 || ageS > 0.75) return false;
-  const k = Math.min(1, ageS / 0.55), cx = Math.round(x + dir * k * 6), cy = Math.round(y - Math.sin(k * Math.PI) * 9 - k * 2);
-  g.drawImage(SPR.coin8, cx - 4, cy - 4);
-  const sp = Math.floor(ageS * 16) % 4;
-  px(g, cx + sparkleX[sp], cy + sparkleY[sp], P.goldHi); px(g, cx + sparkleX[sp] + 1, cy + sparkleY[sp], P.gold);
-  return true;
-}
 export type GhostState = 'locked' | 'open' | 'afford' | 'picked';
 /** Build site overlay. Static: locked is nearly silent, open a faint outline, affordable gold. */
 export function drawGhost(g: G, x: number, y: number, w: number, h: number, state: GhostState): void {

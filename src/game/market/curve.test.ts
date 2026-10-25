@@ -1,4 +1,4 @@
-import { baseRate, memberSize, startIntensity } from './curve';
+import { baseRate, startIntensity, taskSize } from './curve';
 
 describe('intensity curve (D12.1, D20, tasks.md §3)', () => {
   it('ramps T(I) = min(250, 7 × 2^(I / 5)) seconds per unit', () => {
@@ -12,9 +12,10 @@ describe('intensity curve (D12.1, D20, tasks.md §3)', () => {
     expect([startIntensity(0), startIntensity(5.9), startIntensity(20.5)]).toEqual([0, 0, 14.5]);
   });
 
-  it('sizes members in whole units, at least 1', () => {
-    expect(memberSize(0, 0.8, 1)).toBe(1);
-    expect(memberSize(10, 1, 1)).toBe(Math.round(2 ** 8.5));
-    expect(memberSize(10, 1, 4)).toBe(Math.round(2 ** 8.5 / 4));
+  it('sizes tasks in whole units, at least 1; a minimum split at least members × grain (D25.6)', () => {
+    expect(taskSize(0, 0.8, 1, 4096)).toBe(1);
+    expect(taskSize(10, 1, 1, 4096)).toBe(362);
+    expect(taskSize(0, 1, 4, 64)).toBe(256);
+    expect(taskSize(10, 1, 4, 64)).toBe(362);
   });
 });

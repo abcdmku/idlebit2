@@ -28,15 +28,15 @@ export function childAt(w: World, kind: number, id: number, slot: number): numbe
   }
 }
 
-export interface RouterCols { strategy: number; filters: number; placements: number }
+export interface RouterCols { strategy: number; filters: number }
 
 export function routerOf(w: World, kind: number, id: number, out: RouterCols): RouterCols {
   const c = w.compiled;
   switch (kind) {
-    case RACK: out.strategy = c.rack.lbStrategy[id]!; out.filters = c.rack.lbFilters[id]!; out.placements = c.rack.lbPlacements[id]!; break;
-    case ROOM: out.strategy = c.room.lbStrategy[id]!; out.filters = c.room.lbFilters[id]!; out.placements = c.room.lbPlacements[id]!; break;
-    case SITE: out.strategy = c.site.dpStrategy[id]!; out.filters = c.site.dpFilters[id]!; out.placements = c.site.dpPlacements[id]!; break;
-    default: out.strategy = c.global.lbStrategy[0]!; out.filters = c.global.lbFilters[0]!; out.placements = c.global.lbPlacements[0]!;
+    case RACK: out.strategy = c.rack.lbStrategy[id]!; out.filters = c.rack.lbFilters[id]!; break;
+    case ROOM: out.strategy = c.room.lbStrategy[id]!; out.filters = c.room.lbFilters[id]!; break;
+    case SITE: out.strategy = c.site.dpStrategy[id]!; out.filters = c.site.dpFilters[id]!; break;
+    default: out.strategy = c.global.lbStrategy[0]!; out.filters = c.global.lbFilters[0]!;
   }
   return out;
 }

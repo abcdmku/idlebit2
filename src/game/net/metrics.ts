@@ -1,7 +1,10 @@
 import { MAX_UPS, MAX_ZONES_PER_SITE, RACKS_PER_ROOM, SERVERS_PER_RACK } from '../core/constants';
 import type { CompiledBuffers } from '../core/buffers';
 import type { World } from '../core/world';
-import { admittedOf, canAdmit, keffOf } from '../exec/slots';
+import { admittedOf, canAdmit, keffOf, slotsOf } from '../exec/slots';
+import { LINK_KIND } from '../core/buffers';
+import { rqLen, rqLevel, rqRow } from '../core/routerQueue';
+import { linkOf } from './paths';
 import { memo } from './routeMemo';
 import { RACK, ROOM, SITE } from './scope';
 
@@ -55,11 +58,35 @@ export function conns(w: World, kind: number, u: number): number {
   return n;
 }
 
-/** rated(c): Σ rated compute ops/s (lanes × clock × threads at e = 1, factor 1). */
-export function rated(w: World, kind: number, u: number): number {
+/** rated(c): Σ rated compute ops/s (lanes × clock × threads at e = 1, factor 1); with `room`, only systems that can admit now. */
+export function rated(w: World, kind: number, u: number, room = false): number {
   let ops = 0;
-  someSystem(w, kind, u, (s) => { ops += w.compiled.sys.threadRate[s]! * Math.max(1, w.compiled.sys.threads[s]!); return false; });
+  const add = (s: number) => { if (!room || canAdmit(w, s)) ops += w.compiled.sys.threadRate[s]! * Math.max(1, w.compiled.sys.threads[s]!); return false; };
+  if (room) someAdmitting(w, kind, u, add); else someSystem(w, kind, u, add);
   return ops;
+}
+
+/** free(c) (spec §8.3): free slots over its systems that can admit, plus its router queue's free slots. */
+export function freeOf(w: World, kind: number, u: number): number {
+  let free = 0;
+  someAdmitting(w, kind, u, (s) => { if (canAdmit(w, s)) free += slotsOf(w, s) - admittedOf(w, s); return false; });
+  if (kind !== RACK) {
+    const child = kind - 1, row = rqRow(w.hot, child, u);
+    if (row < w.hot.rq.len) free += Math.max(0, rqLevel(w.compiled, child, u) - rqLen(w.hot, row));
+  }
+  return free;
+}
+
+/** link(c) (spec §8.3): the speed of c's top link, all channels (a system's port, a rack's uplinks, a zone's uplinks, a site's backbone). */
+export function linkSpeedOf(w: World, kind: number, u: number): number {
+  const c = w.compiled;
+  let s = -1;
+  someSystem(w, kind, u, (sys) => { s = sys; return true; });
+  if (s < 0) return 0;
+  const top = kind === RACK ? LINK_KIND.server : kind === ROOM ? LINK_KIND.rack : kind === SITE ? LINK_KIND.zone : LINK_KIND.backbone;
+  let l = linkOf(w, s, top);
+  if (l < 0 && top === LINK_KIND.backbone) l = linkOf(w, s, LINK_KIND.zone);
+  return l < 0 ? Infinity : c.link.speed[l]! * Math.max(1, c.link.channels[l]!);
 }
 
 /** Last tick's usage of the candidate's own supply (rack LB: the PSU; room: the PDU; site: the UPS; global: the grid). */

@@ -1,19 +1,21 @@
 import { REGIONS } from '../../core/constants';
 import { GLOBAL } from '../scope';
 import { siteLatency } from './latency';
-import type { RouteStrategy } from './types';
+import { equal, sortBy, type RouteStrategy } from './types';
 
-/** price (global, D1.7): the lowest regional energy price; ties by latency, then slot. Below global, firstFit. */
+/** price (global, D1.7): sites by regional energy price, ties by latency, then slot; one site takes the entry. Below global, firstFit. */
 export const price: RouteStrategy = {
   id: 'price',
-  choose(w, kind, _id, r, cand, _slot, n) {
-    if (kind !== GLOBAL) return 0;
-    const key = (i: number) => REGIONS[w.compiled.site.region[cand[i]!]!]!.energyPrice;
-    let best = 0;
-    for (let i = 1; i < n; i += 1) {
-      const a = key(i), b = key(best);
-      if (a < b || (a === b && siteLatency(w, cand[i]!, r) < siteLatency(w, cand[best]!, r))) best = i;
-    }
-    return best;
+  weighted: false,
+  plan(w, kind, _id, r, cand, slot, weight, n) {
+    equal(weight, n);
+    if (kind !== GLOBAL) return n;
+    const lat = Array.from({ length: n }, (_, i) => siteLatency(w, cand[i]!, r));
+    const pr = Array.from({ length: n }, (_, i) => REGIONS[w.compiled.site.region[cand[i]!]!]!.energyPrice);
+    const rank = Array.from({ length: n }, (_, i) => i).sort((a, b) => pr[a]! - pr[b]! || lat[a]! - lat[b]! || a - b);
+    const pos = new Float64Array(n);
+    rank.forEach((i, k) => { pos[i] = k; });
+    sortBy(cand, slot, weight, n, (i) => pos[i]!);
+    return n;
   },
 };

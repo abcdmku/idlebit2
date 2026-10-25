@@ -1,5 +1,7 @@
+import { FAIL_CAUSES } from '../types/events';
 import { advanceGame } from '../core/advance';
-import { allocHot } from '../core/buffers';
+import { allocHot, cloneHot } from '../core/buffers';
+import { MODE } from '../core/timers';
 import { RATE_RING_TICKS } from '../core/constants';
 import { createInitialState } from '../core/state';
 import { familyId } from '../types/ids';
@@ -12,7 +14,7 @@ const hotWithRing = (rows: { at: number; taken: number; met?: number; failed?: n
   for (const r of rows) {
     const i = r.at % RATE_RING_TICKS;
     hot.ring.at[i] = r.at; hot.ring.taken[i] = r.taken; hot.ring.met[i] = r.met ?? 0; hot.ring.failed[i] = r.failed ?? 0;
-    if (r.cause !== undefined) hot.ring.failBy[i * 6 + r.cause] = r.failed ?? 0;
+    if (r.cause !== undefined) hot.ring.failBy[i * FAIL_CAUSES.length + r.cause] = r.failed ?? 0;
   }
   return hot;
 };
@@ -31,6 +33,18 @@ describe('feed rates', () => {
 });
 
 describe('the queue window and transfers (spec §16.2)', () => {
+  it('clears every queue gate between rounds even though hardware is paused', () => {
+    const base = createInitialState(42);
+    const hot = cloneHot(base.hot);
+    hot.sys.mode.fill(MODE.paused);
+    for (const phase of ['ended', 'between'] as const) {
+      const feed = feedSnapshot({ ...base, hot, round: { ...base.round, phase } }, null, false);
+      expect(feed.blockedBy).toBeNull();
+      expect(feed.window.every(task => task.blockedBy === null)).toBe(true);
+    }
+    expect(feedSnapshot({ ...base, hot }, null, false).blockedBy).toBe('cache');
+  });
+
   it('shows the five next tasks with their work and transfer time, and the head clock', () => {
     const s = createInitialState(42);
     const feed = feedSnapshot(s, null, false);
@@ -44,7 +58,10 @@ describe('the queue window and transfers (spec §16.2)', () => {
     const head: QueuedTask = { ...base.market.window[0]!, size: 1500 };
     const s = advanceGame({ ...base, market: { ...base.market, window: [head, ...base.market.window.slice(1)] } }, 500).state;
     const feed = feedSnapshot(s, null, false);
-    expect(feed.transfers).toEqual([{ taskId: 1, family: head.family, systemId: 0, link: 'pipe', bitsSent: 500, bits: 1500, speed: 1000 }]);
+    expect(feed.transfers).toEqual([{
+      taskId: 1, family: head.family, systemId: 0, link: 'pipe', bitsSent: 500, bits: 1500, speed: 1000,
+      shard: 0, shards: 1, units: 1500, from: null, to: { level: 'system', id: 0 }, key: 256,
+    }]);
     expect(feed.inTransfer).toBe(1);
     // Only one transfer at a time and the core waits: #2 is the head, untaken.
     expect(feed.window[0]!.task.taskId).toBe(2);

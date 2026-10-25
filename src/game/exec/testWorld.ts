@@ -12,8 +12,10 @@ import { linkPhase } from '../net/links';
 import { routePhase } from '../net/hops';
 import { buildState, type FleetSpec } from '../testkit/builders';
 import type { GameState } from '../types/state';
+import { FAIL_CAUSES } from '../types/events';
 import { admitPhase } from './admit';
 import { runPhase } from './run';
+import { latePhase } from './outcome';
 
 /**
  * Test fixtures for exec and net (not imported by the sim). Capability columns are written here,
@@ -22,7 +24,8 @@ import { runPhase } from './run';
  */
 export interface Caps {
   readonly threads: number; readonly cores: number; readonly K: number; readonly Q: number; readonly strategy: number;
-  readonly threadRate: number; readonly memCap: number; readonly hasRam: number; readonly ramBw: number;
+  /** memCap is the RAM tier here; cacheBits the cache tier (default 0) and storageCap the disk tier (D26.1). */
+  readonly threadRate: number; readonly memCap: number; readonly cacheBits: number; readonly hasRam: number; readonly ramBw: number;
   readonly gpuOps: number; readonly vram: number; readonly storageCap: number; readonly ioRate: number; readonly ioConc: number; readonly ecc: number;
   /** The lone system's pipe in bit/s. Infinity lands transfers at the τ they start, isolating execution tests from transfer time. */
   readonly pipeSpeed: number;
@@ -53,7 +56,7 @@ export function setAccels(c: CompiledBuffers, s: number, cards: readonly AccelCa
   }
 }
 export const CAPS: Caps = {
-  threads: 1, cores: 1, K: 1, Q: 0, strategy: 0, threadRate: 1, memCap: 1024, hasRam: 1, ramBw: 1,
+  threads: 1, cores: 1, K: 1, Q: 0, strategy: 0, threadRate: 1, memCap: 1024, cacheBits: 0, hasRam: 1, ramBw: 1,
   gpuOps: 1, vram: 16, storageCap: 16, ioRate: 1, ioConc: 1, ecc: 0, pipeSpeed: Infinity,
 };
 
@@ -63,7 +66,10 @@ export function setCaps(c: CompiledBuffers, s: number, caps: Partial<Caps>): voi
   sys.threads[s] = all.threads; sys.cores[s] = all.cores; sys.K[s] = all.K; sys.Q[s] = all.Q; sys.strategy[s] = all.strategy;
   const keff = all.strategy === 2 ? 2 * all.K : Math.min(all.K, all.threads);
   sys.keff[s] = keff; sys.slots[s] = keff + all.Q;
-  sys.threadRate[s] = all.threadRate; sys.memCap[s] = all.memCap; sys.cacheBits[s] = all.memCap; sys.hasRam[s] = all.hasRam;
+  sys.threadRate[s] = all.threadRate; // Without RAM, memCap is the cache tier (the pre-D26 fixtures' meaning).
+  const ram = all.hasRam === 1 ? all.memCap : 0, cache = all.hasRam === 1 ? all.cacheBits : Math.max(all.cacheBits, all.memCap);
+  sys.ramCap[s] = ram; sys.cacheBits[s] = cache; sys.hasRam[s] = all.hasRam;
+  sys.memCap[s] = cache + ram + all.storageCap; sys.diskNode[s] = -1; sys.unifiedBits[s] = 0;
   sys.ramBw[s] = all.ramBw; sys.gpuOps[s] = all.gpuOps; sys.tensorOps[s] = 0; sys.npu[s] = 0;
   sys.vram[s] = all.vram; sys.storageCap[s] = all.storageCap; sys.ioRate[s] = all.ioRate; sys.ioConc[s] = all.ioConc;
   sys.ecc[s] = all.ecc; sys.etaCfg[s] = 1; sys.kind[s] = 0; sys.pipeSpeed[s] = all.pipeSpeed;
@@ -97,9 +103,8 @@ export function execState(spec: Partial<FleetSpec> = {}, caps: Partial<Caps> = {
 export function feed(w: World, family: number, count: number, scale: number): number {
   const r = allocRecord(w.hot);
   const rec = w.hot.rec;
-  rec.family[r] = family; rec.count[r] = count; rec.stage[r] = 0; rec.scale[r] = scale;
+  rec.family[r] = family; rec.count[r] = count; rec.stage[r] = 0; rec.part[r] = 0; rec.units[r] = scale; rec.deadline[r] = -1;
   rec.payout[r] = payoutAt(FAMILIES[family]!, scale);
-  rec.threads[r] = FAMILIES[family]!.threads;
   rec.taskId[r] = w.hot.g[4]!;
   w.hot.g[4] = w.hot.g[4]! + count;
   rec.loc[r] = LOC.front;
@@ -114,6 +119,7 @@ export function step(w: World): void {
   routePhase(w);
   admitPhase(w);
   runPhase(w);
+  latePhase(w);
   const h = w.hot.rack;
   for (let r = 0; r < h.len; r += 1) h.effClock[r] = h.effClock[r]! + h.eff[r]! * DT_S;
   w.tick += 1;
@@ -125,4 +131,4 @@ export function steps(w: World, n: number, each?: (w: World) => void): void {
 
 /** Met tasks of `family` tallied so far (no events phase in `step`). */
 export const metOf = (w: World, family: number): number => w.hot.fam.metTick[family]!;
-export const failedOf = (w: World, family: number, cause: number): number => w.hot.fam.failTick[family * 6 + cause]!;
+export const failedOf = (w: World, family: number, cause: number): number => w.hot.fam.failTick[family * FAIL_CAUSES.length + cause]!;

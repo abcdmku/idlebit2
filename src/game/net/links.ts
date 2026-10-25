@@ -1,4 +1,5 @@
-import { LOC } from '../core/buffers';
+import { LINK_KIND, LOC } from '../core/buffers';
+import { wakeRouters } from '../core/routerQueue';
 import { DT_S } from '../core/constants';
 import type { World } from '../core/world';
 import { hasRule } from '../exec/rules';
@@ -21,7 +22,7 @@ export const arrived: number[] = [];
 
 /** Bits one record carries over each link: its tasks × the member payload. */
 export const transferBits = (w: World, r: number): number =>
-  w.hot.rec.count[r]! * memberPayload(shapeOf(w.hot.rec.family[r]!), w.hot.rec.scale[r]!);
+  w.hot.rec.count[r]! * memberPayload(shapeOf(w.hot.rec.family[r]!), w.hot.rec.units[r]!);
 
 /** Sends for DT_S on link l. Collects records ready to move on into `moving`. */
 function serveLink(w: World, l: number): void {
@@ -59,7 +60,16 @@ function serveLink(w: World, l: number): void {
   for (let k = 0; k < chans; k += 1) busy += chanFree[k]!;
   lh.busyS[l] = busy;
   lh.bitClock[l] = lh.bitClock[l]! + bits;
-  lh.backlog[l] = Math.max(0, lh.backlog[l]! - bits);
+  const before = lh.backlog[l]!, room = chans * speed * DT_S;
+  lh.backlog[l] = Math.max(0, before - bits);
+  // First-link room came back (net/split.ts linkRoom): the routers above may split again.
+  if (before >= room && lh.backlog[l]! < room) wakeLink(w, l);
+}
+
+/** Wakes the routers whose systems take link l as a hop. */
+function wakeLink(w: World, l: number): void {
+  const kind = w.compiled.link.kind[l]!, owner = w.compiled.link.owner[l]!;
+  wakeRouters(w, kind === LINK_KIND.backbone ? 2 : kind === LINK_KIND.zone ? 1 : 0, owner);
 }
 
 /** Moves record r (off any link) onto the next link of its path, or marks it arrived. */

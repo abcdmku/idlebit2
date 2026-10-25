@@ -16,15 +16,16 @@
 
 /* head */
 .v3-plate .p-head { position: relative; display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; min-height: 24px; }
-.v3-plate.has-x .p-head { padding-right: 40px; }
+.v3-plate.has-x .p-head { padding-right: 56px; }
 .v3-plate .p-head .p-title { font-size: var(--head); line-height: 18px; font-weight: 700; }
 .v3-plate .p-sub { color: #a99be6; }
 .v3-plate .p-head .pz { margin-left: auto; }
 .v3-plate .pips { display: inline-flex; gap: 2px; margin-left: auto; align-self: center; }
 .v3-plate .pips i { width: 6px; height: 6px; background: #8ef5ff; box-shadow: 0 0 0 1px #0e0b1c; }
 .v3-plate .pips i:not(.on) { background: #2c2552; }
-.v3-plate .p-x { position: absolute; right: -10px; top: -10px; width: 44px; height: 44px; border: 0; padding: 0; background: none;
-  color: #a99be6; font-size: var(--head); line-height: 1; cursor: pointer; }
+.v3-plate .p-x { position: absolute; right: -8px; top: -8px; width: 48px; height: 48px; border: 0; padding: 0; display: flex; align-items: center;
+  justify-content: center; background: #1f1a3a; box-shadow: inset 0 0 0 2px #0e0b1c, inset 0 4px 0 #3a2f6e, inset 0 -6px 0 #15122a;
+  color: #a99be6; cursor: pointer; }
 
 /* facts */
 .v3-plate .p-status { min-height: 18px; color: #efeaff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -67,7 +68,7 @@
 .v3-plate .key .action-detail em { display: block; font-style: normal; }
 
 .v3-plate .need { margin: 0; color: #a99be6; text-align: center; }
-.v3-plate .key-slot { margin: 0; min-height: 44px; display: flex; align-items: center; justify-content: center; color: #6e6698;
+.v3-plate .key-slot { margin: 0; min-height: 44px; display: flex; align-items: center; justify-content: center; color: var(--dim);
   background: #120d28; box-shadow: inset 2px 2px 0 #07050f, inset -2px -2px 0 #2a2252; }
 .v3-plate .key-pair { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
 
@@ -102,7 +103,7 @@
 .v3-plate .setpoint b { text-align: center; color: #8ef5ff; }
 .v3-plate .setpoint .step { height: 44px; border: 0; background: #29234b; color: #efeaff; font-weight: 700; cursor: pointer;
   box-shadow: inset 0 -3px 0 #15122a, inset 0 2px 0 #5d5296, 0 0 0 2px #0e0b1c; }
-.v3-plate .setpoint .step:disabled { color: #6e6698; cursor: default; }
+.v3-plate .setpoint .step:disabled { color: var(--dim); cursor: default; }
 
 /* online switch row */
 .v3-plate .p-online { display: flex; align-items: center; gap: 10px; height: 44px; margin-top: 8px; }
@@ -153,7 +154,7 @@
 .cfg .cfg-opt.more { color: #a99be6; }
 .cfg .cfg-opt[aria-pressed="true"] { background: #2a2052; box-shadow: inset 0 0 0 2px #efeaff, inset 0 0 0 4px #0e0b1c; }
 .cfg .cfg-empty { margin: 0; height: 100%; display: flex; align-items: center; justify-content: center; text-align: center; padding: 0 12px;
-  color: #6e6698; background: #120d28; box-shadow: inset 2px 2px 0 #07050f, inset -2px -2px 0 #2a2252; grid-column: 1 / -1; }
+  color: var(--dim); background: #120d28; box-shadow: inset 2px 2px 0 #07050f, inset -2px -2px 0 #2a2252; grid-column: 1 / -1; }
 .cfg .cfg-detail { margin: 8px 0 0; height: 32px; line-height: 16px; color: #c8c2ff; overflow: hidden; }
 .cfg .cfg-detail.warn { color: #ffab98; }
 .l-desktop .cfg .cfg-detail { height: 16px; margin-top: 5px; white-space: nowrap; text-overflow: ellipsis; }
@@ -173,3 +174,20 @@
 .save .save-keys { display: grid; grid-template-columns: 1fr 112px; gap: 8px; margin-top: 10px; }
 .save .key.go { justify-content: center; }
 
+
+/* the router queue (D25.7): one well per slot, filled in the queued task's type colour */
+.v3-plate .lb-queue { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-top: 8px; }
+.v3-plate .lb-queue .v { color: #efeaff; }
+.v3-plate .lb-wells { display: flex; flex-wrap: wrap; gap: 2px; flex-basis: 100%; }
+.v3-plate .lb-wells i { width: 8px; height: 8px; background: #120d28; box-shadow: inset 0 0 0 1px #3a2f6e; }
+.v3-plate .lb-wells i.on { background: var(--well, #a6f6ff); box-shadow: none; }
+
+/* the memory hierarchy (D26): one bar per tier; spilled bits hatched */
+.v3-plate .mem-tiers { display: grid; gap: 6px; margin-top: 8px; }
+.v3-plate .mem-tier { display: grid; grid-template-columns: 48px 1fr; column-gap: 8px; align-items: center; }
+.v3-plate .mem-tier .v { text-align: right; color: #efeaff; }
+.v3-plate .mem-bar { grid-column: 1 / -1; display: flex; height: 6px; background: #120d28; box-shadow: 0 0 0 1px #0e0b1c; }
+.v3-plate .mem-bar b { display: block; background: #a6f6ff; }
+.v3-plate .mem-bar s { display: block; min-width: 4px; background: repeating-linear-gradient(135deg, #ffb03b 0 2px, #5a3208 2px 4px); }
+.v3-plate .mem-tier .v.warn { color: #ffb03b; } .v3-plate .mem-tier .v.dim { color: var(--dim); }
+.v3-plate .mem-note { grid-column: 1 / -1; color: #a99be6; min-height: 1.35em; }

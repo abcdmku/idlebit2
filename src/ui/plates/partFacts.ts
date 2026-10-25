@@ -50,9 +50,12 @@ export function partFacts(focus: LevelSnapshot, slot: PartSlot): PartFacts | nul
       const list = slot.kind === 'ram' ? focus.ram : slot.kind === 'gpu' ? focus.gpu : focus.storage;
       const p = slot.kind === 'gpu' ? list.find(p => p.slot === slot.index) : list[slot.index];
       if (!p) return null;
-      const cap = slot.kind === 'ram' ? `${bits(focus.used.memory)} of ${bits(focus.capacities.ram)} held`
+      // RAM and drives are tiers of one memory (D26.1): what each holds, what spilled into it, and a drive's IO as spill speed.
+      const tier = focus.memory.tiers.find(t => t.tier === (slot.kind === 'ram' ? 'ram' : 'disk'));
+      // RAM reads plainly as used; every bit on disk spilled from RAM, so a drive reads what it holds as spilled (lead ruling).
+      const cap = slot.kind === 'ram' ? (tier ? `${bits(tier.usedBits)} of ${bits(tier.capacityBits)} used` : '')
         : slot.kind === 'gpu' ? `${bits(p.vramUsedBits ?? 0)} VRAM held · tensor tasks with no GPU core minimum`
-        : `${bits(focus.used.storage)} of ${bits(focus.capacities.storage)} stored`;
+        : `${tier ? (tier.usedBits > 0 ? `${bits(tier.usedBits)} spilled` : `${bits(tier.capacityBits)} free`) : ''}${tier?.rateBits ? ` · spill speed ${hertz(tier.rateBits)}` : ''}`;
       return { title: `${p.kind === 'npu' ? 'NPU' : SLOT_TITLE[slot.kind]} ${slot.index + 1}`, sub: `${p.kind === 'npu' ? `Gen ${p.generation + 1}` : gen(p.generation)}${p.ecc ? ' · ECC' : ''}`, level: p.level,
         status: busy(p), lines: [{ text: cap, tone: 'muted' }] };
     }

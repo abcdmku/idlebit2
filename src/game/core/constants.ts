@@ -61,7 +61,18 @@ export const ACCEL_CLOCKS = 18;
 export const SOCKET_FACTOR: readonly number[] = [1, 0.92, 0.85, 0.78];
 /** dimmFactor by RAM modules on a general board: 0–2 → 1, 3 → 0.95, 4 → 0.9; an accelerator board is 1 up to 8. */
 export const DIMM_FACTOR: readonly number[] = [1, 1, 1, 0.95, 0.9];
-export const MAX_GANG_MEMBERS = 256;
+/** D25.1: a task has at most this many shards; also the largest minimum split (members). */
+export const MAX_SHARDS = 256;
+/** Resource clocks per system (exec/shape): CPU, RAM, GPU, IO (the disk tier). Stride of every per-resource column. */
+export const RES_CLOCKS = 4;
+/** D26.5 deadline ring buckets (architecture §1.4); every window (at most 288 s × size jitter) is shorter. */
+export const DEADLINE_BUCKETS = 4096;
+/** D25.7: router queue levels run 1 … ROUTER_QUEUE_MAX, one slot per level. */
+export const ROUTER_QUEUE_MAX = 32;
+/** D25.9 Gather: a queued entry dispatches anyway after this many ticks (10 s). A deadline, not hardware time. */
+export const GATHER_WAIT_TICKS = secondsToTicks(10);
+/** D25 checkpointing: a lost shard's replacement must be picked up within this many ticks (10 s). */
+export const CHECKPOINT_TICKS = secondsToTicks(10);
 export const MAX_UPS = 2;
 export const MAX_ACTIVE_FAMILIES = 12;
 /** Catalog bound for per-family tallies. */

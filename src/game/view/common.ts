@@ -2,10 +2,12 @@ import type { CompiledBuffers, HotBuffers } from '../core/buffers';
 import { HOME_TEMP_F, MAX_ZONES_PER_SITE, RACKS_PER_ROOM, REGIONS, SERVERS_PER_RACK, TICK_MS } from '../core/constants';
 import { MODE } from '../core/timers';
 import type { CoolerBuild, PartLevel, RouterBuild, SupplyBuild, SwitchBuild } from '../types/build';
-import { FILTER_IDS, PLACEMENT_IDS, ROUTE_STRATEGY_IDS, type CoolTech, type FilterId, type PlacementId } from '../types/catalog';
+import { FILTER_IDS, ROUTE_STRATEGY_IDS, type CoolTech, type FilterId } from '../types/catalog';
+import { rqAt, rqLen, rqRow } from '../core/routerQueue';
+import { familyId } from '../types/ids';
 import type { SupplyKind } from '../types/events';
 import type { GameState } from '../types/state';
-import { UNIT_MODES, type CoolerView, type LbView, type PortView, type SupplyView, type UnitMode } from '../types/views';
+import { UNIT_MODES, type CoolerView, type LbQueueEntryView, type LbView, type PortView, type SupplyView, type UnitMode } from '../types/views';
 
 /** Cooler ΔT (spec §10.5). */
 const COOLER_DT_F = 20;
@@ -130,15 +132,33 @@ const maskIds = <T extends string>(ids: readonly T[], mask: number): T[] => ids.
 
 /** A router's compiled and hot columns: rack, room, site data plane (dp*) or global. */
 export interface RouterCols {
-  readonly strategy: number; readonly filters: number; readonly placements: number; readonly reserve: number;
-  readonly routed: number; readonly last: number;
+  readonly strategy: number; readonly filters: number; readonly routed: number; readonly last: number;
+  /** Router kind (net/scope: rack 0, room 1, site 2, global 3) and id, for its queue. */
+  readonly kind: number; readonly id: number;
 }
-export function lbView(part: RouterBuild, r: RouterCols): LbView {
+
+/** The entries of router (kind, id)'s queue, oldest first (D25.7). */
+export function lbQueueEntries(state: GameState, kind: number, id: number): LbQueueEntryView[] {
+  const hot = state.hot, row = rqRow(hot, kind, id), q = hot.rq, out: LbQueueEntryView[] = [];
+  if (row >= q.len) return out;
+  for (let i = 0; i < rqLen(hot, row); i += 1) {
+    const at = rqAt(hot, row, i), p = q.rqParent[at]!;
+    out.push({
+      taskId: q.rqTask[at]!, family: familyId(p >= 0 ? hot.parent.family[p]! : q.rqFamily[at]!), units: q.rqUnits[at]!,
+      // A windowed whole task waits as a share of all its units (D26.5): still a whole task here.
+      shard: p >= 0 && !(hot.parent.placed[p] === 0 && hot.parent.units[p] === q.rqUnits[at]) ? hot.parent.placed[p]! : null, sinceTick: q.rqSince[at]!,
+      windowEndTick: p >= 0 && hot.parent.deadline[p]! >= 0 ? hot.parent.taken[p]! + hot.parent.deadline[p]! - 1 : null,
+    });
+  }
+  return out;
+}
+
+export function lbView(state: GameState, part: RouterBuild, r: RouterCols): LbView {
   return {
     generation: part.gen, level: part.level,
     strategy: ROUTE_STRATEGY_IDS[r.strategy] ?? part.strategy,
-    filters: maskIds<FilterId>(FILTER_IDS, r.filters), placements: maskIds<PlacementId>(PLACEMENT_IDS, r.placements),
-    reserveOnRoute: r.reserve === 1,
+    filters: maskIds<FilterId>(FILTER_IDS, r.filters),
+    queue: { slots: part.queueLevel, level: part.queueLevel, entries: lbQueueEntries(state, r.kind, r.id) },
     // TODO(S3): misroutes per router have no hot column yet.
     routedPerSec: r.routed / TICK_S, misroutesThisRound: 0, lastTarget: r.last >= 0 ? r.last : null,
   };

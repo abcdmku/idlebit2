@@ -7,7 +7,7 @@ import { commitPlan } from './plan';
 import { planAddPort, planAddUplink, planReplaceLadder, planSameSpeed, planUpgradePort, planUpgradeUplink } from './ports';
 import { researchHandlers } from './research/actions';
 import {
-  planCStateLimit, planFilter, planPlacement, planPowerCap, planReserveOnRoute, planSetpoint, planStrategy, planSystemSetting,
+  planCStateLimit, planFilter, planPowerCap, planRouterQueue, planSetpoint, planStrategy, planSystemSetting,
 } from './settings';
 import { planAddRow, planAddUnit, planRemoveUnit } from './units';
 import { planInstallGpu } from './gpuPlans';
@@ -37,8 +37,7 @@ export const buildHandlers: HandlerMap = {
   addUplink: (s, a) => commitPlan(s, planAddUplink(s, a.sw)),
   setStrategy: (s, a) => commitPlan(s, planStrategy(s, a.unit, a.strategy)),
   setFilter: (s, a) => commitPlan(s, planFilter(s, a.unit, a.filter, a.on)),
-  setPlacement: (s, a) => commitPlan(s, planPlacement(s, a.unit, a.mode, a.on)),
-  setReserveOnRoute: (s, a) => commitPlan(s, planReserveOnRoute(s, a.unit, a.on)),
+  upgradeRouterQueue: (s, a) => commitPlan(s, planRouterQueue(s, a.unit)),
   setSetpoint: (s, a) => commitPlan(s, planSetpoint(s, a.unit, a.setpointF)),
   setPowerCap: (s, a) => commitPlan(s, planPowerCap(s, a.part, a.on)),
   setSystemSetting: (s, a) => commitPlan(s, planSystemSetting(s, a.system, a.setting, a.on)),

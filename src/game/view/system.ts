@@ -1,17 +1,20 @@
 import { ACCEL_GPU_SLOTS, ACCEL_MAX_CPUS, ACCEL_RAM_SLOTS, GENERAL_MAX_GPUS, QUEUE_SAMPLE, GENERAL_MAX_RAM, MAX_CPUS } from '../core/constants';
 import { capacity, capacity2, PARTS } from '../build/catalog';
 import type { SystemSpec } from '../types/build';
-import { RESOURCES, type PartId } from '../types/catalog';
+import type { PartId } from '../types/catalog';
+import { RES_CLOCKS } from '../core/constants';
 import type { NodeRef, SystemId } from '../types/ids';
 import type { SystemSnapshot } from '../types/snapshot';
 import type { GameState } from '../types/state';
 import type { BuildSlotView, PartView, PartViewKind } from '../types/views';
 import { chipSnapshot, chipStatic, cpuCountOf, type ChipStatic } from './chip';
 import { modeName, psuView, systemCoreActivity, systemTimerS, ticksToS } from './common';
+import { inboundTransfer } from './flows';
 import { queuedTasks, runningTasks } from './tasks';
 import { acceleratorView } from './accelerators';
+import { memoryTiers } from './memory';
 
-const R = RESOURCES.length;
+const R = RES_CLOCKS;
 const RES = { cpu: 0, ram: 1, io: 3 } as const;
 const genOpen = (state: GameState, part: PartId): boolean => (state.research.unlocks.gens[part] ?? 0) !== 0;
 
@@ -91,10 +94,12 @@ export function systemSnapshot(state: GameState, id: SystemId, parent: NodeRef |
     queue: { cap: c.Q[id] ?? 0, count: h.queueLen[id] ?? 0, sample: queuedTasks(state, id, 0, QUEUE_SAMPLE) },
     reserved: h.reserved[id] ?? 0,
     rates: { ops: (c.threadRate[id] ?? 0) * threads, ramBits: c.ramBw[id] ?? 0, gpuOps: c.gpuOps[id] ?? 0, ioBits: c.ioRate[id] ?? 0 },
-    capacities: { cache: c.cacheBits[id] ?? 0, ram: c.memCap[id] ?? 0, vram: c.vram[id] ?? 0, storage: c.storageCap[id] ?? 0 },
-    used: { memory: h.usedMem[id] ?? 0, vram: h.usedVram[id] ?? 0, storage: h.usedStorage[id] ?? 0 },
+    capacities: { cache: c.cacheBits[id] ?? 0, ram: c.ramCap[id] ?? 0, vram: c.vram[id] ?? 0, storage: c.storageCap[id] ?? 0 },
+    used: { memory: (h.usedCache[id] ?? 0) + (h.usedRam[id] ?? 0), vram: h.usedVram[id] ?? 0, storage: h.usedDisk[id] ?? 0 },
+    memory: { tiers: memoryTiers(state, id) },
     drawW: h.drawW[id] ?? 0,
     saveable: state.research.unlocks.rules.includes('configSave'),
     slots: st.slots,
+    inbound: inboundTransfer(state, id),
   };
 }

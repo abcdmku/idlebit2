@@ -15,7 +15,7 @@ type RuntimeResearchOverride = Readonly<Pick<ResearchDef, 'effect'> & Partial<Pi
  */
 export const DEFERRED_HARDWARE_RESEARCH: Readonly<Record<DeferredHardwareNodeId, RuntimeResearchOverride>> = {
   ddr: {
-    effect: "RAM gen 1: twice SDRAM's capacity and bandwidth at the same level; load watts scale with bandwidth.",
+    effect: 'Unlocks DDR RAM with twice the SDRAM capacity and bandwidth, with power use rising with bandwidth.',
   },
   rdimm: {
     effects: [{ kind: 'ceiling', key: 'ramLevelBonus', value: 4 }],

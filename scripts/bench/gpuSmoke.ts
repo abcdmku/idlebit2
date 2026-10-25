@@ -50,7 +50,7 @@ assert.equal(card.kind, 'gpu');
 if (card.kind !== 'gpu') throw new Error('Expected GPU');
 const stats = installedGpuStats(card, source.research.unlocks);
 const family = FAMILIES.find(f => f.key === 'rayTrace')!;
-const scale = source.hot.rec.scale[source.hot.sys.queueHead[0]!]!;
+const scale = source.hot.rec.units[source.hot.sys.queueHead[0]!]!;
 const work = stageWork(family.stages[0]!, scale);
 const c = source.compiled.sys;
 const fullSystemW = c.coreIdleW[0]! + c.coreLoadW[0]! + c.clockIdleW[0]!

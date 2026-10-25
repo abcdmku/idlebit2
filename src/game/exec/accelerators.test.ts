@@ -1,5 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { accelGate, accelNeed } from '../core/accelerators';
+import { readCompletions } from '../core/completions';
+import { ledgerPhase } from '../core/ledger';
 import { cloneCompiled, LOC } from '../core/buffers';
 import { ACCEL_DOMAINS, MAX_ACCELS, POOL_DOMAIN } from '../core/constants';
 import { openWorld, type World } from '../core/world';
@@ -9,14 +11,17 @@ import { estOn, estRecord } from './est';
 import { dropAllWork, killSubtree } from './kill';
 import { abortRecord } from './outcome';
 import { reconcileAccelerators } from './reconcile';
-import { GPU, shapeOf } from './shape';
+import { GPU } from './shape';
 import { F, TEST_FAMILIES } from './testFamilies';
 import { execState, feed, metOf, setAccels, step, steps, type AccelCaps } from './testWorld';
 
 vi.mock('../market/families', async (orig) => ({ ...(await orig<object>()), FAMILIES: (await import('./testFamilies')).TEST_FAMILIES }));
 
-const world = (cards: readonly AccelCaps[], linked = false, K = 4): World => openWorld(execState({},
-  { threads: K, K, Q: 8, threadRate: 1 }, (c) => setAccels(c, 0, cards, linked)));
+const world = (cards: readonly AccelCaps[], linked = false, K = 4): World => {
+  const state = execState({}, { threads: K, K, Q: 8, threadRate: 1 }, c => setAccels(c, 0, cards, linked));
+  readCompletions(state.hot);
+  return openWorld(state);
+};
 const card = (ops = 10, vram = 100, cores = 4): AccelCaps => ({ ops, vram, cores });
 const gpuWork = (w: World, r: number) => accelClockAt(w, recordAccelClock(w, 0, r), w.hot.rack.effClock[0]!);
 
@@ -31,6 +36,11 @@ describe('physical accelerator assignment and lifetime holds', () => {
     expect(estRecord(w, 0, r)).toBeCloseTo(0.9, 12);
     steps(w, 10);
     expect(metOf(w, F.gpu60)).toBe(1);
+    ledgerPhase(w);
+    const completions = readCompletions(w.hot);
+    expect(completions).toHaveLength(1);
+    expect(completions[0]).toMatchObject({ system: 0, cpu: null, core: null, gpu: 1 });
+    expect(completions.reduce((sum, c) => sum + BigInt(c.credits), 0n)).toBe(w.ledger.callGross);
   });
 
   it('keeps core and VRAM gates paired and ignores diagnostic aggregate maxima', () => {
@@ -88,7 +98,8 @@ describe('physical accelerator assignment and lifetime holds', () => {
 
   it('keeps VRAM through an IO stage and an IO cohort split', () => {
     const w = world([card(100, 200)]);
-    w.compiled.sys.ioConc[0] = 1; w.compiled.sys.ioRate[0] = 0.1;
+    // No RAM: the 1-bit working set sits on the drive, so the mem stage is a disk part (D26.1).
+    w.compiled.sys.ioConc[0] = 1; w.compiled.sys.ioRate[0] = 0.1; w.compiled.sys.ramCap[0] = 0;
     feed(w, F.gpuIo, 2, 1);
     step(w);
     const h = w.hot.sys, rec = w.hot.rec;
@@ -98,7 +109,7 @@ describe('physical accelerator assignment and lifetime holds', () => {
     expect(h.accelHolders[0]).toBe(2);
     const live = Array.from({ length: rec.len }, (_, r) => r).filter((r) => rec.loc[r] === LOC.running);
     expect(live).toHaveLength(2);
-    expect(live.every((r) => rec.accelDomain[r] === 0 && shapeOf(rec.family[r]!).res[rec.stage[r]!] === 3)).toBe(true);
+    expect(live.every((r) => rec.accelDomain[r] === 0 && rec.stage[r] === 1 && rec.part[r] === 2)).toBe(true);
     abortRecord(w, live[0]!);
     expect(h.accelUsedVram[0]).toBe(60);
     abortRecord(w, live[1]!);

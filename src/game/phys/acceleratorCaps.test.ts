@@ -19,11 +19,11 @@ vi.mock('../build/compile', () => ({ compileUnits: () => undefined }));
 vi.mock('../market/families', async (original) => {
   const actual = await original<typeof import('../market/families')>();
   const { familyId } = await import('../types/ids');
-  const families: FamilyDef[] = (['gpu', 'cpu'] as const).map((resource, id) => ({
+  const families: FamilyDef[] = (['gpu', 'compute'] as const).map((resource, id) => ({
     id: familyId(id), key: `cap-${resource}`, name: resource, band: 'bits', note: '',
     window: { from: 0, to: 0 }, weight: 0, stages: [{ resource, work: { fixed: 0, perSize: 1 } }],
-    threads: 1, workingSet: { fixed: 0, perSize: 0 }, vramBits: { fixed: resource === 'gpu' ? 50 : 0, perSize: 0 },
-    storageBits: { fixed: 0, perSize: 0 }, payloadBits: { fixed: 0, perSize: 0 },
+    grain: 2 ** 40, threads: 1, workingSet: { fixed: 0, perSize: 0 }, vramBits: { fixed: resource === 'gpu' ? 50 : 0, perSize: 0 },
+    windowS: null, payloadBits: { fixed: 0, perSize: 0 },
     members: 1, minZones: 1, region: { kind: 'any' }, tensor: false, ecc: false,
     gpuCoresMin: resource === 'gpu' ? 2 : 0, affinity: 'general', dataRatio: 10,
   }));

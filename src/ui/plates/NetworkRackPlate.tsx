@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import type { LbView, QuoteResult, RoomId, SwitchView } from '../../game';
+import type { LbView, Quote, QuoteResult, RoomId, SwitchView } from '../../game';
 import { ROUTE_NAMES, zoneLetter } from './copy';
 import { PlateFrame } from './PlateFrame';
 import { LbBody, lbLines, lbStatus } from './LbPlate';
@@ -15,12 +15,14 @@ export interface NetworkRackPlateProps extends PlateCommon {
   racks: number;
   /** `quotes` are the room switch quotes; these are the room LB's. */
   lbQuotes: QuoteResult | null;
+  /** The room LB's next queue slot (D25.7). */
+  queueQuote?: Quote | null;
   initialView?: 'ports' | 'lb';
   initialPort?: number | null;
 }
 
 /** The room's network rack: rack uplinks and speeds, and the room load balancer behind one key. */
-export function NetworkRackPlate({ room, zone, network, racks, lbQuotes, initialView = 'ports', initialPort,
+export function NetworkRackPlate({ room, zone, network, racks, lbQuotes, queueQuote, initialView = 'ports', initialPort,
   quotes, onAction, onResearch, researchName, ...frame }: NetworkRackPlateProps) {
   const [view, setView] = useState(initialView);
   const [sel, setSel] = useState(initialPort ?? 0);
@@ -30,7 +32,7 @@ export function NetworkRackPlate({ room, zone, network, racks, lbQuotes, initial
     return <PlateFrame {...frame} title="Room load balancer" sub={`${az} · in the network rack`} className="lb netrack">
       <Status text={st.text} progress={st.progress} />
       <Lines lines={lbLines(network.lb, 'rack')} slots={2} />
-      <LbBody unit={{ kind: 'room', id: room }} view={network.lb} child="rack" quotes={lbQuotes}
+      <LbBody unit={{ kind: 'room', id: room }} view={network.lb} child="rack" quotes={lbQuotes} queueQuote={queueQuote}
         onAction={onAction} onResearch={onResearch} researchName={researchName} />
       <div className="keys"><Key tone="go" label="Port speeds and count" onPress={() => setView('ports')} /></div>
     </PlateFrame>;

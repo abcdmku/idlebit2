@@ -30,7 +30,7 @@ Every geometry method takes an optional trailing `form` (`'desktop' | 'phone'`, 
 | Member | Contract |
 |---|---|
 | `size(s, out, form)` | The world size in art px. It sizes the world buffer. |
-| `focus(s, viewport, out, form)` | The rect inside `size` that the rest camera frames. |
+| `focus(s, viewport, out, form, area?)` | The rect inside `size` that the rest camera frames, whole (see Rest framing). `area` (the free world in CSS px and the shell's N) lets a wide world frame part of itself: the rack row, the World map. |
 | `entry?(s, out, form)` | Where the inbound link meets the art, at its top (D17): CPU the IN pad, System the port cable (x 33, y 0), Rack the ceiling uplink, Room the gateway fibre, World the backbone hub. The framed rest puts it on the lattice, and the core's pipe drops into it. Without it the core uses the top centre of a target with id `entry` (pipe only, no snap). |
 | `miniRect?(s, out, form)` | The rect of this world that a parent's mini of it shows; defaults to `size`. The CPU reports its package, so System → CPU dives into the socket. |
 | `draw(g, s, view, frame)` | Draws the full world into the buffer in art px. `g` is already offset by `size.x/y`. |
@@ -39,7 +39,9 @@ Every geometry method takes an optional trailing `form` (`'desktop' | 'phone'`, 
 | `children(s, out, form)` | Drillable children `{ ref, rect, world? }` from index 0; return the count (at most `MAX_CHILDREN`). `rect` is the tap rect. `world` (reset to null before each call) is where the child's world lands in the zoom when that differs: the rack row's span, the board on the sled. |
 | `targets(s, view, out, from, form)` | Tap targets, back to front, from `from` (the children already fill `out[0..from)`). Reuse entries with `resetHitTarget`; at most `MAX_TARGETS`. |
 | `followFocus?(s)` | True while the player drags the view (rack row): the rest camera follows the focus with no 0.25 s lerp. |
-| `unitAnchor?`, `faults?`, `icon` | Payout coin rect, live fault rects (they smoke), the 16×16 rail icon. |
+| `payoutAnchor?(s, c, out, form)` | The component that completed `c` (a `CompletionView`): CPU core, System socket or GPU card, Rack sled, Room rack, World site. Writes its rect and returns a key stable per component, or -1 when it isn't shown. See Payouts. |
+| `popWindowMs?`, `partVersion?(s, id)`, `restEaseS?` | How long completions join a component's pop (Room 1 s). A number that rises when part target `id` is upgraded, for the purchase flash. Seconds the rest camera eases to a new focus (rack row 0.15). |
+| `faults?`, `icon` | Live fault rects (they smoke), the 16×16 rail icon. |
 
 ## Hits and commands
 
@@ -63,10 +65,11 @@ The renderer does not emit commands. `renderer.hit(x, y)` returns a borrowed `Hi
 
 `renderer.resize(w, h, dpr, viewport, framing)` takes a `RestFraming` (`DESKTOP_FRAMING`, `PHONE_FRAMING` in `core/camera.ts`):
 
-- `scale` N (3 desktop, 2 phone): every rest draws 1:1, one art px = N CSS px.
-- `top`: CSS px from the viewport top to the free world, the band plus the queue strip (96 desktop, 128 phone). The focus centres below it. A focus taller than that keeps its top, where the link enters, and crops at the bottom.
+- `scale` N (3 desktop, 2 phone): the shell's art scale; one art px = N CSS px.
+- `top`: CSS px from the viewport top to the free world, the band plus the queue strip (144 at 1440×900, 192 at 390×780).
+- **Contain-fit (A05, D15.2).** The free world is the view below `top` minus the gutters (`gutters()`; `RestFraming.gutters` overrides). Desktop: left 216 (the pipe's vertical run and its tag), right 312 (the UI's callout dock, 288 plus a lattice); phone: a lattice each side; both: the pipe run on top. The focus rests whole and centred there at N, or at the largest lower integer scale that fits (`fitScale`), never cropped, and never below 2 (N = 1 is too small to read): a level that doesn't fit whole at 2 rests at 2 and pans (`core/restPan.ts`, `restPan`), centred by `restCentre` (Room: the active rack's row; World: the owned sites) and snapped by `panSnap`. Only `wholeAtRest` levels (System, D15.2) skip the pan; on desktop the core reports one that doesn't fit at 2. `frame.scale` is that rest scale; labels pick their arrangement and type by it (`typeForScale`: the desktop type at 3, the phone type at 2 and below).
 - `lattice` (24 desktop, 8 phone): the level's `entry()`, else its world origin, snaps to it from the viewport origin.
-- `pipe` (optional, CSS px `{ x, y, runY }`): the core draws the inbound pipe from under the head slot down to `runY`, across, and into the entry, 4 art px wide, with the link label and packet tag under the run. A transfer rides it at its real progress; one shorter than 0.25 s is a landing flash (`core/pipe.ts`). During a zoom only the first drop shows. `inbound(snapshot)` gives each level's link name, speed and transfer.
+- `pipe` (optional, CSS px `{ x, y, runY }`): the core draws the inbound pipe from under the head slot down to `runY`, across, and into the entry, 4 art px wide, with the link tag and the packet tag under it, in the left gutter. A transfer rides it at its real progress; one shorter than 0.25 s is a landing flash (`core/pipe.ts`). During a zoom the pipe follows the entry as it moves between the two worlds (A27). `inbound(snapshot)` gives each level's link name, speed and transfer.
 - At rest `frame.visible` is the world rect (art px) below `top`; it is null during a zoom.
 
 Without a framing the old largest-integer fit applies (harness, previews).
@@ -83,7 +86,9 @@ Without a framing the old largest-integer fit applies (harness, previews).
   - World ↔ Room: `siteSink(link, reduced)` sinks the site into the map (global.js `diveOf`).
   - System ↔ CPU: the camera alone dives into the package (`miniRect`).
 - `transitionAlpha(frame.zoom, key)` tells a mini how far its full world has faded in. `drawContained(g, rect, size, draw)` draws a world into a rect with the zoom's contain transform.
-- Labels and selection brackets hide during a zoom. The HUD and deck are DOM and never move.
+- Labels fade out over the first 15% of the eased zoom and in over the last 20%, each through its own world's camera (`core/zoomLayer.ts`, A27). Selection brackets hide during a zoom. The HUD and deck are DOM and never move.
+- **Rack row (A06, `rack/row.ts`).** Clamped so the row's first and last racks stop at the view edges. Ending a gesture snaps to the rack pitch in 0.15 s. A tapped neighbour holds for a frame, then eases to the framed rest. The UI divides drag px by `rackRowScroll.scale` (the rest scale) and may call `release(velocity)`.
+- **World (A09, `global/pan.ts`).** The rest frames the owned sites plus one region of context, cut to the free world. When that doesn't fit at 2 the core's `restPan` pans the map (`worldPan` is the same object), clamped to it.
 - **One bad frame never stops the loop.** Every level call (draw, labels, targets, children, entry, faults) is guarded. A failure is logged once per place and message (`reportRenderError`) and the frame goes on. A throw anywhere else cuts the zoom, and the next frame draws at rest.
 
 ## Motion: real state at its real rate
@@ -99,9 +104,28 @@ Program §1 and v2 program §7 apply:
 - While `frame.paused`, draw steady power LEDs only. The core draws the veil.
 - No idle twinkles, breathing pulses, sheens or decorative blinks.
 
+## Payouts
+
+Work pays on the component that ran it. Nothing flows out to the deck or the HUD; no level draws an output trace. Tasks still enter every level from the top, over the inbound pipe.
+
+- The sim lists each completion in `snapshot.completions` (`system`, `cpu`, `core`, `gpu`, `rack`, `room`, `site`, `type`, `credits`, `data`, `tick`, `tau`, `seq`). The core reads each `seq` once. At rest and while running, it asks the focus level's `payoutAnchor` where the completion lands. Completions during a zoom, a pause or a load are only consumed.
+- `core/pops.ts` (`PayoutPops`) draws a plate on that component at the completion's time, `(tick + tau) × TICK_MS`. The plate shows the coin and `+Credits` in gold, then the gem and `+Data` in the Data green, the HUD's icons and colours. It uses whole numbers, Chakra Petch 700 at the body size, 8 art px icons at N, and edges on the N grid. It rises 3 art px, one px at a time, then fades out at 1 s.
+- **No spray.** Completions on one component within 250 ms sum into one pop. Each component has at most one live pop; a later completion replaces it. A plate that would cover another component's pop in its first half waits, and keeps summing, until it fits. Anything older than 1 s is dropped. There are at most 24 pops.
+- Reduced motion: no rise or fade; the pop shows for its second.
+- **Pay is per whole task (user).** A pop means a task completed and paid. A task run on several members, or (D25) split into shards, pays once, with its whole payout, on the component that finished its last member or shard; the sim lists only those completions. A shard that finishes earlier shows only its piece emptying, with no currency. A level's `payoutAnchor` rects are also the targets a split task's pieces flow to.
+- L2 harness: `l2.html?level=<id>&pops=<age ms>` holds QA pops at that age on the level's first components.
+- **Other feedback (`core/feedback.ts`).** A failure (`snapshot.failures`, by `seq`) beats its red cause mark at the pipe mouth for 0.4 s (A11). A part whose `partVersion` rises, or that appears, flashes gold with a 1·N bracket for 0.3 s, once (A10).
+
+## Split tasks (D25)
+
+- A task arrives from the top and splits into shards. Each shard is one transfer (`FlowView`, `core/flows.ts`): a shared uplink carries a task's shards in turn (one travels, the rest wait as a stack at its mouth), ports carry them in parallel. Shards of one take share `taskId` and draw in their task type's colour; `drawFork` marks the router where their paths diverge. Positions come only from `bitsSent / bits`; a transfer shorter than `MIN_VISIBLE_TRANSFER_S` is a landing flash.
+- Level flows: `RackSnapshot.flows` (uplink, ports), `RoomSnapshot.flows` (zone link, rack uplinks), `GlobalSnapshot.flows` (data plane, backbone), `SystemSnapshot.inbound` (its port). The core pipe reads each level's top-link shard (`inbound`).
+- Pay is for the whole task: one completion, one pop, on the component that finished the last shard. A finished non-final shard (`RenderSnapshot.shardsDone`, by `seq`) only drains its piece on that component for 300 ms (`core/shardDone.ts`), located by the level's `payoutAnchor`.
+- Router queues: `LbView.queue` wells in the LB's slot (`drawLbQueue`), filled by queued entries in their task colour.
+
 ## Text (D2.1, D11)
 
-- World labels (block names, part values) are written by the level through `labels()` and drawn by the core in Chakra Petch at the one body size (16/24 desktop, 13/16 phone), weight 500, or 700 for names, on the 8 px text grid, crisp at device resolution. `out.label(id, x, y, align, tag).text(text, tone, bold).br()`.
+- World labels (block names, part values) are written by the level through `labels()` and drawn by the core in Chakra Petch at the one body size (16/24 desktop, 13/16 phone), weight 500, or 700 for names, on the 8 px text grid, crisp at device resolution. `out.label(id, x, y, align, tag).text(text, tone, bold).br()`; `.leader(x, y)` adds a 1·N leader from the label to an art point (the Room's fixture tags, A20).
 - Values: the formatters in `core/format.ts` (`hertz`, `bitsText`, `bitRate`, `wattsText`, `whole`, `opsText`, `secondsText`) over snapshot fields. Never compute a value.
 - Prices and callouts are DOM (U).
 - Canvas text waits for the font (`loadCanvasFont`, D11.4).
@@ -110,28 +134,15 @@ Program §1 and v2 program §7 apply:
 ## Shared world pieces (core)
 
 - `unit.ts`: `drawSaveIcon`, `saveIconRect`, `lampState`, `drawUnitLamp`, `drawVeil`.
+- `pops.ts`: `PayoutPops`, `completionMs`, the `Completion` shape (see Payouts).
 - `feed.ts`: `drawCart`, `drawFamilyGlyph` (by `FamilyId`), `drawReq`, `drawCause`, `deadlineMs`.
 - `pipe.ts`: `drawPipe`, `inbound`, `transferProgress`.
-- `familyIcons/` (task types and family icons, D23, for the canvas and the UI shell):
-  - Task types group the catalog bands. Each type has one colour and one frame silhouette:
-
-    | Type | Bands | Colour | Frame |
-    | --- | --- | --- | --- |
-    | `compute` Compute | bits, ints | `#7fe3ff` | chip with pins |
-    | `parallel` Parallel | threads | `#b18cff` | two stacked plates |
-    | `memory` Memory | ram | `#ff8c42` | RAM stick with contacts |
-    | `accel` Accelerated | gpu | `#c2e05a` | tensor cube |
-    | `storage` Storage | storage | `#d6ab78` | disk cylinder |
-    | `cluster` Distributed | rackDist, roomDist | `#aab3d4` | four linked nodes |
-    | `zones` Multi-zone | multiAz | `#4f9dff` | twin-gable halls |
-    | `region` Regional | region | `#ff8fb3` | globe |
-
-  - A family icon is its type's frame with the family's glyph on the frame's dark plate, so a type's families read as a set. Every icon is a 16×16 art cell: a 14×14 silhouette with a 1 px ink outline baked into the margin, so it reads on the void, the cards and the core purple. Each run of one colour is one fill of N px height, on the N grid.
-  - `typeOf(family)`, `typeColor(type)`, `typeName(type)`, `TASK_TYPES`, `TYPE` (name, bands, `a` colour, `d` shade, `l` light, `k` plate), `BAND_TYPE`.
-  - `drawFamilyIcon(g, family, x, y, N = 1, tone = 'type' | 'fail')` and `drawTypeIcon(g, type, x, y, N = 1, tone)`: draw the icon in the 16×16 cell at (x, y). `family` is a `FamilyId` or its key (`familyKey`).
-  - `paintFamilyIcon(canvas, family, N, dpr = 1, tone)` and `paintTypeIcon(canvas, type, N, dpr, tone)`: for DOM. They size `canvas` to 16N × 16N CSS px (backed at `dpr`), set `image-rendering: pixelated` and paint the icon.
-  - `bandColor(family)` returns the family's type colour, and `BAND[band]` carries its type's colours. `familyName`, `familyBand`, `hasFamilyIcon` and `FAMILY` read the game catalog. Also `FAMILY_CELL` (16) and `FAMILY_ICON` (14). Requirement pips: `drawPip(g, req, x, y, N, mini)` and `PIPS`.
-  - The art lives in `familyIcons/art/` (`types.mjs`: types, colours, frames; `glyphs-*.mjs`: 10×10 glyphs; `catalog.mjs`: band and family names, requirement pips). Regenerate the data with `node src/render/core/familyIcons/generate.mjs`. The generator refuses glyphs that leave the plate, bands without a type, and duplicate icons.
+- `familyIcons/` (task types and their icons, D23, set F, for the canvas and the UI shell):
+  - Task types group the catalog bands; each has one colour ramp (`TYPE`: name, bands, `a` colour, `d` shade, `l` light, `k` plate) and one icon. Compute, Parallel, Memory, Accelerated, Storage, Distributed, Multi-zone, Regional.
+  - **Every family shows its type's icon** in its type colour (set F, `setF.ts`): family glyphs are retired, and the family name is text on the card. Icons are 16×16 art cells, a 14×14 silhouette with a 1 px ink ring baked into the margin, so they read on the void, the cards, the purple core tile and the LCD.
+  - `drawFamilyIcon(g, family, x, y, N = 1, tone = 'type' | 'fail')` and `drawTypeIcon(g, type, x, y, N, tone)` draw the icon at integer scale N; `paintFamilyIcon` and `paintTypeIcon` paint it into a DOM canvas (16N × 16N CSS px at `dpr`, pixelated). `drawTypeMini(g, type, x, y, N)` draws the 5×5 mini the sled LCD uses.
+  - `typeOf(family)`, `typeColor`, `typeName`, `TASK_TYPES`, `BAND_TYPE`, `bandColor`, `BAND`, `familyName`, `familyBand`, `FAMILY`, `FAMILY_CELL` (16), `FAMILY_ICON` (14). Requirement pips: `drawPip(g, req, x, y, N, mini)` and `PIPS`.
+  - The matrices are literal (`setF.ts`, from `artifacts/icons/index.html`); there is no generator.
 - Task numbers are never drawn (user): a task shows as its family icon and name.
 - `px.ts`, `palette.ts`, `glyphs.ts`, `sprites.ts`, `decoration.ts`: pixel primitives, one palette, the 3×5 glyphs, the sprite cache and state overlays.
 

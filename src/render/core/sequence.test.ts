@@ -96,11 +96,11 @@ describe('zoom chain', () => {
     expect(chain.step(1, 2, 2, 3.6)).toMatchObject({ a: 0, b: 1 });
   });
   it('keeps the camera continuous across chained steps: each boundary is a level at rest', () => {
-    const vp = rect(0, 0, 1392, 648), r = { x: 1, y: 1 };
+    const vp = rect(24, 24, 1392, 708), r = { x: 1, y: 1 };
     const zoom = new ZoomTransition(), rest = camera();
     const path = [
       { key: 'system:0', size: rect(0, 0, 168, 236), rect: rect(), focus: rect(6, 24, 156, 196) },
-      { key: 'chip:0', size: rect(0, 0, 480, 400), rect: rect(17, 63, 36, 36), focus: rect(140, 100, 200, 180), mini: rect(144, 104, 192, 152) },
+      { key: 'chip:0', size: rect(0, 0, 480, 400), rect: rect(17, 63, 36, 36), focus: rect(140, 100, 200, 160), mini: rect(144, 104, 192, 152) },
     ];
     zoom.begin(path, 'system:0', 'chip:0', vp, r, 0, false, { framing: DESKTOP_FRAMING, segment: { a: 0.5, b: 0.75, total: 2.6 } });
     expect(zoom.seconds).toBeCloseTo(0.65);
@@ -112,10 +112,13 @@ describe('zoom chain', () => {
 });
 
 describe('framed rest', () => {
-  it('draws 1:1 at N and puts the world origin on the lattice', () => {
-    const out = camera(), vp = rect(24, 24, 1392, 648);
-    framedRest(rect(6, 24, 156, 196), vp, { x: 2, y: 2 }, DESKTOP_FRAMING, out);
+  it('draws 1:1 at N when the focus fits whole, else at the next lower scale, with the world origin on the lattice', () => {
+    const out = camera(), vp = rect(24, 24, 1392, 708);
+    framedRest(rect(0, 0, 200, 160), vp, { x: 2, y: 2 }, DESKTOP_FRAMING, out);
     expect(out.s).toBe(6);
+    // The System board (196 tall) doesn't fit in 708 − 144 (band and strip) − 48 (pipe run) at N = 3.
+    framedRest(rect(6, 24, 156, 196), vp, { x: 2, y: 2 }, DESKTOP_FRAMING, out);
+    expect(out.s).toBe(4);
     const originX = ((vp.x + vp.w / 2) * 2 - out.cx * out.s) / 2, originY = ((vp.y + vp.h / 2) * 2 - out.cy * out.s) / 2;
     expect(Math.abs((originX - vp.x) % 24)).toBe(0); expect(Math.abs((originY - vp.y) % 24)).toBe(0);
     framedRest(rect(0, 0, 160, 120), rect(8, 8, 368, 504), { x: 1, y: 1 }, PHONE_FRAMING, out);
@@ -172,16 +175,17 @@ describe('renderer zoom sequencing', () => {
 });
 
 describe('labels', () => {
-  it('draws level labels at the body size at rest and never during a zoom', () => {
+  it('draws level labels at the rest scale body size, and none mid-zoom (they fade at the ends)', () => {
     const { registry, renderer } = world(), ui = driver(renderer, 'system');
     const board = registry.level('system');
     board.labels = (_s, _v, _f, out) => { out.label('psu', 120, 40, 'left').text('PSU', 'silk', true).br().text('64 W', 'value'); };
     ui.frame();
     const texts = () => contexts[0].texts.map(t => `${t.text}|${t.font}`);
-    expect(texts()).toEqual(['PSU|700 16px "Chakra Petch"', '64 W|500 16px "Chakra Petch"']);
-    contexts[0].texts.length = 0;
-    ui.request('chip'); ui.frame(); ui.frame();
-    expect(renderer.transition).not.toBeNull(); expect(contexts[0].texts).toHaveLength(0);
+    // The fixture board rests at 2 on this desktop, so its labels take the stacked (phone) type.
+    expect(texts()).toEqual(['PSU|700 13px "Chakra Petch"', '64 W|500 13px "Chakra Petch"']);
+    ui.request('chip'); ui.frame(); renderer.hold(0.5); ui.frame();
+    contexts[0].texts.length = 0; ui.frame();
+    expect(renderer.transition).not.toBeNull(); expect(contexts[0].texts.filter(t => t.text === 'PSU')).toHaveLength(0);
   });
 });
 
@@ -204,9 +208,10 @@ describe('R38 core hooks', () => {
     rack.targets = (s, _v, out, from) => { const t = out[from]; t.id = 'probe'; t.kind = 'part'; t.owner = refOf(s); copyRect(rect(0, 0, 8, 8), t.rect); return from + 1; };
     const at = rect(), draw = (now: number) => renderer.draw(fixtureSnapshot(snap('rack')), { selectedId: null, picked: null, quotes: null, reducedMotion: false }, { nowS: now, sincePublishMs: 0 });
     draw(0); renderer.anchor('probe', at); const x0 = at.x;
-    x = 40; draw(0.01); renderer.anchor('probe', at); expect(at.x).toBeGreaterThan(x0 - 120);
-    expect(at.x).not.toBe(x0 - 120);
-    follow = true; x = 80; draw(0.02); renderer.anchor('probe', at);
-    expect(at.x).toBe(x0 - 240);
+    // The 120×240 box rests at 2 here (it doesn't fit whole at 3).
+    x = 40; draw(0.01); renderer.anchor('probe', at); expect(at.x).toBeGreaterThan(x0 - 80);
+    expect(at.x).not.toBe(x0 - 80);
+    follow = true; x = 72; draw(0.02); renderer.anchor('probe', at);
+    expect(at.x).toBe(x0 - 144);
   });
 });

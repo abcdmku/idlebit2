@@ -1,8 +1,8 @@
 import { FAIL_CAUSES, FAIL_DETAILS } from '../types/events';
-import { RESOURCES } from '../types/catalog';
 import { MAX_CPUS, MAX_FAMILIES, MAX_RACK_PORTS, MAX_ROOM_PORTS, MAX_SITES, MAX_UPLINKS, MAX_UPS, MAX_ZONES_PER_SITE, RACKS_PER_ROOM, RATE_RING_TICKS, SERVERS_PER_RACK } from './constants';
 import { allocTable, cloneTable, type Layout, type Table } from './table';
-import { ACCEL_CLOCKS, ACCEL_DOMAINS, MAX_ACCELS } from './constants';
+import { ACCEL_CLOCKS, ACCEL_DOMAINS, DEADLINE_BUCKETS, MAX_ACCELS, RES_CLOCKS, ROUTER_QUEUE_MAX } from './constants';
+import { copyCompletionLog } from './completions';
 
 /*
  * Buffer layouts (architecture §1.3). Row index = unit id. Field-writer table (architecture §2.2):
@@ -20,7 +20,7 @@ import { ACCEL_CLOCKS, ACCEL_DOMAINS, MAX_ACCELS } from './constants';
  * |   G.running; G.researchOps (adds; build reads and zeroes it)  |                                |
  * | hot link FIFOs, backlog, busyS, bitClock; lb cursors, routed, | net (S3)                       |
  * |   lbLast, wrr, globalWrr, G.globalCursor/Routed/Last          |                                |
- * |   wrr counters; gang placement                                |                                |
+ * |   wrr counters; rq; parent rows                               |                                |
  * | queue front list, record taken/payout, rate ring, family      | market (S2)                    |
  * |   jitter, round counters (G met/failed/work/taken/dismissed), |                                |
  * |   rng; zeroes detailRound at round start                      |                                |
@@ -29,7 +29,7 @@ import { ACCEL_CLOCKS, ACCEL_DOMAINS, MAX_ACCELS } from './constants';
  * |   duty/W, region bill W                                       |                                |
  * | per-family tallies (fam.*Tick, metSys, failDetail), tally     | exec/market/phys add through   |
  * |   pairs, detailRound                                          |   core/events; core clears     |
- * | pool free lists (G.recFree, G.gangFree, rec.next on free)     | core/pool                      |
+ * | pool free lists (G.recFree, G.parentFree, rec.next on free)   | core/pool                      |
  * | wallet, ledger                                                | core/ledger (plain state)      |
  * | research progress; build and compiled inside a tick (step 12) | build (World.build, .compiled) |
  *
@@ -42,17 +42,25 @@ const u32 = { t: 'u32' } as const;
 const i32 = { t: 'i32' } as const;
 const f64 = { t: 'f64' } as const;
 const neg1 = { t: 'i32', fill: -1 } as const;
-const R = RESOURCES.length;
+const R = RES_CLOCKS;
 
 /* ---------- compiled ---------- */
 const COOLER = { coolerQc: f64, coolerTau: f64, coolerIdleW: f64, coolerLoadW: f64, coolerTech: u8, setpointF: f64, hasSetpoint: u8, leak: f64 } as const;
-const ROUTER = { lbStrategy: u8, lbFilters: u8, lbPlacements: u8, reserveOnRoute: u8, lbIdleW: f64, lbLoadW: f64 } as const;
+/** lbQueueSlots: the router queue's level L (D25.7), 1–32. */
+const ROUTER = { lbStrategy: u8, lbFilters: u8, lbQueueSlots: u8, lbIdleW: f64, lbLoadW: f64 } as const;
 
 export const SYS_COMPILED = {
   alive: u8, kind: u8, intent: u8, rack: i32, room: i32, site: i32, slot: u8,
   port: neg1, threads: u16, cores: u16, sockets: u8, K: u16, Q: u16, keff: u16, slots: u16, strategy: u8,
-  threadRate: f64, clockHz: f64, cacheBits: f64, memCap: f64, hasRam: u8, ramBw: f64, ecc: u8,
-  gpuOps: f64, tensorOps: f64, vram: f64, npu: u8, storageCap: f64, ioRate: f64, ioConc: u8,
+  /**
+   * D26.1 memory tiers: cacheBits (Σ L1+L2+L3), ramCap (Σ modules), storageCap (Σ own drives) and diskNode, the
+   * rack's storage node whose free capacity extends the disk tier (sharedStorage; -1 none). memCap is the whole
+   * hierarchy, cache + RAM + drives + the node's drives: the only memory gate. ioRate is the disk tier's IO.
+   */
+  threadRate: f64, clockHz: f64, cacheBits: f64, ramCap: f64, memCap: f64, hasRam: u8, ramBw: f64, ecc: u8,
+  gpuOps: f64, tensorOps: f64, vram: f64, npu: u8, storageCap: f64, diskNode: neg1, ioRate: f64, ioConc: u8,
+  /** D26.4 unifiedMemory: RAM + disk a VRAM need may overflow into (static gate); 0 without the rule. */
+  unifiedBits: f64,
   accelKind: { t: 'u8', stride: MAX_ACCELS }, gpuLinked: u8,
   accelCores: { t: 'f64', stride: MAX_ACCELS }, accelClockHz: { t: 'f64', stride: MAX_ACCELS },
   accelVram: { t: 'f64', stride: MAX_ACCELS }, accelOps: { t: 'f64', stride: MAX_ACCELS },
@@ -81,7 +89,7 @@ export const ROOM_COMPILED = {
 } as const satisfies Layout;
 export const SITE_COMPILED = {
   alive: u8, opened: u8, intent: u8, region: u8, zones: { t: 'i32', stride: MAX_ZONES_PER_SITE, fill: -1 },
-  gridCapW: f64, gridLoss: f64, dpSpeed: f64, dpLatencyTicks: i32, dpStrategy: u8, dpFilters: u8, dpPlacements: u8,
+  gridCapW: f64, gridLoss: f64, dpSpeed: f64, dpLatencyTicks: i32, dpStrategy: u8, dpFilters: u8, dpQueueSlots: u8,
   dpLink: { t: 'i32', stride: MAX_ZONES_PER_SITE, fill: -1 }, backboneLink: neg1,
 } as const satisfies Layout;
 /** One row. */
@@ -100,7 +108,9 @@ export const SYS_HOT = {
   accelTaskS: { t: 'f64', stride: MAX_ACCELS }, accelResearchS: { t: 'f64', stride: MAX_ACCELS }, accelResearchOps: f64,
   wAnchor: { t: 'f64', stride: R }, eAnchor: { t: 'f64', stride: R }, rate: { t: 'f64', stride: R },
   due: { t: 'f64', stride: R, fill: Infinity }, head: { t: 'i32', stride: R, fill: -1 }, active: { t: 'u16', stride: R },
-  busyThreads: u16, usedMem: f64, usedVram: f64, usedStorage: f64, queueHead: neg1, queueTail: neg1, queueLen: u16,
+  busyThreads: u16,
+  /** D26.1: bits held per tier by running shards (and unified-memory VRAM overflow); a storage node's usedDisk includes servers' spill onto it. */
+  usedCache: f64, usedRam: f64, usedDisk: f64, usedVram: f64, queueHead: neg1, queueTail: neg1, queueLen: u16,
   running: u16, reserved: u16, ioHolds: u8, busy: f64, researchOps: f64,
   /** Σ est seconds of admitted + reserved tasks (leastWork); busy threads per socket; research ops/s at e = 1. */
   estS: f64, sockBusy: { t: 'u16', stride: MAX_CPUS }, researchRate: f64,
@@ -144,27 +154,69 @@ export const LINK_HOT = { head: neg1, tail: neg1, qlen: i32, backlog: f64, busyS
 /** Record location codes (rec.loc). */
 /** front: taken work returned to the queue front (spec §5.2). probe: the head materialized for a take attempt. */
 export const LOC = { free: 0, front: 1, link: 2, queue: 3, running: 4, probe: 5 } as const;
-/** Task cohort records (architecture §1.4). */
+/**
+ * Task cohort records (architecture §1.4). Since D25 a record is a task or one shard of a task:
+ * `units` its size units, `parent` its parent row (-1 for an unsplit task), `shard` its index
+ * and `sib` the next record of the same parent. `payout` is the whole task's W for an unsplit
+ * task and unused for a shard (pay comes from the parent row).
+ */
 export const RECORD = {
   /** Lifetime accelerator assignment, including stages on other resources. */
   accelDomain: neg1,
-  family: u16, count: u32, stage: u8, scale: f64, payout: f64,
+  family: u16, count: u32, stage: u8, units: f64, payout: f64, shard: u16, sib: neg1,
   /** Owning resource's work clock W when the current stage started, and the W at which it finishes. */
   /** `taken`: the tick the task was taken (strategy ties: earlier take first). */
   start: f64, finish: f64, taken: i32, taskId: f64,
   /** Exec record bits (socket span, IO hold, waiting). */
   flags: u8,
-  loc: u8, owner: neg1, target: neg1, prev: neg1, next: neg1, gang: neg1, threads: u16,
+  /** D26.5: completion window in ticks from take (-1 none), frozen at the draw; with `taken` it is the task's clock. */
+  deadline: neg1,
+  /**
+   * D26.1 placement per task, bits, written at start (exec/memory) and released once: cache, RAM, disk (memN
+   * of it on the rack storage node). trafR/trafD: frozen traffic fractions of its mem stages (D26.2).
+   * vramR/vramD (vramN on the node): unified-memory VRAM overflow (D26.4). `part`: the current stage part.
+   */
+  memC: f64, memR: f64, memD: f64, memN: f64, trafR: f64, trafD: f64, vramR: f64, vramD: f64, vramN: f64, part: u8,
+  loc: u8, owner: neg1, target: neg1, prev: neg1, next: neg1, parent: neg1, threads: u16,
 } as const satisfies Layout;
-export const GANG = {
-  family: u16, members: u16, placed: u16, done: u16, scopeKind: u8, scopeId: neg1,
-  payout: f64, lostCause: { t: 'u8', fill: 255 }, replaceDeadline: neg1, next: neg1,
+/**
+ * The parent pool (D25 data layout): one row per split task. `units` and `work` are the whole
+ * task's s and W; `placed` shards hold indices 0 … placed − 1, `done` of them finished, and
+ * `pending` shares still wait in router queues. The task is met when done === placed with
+ * nothing pending. `head` starts the sibling list (rec.sib); `taken` is the pickup tick.
+ * With checkpointing a lost shard leaves `lostCause`, `replaceDeadline` (tick), and the
+ * replacement's rack and units in `replaceRack` / `replaceUnits`. `next` chains the free list.
+ */
+export const PARENT = {
+  taskId: f64, family: u16, units: f64, work: f64, minShards: u16, placed: u16, done: u16, pending: u16,
+  head: neg1, taken: i32,
+  /**
+   * D26.5: the window in ticks (-1 none) and the deadline ring links (core/deadlines: bucket
+   * (taken + deadline − 1) % DEADLINE_BUCKETS, doubly linked through dlPrev/dlNext). `tier`: the slowest
+   * tier its shards' traffic touched (0 none, 1 RAM, 2 disk); ramBits/diskBits: that traffic of done shards.
+   */
+  deadline: neg1, dlPrev: neg1, dlNext: neg1, tier: u8, ramBits: f64, diskBits: f64,
+  lostCause: { t: 'u8', fill: 255 }, replaceDeadline: neg1, replaceRack: neg1, replaceUnits: f64, replaceShard: u16, next: neg1,
+} as const satisfies Layout;
+/**
+ * Router queues (D25.7), one row per router: global 0, then sites, zones (rooms), racks, each in id
+ * order (rqRow). A ring of ROUTER_QUEUE_MAX entries from rqHead, rqLen long, oldest first. An entry
+ * is a whole task (rqParent -1: its family in rqFamily) or a share of parent row rqParent.
+ * `rqWait` 1: the front entry could not be split and nothing below the router has changed since
+ * (net/hops.ts retries it only after a wake, core/routerQueue.ts).
+ */
+export const RQ = {
+  rqTask: { t: 'f64', stride: ROUTER_QUEUE_MAX }, rqParent: { t: 'i32', stride: ROUTER_QUEUE_MAX, fill: -1 },
+  rqUnits: { t: 'f64', stride: ROUTER_QUEUE_MAX }, rqSince: { t: 'i32', stride: ROUTER_QUEUE_MAX },
+  rqFamily: { t: 'u16', stride: ROUTER_QUEUE_MAX }, rqHead: u8, rqLen: u8, rqWait: u8,
 } as const satisfies Layout;
 /** Completed cohorts this tick: (payout per task, count). Ledger sums and clears. */
 export const TALLY = { pay: f64, count: f64 } as const satisfies Layout;
 /** Fixed MAX_FAMILIES rows. *Tick columns are this tick's tallies; core clears them at tick end.
  * metSys / metRack / metRoom / metSite: the one unit where the family's cohorts completed this tick, -1 none yet, -2 several. */
 export const FAMILY_HOT = {
+  /** Round report work sums and dismissals. Saved so a mid-round reload preserves the breakdown. */
+  metWorkRound: f64, failedWorkRound: f64, dismissedRound: f64,
   metTick: u32, metSys: { t: 'i32', fill: -1 }, metRack: { t: 'i32', fill: -1 }, metRoom: { t: 'i32', fill: -1 }, metSite: { t: 'i32', fill: -1 }, failTick: { t: 'u32', stride: FAIL_CAUSES.length },
   /** Detail of the last failure per cause this tick (FAIL_DETAILS index, 255 none). */
   failDetail: { t: 'u8', stride: FAIL_CAUSES.length, fill: 255 },
@@ -182,13 +234,12 @@ export const RING_HOT = {
 export const G = {
   /** The queue front: taken work returned to the market (spec §5.2), a record list. */
   frontHead: 0, frontTail: 1, frontLen: 2, transitCount: 3, nextTaskId: 4, rngDraws: 5, met: 6, failed: 7,
-  /** failByCause: G.fail + FAIL_CAUSES index (6 slots). */
-  fail: 8,
-  queued: 14, running: 15, researchOps: 16, recFree: 17, gangFree: 18,
+  /** failByCause: G.fail + FAIL_CAUSES index (7 slots, 8..14; D26.5 added late). */
+  fail: 8, running: 15, researchOps: 16, recFree: 17, parentFree: 18,
   /** Round SLA sums in ops (spec §4.2). */
   deliveredWork: 19, globalCursor: 20, globalRouted: 21, utilityW: 22, onlineThreads: 23, busyThreads: 24,
-  /** Live rows in rec / gang (core/pool). */
-  recUsed: 25, gangUsed: 26,
+  /** Live rows in rec / parent (core/pool). */
+  recUsed: 25, parentUsed: 26,
   /** Exec: build revision + research mode it last anchored rates against; the global scheduler's last pick. */
   execStamp: 27, globalLast: 28,
   failedWork: 30,
@@ -196,8 +247,20 @@ export const G = {
   metWorkTick: 31, failWorkTick: 32,
   /** Tasks taken and dismissed this round. */
   taken: 33, dismissed: 34,
+  /** The site and room counts hot.rq rows are laid out for (rqRow); syncHotSizes moves rows when they change. */
+  rqSites: 35, rqRooms: 36,
+  /** Router-queue entries over every router (feed counts). */
+  rqTotal: 37,
+  /** Parent rows waiting for a checkpoint replacement shard (net scans them only when > 0). */
+  replacing: 38,
+  /** Build revision and research count the router-queue waits were last valid for (net/hops.ts). */
+  routeStamp: 39,
+  /** D26 round spill sums: bits met tasks' shards touched in RAM and on disk (RoundReport.spill). */
+  ramWork: 40, diskWork: 41,
+  /** Queued tasks over every system (moved here when late took slot 14). */
+  queued: 42,
 } as const;
-export const G_SIZE = 40;
+export const G_SIZE = 43;
 
 export interface CompiledBuffers {
   readonly sys: Table<typeof SYS_COMPILED>;
@@ -217,7 +280,8 @@ export interface HotBuffers {
   readonly site: Table<typeof SITE_HOT>;
   readonly link: Table<typeof LINK_HOT>;
   readonly rec: Table<typeof RECORD>;
-  readonly gang: Table<typeof GANG>;
+  readonly parent: Table<typeof PARENT>;
+  readonly rq: Table<typeof RQ>;
   readonly tally: Table<typeof TALLY>;
   readonly fam: Table<typeof FAMILY_HOT>;
   readonly ring: Table<typeof RING_HOT>;
@@ -227,7 +291,12 @@ export interface HotBuffers {
   readonly detailRound: Float64Array;
   /** Smooth weighted round-robin counters of the global scheduler, per site (net). */
   readonly globalWrr: Float64Array;
+  /** D26.5 deadline ring: per bucket the first parent row whose window ends at a tick ≡ bucket (-1 none). */
+  readonly dlHead: Int32Array;
 }
+
+/** Router rows: global, sites, rooms, racks (RQ). */
+export const routerRows = (size: { readonly sites: number; readonly rooms: number; readonly racks: number }): number => 1 + size.sites + size.rooms + size.racks;
 
 export interface FleetSize { readonly systems: number; readonly racks: number; readonly rooms: number; readonly sites: number; readonly links: number }
 
@@ -245,7 +314,8 @@ export function allocCompiled(size: FleetSize): CompiledBuffers {
 export function allocHot(size: FleetSize, records = 8): HotBuffers {
   const g = new Float64Array(G_SIZE);
   g[G.nextTaskId] = 1;
-  g[G.frontHead] = -1; g[G.frontTail] = -1; g[G.recFree] = -1; g[G.gangFree] = -1;
+  g[G.frontHead] = -1; g[G.frontTail] = -1; g[G.recFree] = -1; g[G.parentFree] = -1;
+  g[G.rqSites] = size.sites; g[G.rqRooms] = size.rooms;
   return {
     g, rng: new Uint32Array(4),
     sys: allocTable(SYS_HOT, size.systems, size.systems),
@@ -253,23 +323,27 @@ export function allocHot(size: FleetSize, records = 8): HotBuffers {
     room: allocTable(ROOM_HOT, size.rooms, size.rooms),
     site: allocTable(SITE_HOT, size.sites, size.sites),
     link: allocTable(LINK_HOT, size.links, size.links),
-    rec: allocTable(RECORD, records), gang: allocTable(GANG, 1), tally: allocTable(TALLY, 8),
+    rec: allocTable(RECORD, records), parent: allocTable(PARENT, 1), tally: allocTable(TALLY, 8),
+    rq: allocTable(RQ, routerRows(size), routerRows(size)),
     fam: allocTable(FAMILY_HOT, MAX_FAMILIES, MAX_FAMILIES),
     ring: allocTable(RING_HOT, RATE_RING_TICKS, RATE_RING_TICKS),
     bill: new Float64Array(MAX_SITES),
     detailRound: new Float64Array(FAIL_CAUSES.length * FAIL_DETAILS.length),
     globalWrr: new Float64Array(MAX_SITES),
+    dlHead: new Int32Array(DEADLINE_BUCKETS).fill(-1),
   };
 }
 
-export function cloneHot(hot: HotBuffers): HotBuffers {
-  return {
+export function cloneHot(hot: HotBuffers, copyDisplayHistory = true): HotBuffers {
+  const copy: HotBuffers = {
     g: hot.g.slice(), rng: hot.rng.slice(),
     sys: cloneTable(hot.sys), rack: cloneTable(hot.rack), room: cloneTable(hot.room), site: cloneTable(hot.site),
-    link: cloneTable(hot.link), rec: cloneTable(hot.rec), gang: cloneTable(hot.gang), tally: cloneTable(hot.tally),
+    link: cloneTable(hot.link), rec: cloneTable(hot.rec), parent: cloneTable(hot.parent), rq: cloneTable(hot.rq), tally: cloneTable(hot.tally),
     fam: cloneTable(hot.fam), ring: cloneTable(hot.ring), bill: hot.bill.slice(),
-    detailRound: hot.detailRound.slice(), globalWrr: hot.globalWrr.slice(),
+    detailRound: hot.detailRound.slice(), globalWrr: hot.globalWrr.slice(), dlHead: hot.dlHead.slice(),
   };
+  if (copyDisplayHistory) copyCompletionLog(hot, copy);
+  return copy;
 }
 
 export function cloneCompiled(c: CompiledBuffers): CompiledBuffers {

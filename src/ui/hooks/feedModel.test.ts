@@ -23,16 +23,18 @@ describe('published task queue', () => {
   });
   it('words a task: payout, size, transfer time', () => {
     expect([payoutText({ work: 1000 }), payoutText({ work: 28_400 })]).toEqual(['+1,000', '+28.4k']);
-    expect(sizeText({ work: 2, workingSetBits: 1 })).toBe('2 ops · 1 bit');
-    expect(sizeText({ work: 1, workingSetBits: 16 })).toBe('1 op · 16 bits');
+    expect(sizeText({ work: 2, workingSetBits: 1 })).toBe('2 ops · 1 b');
+    expect(sizeText({ work: 1, workingSetBits: 16 })).toBe('1 op · 16 b');
     expect([transferText(0.001), transferText(0.25), transferText(1), transferText(12.5)]).toEqual(['1 ms', '0.25 s', '1.00 s', '12.5 s']);
   });
-  it('shows exact small capacities and separate work, thread, GPU and member facts', () => {
-    const task = { ...entry(1), stages: [{ resource: 'cpu' as const, work: 2 }, { resource: 'ram' as const, work: 8 }],
-      threads: 4, workingSetBits: 2, gpuCoresMin: 64, vramBits: 1024, members: 8, blockedBy: 'cache' as const };
+  it('shows exact small capacities and separate work, GPU and minimum-split facts (no grain, D25)', () => {
+    const task = { ...entry(1), stages: [{ resource: 'compute' as const, work: 2 }, { resource: 'mem' as const, work: 8 }],
+      grain: 64, workingSetBits: 2, gpuCoresMin: 64, vramBits: 1024, members: 8, blockedBy: 'cache' as const };
     const text = requirementText(task);
-    for (const fact of ['CPU 2 ops', 'RAM 8 bits', '2 bits cache / RAM', '4 threads max', '64 GPU cores', '1024 bits VRAM', '8 members']) expect(text).toContain(fact);
-    expect(blockedText(task)).toBe('Needs 2 bits cache');
+    for (const fact of ['CPU 2 ops', 'Traffic 8 b', 'Memory 2 b', '64 GPU cores', '1.02 kb VRAM', '8 systems']) expect(text).toContain(fact);
+    expect(text).not.toMatch(/storage/i);
+    expect(text).not.toMatch(/grain|thread/i);
+    expect(blockedText(task)).toBe('Needs 2 b cache');
     expect(causeText('cantRun', 'gpuCores')).toBe("Can't run · GPU cores");
   });
 });
@@ -43,5 +45,13 @@ describe('formatting', () => {
     expect([clockText(38_000), clockText(845_000), clockText(3_729_000)]).toEqual(['0:38', '14:05', '1:02:09']);
     expect([slaFill(80), slaFill(100), slaFill(50)]).toEqual([50, 100, 0]);
     expect(causeText('timeout', 'link')).toBe('Timed out · Link');
+  });
+});
+
+describe('phone card payouts', () => {
+  it('whole units from 10 up and one decimal below, so a narrow card never cuts the number', async () => {
+    const { payoutShort } = await import('./feedModel');
+    expect([82_340, 117_000, 122_400, 999, 9_960, 1_234_567, 999_600].map(work => payoutShort({ work })))
+      .toEqual(['+82k', '+117k', '+122k', '+999', '+10k', '+1.2M', '+1M']);
   });
 });

@@ -1,4 +1,5 @@
 import { amount } from '../amount';
+import { applyAction } from '../core/actions';
 import { compileAll } from '../core/topology';
 import { buildState } from '../testkit/builders';
 import { FLEETS } from '../testkit/fleets';
@@ -51,12 +52,43 @@ describe('tray GPU item (R44)', () => {
 });
 
 describe('tray effects (R42)', () => {
+  it('quotes every installed core with current affordability and mirrored CPU pricing', () => {
+    const base = gpuState([]), system = base.build.systems[id]!;
+    const make = (cpuCount: number): GameState => {
+      const build = { ...base.build, systems: base.build.systems.map(s => s && ({ ...s,
+        spec: { ...s.spec, cpuCount, cpu: { ...system.spec.cpu!, cores: [{ gen: 0, level: 1 }, { gen: 0, level: 2 }] } },
+      })) };
+      return { ...base, build, compiled: compileAll(build, base.research) };
+    };
+    const single = make(1), mirrored = make(2), at = { level: 'chip', id } as const;
+    const tray = quote(mirrored, { kind: 'tray', at }).quotes;
+    expect(tray).toHaveLength(6);
+    const upgrades = tray.slice(4);
+    for (const [index, q] of upgrades.entries()) {
+      const part = { unit: { kind: 'system', id }, slot: { kind: 'core', socket: 0, index } } as const;
+      expect(q.action).toEqual({ type: 'upgradePart', part });
+      expect(q.locked).toBeNull();
+      expect(q.affordable).toBe(true);
+      expect(q.cost).toBe(quote(mirrored, { kind: 'part', part }).quotes[0]!.cost);
+      expect(BigInt(q.cost)).toBe(2n * BigInt(quote(single, { kind: 'part', part }).quotes[0]!.cost));
+    }
+    const q = upgrades[0]!, short = { ...mirrored, wallet: { ...mirrored.wallet, credits: amount((BigInt(q.cost) - 1n).toString()) } };
+    expect(quote(short, { kind: 'tray', at }).quotes[4]!.affordable).toBe(false);
+    const funded = { ...mirrored, wallet: { ...mirrored.wallet, credits: q.cost } };
+    expect(quote(funded, { kind: 'tray', at }).quotes[4]!.affordable).toBe(true);
+    const bought = applyAction(funded, q.action);
+    expect(bought.ok).toBe(true);
+    expect(bought.state.wallet.credits).toBe('0');
+    expect(bought.state.build.systems[id]!.spec.cpuCount).toBe(2);
+    expect(bought.state.build.systems[id]!.spec.cpu!.cores.map(c => c.level)).toEqual([2, 2]);
+  });
+
   it('shows counts on adds and capacity on upgrades at boot', () => {
     const boot = FLEETS.boot();
     const chip = quote(boot, { kind: 'tray', at: { level: 'chip', id } }).quotes;
     expect(chip[0]!.effect).toMatchObject({ capacityBefore: 1, capacityAfter: 2, unit: 'slots' });
     expect(chip[2]!.action.type).toBe('upgradePart');
-    expect(chip[2]!.effect).toMatchObject({ capacityBefore: 1, capacityAfter: 2, unit: 'ops/s' });
+    expect(chip[2]!.effect).toMatchObject({ capacityBefore: 1, capacityAfter: 2, unit: 'Hz' });
     const system = quote(boot, { kind: 'tray', at: { level: 'system', id } }).quotes;
     expect(system[0]!.effect).toMatchObject({ capacityBefore: 1, capacityAfter: 2, unit: 'slots' });
     expect(system[1]!.effect).toMatchObject({ capacityBefore: 0, capacityAfter: 1, unit: 'slots' });
@@ -67,7 +99,7 @@ describe('tray effects (R42)', () => {
     const at = { level: 'rack', id: rackId(0) } as const;
     const a = quote(s, { kind: 'tray', at }).quotes, b = quote(s, { kind: 'tray', at }).quotes;
     expect(b.map((q) => q.cost)).toEqual(a.map((q) => q.cost));
-    expect(a[3]!.effect).toMatchObject({ capacityBefore: 1e10, capacityAfter: 2e10, unit: 'bit/s' });
+    expect(a[3]!.effect).toMatchObject({ capacityBefore: 1e10, capacityAfter: 2e10, unit: 'Hz' });
   });
 });
 
@@ -77,7 +109,7 @@ describe('inbound link quote (R43)', () => {
     expect(q!.action).toEqual({ type: 'upgradePort', sw: { kind: 'rack', id: 0 }, port: 0 });
     expect(q!.label).toBe('Pipe · 1 kHz');
     expect(q!.locked).toMatchObject({ code: 'research', text: PIPE_LOCK_TEXT });
-    expect(q!.effect).toMatchObject({ capacityBefore: 1_000, capacityAfter: 2_000, unit: 'bit/s' });
+    expect(q!.effect).toMatchObject({ capacityBefore: 1_000, capacityAfter: 2_000, unit: 'Hz' });
   });
 
   it('steps all ports on a same-speed rack switch, and locks the rack uplink until a Room', () => {

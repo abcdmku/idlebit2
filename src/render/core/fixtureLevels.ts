@@ -9,6 +9,7 @@ import { R, prism } from './px';
 import { silk } from './glyphs';
 import { resetHitTarget } from './types';
 import type { LevelRegistry, LevelRenderer, LevelSnapshot } from './types';
+import type { Completion } from './pops';
 import { drawUnitLamp, lampState } from './unit';
 
 export const CHIP_SLOT = rect(52, 55, 76, 76);
@@ -22,7 +23,7 @@ export function fixtureChip(online: ChipSnapshot['online'] = 'onMarket'): ChipSn
   return {
     level: 'chip', parent: { level: 'system', id: systemId(0) }, systemId: systemId(0), cpuCount: 1, online, tier: 0, psu: SUPPLY,
     clock: { hz: 1, effectiveHz: 1, generation: 0, level: 1 }, coreSites: 4,
-    cores: [], cache: { levels: [], usedBits: 0, capacityBits: 0 }, scheduler: null, queue: [], researchShare: 0, slots: [],
+    cores: [], cache: { levels: [], usedBits: 0, capacityBits: 0, spilledOutBits: 0 }, scheduler: null, queue: [], researchShare: 0, slots: [],
     pipe: { speed: 1000, transfer: null, waiting: false },
   };
 }
@@ -30,18 +31,19 @@ export function fixtureSystem(online: SystemSnapshot['online'] = 'onMarket'): Sy
   const part = { slot: 0, kind: 'cpu' as const, generation: 0, level: 1, active: false, resourceBusy: 0 };
   return {
     level: 'system', parent: null, systemId: systemId(0), kind: 'server', board: 'general', cpuCount: 1, ramSlots: 1, etaCfg: 1,
-    chip: fixtureChip(online), cpuBusy: [0], online, timerS: null, timerTotalS: null, cpu: part, ram: [], gpu: [], storage: [],
+    chip: fixtureChip(online), inbound: null, cpuBusy: [0], online, timerS: null, timerTotalS: null, cpu: part, ram: [], gpu: [], storage: [],
     psu: SUPPLY,
-    running: [], queue: { cap: 0, count: 0, sample: [] }, reserved: 0, rates: { ops: 0, ramBits: 0, gpuOps: 0, ioBits: 0 },
+    running: [], memory: { tiers: [] }, queue: { cap: 0, count: 0, sample: [] }, reserved: 0, rates: { ops: 0, ramBits: 0, gpuOps: 0, ioBits: 0 },
     capacities: { cache: 0, ram: 0, vram: 0, storage: 0 }, used: { memory: 0, vram: 0, storage: 0 }, drawW: 0, saveable: true, slots: [],
   };
 }
 /** A complete idle snapshot for render core tests and the development harness. */
 export function fixtureSnapshot(focus: LevelSnapshot, partner: LevelSnapshot | null = null,
-  o: { simTimeMs?: number; epoch?: number; round?: 'running' | 'ended' | 'between'; events?: readonly GameEvent[] } = {}): RenderSnapshot {
+  o: { simTimeMs?: number; epoch?: number; round?: 'running' | 'ended' | 'between'; events?: readonly GameEvent[]; completions?: readonly Completion[] } = {}): RenderSnapshot {
   const events = o.events ?? [];
   const round = o.round ?? 'running';
   return {
+    completions: o.completions ?? [], failures: [], shardsDone: [],
     epoch: o.epoch ?? 1, tick: Math.floor((o.simTimeMs ?? 0) / 100), simTimeMs: o.simTimeMs ?? 0, bootMs: 10_000,
     hud: { credits: ZERO_AMOUNT, data: ZERO_AMOUNT, netPerMinute: ZERO_AMOUNT, sla: { met: 0, failed: 0, percent: 100, deliveredWork: 0, failedWork: 0, grace: 10 },
       roundState: round, roundIndex: 1, roundElapsedMs: o.simTimeMs ?? 0, autoReturnInMs: null },
@@ -93,7 +95,7 @@ export function createFixtureLevels(registry: LevelRegistry): readonly [LevelRen
       const t = resetHitTarget(out[from], 'save', 'save', { level: 'system', id: s.systemId });
       t.unit = { kind: 'system', id: s.systemId }; copyRect(SAVE_AT, t.rect); return from + 1;
     },
-    unitAnchor: (s, id, out) => (id === s.systemId ? (copyRect(CHIP_SLOT, out), true) : false),
+    payoutAnchor: (s, c, out) => (c.system === s.systemId ? (copyRect(CHIP_SLOT, out), 0) : -1),
     faults: (s, out) => (s.online === 'crashed' ? (copyRect(CHIP_SLOT, out[0]), 1) : 0),
     icon: g => R(g, 2, 1, 12, 14, P.mask),
   };

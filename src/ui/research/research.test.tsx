@@ -17,7 +17,7 @@ afterEach(() => m.unmount());
 
 const node = (id: string, state: ResearchNodeView['state'], over: Partial<ResearchNodeView> = {}): ResearchNodeView => ({
   id: researchId(id), name: id, category: 'compute', state, progress: 0, dataCost: '150000' as Amount, workOps: 3e6, requires: [], lockedBy: null,
-  level: 'system', era: 'khz', tier: 6, needsData: false, effect: '', summary: '', ...over });
+  level: 'system', era: 'khz', tier: 6, needsData: false, effect: '', summary: '', answers: [], ...over });
 const tree = (nodes: ResearchNodeView[], over: Partial<ResearchTreeView> = {}): ResearchTreeView => ({
   nodes, active: null, mode: 'shared', opsPerSec: 6400, queue: [], queueSlots: 0, horizon: 'system', lenders: [], creditsPerMinute: '9960' as Amount, ...over });
 
@@ -67,7 +67,7 @@ describe('research drawer', () => {
 
   it('locked projects show a lock glyph and what they need, never ×', () => {
     const t = tree([node('pipelining', 'done'), node('fabKhz', 'locked', { name: 'kHz fab', lockedBy: researchId('systemBoard') }),
-      node('systemBoard', 'available', { name: 'System board', effect: 'Opens the System view' })]);
+      node('systemBoard', 'available', { name: 'System board', effect: 'Opens the System view', answers: ['compute', 'parallel'] })]);
     m.render(<ResearchList tree={t} phase="running" focusProject={null} onAction={(a) => acts.push(a)} onClose={() => undefined} />);
     const locked = m.host.querySelector('.rl-item.locked')!;
     expect(locked.querySelector('svg.lock')).not.toBeNull();
@@ -77,8 +77,9 @@ describe('research drawer', () => {
     expect(m.host.textContent).toContain('1 of 3 done');
     const avail = m.host.querySelector('.rl-item.available')!;
     expect(avail.textContent).toContain('Opens the System view');
+    expect([...avail.querySelectorAll('.research-answers span')].map(n => n.textContent)).toEqual(['Compute', 'Parallel']);
     expect(avail.textContent).toContain('150k Data');
-    expect(avail.textContent).toContain('Work 3.00 Mops');
+    expect(avail.textContent).toContain('Work 3M ops');
     click(button(avail, 'Start'));
     expect(acts).toEqual([{ type: 'startResearch', project: 'systemBoard' }]);
   });
@@ -86,8 +87,8 @@ describe('research drawer', () => {
   it('priority during a round; the whole-Credit energy cost between rounds', () => {
     const t = tree([node('a', 'active', { progress: 0.4 })], { active: researchId('a') });
     m.render(<ResearchList tree={t} phase="running" focusProject={null} onAction={(a) => acts.push(a)} onClose={() => undefined} />);
-    expect(m.host.querySelector('[aria-checked="true"]')?.textContent).toBe('Shared');
-    click(button(m.host, 'Focus'));
+    expect(m.host.querySelector('[aria-checked="true"]')?.textContent).toBe('Shared 25%');
+    click(button(m.host, 'Focus 100%'));
     expect(acts).toEqual([{ type: 'setResearchPriority', mode: 'focus' }]);
     m.render(<ResearchList tree={t} phase="between" focusProject={null} onAction={(a) => acts.push(a)} onClose={() => undefined} />);
     expect(m.host.querySelector('.rl-energy')?.textContent).toBe('Full speed between rounds−9,960/min');

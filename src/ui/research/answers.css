@@ -1,0 +1,6 @@
+/* What a project answers: task types as plain coloured words (A04), so they never read as keys. */
+.research-answers { display: flex; flex-wrap: wrap; gap: 0 12px; padding-top: 8px; font-weight: 600; }
+.research-answers > span { font: inherit; line-height: inherit; }
+.research-projects { position: absolute; overflow-y: auto; overscroll-behavior: contain; touch-action: pan-y; }
+.research-projects .project { position: relative; padding-bottom: 16px; }
+.research-projects .project-copy { overflow-wrap: anywhere; }

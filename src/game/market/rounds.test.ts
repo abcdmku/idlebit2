@@ -1,6 +1,6 @@
 import { advanceGame } from '../core/advance';
 import { applyAction } from '../core/actions';
-import { eventPhase } from '../core/events';
+import { eventPhase, tallyMet } from '../core/events';
 import { G } from '../core/buffers';
 import { slaValue } from '../core/sla';
 import { MODE } from '../core/timers';
@@ -12,6 +12,8 @@ import type { GameState } from '../types/state';
 import { roundPhase } from './rounds';
 import { failTasks } from './sla';
 import { BOOT_CAPS, marketState } from './testState';
+import { FAMILIES } from './families';
+import { dismissAt } from './queue';
 
 const withAutoReturn = (s: GameState, delay = 150): GameState => ({
   ...s,
@@ -67,6 +69,34 @@ describe('work-weighted SLA (program D10.6, spec §4.2)', () => {
 });
 
 describe('round end and return (spec §4.1, §4.6, §4.7, D12.1)', () => {
+  it('freezes per-type work and dismissals across a mid-round save, then resets the next round', () => {
+    const initial = marketState(), w = openWorld(initial);
+    const memory = FAMILIES.findIndex(f => f.band === 'ram');
+    tallyMet(w, 0, 3, 0, 30);
+    failTasks(w, memory, 'cantRun', 2, 300);
+    dismissAt(w, 0);
+    w.ledger.roundGross = 120n;
+    w.ledger.roundEnergy = 40n;
+    const saved = deserializeSave(serializeSave(commitWorld(initial, w, 0)));
+    if (!saved.ok) throw new Error(saved.error);
+    const resumed = openWorld(saved.state);
+    roundPhase(resumed);
+    const report = resumed.round.reports.at(-1)!;
+    expect(report).toMatchObject({ gross: '120', energy: '40', net: '80' });
+    expect(report.byType).toEqual([
+      { type: 'compute', metWork: 30, failedWork: 0, dismissed: 1 },
+      { type: 'memory', metWork: 0, failedWork: 300, dismissed: 0 },
+    ]);
+    expect(report.byType.reduce((sum, t) => sum + t.metWork, 0)).toBe(report.deliveredWork);
+    expect(report.byType.reduce((sum, t) => sum + t.failedWork, 0)).toBe(report.failedWork);
+    expect(report.byType.reduce((sum, t) => sum + t.dismissed, 0)).toBe(report.dismissed);
+    const returned = applyAction(commitWorld(saved.state, resumed, 0), { type: 'returnToMarket' }).state;
+    expect(returned.hot.fam.metWorkRound.every(n => n === 0)).toBe(true);
+    expect(returned.hot.fam.failedWorkRound.every(n => n === 0)).toBe(true);
+    expect(returned.hot.fam.dismissedRound.every(n => n === 0)).toBe(true);
+    expect(returned.round.reports.at(-1)!.byType).toEqual(report.byType);
+  });
+
   it('drops the queue uncounted, pauses hardware and freezes the report', () => {
     const s = endedAt50(marketState());
     expect(s.round.phase).toBe('ended');

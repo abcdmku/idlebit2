@@ -1,7 +1,7 @@
 import type { Amount } from '../amount';
 import type { CompiledBuffers, HotBuffers } from '../core/buffers';
 import type { BuildState, SavedConfigs } from './build';
-import type { CeilingId, FilterId, PartId, PlacementId, QueueStrategyId, RouteStrategyId, RuleId } from './catalog';
+import type { CeilingId, FilterId, PartId, QueueStrategyId, RouteStrategyId, RuleId } from './catalog';
 import type { EventRing } from './events';
 import type { FamilyId, LevelId, ResearchId } from './ids';
 import type { RoundReport } from './report';
@@ -88,8 +88,10 @@ export interface TaskRef {
 export interface QueuedTask {
   readonly taskId: number;
   readonly family: FamilyId;
-  /** Per-member size, whole units. */
+  /** Task size, whole units. */
   readonly size: number;
+  /** D26.5: completion window in ticks from take, frozen at the draw (ceil(windowS × j / dt)); null when the family has none. */
+  readonly deadline: number | null;
 }
 
 /**
@@ -134,7 +136,6 @@ export interface Unlocks {
   readonly queueStrategies: readonly QueueStrategyId[];
   readonly routeStrategies: readonly RouteStrategyId[];
   readonly filters: readonly FilterId[];
-  readonly placements: readonly PlacementId[];
   readonly rules: readonly RuleId[];
   /** Merged `params` of granted rules, by rule id. */
   readonly ruleParams: Readonly<Partial<Record<RuleId, Readonly<Record<string, number>>>>>;

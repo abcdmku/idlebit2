@@ -133,8 +133,6 @@ function routerChecks(u: Unlocks, r: RouterBuild): Check[] {
   return [
     () => (r.strategy === 'firstFit' ? null : optionLock(u, r.strategy, 'route')),
     ...r.filters.map((f): Check => () => optionLock(u, f, 'filter')),
-    ...r.placements.map((p): Check => () => optionLock(u, p, 'placement')),
-    () => (r.reserveOnRoute ? ruleLock(u, 'reserveOnRoute') : null),
   ];
 }
 function switchChecks(u: Unlocks, sw: SwitchBuild, room: boolean): Check[] {

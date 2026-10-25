@@ -22,13 +22,13 @@ describe('callout placement: beside the target, never over it', () => {
 
 const q = (cost: number, extra: Partial<Quote> = {}): Quote => ({ action: { type: 'returnToMarket' }, label: 'x', cost: String(cost) as never,
   currency: 'credits', affordable: true, locked: null, cold: false, downtimeMs: 0, effect: null, workOps: null, ...extra });
-const eff = (a: number, b: number, unit: 'bits' | 'ops/s' | 'bit/s') =>
+const eff = (a: number, b: number, unit: 'bits' | 'ops/s' | 'bit/s' | 'Hz') =>
   ({ capacityBefore: a, capacityAfter: b, unit, wattsBefore: 0, wattsAfter: 0, energyPerMinuteDelta: '0' as never, paybackS: null });
 
 describe('offers: the deck words quotes, it never prices', () => {
   it('"x → x" with the unit once', () => {
-    expect(changeText(eff(1, 2, 'bits'))).toBe('1 → 2 bits');
-    expect(changeText(eff(1, 2, 'ops/s'), true)).toBe('1 → 2 Hz');
+    expect(changeText(eff(1, 2, 'bits'))).toBe('1 → 2 b');
+    expect(changeText(eff(1, 2, 'Hz'))).toBe('1 → 2 Hz');
     expect(changeText(eff(500, 2000, 'bit/s'))).toBe('500 Hz → 2 kHz');
   });
   it('Buy is the cheapest affordable offer, else the cheapest priced one; locks name what they need', () => {
@@ -37,7 +37,7 @@ describe('offers: the deck words quotes, it never prices', () => {
     const pipe = q(0, { effect: eff(1000, 2000, 'bit/s'), locked: { code: 'research', node: 'rack' as never, text: 'Upgrade at the Rack switch' } });
     const o = buildOffers('chip', tray, pipe);
     expect(o.rows.map(r => [r.name, r.change, r.price, r.lock])).toEqual([
-      ['Cores', 'x', null, 'Needs Dual core'], ['Cache', '1 → 2 bits', 3, null], ['Clock', 'x', 2, null], ['Queue', 'x', 9, null],
+      ['Cores', 'x', null, 'Needs Dual core'], ['Cache', '1 → 2 b', 3, null], ['Clock', 'x', 2, null], ['Queue', 'x', 9, null],
       ['Pipe', '1 kHz', null, 'Upgrade at the Rack switch']]);
     expect(o.rows[4]!.where).toBe(true);
     expect([o.best, o.next?.name]).toEqual([1, 'Cache']);
@@ -52,13 +52,16 @@ describe('callout quote effects', () => {
     part: { unit: { kind: 'system', id: systemId(0) }, slot: { kind: 'core', socket: 0, index: 0 } },
     unit: null, sw: null, port: null, slot: null, rect: { x: 0, y: 0, w: 8, h: 8 } };
 
-  it('uses the deck tray effect for the core count', () => {
+  it('an installed core reads its own upgrade; an empty core site offers the next core', () => {
     const state = createInitialState(42), focus = fixtureSnapshot('chipBoot').focus;
     const tray = quote(state, { kind: 'tray', at }).quotes;
     const offers = buildOffers('chip', tray, null);
-    const model = calloutModel(target, focus, null, offers);
-    expect(model.change).toBe(changeText(tray[0]!.effect!));
-    expect(model.offer).toBe(offers.rows[0]);
+    const own = calloutModel(target, focus, null, offers);
+    expect([own.name, own.offer]).toEqual(['Core 1', offers.cores[0]]);
+    expect(own.change).toBe(`Needs research: ${tray[4]!.locked!.text.replace(/^Needs /, '')}`);
+    // Core 2 needs research: the callout names what you get, and its key opens the research (A07)
+    const site = calloutModel({ ...target, part: { ...target.part!, slot: { kind: 'core', socket: 0, index: 1 } } }, focus, null, offers);
+    expect([site.name, site.change, site.offer]).toEqual(['Add Core 2', `Needs research: ${tray[0]!.locked!.text.replace(/^Needs /, '')}`, offers.rows[0]]);
   });
 
   it.each(['l1', 'clock'] as const)('uses the same part effect and formatting as the %s tray row', kind => {

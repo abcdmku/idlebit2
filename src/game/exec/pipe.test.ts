@@ -1,3 +1,4 @@
+import { cloneCompiled } from '../core/buffers';
 import { describe, expect, it, vi } from 'vitest';
 import { G } from '../core/buffers';
 import { openWorld, type World } from '../core/world';
@@ -58,7 +59,9 @@ describe('the inbound pipe (D10.4, spec §6.4)', () => {
     steps(w, 20);
     expect(w.hot.g[G.frontLen]).toBe(2);
     expect(metOf(w, F.cpu)).toBe(0);
-    w.compiled.sys.memCap[0] = 64;
+    // A purchase compiles fresh buffers (gate answers are kept per compiled).
+    w.compiled = cloneCompiled(w.compiled);
+    w.compiled.sys.ramCap[0] = 64; w.compiled.sys.memCap[0] = 64 + w.compiled.sys.storageCap[0]!;
     expect(tickOf(w, F.cpu, 1)).toBeGreaterThan(19);
   });
 });

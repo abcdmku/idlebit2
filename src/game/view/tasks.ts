@@ -1,14 +1,18 @@
-import type { HotBuffers } from '../core/buffers';
-import { ACCEL_CLOCKS, DT_S } from '../core/constants';
+import { LOC, type HotBuffers } from '../core/buffers';
+import { ACCEL_CLOCKS, DT_S, RES_CLOCKS } from '../core/constants';
 import { isEAxis } from '../exec/clocks';
 import { FAMILIES } from '../market/families';
-import { RESOURCES } from '../types/catalog';
+import type { Resource } from '../types/catalog';
 import { familyId } from '../types/ids';
 import type { GameState } from '../types/state';
+import { shardKey, shardOf } from './flows';
 import { taskRequirements } from './taskRequirements';
+import { placementOf } from './memory';
 import type { TaskView } from '../types/views';
 
-const R = RESOURCES.length;
+const R = RES_CLOCKS;
+/** Clock index (exec/shape CPU, RAM, GPU, IO) → the stage resource it serves (D26.2: RAM and disk parts are mem). */
+const RES_NAME: readonly Resource[] = ['compute', 'mem', 'gpu', 'mem'];
 
 /**
  * CPU clock on the rack efficiency axis; RAM and IO clocks on plain time.
@@ -36,13 +40,22 @@ export function stageProgress(hot: HotBuffers, tick: number, r: number, rack: nu
   return Math.max(0, Math.min(1, (clock - start) / (finish - start)));
 }
 
-export function taskView(hot: HotBuffers, r: number, res: number, progress: number, deadlineTick: number | null): TaskView {
+export function taskView(hot: HotBuffers, r: number, res: number, progress: number): TaskView {
   const domain = hot.rec.accelDomain[r] ?? -1;
+  const taskId = hot.rec.taskId[r] ?? 0, { shard, shards } = shardOf(hot, r);
+  const p = hot.rec.parent[r] ?? -1;
+  const deadline = (hot.rec.deadline[r] ?? -1) >= 0 ? hot.rec.deadline[r]! : null;
+  const taken = hot.rec.taken[r] ?? 0;
+  // Requirements are the whole task's (its size); `units` is this shard's share.
   return {
-    ...taskRequirements(familyId(hot.rec.family[r] ?? 0), hot.rec.scale[r] ?? 0),
+    ...taskRequirements(familyId(hot.rec.family[r] ?? 0), p >= 0 ? (hot.parent.units[p] ?? 0) : (hot.rec.units[r] ?? 0), deadline),
     accelDomain: domain >= 0 ? domain : null,
-    key: hot.rec.taskId[r] ?? r, family: familyId(hot.rec.family[r] ?? 0), count: hot.rec.count[r] ?? 0,
-    stage: hot.rec.stage[r] ?? 0, resource: RESOURCES[res] ?? 'cpu', progress, deadlineTick,
+    taskId, shard, shards, units: hot.rec.units[r] ?? 0,
+    threads: hot.rec.loc[r] === LOC.running ? (hot.rec.threads[r] ?? 0) * (hot.rec.count[r] ?? 1) : 0,
+    key: shardKey(taskId, shard), family: familyId(hot.rec.family[r] ?? 0), count: hot.rec.count[r] ?? 0,
+    stage: hot.rec.stage[r] ?? 0, resource: RES_NAME[res] ?? 'compute', progress,
+    ...placementOf(hot, r, res),
+    windowEndTick: deadline === null ? null : taken + deadline - 1,
   };
 }
 
@@ -70,7 +83,7 @@ export function runningTasks(state: GameState, s: number, limit: number): TaskVi
   if (limit <= 0) return out;
   const rack = state.compiled.sys.rack[s] ?? 0;
   forEachRunning(state, s, (r, res) => {
-    out.push(taskView(state.hot, r, res, stageProgress(state.hot, state.clock.tick, r, rack, s, res), null));
+    out.push(taskView(state.hot, r, res, stageProgress(state.hot, state.clock.tick, r, rack, s, res)));
     return out.length < limit;
   });
   return out;
@@ -82,7 +95,7 @@ export function queuedTasks(state: GameState, s: number, offset: number, limit: 
   const out: TaskView[] = [];
   let r = hot.sys.queueHead[s] ?? -1;
   for (let i = 0; r >= 0 && out.length < limit; i += 1) {
-    if (i >= offset) out.push(taskView(hot, r, resourceOfStage(state, r), 0, null));
+    if (i >= offset) out.push(taskView(hot, r, resourceOfStage(state, r), 0));
     r = hot.rec.next[r] ?? -1;
   }
   return out;
@@ -92,5 +105,5 @@ export function queuedTasks(state: GameState, s: number, offset: number, limit: 
 export function resourceOfStage(state: GameState, r: number): number {
   const fam = FAMILIES[state.hot.rec.family[r] ?? 0];
   const stage = fam?.stages[state.hot.rec.stage[r] ?? 0];
-  return stage ? RESOURCES.indexOf(stage.resource) : 0;
+  return stage ? RES_NAME.indexOf(stage.resource) : 0;
 }

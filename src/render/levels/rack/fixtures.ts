@@ -1,9 +1,11 @@
 // Rack snapshots for the harness and tests, derived from the contract fixture. Port transfers
-// advance with `timeMs` so packets move in the harness; nothing here runs the sim. The `slot`
-// and `row` fields are R36's shape (open): the renderer reads them when present.
+// advance with `timeMs` so packets move in the harness; nothing here runs the sim. `slot` and
+// `row` follow R36 (RackSnapshot).
 import { LEVEL_FIXTURES } from '../../../game/fixtures';
 import { UNIT_MODES, familyId, rackId, systemId } from '../../../game';
-import type { CoolTech, PortView, RackSlotView, RackSnapshot, ServerSlotView, UnitMode } from '../../../game';
+import type { CoolTech, LbView, PortView, RackSlotView, RackSnapshot, ServerSlotView, UnitMode } from '../../../game';
+import { FAM, flowAt, queueOf } from './flowFixtures';
+import type { FlowCase } from './flowFixtures';
 
 type Mutable<T> = { -readonly [K in keyof T]: T[K] };
 export type RackRowSnapshot = RackSnapshot & { readonly slot: number; readonly row: readonly RackSlotView[] };
@@ -13,6 +15,8 @@ export interface RackCase {
   id?: number; slot?: number; built?: readonly number[]; servers?: number; ports?: number; active?: readonly number[];
   uplink?: boolean; tempF?: number; crashed?: boolean; crashS?: number; dark?: boolean; tech?: CoolTech; gen?: number;
   modes?: Readonly<Record<number, UnitMode>>; cores?: number; usage?: number; overloadS?: number; lbTarget?: number | null;
+  /** D25: shard flows (server slot → system in `to`) and the LB queue. */
+  flows?: readonly FlowCase[]; queue?: LbView['queue'];
 }
 const port = (peer: number | null, active: boolean, progress: number, rung: number): PortView => ({
   speedHz: [1e3, 2e3, 5e3, 1e4, 2e4, 5e4, 1e5, 2e5, 5e5, 1e6][Math.min(9, rung)], rung, peer, active, family: null, progress: active ? progress : 0, queued: 0,
@@ -49,13 +53,28 @@ export function rackCase(o: RackCase, timeMs: number): RackRowSnapshot {
     tempF: o.tempF ?? 72, eff: (o.tempF ?? 72) > 80 ? 0.86 : 1, crashed, crashS: o.crashS ?? 0,
     cooler: { ...BASE.cooler, tech: o.tech ?? 'air', generation: o.gen ?? 1, duty: o.tempF && o.tempF > 80 ? 1 : 0.55 },
     pdu: { ...BASE.pdu, usage: o.usage ?? 0.39, failed: dark, rebootMs: dark ? 6000 : null, overloadS: o.overloadS ?? 0 },
-    lb: { ...BASE.lb, strategy: 'leastConn', lastTarget: o.lbTarget === undefined ? 3 : o.lbTarget },
+    lb: { ...BASE.lb, strategy: 'leastConn', lastTarget: o.lbTarget === undefined ? 3 : o.lbTarget, queue: o.queue ?? BASE.lb.queue },
+    flows: (o.flows ?? []).map(f => flowAt(f, timeMs)),
     switch: { ...BASE.switch, generation: 1, ports, uplinks: [port(null, !!o.uplink && !dark, (t * 0.45) % 1, 6)] },
     servers, saveable: true, slot, row,
   };
   return s;
 }
 
+const sys = (slot: number, id = 0): FlowCase['to'] => ({ level: 'system', id: systemId(id * 12 + slot) });
+/** A 6-shard Parallel task mid-split: two shards on ports, one crossing the uplink, three waiting;
+ * a 2-shard Memory task on two ports; a short Compute shard landing. */
+export const SPLIT_FLOWS: readonly FlowCase[] = [
+  { task: 41, family: FAM.parallel, shard: 0, shards: 6, link: 'server', to: sys(0), phase: 0.6 },
+  { task: 41, family: FAM.parallel, shard: 1, shards: 6, link: 'server', to: sys(3), phase: 0.3 },
+  { task: 41, family: FAM.parallel, shard: 2, shards: 6, link: 'uplink', to: sys(5), phase: 0.45 },
+  { task: 41, family: FAM.parallel, shard: 3, shards: 6, link: 'uplink', to: sys(6), state: 'waiting' },
+  { task: 41, family: FAM.parallel, shard: 4, shards: 6, link: 'uplink', to: sys(7), state: 'waiting' },
+  { task: 42, family: FAM.memory, shard: 0, shards: 2, link: 'uplink', to: sys(1), state: 'waiting' },
+  { task: 43, family: FAM.accel, shard: 0, shards: 2, link: 'server', to: sys(9), phase: 0.2 },
+  { task: 43, family: FAM.accel, shard: 1, shards: 2, link: 'server', to: sys(10), phase: 0.75 },
+  { task: 44, family: FAM.compute, shard: 0, shards: 1, link: 'server', to: sys(2), state: 'landing' },
+];
 export const CASES: Readonly<Record<string, (timeMs: number) => RackRowSnapshot>> = {
   overview: t => rackCase({ uplink: true }, t),
   first: t => rackCase({ slot: 0, built: [0, 1, 2], uplink: true }, t),
@@ -68,4 +87,7 @@ export const CASES: Readonly<Record<string, (timeMs: number) => RackRowSnapshot>
   water: t => rackCase({ tech: 'water', gen: 2, tempF: 66 }, t),
   noport: t => rackCase({ servers: 10, ports: 8, modes: { 2: 'boot', 4: 'offline' } }, t),
   paused: t => rackCase({}, t),
+  flows: t => rackCase({ servers: 12, active: [0, 2, 3, 9, 10], uplink: true, flows: SPLIT_FLOWS, queue: queueOf(8, [FAM.storage, FAM.parallel, FAM.cluster]) }, t),
+  queue1: t => rackCase({ queue: queueOf(1, [FAM.memory]) }, t),
+  queue32: t => rackCase({ servers: 12, queue: queueOf(32, Array.from({ length: 21 }, (_, i) => [FAM.compute, FAM.parallel, FAM.memory, FAM.accel][i % 4])) }, t),
 };

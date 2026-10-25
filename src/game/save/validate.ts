@@ -1,5 +1,5 @@
 import { G, G_SIZE, LOC } from '../core/buffers';
-import { MAX_SITES, QUEUE_VISIBLE, TICK_MS } from '../core/constants';
+import { DEADLINE_BUCKETS, MAX_SITES, QUEUE_VISIBLE, TICK_MS } from '../core/constants';
 import { ARRAY_CTORS, type Layout } from '../core/table';
 import type { GameState } from '../types/state';
 import type { SaveLoadResult } from '../types/save';
@@ -82,6 +82,7 @@ function check(raw: unknown): GameState {
   typed(hot.bill, 'hot.bill', 'f64', MAX_SITES);
   typed(hot.detailRound, 'hot.detailRound', 'f64', FAIL_CAUSES.length * FAIL_DETAILS.length);
   typed(hot.globalWrr, 'hot.globalWrr', 'f64', MAX_SITES);
+  typed(hot.dlHead, 'hot.dlHead', 'i32', DEADLINE_BUCKETS);
   const events = obj(s.events, 'events');
   int(events.nextSeq, 'events.nextSeq');
   arr(events.entries, 'events.entries');

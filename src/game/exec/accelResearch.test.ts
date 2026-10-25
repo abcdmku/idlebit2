@@ -133,8 +133,8 @@ describe('per-card task and research duty', () => {
     expect(h.usedVram[0]).toBe(0);
     expect(h.accelHolders.every((count) => count === 0)).toBe(true);
     expect(h.accelHead.every((head) => head === -1)).toBe(true);
-    expect(result.state.hot.fam.failTick[F.gpu60 * 6 + 5]).toBe(2);
-    expect(result.state.hot.fam.failTick[F.cpuGpu * 6 + 5]).toBe(1);
+    expect(result.state.hot.fam.failTick[F.gpu60 * 7 + 5]).toBe(2);
+    expect(result.state.hot.fam.failTick[F.cpuGpu * 7 + 5]).toBe(1);
     expect(h.mode[0]).toBe(MODE.goingOffline);
   });
 });

@@ -1,14 +1,15 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { FAMILIES, POOL_DOMAIN } from '../../../game';
 import type { TaskView } from '../../../game';
-import { DESKTOP_FRAMING, P, PHONE_FRAMING, createCanvasRenderer, createHitTarget, createLevelRegistry, rect } from '../../core';
+import { DESKTOP_FRAMING, P, PHONE_FRAMING, createCanvasRenderer, createHitTarget, createLevelRegistry, flowColor, rect } from '../../core';
 import type { RestFraming } from '../../core';
 import { fixtureSnapshot } from '../../core/fixtureLevels';
 import { recordingContext } from '../../core/testCanvas';
 import { createSystemRenderer } from '.';
-import { BOARDS, siteCentre } from './layout';
+import { BOARDS } from './layout';
 import { boardModel } from './model';
-import { sceneTaskRequirements, systemScene } from './scenes';
+import { sceneTask, sceneTaskRequirements, systemScene } from './scenes';
+import { drawGpuPiece } from './shards';
 import { drawStageBit } from './world';
 
 const VIEW = { selectedId: null, picked: null, quotes: null, reducedMotion: false };
@@ -55,25 +56,45 @@ describe('accelerator board', () => {
     });
 });
 
-const TASK: TaskView = { ...sceneTaskRequirements(FAMILIES.find(f => f.key === 'imageBlur')!, 8),
-  key: 1, count: 1, stage: 1, resource: 'gpu', progress: 1, deadlineTick: null, accelDomain: 6 };
-function flow(task: TaskView, npuSlot: number | null = null) {
+const TASK: TaskView = sceneTask('imageBlur', 8, { resource: 'gpu', progress: 0.25, accelDomain: 6 });
+const BLUR = flowColor(TASK);
+function piece(task: TaskView, npuSlot: number | null = null) {
   const m = boardModel({ ...full, gpu: full.gpu.map(p => p.slot === npuSlot ? { ...p, kind: 'npu', gpu: undefined } : p) });
-  const rec = recordingContext(); drawStageBit(rec.g, m, task); return { ...rec, m };
+  const rec = recordingContext(), n = drawGpuPiece(rec.g, m, task);
+  return { ...rec, m, n, lit: rec.fills.filter(f => f.c === flowColor(task)) };
 }
-describe('assigned accelerator task flow', () => {
-  it('ends at the assigned module even when another module is the active one', () => {
-    const { fills } = flow(TASK), c = siteCentre(BOARDS.accelerator, 'gpu', 6, { x: 0, y: 0 });
-    const bit = fills.find(f => f.c === P.gpu)!;
-    expect(Math.abs(bit.x + bit.w / 2 - c.x)).toBeLessThanOrEqual(3); expect(Math.abs(bit.y + bit.h / 2 - c.y)).toBeLessThanOrEqual(3);
+/** The site index of the card a fill lies on. */
+const cardOf = (f: { x: number; y: number }) => BOARDS.accelerator.sites.gpu.findIndex(r => f.x >= r.x && f.x < r.x + r.w && f.y >= r.y - 6 && f.y < r.y + r.h);
+describe('a GPU-stage shard (D25)', () => {
+  it('lights its piece on the assigned module, in its task type colour, even when another module is the active one', () => {
+    const { lit, n } = piece(TASK);
+    expect(n).toBe(1);
+    expect(lit).toHaveLength(1);
+    expect(cardOf(lit[0]!)).toBe(6);
   });
-  it('draws no GPU path for an unassigned task', () => { expect(flow({ ...TASK, accelDomain: null }).fills).toHaveLength(0); });
-  it('fans linked work out to real GPUs, excluding the NPU', () => {
-    expect(flow({ ...TASK, accelDomain: POOL_DOMAIN }, 3).fills.filter(f => f.c === '#ffffff')).toHaveLength(7);
+  it('drains the piece as the stage runs: the remaining work, 1 - progress', () => {
+    const width = (progress: number) => piece({ ...TASK, progress }).lit[0]?.w ?? 0;
+    const full0 = width(0);
+    expect(full0).toBeGreaterThan(20);
+    expect(width(0.25)).toBe(Math.round(full0 * 0.75));
+    expect(width(0.5)).toBe(Math.round(full0 * 0.5));
+    expect(width(1)).toBe(0);
+    expect(BLUR).not.toBe(P.gpu);
+  });
+  it('draws no piece for an unassigned shard or a CPU stage, and no travelling GPU bit', () => {
+    expect(piece({ ...TASK, accelDomain: null }).fills).toHaveLength(0);
+    expect(piece({ ...TASK, resource: 'compute' }).fills).toHaveLength(0);
+    const rec = recordingContext(); drawStageBit(rec.g, boardModel(full), TASK);
+    expect(rec.fills).toHaveLength(0);
+  });
+  it('splits linked work over the real GPUs, excluding the NPU', () => {
+    const { lit } = piece({ ...TASK, accelDomain: POOL_DOMAIN }, 3);
+    expect(lit.map(cardOf).sort()).toEqual([0, 1, 2, 4, 5, 6, 7]);
   });
   it('never portrays an NPU serving ordinary GPU work', () => {
-    expect(flow({ ...TASK, accelDomain: 3 }, 3).fills).toHaveLength(0);
+    expect(piece({ ...TASK, accelDomain: 3 }, 3).fills).toHaveLength(0);
     const tensor = FAMILIES.find(f => f.tensor && f.gpuCoresMin === 0)!;
-    expect(flow({ ...TASK, ...sceneTaskRequirements(tensor, 2), accelDomain: 3 }, 3).fills.some(f => f.c === P.rnd)).toBe(true);
+    const t = { ...TASK, ...sceneTaskRequirements(tensor, 2), accelDomain: 3 };
+    expect(piece(t, 3).lit.map(cardOf)).toEqual([3]);
   });
 });

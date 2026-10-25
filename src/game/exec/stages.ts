@@ -7,7 +7,8 @@ import { accelClockAt, holdAccel, insertAccelStage, recordAccelClock, releaseAcc
 import { runInsert, runUnlink } from './lists';
 import { executionBoundary } from './boundary';
 import { canAdmit, noteAdmit, noteAdmitted } from './slots';
-import { CPU, GPU, IO, NRES, shapeOf, stageWorkAt, workingSetOf } from './shape';
+import { CPU, GPU, IO, NRES, shapeOf } from './shape';
+import { firstPart, partClock, partWork, placeRecord, releaseMemory } from './memory';
 
 /**
  * Record mechanics on one system: start, stage entry and exit, release. All at a fraction τ of the
@@ -32,7 +33,8 @@ export function enterStage(w: World, s: number, r: number, tau: number, span: Sp
   const rec = w.hot.rec, h = w.hot.sys;
   const shape = shapeOf(rec.family[r]!);
   const stage = rec.stage[r]!;
-  const res = shape.res[stage]!;
+  const part = rec.part[r]!;
+  const res = partClock(shape, stage, part);
   let k = rec.count[r]!;
   if (res === IO) {
     const free = ioFree(w, s);
@@ -56,7 +58,7 @@ export function enterStage(w: World, s: number, r: number, tau: number, span: Sp
   const start = carryRes === res && carryW === carryW ? carryW
     : res === GPU ? accelClockAt(w, recordAccelClock(w, s, r), e) : clockAt(w, s, res, e);
   const div = divisorOf(w, r, res);
-  const work = stageWorkAt(shape, stage, rec.scale[r]!);
+  const work = partWork(w, r, shape, stage, part);
   rec.start[r] = start;
   rec.finish[r] = work <= 0 ? start : div > 0 ? start + work / div : Infinity;
   if (res === GPU) { insertAccelStage(w, s, r, e); return; }
@@ -65,16 +67,21 @@ export function enterStage(w: World, s: number, r: number, tau: number, span: Sp
   refreshDue(w, s, res);
 }
 
-/** Moves record r from s's queue bookkeeping into running at τ. The caller unlinked it from the queue. */
+/**
+ * Moves record r from s's queue bookkeeping into running at τ. The caller unlinked it from the queue and
+ * checked that its working set fits the free hierarchy; `choice` was made against the same free memory.
+ */
 export function startRecord(w: World, s: number, r: number, tau: number, span: Span, choice?: AccelChoice): void {
   const rec = w.hot.rec, h = w.hot.sys;
   const k = rec.count[r]!;
   const shape = shapeOf(rec.family[r]!);
-  const selected = choice ?? chooseAccel(w.compiled, w.hot, s, accelNeed(shape.def, rec.scale[r]!), k);
+  const selected = choice ?? chooseAccel(w.compiled, w.hot, s, accelNeed(shape.def, rec.units[r]!), k);
   if (!selected || selected.take < k) throw new Error('startRecord: no accelerator capacity');
   holdAccel(w, s, r, selected);
   rec.loc[r] = LOC.running;
   rec.owner[r] = s;
+  // Queued → running keeps the slot sum, but a system capped at Q queued (D26 memWait) may admit again.
+  const before = canAdmit(w, s);
   h.queueLen[s] = h.queueLen[s]! - k;
   w.hot.g[G.queued] = w.hot.g[G.queued]! - k;
   h.running[s] = h.running[s]! + k;
@@ -82,14 +89,16 @@ export function startRecord(w: World, s: number, r: number, tau: number, span: S
   const threads = k * rec.threads[r]!;
   h.busyThreads[s] = h.busyThreads[s]! + threads;
   w.hot.g[G.busyThreads] = w.hot.g[G.busyThreads]! + threads;
-  h.usedMem[s] = h.usedMem[s]! + k * workingSetOf(shape, rec.scale[r]!);
+  noteAdmit(w, s, before);
+  placeRecord(w, s, r, selected.held);
+  rec.part[r] = firstPart(w, r, shape, rec.stage[r]!, 0);
   enterStage(w, s, r, tau, span, -1, NaN);
 }
 
-/** Takes record r out of its run list, giving back an IO hold. Returns the resource it was on. */
+/** Takes record r out of its run list, giving back an IO hold. Returns the clock it was on. */
 export function leaveStage(w: World, s: number, r: number, e = executionBoundary(w, s)): number {
   const rec = w.hot.rec, h = w.hot.sys;
-  const res = shapeOf(rec.family[r]!).res[rec.stage[r]!]!;
+  const res = partClock(shapeOf(rec.family[r]!), rec.stage[r]!, rec.part[r]!);
   const k = rec.count[r]!;
   if (res === GPU) { removeAccelStage(w, s, r, e); return res; }
   runUnlink(w.hot, s, res, r);
@@ -103,16 +112,16 @@ export function leaveStage(w: World, s: number, r: number, e = executionBoundary
 export function releaseRunning(w: World, s: number, r: number): void {
   const rec = w.hot.rec, h = w.hot.sys;
   const k = rec.count[r]!;
-  const shape = shapeOf(rec.family[r]!);
   const before = canAdmit(w, s);
   h.running[s] = h.running[s]! - k;
   w.hot.g[G.running] = w.hot.g[G.running]! - k;
   const threads = k * rec.threads[r]!;
   h.busyThreads[s] = h.busyThreads[s]! - threads;
   w.hot.g[G.busyThreads] = w.hot.g[G.busyThreads]! - threads;
-  h.usedMem[s] = Math.max(0, h.usedMem[s]! - k * workingSetOf(shape, rec.scale[r]!));
   releaseAccel(w, s, r);
-  if (h.running[s] === 0) { h.usedMem[s] = 0; h.usedVram[s] = 0; }
+  releaseMemory(w, s, r);
+  // The last running shard leaves nothing held: clear subtraction roundoff (a storage node's disk is held by others).
+  if (h.running[s] === 0) { h.usedCache[s] = 0; h.usedRam[s] = 0; h.usedDisk[s] = 0; h.usedVram[s] = 0; }
   noteAdmitted(w, s, -k, r);
   noteAdmit(w, s, before);
 }

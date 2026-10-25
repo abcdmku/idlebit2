@@ -107,9 +107,10 @@ describe('system strategies (spec §8.1): each differs from FIFO and orders the 
 });
 
 describe('shared resources', () => {
-  it('sums working sets against memory (D1.1)', () => {
+  it('sums working sets against the free hierarchy (D1.1, D26.1)', () => {
     const run = (memCap: number) => {
-      const w = lone({ K: 2, Q: 2, threads: 2, memCap });
+      // No cache, no drive: the hierarchy is the RAM tier.
+      const w = lone({ K: 2, Q: 2, threads: 2, memCap, storageCap: 0 });
       feed(w, F.ram, 2, 0.95);
       step(w);
       return w.hot.sys.running[0];
@@ -118,9 +119,10 @@ describe('shared resources', () => {
     expect(run(6)).toBe(1);
   });
 
-  it('serves one IO stage per drive at a time (D1.2)', () => {
+  it('serves one disk part per drive at a time (D1.2)', () => {
     const run = (ioConc: number) => {
-      const w = lone({ K: 2, Q: 2, threads: 2, ioConc, ioRate: 1 });
+      // No cache and no RAM: each working set sits on the drive and its mem stage is a disk part (D26.2).
+      const w = lone({ K: 2, Q: 2, threads: 2, ioConc, ioRate: 1, memCap: 0 });
       feed(w, F.io, 2, 0.45);
       return [tickOf(w, F.io, 1), tickOf(w, F.io, 2)];
     };
@@ -165,15 +167,15 @@ describe('research share (spec §11.2)', () => {
 });
 
 describe('work stealing (spec §6.5)', () => {
-  it('free threads join a running task short of its threads', () => {
+  it('free threads join a running shard short of floor(units / grain) threads', () => {
     const run = (rules: string[]) => {
       const w = lone({ threads: 2, K: 2, Q: 2 });
       w.research.unlocks = { ...w.research.unlocks, rules: rules as never };
       feed(w, F.cpu, 1, 0.15);
-      feed(w, F.cpu4, 1, 1.9);
+      // Grain 1: a 4-unit task wants 4 threads; it starts on the one left free.
+      feed(w, F.cpu4, 1, 4);
       return tickOf(w, F.cpu4, 1);
     };
-    expect(run([])).toBe(18);
-    expect(run(['workStealing'])).toBe(10);
+    expect([run([]), run(['workStealing'])]).toEqual([39, 20]);
   });
 });

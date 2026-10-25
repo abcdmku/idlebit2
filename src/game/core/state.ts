@@ -20,7 +20,7 @@ export function baseUnlocks(): Unlocks {
   return {
     levels: { chip: true, system: false, rack: false, room: false, global: false },
     gens, ceilings: CEILINGS_START,
-    queueStrategies: [], routeStrategies: ['firstFit'], filters: [], placements: [], rules: [], ruleParams: {},
+    queueStrategies: [], routeStrategies: ['firstFit'], filters: [], rules: [], ruleParams: {},
     bootTicks: BOOT_TICKS_BASE, autoReturnDelayTicks: AUTO_RETURN_DELAY_TICKS, offlineCapHours: OFFLINE_CAP_HOURS_BASE,
   };
 }

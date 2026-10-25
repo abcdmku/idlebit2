@@ -1,7 +1,7 @@
 // Rack children (servers to drill into) and tap targets, in row coordinates (the active rack
 // stands at colX(col)). Refs are built once per id and reused: hit-testing allocates nothing.
 import { copyRect, resetHitTarget, saveIconRect, setRect } from '../../core';
-import type { ChildView, HitTarget, NodeRef, Rect } from '../../core';
+import type { ChildView, Completion, HitTarget, NodeRef, Rect } from '../../core';
 import type { PartRef, RackId, RackSnapshot, SwitchRef, SystemId, UnitRef } from '../../../game';
 import {
   CAB_RECT, HEADER_Y, LAMP, LB_RECT, PLINTH, ROOF_RECT, ROW_COLS, SAVE_AT, SERVER_SLOTS, STRIP_RECT, SWITCH_RECT, UPLINK_JACK, UP_X,
@@ -9,6 +9,7 @@ import {
 } from './layout';
 import { isNeighbour, rackCol, rowViews } from './row';
 import { nextFreeServer } from './world';
+import { serverLcd } from './sprites';
 
 interface RackRefs {
   readonly node: NodeRef; readonly unit: UnitRef; readonly sw: SwitchRef;
@@ -100,10 +101,17 @@ export function rackTargets(s: RackSnapshot, out: HitTarget[], from: number): nu
   return sink.n;
 }
 
-/** The active rack's server rect for system `id`, for payout coins. */
-export function rackUnitAnchor(s: RackSnapshot, id: SystemId, out: Rect): boolean {
-  for (let i = 0; i < s.servers.length; i++) if (s.servers[i].systemId === id) {
-    serverRect(i, out); out.x += colX(rackCol(s)); return true;
+/** A payout pops on the active rack's sled that ran it; the key is the server slot. */
+/** A finished non-final shard empties across its sled's LCD (D25.5); the key is the server slot. */
+export function rackShardAnchor(s: RackSnapshot, d: { readonly system: number }, out: Rect): number {
+  for (let i = 0; i < s.servers.length; i++) if (s.servers[i].systemId === d.system) {
+    serverRect(i, out); serverLcd(out.x + colX(rackCol(s)), out.y, s.servers[i].cores, out); return i;
   }
-  return false;
+  return -1;
+}
+export function rackPayoutAnchor(s: RackSnapshot, c: Completion, out: Rect): number {
+  for (let i = 0; i < s.servers.length; i++) if (s.servers[i].systemId === c.system) {
+    serverRect(i, out); out.x += colX(rackCol(s)); return i;
+  }
+  return -1;
 }

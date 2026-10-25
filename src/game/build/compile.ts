@@ -16,11 +16,13 @@ import { hasRule, ruleParam } from './research/unlocks';
  *   threadRate   mean core rate at clockFactor 1, e = 1: Σ(lanes × clockHz of its socket) / cores
  *   clockHz      socket 1's clock                     K, Q             scheduler (1, 0 without one)
  *   keff         timeSlice 2K; dma K; else min(K, threads)            slots = keff + Q
- *   cacheBits    Σ sockets L1 + L2 + L3               memCap           Σ RAM, or cache with no RAM
+ *   cacheBits    Σ sockets L1 + L2 + L3               ramCap           Σ RAM modules
+ *   memCap       the hierarchy (D26.1): cache + RAM + drives + the rack storage node's drives (diskNode)
  *   ramBw        channels × bw when every module matches (multiChannel), else the lowest module
  *   gpuOps/tensorOps/vram  GPU-only diagnostics; paired physical columns own eligibility.
  *   npu          Physical NPU count.
- *   storageCap, ioRate   Σ drives;  ioConc 1, or ncq's `concurrent`
+ *   storageCap, ioRate   Σ own drives: the disk tier;  ioConc 1, or ncq's `concurrent`
+ *   diskNode     with sharedStorage, the rack's first storage node (its drives extend every server's disk tier), else -1
  *   idleW/loadW  per resource at full use (§9.1 post-D5), rule factors applied (ecc, ramWatts, HBM watts);
  *                [cpu] is the uncore only: package, caches, scheduler (idle only). coreIdleW/coreLoadW are
  *                the cores (rate parts: lanes × clock); clocks are idle-only, so clockLoadW is 0.
@@ -34,6 +36,7 @@ import { hasRule, ruleParam } from './research/unlocks';
 export const compileUnits = (compiled: CompiledBuffers, build: BuildState, research: ResearchState): void => {
   const u = research.unlocks;
   for (const sys of build.systems) if (sys) compileSystem(compiled, sys, u);
+  compileStorageNodes(compiled, build, u);
   compileInfra(compiled, build, u);
   compileLinks(compiled, build, u);
 };
@@ -132,7 +135,7 @@ export function compileSystem(c: CompiledBuffers, build: SystemBuild, u: Unlocks
   }
   const nRam = sys.ram.length;
   s.hasRam[i] = nRam > 0 ? 1 : 0;
-  s.memCap[i] = nRam > 0 ? mem : cache;
+  s.ramCap[i] = mem;
   s.ramBw[i] = nRam === 0 ? 0 : uniform && hasRule(u, 'multiChannel') ? nRam * minBw : minBw;
   s.ecc[i] = nRam > 0 && sys.ram.every((m) => m.ecc) ? 1 : 0;
 
@@ -148,6 +151,9 @@ export function compileSystem(c: CompiledBuffers, build: SystemBuild, u: Unlocks
     ioLoad += w.load;
   }
   s.storageCap[i] = store; s.ioRate[i] = io;
+  s.memCap[i] = cache + mem + store;
+  s.diskNode[i] = -1;
+  s.unifiedBits[i] = hasRule(u, 'unifiedMemory') ? mem + store : 0;
   s.ioConc[i] = hasRule(u, 'ncq') ? ruleParam(u, 'ncq', 'concurrent', 4) : 1;
 
   const watts = [[uncoreIdle, 0], [ramIdle, ramLoad], [gpuWatts.idle, gpuWatts.load], [ioIdle, ioLoad]] as const;
@@ -157,4 +163,24 @@ export function compileSystem(c: CompiledBuffers, build: SystemBuild, u: Unlocks
   s.psuLoss[i] = lossFraction(PARTS.psu, sys.psu.gen, sys.psu.level);
   s.psuCapSwitch[i] = sys.psu.capped && hasRule(u, 'powerCap') ? 1 : 0;
   s.rules[i] = ruleMask(sys, u);
+}
+
+/**
+ * D26.1, spec §6.10: with sharedStorage, a rack's storage node is a disk tier shared by its servers. Each
+ * server records the rack's first storage node, and its hierarchy (memCap) counts the node's drives.
+ */
+function compileStorageNodes(c: CompiledBuffers, build: BuildState, u: Unlocks): void {
+  if (!hasRule(u, 'sharedStorage')) return;
+  const node = new Map<number, number>();
+  for (const sys of build.systems) if (sys && sys.spec.kind === 'storageNode' && !node.has(sys.rack)) node.set(sys.rack, sys.id);
+  if (node.size === 0) return;
+  const s = c.sys;
+  for (const sys of build.systems) {
+    if (!sys || sys.spec.kind !== 'server') continue;
+    const n = node.get(sys.rack);
+    if (n === undefined) continue;
+    s.diskNode[sys.id] = n;
+    s.memCap[sys.id] = s.memCap[sys.id]! + s.storageCap[n]!;
+    if (s.unifiedBits[sys.id]! > 0) s.unifiedBits[sys.id] = s.unifiedBits[sys.id]! + s.storageCap[n]!;
+  }
 }

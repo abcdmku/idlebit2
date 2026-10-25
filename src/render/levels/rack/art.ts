@@ -2,7 +2,7 @@
 // Chakra Petch LCD labels, discs, fans whose angle is real duty, bezel ears and blanking plates.
 // Static art only; motion comes in as arguments (fan angle, lit flags) from real state.
 import { silk, silkWidth, P, R, fanAngle, fanAnimation, createFanAnimation, mix, px } from '../../core';
-import type { FanAnimation } from '../../core';
+import type { FanAnimation, TaskType } from '../../core';
 import type { RouteStrategyId } from '../../../game';
 
 type G = CanvasRenderingContext2D;
@@ -106,27 +106,26 @@ export function drawLayer(g: G, key: string, w: number, h: number, draw: (g: G) 
 }
 
 // ---------- labels ----------
-// LCD copy per family key: longest first; the renderer picks the first that fits.
-const LCD_NAMES: Readonly<Record<string, readonly string[]>> = {
-  parity: ['PARITY'], crc32: ['CRC32'], intsort: ['INT SORT', 'SORT'], regex: ['REGEX'], json: ['JSON PARSE', 'JSON'],
-  sql: ['SQL QUERY', 'SQL'], thumb: ['THUMBNAIL', 'THUMB'], scan: ['LOG SCAN', 'SCAN'], transcode: ['TRANSCODE', 'XCODE'],
-  repl: ['REPL WRITE', 'REPL'], infer: ['ML INFER', 'INFER'], mapreduce: ['MAPREDUCE', 'MAPRED'], shard: ['TRAIN SHARD', 'SHARD'],
-  llm: ['LLM TRAIN', 'LLM'], geo: ['GEO QUERY', 'GEO'],
+// LCD copy per task type (A19): the LCD shows the running task's type, never a squeezed task
+// name. Whole words, longest first; the renderer picks the first that fits. 4 characters always fit.
+const TYPE_LCD: Readonly<Record<TaskType, readonly string[]>> = {
+  compute: ['COMPUTE', 'COMP'], parallel: ['PARALLEL', 'PARAL', 'PARL'], memory: ['MEMORY', 'MEM'], accel: ['ACCEL', 'GPU'],
+  storage: ['STORAGE', 'STOR'], cluster: ['CLUSTER', 'DIST'], zones: ['ZONES', 'ZONE'], region: ['REGION', 'REGN'],
 };
-const jobCache = new Map<string, string>();
-/** Fixed LCD text for a family that fits `max` characters. Cached: no per-frame strings. */
-export function jobText(key: string, max: number): string {
-  const id = `${key}|${max}`;
-  let text = jobCache.get(id);
+const typeCache = new Map<string, string>();
+/** Fixed LCD text for a task type that fits `max` characters. Cached: no per-frame strings. */
+export function typeText(type: TaskType, max: number): string {
+  const id = `${type}|${max}`;
+  let text = typeCache.get(id);
   if (text === undefined) {
-    const names = LCD_NAMES[key] ?? [key.toUpperCase()];
-    text = names.find(n => n.length <= max) ?? names[names.length - 1].slice(0, max);
-    jobCache.set(id, text);
+    const names = TYPE_LCD[type];
+    text = names.find(n => n.length <= max) ?? names[names.length - 1]!.slice(0, Math.max(0, max));
+    typeCache.set(id, text);
   }
   return text;
 }
 const numCache = new Map<string, Map<string, Map<number, string>>>();
-/** Cached strings for LCD numbers such as '72°F' or 'E100%'. `n` should be an integer. No per-frame strings once warm. */
+/** Cached strings for LCD numbers such as '72°F' or '100%'. `n` should be an integer. No per-frame strings once warm. */
 export function label(prefix: string, n: number, suffix = ''): string {
   let bySuffix = numCache.get(prefix);
   if (!bySuffix) { bySuffix = new Map(); numCache.set(prefix, bySuffix); }

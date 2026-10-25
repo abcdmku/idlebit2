@@ -28,7 +28,7 @@ describe('part plate: upgrade (hot) against replace (cold) with payback', () => 
     m.render(<PartPlate title="Clock" sub="1 kHz" level={2} status="Drives every lane" quotes={result([upgrade, replace])} onAction={onAction} onClose={onClose} />);
     const up = button(m.host, 'Upgrade · L3'), rep = button(m.host, 'Replace · kHz clock');
     expect(up.textContent).toContain('360');
-    expect(up.textContent).toContain('1 kops/s → 2 kops/s · +1 W');
+    expect(up.textContent).toContain('1k ops/s → 2k ops/s · +1 W');
     expect(up.textContent).toContain('Hot · no downtime');
     expect(rep.textContent).toContain('2,400');
     expect(rep.textContent).toContain('Cold · 10s offline, running work lost');
@@ -161,7 +161,7 @@ describe('switch plate: port grid, per-port price, same-speed toggle with the su
   });
 });
 
-const lb = (over: Partial<LbView> = {}): LbView => ({ generation: 0, level: 2, strategy: 'firstFit', filters: [], placements: [], reserveOnRoute: false,
+const lb = (over: Partial<LbView> = {}): LbView => ({ generation: 0, level: 2, strategy: 'firstFit', filters: [], queue: { slots: 1, level: 1, entries: [] },
   routedPerSec: 5, misroutesThisRound: 0, lastTarget: null, ...over });
 
 describe('load balancer plate: strategies and filters locked by research, capacity upgrade', () => {
@@ -190,6 +190,15 @@ describe('load balancer plate: strategies and filters locked by research, capaci
     expect(acts).toEqual([{ type: 'setStrategy', unit: rack, strategy: 'leastConn' }, { type: 'setFilter', unit: rack, filter: 'capability', on: true }]);
     const cap = button(m.host, 'Capacity · 24 a second');
     expect(cap.textContent).toContain('30.7k');
+  });
+  it('shows the router queue with a well per slot and buys the next slot (D25.7)', () => {
+    const entries = [{ taskId: 7, family: 0 as never, units: 64, shard: null, sinceTick: 0, windowEndTick: null }];
+    const next = q({ type: 'upgradeRouterQueue', unit: rack }, 379_843);
+    m.render(<LbPlate unit={rack} view={lb({ queue: { slots: 2, level: 2, entries } })} quotes={quotes} queueQuote={next} onAction={onAction} onClose={onClose} />);
+    expect(m.host.querySelector('[data-testid=lb-queue]')?.textContent).toBe('Queue1/2L2/32');
+    expect(m.host.querySelectorAll('.lb-wells i.on')).toHaveLength(1);
+    click(button(m.host, 'Queue 2 → 3'));
+    expect(acts).toEqual([{ type: 'upgradeRouterQueue', unit: rack }]);
   });
   it('a capability filter clears the blind warning', () => {
     m.render(<LbPlate unit={rack} view={lb({ filters: ['capability'] })} quotes={quotes} onAction={onAction} onClose={onClose} />);

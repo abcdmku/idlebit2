@@ -8,7 +8,7 @@ import { RESEARCH } from '../build/research/tree';
 import { deriveUnlocks } from '../build/research/effects';
 import type { BuildState, GlobalBuild, RackBuild, RoomBuild, SiteBuild, SystemBuild } from '../types/build';
 import {
-  FILTER_IDS, PART_IDS, PLACEMENT_IDS, QUEUE_STRATEGY_IDS, REGION_IDS, ROUTE_STRATEGY_IDS, RULE_IDS, type PartId,
+  FILTER_IDS, PART_IDS, QUEUE_STRATEGY_IDS, REGION_IDS, ROUTE_STRATEGY_IDS, RULE_IDS, type PartId,
 } from '../types/catalog';
 import { rackId, roomId, siteId, systemId, type LevelId, type RackId, type RoomId, type SiteId, type SystemId } from '../types/ids';
 import type { GameState, RoundPhase, Unlocks } from '../types/state';
@@ -51,7 +51,7 @@ export function maxUnlocks(): Unlocks {
     levels: levelsUpTo('global'),
     gens: Object.fromEntries(PART_IDS.map((p) => [p, p === 'gpu' ? 0x1ff : 0x7f])) as Record<PartId, number>,
     ceilings: { ...CEILINGS_MAX, gpuSlots: 2 },
-    queueStrategies: QUEUE_STRATEGY_IDS, routeStrategies: ROUTE_STRATEGY_IDS, filters: FILTER_IDS, placements: PLACEMENT_IDS,
+    queueStrategies: QUEUE_STRATEGY_IDS, routeStrategies: ROUTE_STRATEGY_IDS, filters: FILTER_IDS,
     rules: RULE_IDS, ruleParams: { tensorRate: gpuParams.tensorRate, vramPerLevel: gpuParams.vramPerLevel },
     bootTicks: 20, autoReturnDelayTicks: researched.autoReturnDelayTicks, offlineCapHours: 24,
   };

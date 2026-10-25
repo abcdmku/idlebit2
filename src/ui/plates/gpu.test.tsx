@@ -46,7 +46,7 @@ describe('native GPU model picker', () => {
   it('labels assigned families with the type icon and colour, keeping the family text neutral', () => {
     setup();
     const family = FAMILIES.find(f => f.key === 'inference')!;
-    const task: TaskView = { ...entry(1, family.id), accelDomain: 0, count: 1, stage: 0, resource: 'gpu', progress: 0.5, deadlineTick: null };
+    const task: TaskView = { ...entry(1, family.id), accelDomain: 0, count: 1, stage: 0, resource: 'gpu', progress: 0.5, taskId: 1, shard: 0, shards: 1, units: 1, threads: 0, placement: { cache: 0, ram: 0, disk: 0 }, memTier: null, windowEndTick: null };
     mounted = mount(<GpuPlate system={sys} index={0} installed={installed()} tasks={[task]}
       onAction={a => store.dispatch(a)} onClose={() => undefined} />, store);
     const row = mounted.host.querySelector<HTMLElement>('.gpu-tasks li')!;

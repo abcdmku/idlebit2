@@ -1,8 +1,8 @@
 // Click to upgrade (D15.4): what a tapped world target offers, and where its callout sits.
-// The callout sits beside the target, never over it (L2 calloutRect).
-import { LEVEL_NAMES, type LevelSnapshot, type NodeRef, type Quote, type QuoteResult } from '../../game';
+// Desktop docks it in the right gutter with a leader to the part; phone sits it above or below (A07).
+import { formatHertz, LEVEL_NAMES, type LevelSnapshot, type NodeRef, type PartSlotKind, type Quote, type QuoteResult } from '../../game';
 import type { HitTarget, Rect } from '../../render/core';
-import { rackLetter, SLOT_TITLE, zoneLetter } from '../plates/copy';
+import { rackLetter, regionName, SLOT_TITLE, zoneLetter } from '../plates/copy';
 import { changeText, type Offer, type Offers } from '../deck/offers';
 
 const clamp = (v: number, a: number, b: number) => Math.max(a, Math.min(b, v));
@@ -37,12 +37,23 @@ export function nodeName(ref: NodeRef, focus: LevelSnapshot): string {
   }
 }
 
+/** The board's own labels where they differ from the plate titles (A07). */
+const BOARD_NAME: Partial<Record<PartSlotKind, string>> = { l1: 'Cache', scheduler: 'Queue' };
+
 export function targetName(t: HitTarget, focus: LevelSnapshot): string {
+  const site = t.unit?.kind === 'site' && focus.level === 'global' ? focus.sites.find(s => s.siteId === t.unit!.id) : undefined;
+  if (site) return regionName(site.region);
   if (t.drill && (t.kind === 'child' || t.kind === 'unit')) return nodeName(t.drill, focus);
   if (t.kind === 'port') return t.port === -1 ? 'Uplink' : `Port ${(t.port ?? 0) + 1}`;
   if (t.kind === 'slot') return 'Empty slot';
   if (t.kind === 'unit' && t.unit) return t.unit.kind === 'system' ? `System ${t.unit.id + 1}` : t.unit.kind === 'rack' ? `Rack ${rackLetter(t.unit.id)}` : 'Unit';
-  if (t.part) return t.part.slot.kind === 'core' ? `Core ${t.part.slot.index + 1}` : SLOT_TITLE[t.part.slot.kind];
+  if (t.part) {
+    const k = t.part.slot.kind;
+    if (k === 'core') return `Core ${(t.part.slot as { index: number }).index + 1}`;
+    // One cache level reads "Cache", as on the board; several name their level ("L2 cache").
+    if ((k === 'l1' || k === 'l2' || k === 'l3') && focus.level === 'chip' && focus.cache.levels.length > 1) return SLOT_TITLE[k];
+    return BOARD_NAME[k] ?? SLOT_TITLE[k];
+  }
   return LEVEL_NAMES[t.owner.level];
 }
 
@@ -58,28 +69,75 @@ export function primaryQuote(t: HitTarget, quotes: readonly Quote[]): Quote | nu
 }
 
 export interface CalloutModel {
+  /** What the part is, or for a research-locked add, what you get ("Add Core 2"). */
   readonly name: string;
-  /** "1 → 2 bits", the lock, or a blank line. */
+  /** "1 → 2 bits", "Needs research: Dual core", or a blank line. */
   readonly change: string;
   readonly offer: Pick<Offer, 'quote' | 'price' | 'affordable' | 'lock' | 'where'> | null;
+  /** The research that opens this offer, when that is what stands in the way. */
+  readonly research: string | null;
   /** Open: drill into this unit. */
   readonly drill: NodeRef | null;
 }
 
 /**
- * What the callout shows for a target: a core reads the deck's Cores row (cores are added, not
- * upgraded); every other target reads its plate quotes.
+ * What the callout shows for a target. A part the deck lists reads the deck's own row, so the
+ * world and the deck always agree (A08); every other target reads its plate quotes.
  */
 export function calloutModel(t: HitTarget, focus: LevelSnapshot, quotes: QuoteResult | null, offers: Offers | null): CalloutModel {
-  const name = targetName(t, focus), drill = t.drill;
-  if (t.part?.slot.kind === 'core' && offers) {
-    const o = offers.rows.find(r => r.key === 'core') ?? null;
-    return { name, change: o?.change ?? '', offer: o, drill };
+  const kind = t.part?.slot.kind, drill = t.drill;
+  let name = targetName(t, focus), change = '', offer: CalloutModel['offer'] = null;
+  // A core: an installed one reads its own upgrade and rate; an empty core site offers the next core.
+  const core = t.part?.slot.kind === 'core' ? t.part.slot : null;
+  const own = core && offers ? offers.cores[core.index] ?? null : null;
+  const row = own ?? (kind && offers ? offers.rows.find(r => r.slot === kind) ?? null : null);
+  if (row) {
+    offer = row; change = row.change;
+    if (own) { if (!own.quote?.effect && focus.level === 'chip') change = formatHertz(focus.clock.effectiveHz); }
+    else if (core) name = `Add Core ${(offers?.cores.length ?? 0) + 1}`;
+    else name = row.name.replace(/^Add /, '');
+  } else {
+    const q = quotes ? primaryQuote(t, quotes.quotes) : null;
+    if (q) {
+      const credits = q.currency === 'credits';
+      change = q.effect ? changeText(q.effect) : q.label;
+      offer = { quote: q, price: q.locked || !credits ? null : Math.ceil(Number(q.cost)), affordable: !q.locked && credits && q.affordable,
+        lock: q.locked?.text ?? null, where: false };
+    }
   }
-  const q = quotes ? primaryQuote(t, quotes.quotes) : null;
-  if (!q) return { name, change: '', offer: null, drill };
-  const credits = q.currency === 'credits';
-  return { name, change: q.effect ? changeText(q.effect, t.part?.slot.kind === 'clock') : q.label, drill,
-    offer: { quote: q, price: q.locked || !credits ? null : Math.ceil(Number(q.cost)), affordable: !q.locked && credits && q.affordable,
-      lock: q.locked?.text ?? null, where: false } };
+  const lock = offer?.quote?.locked;
+  // "Upgrade at the Rack switch" is a structure lock (D15.5), not research the player can start.
+  const research = lock?.code === 'research' && !offer!.where && !/^Upgrade at /.test(lock.text) ? lock.text.replace(/^Needs /, '') : null;
+  if (research) {
+    // Locked grammar (A07): the title is what you get, line 2 what it needs, the key opens it.
+    if (t.kind === 'slot') name = `Add ${offer!.quote!.label}`;
+    change = `Needs research: ${research}`;
+  }
+  return { name, change, offer, research, drill };
+}
+
+/** Desktop (A07): the callout docks in the world's right gutter, its top level with the part's, clamped. */
+export function dockCallout(t: Rect, size: { w: number; h: number }, bounds: Rect): Rect {
+  const x = bounds.x + bounds.w - size.w, y = clamp(Math.round(t.y / 8) * 8, bounds.y, bounds.y + bounds.h - size.h);
+  return { x, y, w: size.w, h: size.h };
+}
+
+/**
+ * The leader from the part to its callout (A07), one art px thick on the art grid: horizontal when
+ * the callout sits beside the part, vertical when above or below; null when they overlap.
+ */
+export function leaderRect(t: Rect, c: Rect, n: number): Rect | null {
+  const snap = (v: number) => Math.round(v / n) * n;
+  if (c.x >= t.x + t.w || c.x + c.w <= t.x) {
+    const lo = Math.max(t.y, c.y + 8), hi = Math.min(t.y + t.h, c.y + c.h - 8);
+    if (lo > hi) return null;
+    const y = snap(clamp(t.y + Math.min(t.h / 2, 24), lo, hi)), right = c.x >= t.x + t.w;
+    const x0 = snap(right ? t.x + t.w : c.x + c.w), x1 = snap(right ? c.x : t.x);
+    return x1 > x0 ? { x: x0, y, w: x1 - x0, h: n } : null;
+  }
+  const lo = Math.max(t.x, c.x + 8), hi = Math.min(t.x + t.w, c.x + c.w - 8);
+  if (lo > hi) return null;
+  const x = snap(clamp(t.x + t.w / 2, lo, hi)), below = c.y >= t.y + t.h;
+  const y0 = snap(below ? t.y + t.h : c.y + c.h), y1 = snap(below ? c.y : t.y);
+  return y1 > y0 ? { x, y: y0, w: n, h: y1 - y0 } : null;
 }

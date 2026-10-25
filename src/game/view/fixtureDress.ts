@@ -5,7 +5,7 @@ import { allocRecord, frontList, pushBack, queueList } from '../core/pool';
 import { MODE } from '../core/timers';
 import { FAMILIES } from '../market/families';
 import { FAIL_CAUSES, FAIL_DETAILS, type FailCause, type GameEvent, type GameEventBody } from '../types/events';
-import { RESOURCES } from '../types/catalog';
+import { RES_CLOCKS } from '../core/constants';
 import { familyId, rackId, roomId, siteId, systemId } from '../types/ids';
 import type { RoundReport } from '../types/report';
 import type { GameState, RoundPhase } from '../types/state';
@@ -16,7 +16,7 @@ import type { GameState, RoundPhase } from '../types/state';
  * the domains run them. Test and dev only; never on a production path.
  */
 
-const R = RESOURCES.length;
+const R = RES_CLOCKS;
 /** Deterministic 0..1 noise. */
 const hash = (n: number): number => { const x = Math.sin(n * 12.9898 + 78.233) * 43758.5453; return x - Math.floor(x); };
 const famCount = (): number => Math.max(1, Math.min(12, FAMILIES.length));
@@ -86,7 +86,7 @@ function dressSystems(c: CompiledBuffers, hot: HotBuffers, o: DressOptions): voi
     const busy = Math.max(1, Math.round(threads * (0.4 + 0.6 * hash(s))));
     hot.sys.busyThreads[s] = busy; hot.sys.busy[s] = busy; hot.sys.running[s] = busy;
     hot.sys.psuUsage[s] = 0.3 + 0.5 * hash(s + 1); hot.sys.drawW[s] = hot.sys.psuUsage[s]! * c.sys.psuCapW[s]!;
-    hot.sys.usedMem[s] = c.sys.cacheBits[s]! * 0.5;
+    hot.sys.usedCache[s] = c.sys.cacheBits[s]! * 0.5;
     // Running records on the CPU run list, with stage progress spread over 0..1 (rate 1 on a 0-anchored clock).
     const effClock = 1_000;
     hot.rack.effClock[rack] = effClock;
@@ -165,11 +165,12 @@ function fixtureEvents(o: DressOptions): GameEvent[] {
 /** A frozen report for ended and between fixtures. */
 export function fixtureReport(index: number, durationTicks: number): RoundReport {
   return {
+    byType: [{ type: 'compute', metWork: 128_400, failedWork: 27_500, dismissed: 4 }],
     index, startTick: 0, durationTicks, durationMs: durationTicks * TICK_MS, met: 1_284,
-    failedByCause: { timeout: 190, cantRun: 61, misroute: 12, power: 9, heat: 0, swap: 3 },
-    failDetail: { timeout: 'link', cantRun: 'ram', misroute: 'cache', power: 'psu', heat: null, swap: 'cold' },
+    failedByCause: { timeout: 190, cantRun: 61, misroute: 12, power: 9, heat: 0, swap: 3, late: 0 },
+    failDetail: { timeout: 'link', cantRun: 'ram', misroute: 'cache', power: 'psu', heat: null, swap: 'cold', late: null },
     details: [{ cause: 'timeout', detail: 'link', count: 150 }, { cause: 'cantRun', detail: 'ram', count: 61 }],
-    peakIntensity: 6.4, dismissed: 4, deliveredWork: 128_400, failedWork: 27_500, gross: amount(18_420), data: amount(212), energy: amount(1_310), net: amount(17_110), researchOps: 48_000,
+    peakIntensity: 6.4, dismissed: 4, deliveredWork: 128_400, failedWork: 27_500, spill: { ramWork: 0, diskWork: 0 }, gross: amount(18_420), data: amount(212), energy: amount(1_310), net: amount(17_110), researchOps: 48_000,
   };
 }
 

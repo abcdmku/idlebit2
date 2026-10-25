@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { cloneCompiled, LOC } from '../core/buffers';
 import { DT_S, POOL_DOMAIN } from '../core/constants';
 import { ledgerPhase } from '../core/ledger';
-import { allocGang, allocRecord } from '../core/pool';
+import { addSibling, allocParent, allocRecord } from '../core/pool';
 import { openWorld, type World } from '../core/world';
 
 import { powerPhase } from '../phys/power';
@@ -21,30 +21,31 @@ vi.mock('../market/families', async (orig) => ({ ...(await orig<object>()), FAMI
 
 function queued(w: World, s: number, family: number): number {
   const r = allocRecord(w.hot), rec = w.hot.rec;
-  rec.family[r] = family; rec.count[r] = 1; rec.scale[r] = 100; rec.payout[r] = 100; rec.threads[r] = 1;
+  rec.family[r] = family; rec.count[r] = 1; rec.units[r] = 100; rec.payout[r] = 100; rec.threads[r] = 1;
   enqueue(w, s, r); noteAdmitted(w, s, 1);
   return r;
 }
 
-function gangWorld() {
+function splitWorld() {
   const w = openWorld(execState({ serversPerRack: 2 }, { K: 4, threads: 4 }, (c) => {
     for (let s = 0; s < c.sys.len; s += 1) setAccels(c, s, [{ cores: 4, ops: 100, tensorOps: 100, vram: 100, loadW: 100 }]);
     // Isolate accelerator billing from the deliberately unchanged CPU busy-core policy.
     c.sys.idleW.fill(0); c.sys.loadW.fill(0); c.sys.coreIdleW.fill(0); c.sys.coreLoadW.fill(0); c.sys.clockIdleW.fill(0);
   }));
   const incumbent = queued(w, 0, F.gpu), member = queued(w, 0, F.tensor);
-  const g = allocGang(w.hot), gang = w.hot.gang, rec = w.hot.rec;
-  gang.members[g] = 2; gang.family[g] = F.tensor; gang.placed[g] = 2;
-  rec.gang[member] = g;
-  rec.gang[queued(w, 1, F.tensor)] = g;
+  // One task split into two shards, one queued on each server (D25 parent row).
+  const p = allocParent(w.hot), par = w.hot.parent;
+  par.family[p] = F.tensor; par.units[p] = 200; par.work[p] = 200; par.minShards[p] = 1; par.placed[p] = 2;
+  addSibling(w.hot, p, member);
+  addSibling(w.hot, p, queued(w, 1, F.tensor));
   return { w, incumbent, member };
 }
 
-describe('gang cleanup at the completed execution boundary', () => {
+describe('split-task cleanup at the completed execution boundary', () => {
   {
     it('does not retroactively accelerate survivors after a cross-system loss', () => {
-      const { w, incumbent, member } = gangWorld();
-      const reference = gangWorld().w;
+      const { w, incumbent, member } = splitWorld();
+      const reference = splitWorld().w;
       runPhase(w); runPhase(reference);
       const i = recordAccelClock(w, 0, incumbent), end = DT_S;
       expect(accelClockAt(w, i, end)).toBe(5);

@@ -12,7 +12,7 @@ import { switchAt } from './ports';
 
 /*
  * The "x → x" a tray or link quote shows (R42, R43). Part upgrades and replacements use the part
- * preview; adds show the count they change; link steps show the speed in bit/s. A plan that cannot
+ * preview; adds show the count they change; link steps show the speed in Hz. A plan that cannot
  * run has no after, so no effect, except a link locked to its structure (D15.5), which still shows
  * the step it will offer there.
  */
@@ -34,7 +34,7 @@ function addEffect(state: GameState, plan: Plan & { ok: true }, system: number, 
 }
 
 const linkPreview = (state: GameState, ref: PartRef, before: number, after: number, wBefore: number, wAfter: number, cost: bigint): EffectPreview =>
-  preview(before, after, 'bit/s', wBefore, wAfter, energyPrice(state, ref), cost, null);
+  preview(before, after, 'Hz', wBefore, wAfter, energyPrice(state, ref), cost, null);
 const idleW = (row: LadderDef, gen: number, ks: readonly number[]) => ks.reduce((sum, k) => sum + portWatts(row, gen, k).idle, 0);
 
 /** A switch port or uplink step: the slowest changed port's speed, before and after. */

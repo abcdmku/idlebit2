@@ -1,4 +1,5 @@
-import type { Amount } from '../../game';
+import { formatHertz, formatOps, formatSize } from '../../game';
+import type { Amount, EffectPreview } from '../../game';
 
 /**
  * Display formatting for plates, tray and research. Credits and Data are whole numbers (D2.2, D3.3);
@@ -6,7 +7,25 @@ import type { Amount } from '../../game';
  */
 
 const MINUS = '−';
-const COMPACT: readonly (readonly [number, string])[] = [[1e18, 'Qi'], [1e15, 'Q'], [1e12, 'T'], [1e9, 'B'], [1e6, 'M'], [1e3, 'k']];
+/** One scheme everywhere (A13): k … Dc, three significant digits once suffixed, then `1.80e36`. */
+const COMPACT: readonly (readonly [number, string])[] = [[1e33, 'Dc'], [1e30, 'No'], [1e27, 'Oc'], [1e24, 'Sp'], [1e21, 'Sx'],
+  [1e18, 'Qi'], [1e15, 'Q'], [1e12, 'T'], [1e9, 'B'], [1e6, 'M'], [1e3, 'k']];
+/** Past the last band, whole counts print in scientific notation. */
+const SCIENTIFIC = 1e36;
+
+/** A positive whole count from 10,000 up: "12.3k", "1.24M", "180Qi", "1.80e36". */
+export function compactWhole(n: number): string {
+  if (n >= SCIENTIFIC) return n.toExponential(2).replace('e+', 'e');
+  for (let i = 0; i < COMPACT.length; i++) {
+    const [scale, suffix] = COMPACT[i]!;
+    if (n < scale) continue;
+    const text = coefficient(n / scale);
+    // 999.6k rounds to "1000k": carry into the next band.
+    if (Number(text) >= 1000) return i > 0 ? '1' + COMPACT[i - 1]![1] : (1000 * scale).toExponential(2).replace('e+', 'e');
+    return text + suffix;
+  }
+  return grouped(String(n));
+}
 
 const grouped = (digits: string) => digits.replace(/\B(?=(\d{3})+(?!\d))/g, ',');
 const trimZeros = (s: string) => (s.includes('.') ? s.replace(/0+$/, '').replace(/\.$/, '') : s);
@@ -34,15 +53,7 @@ export function wholeText(value: Amount | number | bigint): string {
   const sign = n < 0 ? MINUS : '';
   n = Math.abs(n);
   if (n < 1e4) return sign + grouped(String(n));
-  for (let i = 0; i < COMPACT.length; i++) {
-    const [scale, suffix] = COMPACT[i];
-    if (n < scale) continue;
-    const text = coefficient(n / scale);
-    // 999.6k rounds to "1000k": carry into the next band.
-    if (Number(text) >= 1000 && i > 0) return sign + '1' + COMPACT[i - 1][1];
-    return sign + text + suffix;
-  }
-  return sign + grouped(String(n));
+  return sign + compactWhole(n);
 }
 
 /** Whole Credits per minute, signed: "−9,960/min", "+12.3k/min", "0/min". */
@@ -56,7 +67,9 @@ export function perMinuteText(value: Amount | number, signed = true): string {
 export function sig3(n: number): string {
   if (!Number.isFinite(n)) return '—';
   const a = Math.abs(n), sign = n < 0 ? MINUS : '';
-  const units: readonly (readonly [number, string])[] = [[1e21, ' Z'], [1e18, ' E'], [1e15, ' P'], [1e12, ' T'], [1e9, ' G'], [1e6, ' M'], [1e3, ' k']];
+  // SI up to yotta (A13); past 1000 Y, scientific: "1.80e30 ".
+  if (a >= 1e27) return sign + a.toExponential(2).replace('e+', 'e') + ' ';
+  const units: readonly (readonly [number, string])[] = [[1e24, ' Y'], [1e21, ' Z'], [1e18, ' E'], [1e15, ' P'], [1e12, ' T'], [1e9, ' G'], [1e6, ' M'], [1e3, ' k']];
   const u = units.find(([v]) => a >= v) ?? [1, ' '];
   const v = a / u[0], d = v >= 100 ? 0 : v >= 10 ? 1 : 2;
   return sign + (u[0] === 1 && Number.isInteger(a) ? String(a) : v.toFixed(d)) + u[1];
@@ -70,8 +83,23 @@ export function quantity(n: number, unit: string): string {
 }
 
 export const watts = (w: number) => quantity(w, 'W');
-export const hertz = (hz: number) => quantity(hz, 'Hz');
-export const bits = (b: number) => quantity(b, 'b');
+/** Speeds, sizes and work print through the shared formatters, so one quantity reads the same everywhere. */
+export const hertz = (hz: number) => formatHertz(hz);
+export const bits = (b: number) => formatSize(b);
+export const ops = (n: number) => formatOps(n);
+
+const COUNTS: ReadonlySet<string> = new Set(['lanes', 'slots', 'ports']);
+/** One effect quantity: "21.4 kb", "8 kHz", "53.4k ops", "53.4k ops/s", "4 slots", "234 W". */
+export function measureUnit(n: number, unit: EffectPreview['unit']): string {
+  switch (unit) {
+    case 'bits': return formatSize(n);
+    case 'bit/s': return formatHertz(n);
+    case 'Hz': return formatHertz(n);
+    case 'ops': return formatOps(n);
+    case 'ops/s': return `${formatOps(n)}/s`;
+    default: return COUNTS.has(unit) ? `${Math.round(n)} ${unit}` : quantity(n, unit);
+  }
+}
 export const fahrenheit = (f: number) => `${Math.round(f)}°F`;
 export const percent = (fraction: number) => `${Math.round(Math.max(0, fraction) * 100)}%`;
 

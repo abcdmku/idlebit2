@@ -47,8 +47,8 @@ function billed(accels: readonly AccelBuild[] = [gpu()], hotSwap = true, servers
   const w = openWorld(start), family = FAMILIES.find((f) => f.key === 'rayTrace')!, scale = 2000;
   for (let s = 0; s < servers; s += 1) {
     const r = allocRecord(w.hot), rec = w.hot.rec;
-    rec.family[r] = family.id; rec.count[r] = 1; rec.scale[r] = scale;
-    rec.threads[r] = family.threads; rec.payout[r] = payoutAt(family, scale);
+    rec.family[r] = family.id; rec.count[r] = 1; rec.units[r] = scale;
+    rec.payout[r] = payoutAt(family, scale);
     enqueue(w, s, r); noteAdmitted(w, s, 1);
   }
   const state = advanceGame(commitWorld(start, w, 0), 100).state;

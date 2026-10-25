@@ -1,4 +1,4 @@
-import { useLayoutEffect, useRef, type ReactNode, type RefObject } from 'react';
+import { useLayoutEffect, useRef, type CSSProperties, type ReactNode, type RefObject } from 'react';
 import type { Rect } from '../../render/core/geom';
 import { useDialogFocus } from '../hooks/useDialogFocus';
 import { Pips } from './widgets';
@@ -24,7 +24,7 @@ export interface PlateFrameProps extends PlatePosition {
   /** Extra header content after the subtitle (a total price). */
   head?: ReactNode;
   className?: string;
-  /** A 44 px close key in the header (configuration plate, save prompt). Other plates close on Escape or a world tap. */
+  /** The 48 px close key in the header (A21: one close everywhere); on by default. Plates also close on Escape or a world tap. */
   closeKey?: boolean;
   as?: 'section' | 'form';
   onSubmit?: () => void;
@@ -34,7 +34,7 @@ export interface PlateFrameProps extends PlatePosition {
 }
 
 /** The plate body: a fixed-width dark slab with a paper rim. It never resizes while open. */
-export function PlateFrame({ title, sub, pips, head, className = '', closeKey, as = 'section', onSubmit, initialFocus,
+export function PlateFrame({ title, sub, pips, head, className = '', closeKey = true, as = 'section', onSubmit, initialFocus,
   onClose, children, readAnchor, bounds, subscribeFrame, pinTop }: PlateFrameProps) {
   const ref = useRef<HTMLElement>(null);
   useDialogFocus(ref, onClose, initialFocus);
@@ -73,7 +73,8 @@ export function PlateFrame({ title, sub, pips, head, className = '', closeKey, a
       {sub != null && <span className="p-sub">{sub}</span>}
       {head}
       {pips && <Pips filled={pips[0]} max={pips[1]} />}
-      {closeKey && <button type="button" className="p-x" aria-label="Close" onClick={onClose}>×</button>}
+      {closeKey && <button type="button" className="p-x" aria-label="Close" onClick={onClose}>
+        <i className="x-glyph" aria-hidden="true" style={{ width: 12, height: 12, '--x-w': '1px' } as CSSProperties} /></button>}
     </header>
     {children}
   </>;

@@ -1,10 +1,9 @@
 // Server front panels (mockup levels/rack/sprites.js drawServer), drawn from the slot view.
 // Every light is real: core LEDs are busy cores, the NIC light is a transfer on its switch
 // port, the power light is power, red is halted. A dark rack is fully unlit.
-import { KIND, P, R, frame as outline, drawUnitLamp, lampState, mix, px } from '../../core';
+import { KIND, P, R, frame as outline, drawTypeMini, drawUnitLamp, lampState, mix, px, typeOf } from '../../core';
 import type { RackSnapshot, ServerSlotView } from '../../../game';
-import { familyKey } from '../../../game';
-import { BEZEL, OFF, ears, jobText, label, lcdChars, lcdText } from './art';
+import { BEZEL, OFF, ears, label, lcdChars, lcdText, typeText } from './art';
 
 type G = CanvasRenderingContext2D;
 export type ServerLook = 'live' | 'dark' | 'crash' | 'noport' | 'paused' | 'offline' | 'boot';
@@ -23,8 +22,15 @@ export function serverLook(s: RackSnapshot, v: ServerSlotView, paused: boolean):
 }
 /** Chassis grade from the real core count: bigger servers wear brighter metal. */
 export const tierOf = (cores: number): number => (cores >= 32 ? 3 : cores >= 8 ? 2 : cores >= 2 ? 1 : 0);
+/** The status LCD's window on a server face at (x, y), as `drawServer` lays it out. */
+export function serverLcd(x: number, y: number, cores: number, out: { x: number; y: number; w: number; h: number }): void {
+  const cols = Math.max(1, Math.min(4, cores)), tier = tierOf(cores);
+  out.x = x + 7 + cols * 3 + 2 + 1; out.y = y + 3; out.w = LW[tier]! - 2; out.h = 6;
+}
 const LW = [26, 30, 34, 38], BAYS = [2, 3, 4, 4];
-const LCD_BG = [mix(P.ledOff, P.ink, 0.4), mix(P.sramLo, P.ink, 0.35)], LCD_FG = [P.led, P.cacheOn], LCD_DIM = [P.ledOff, P.sram];
+const LCD_BG = [mix(P.ledOff, P.ink, 0.4), mix(P.sramLo, P.ink, 0.35)], LCD_FG = [P.led, P.cacheOn];
+/** Idle and offline lines: the lit segment colour at 60% over the LCD, readable but quiet (A19). */
+export const LCD_IDLE = [mix(LCD_FG[0]!, LCD_BG[0]!, 0.4), mix(LCD_FG[1]!, LCD_BG[1]!, 0.4)];
 const HALT = mix(P.fault, P.ink, 0.25), box = { x: 0, y: 0, w: 0, h: 0 };
 
 function lcdLine(v: ServerSlotView, look: ServerLook, max: number): string {
@@ -35,7 +41,7 @@ function lcdLine(v: ServerSlotView, look: ServerLook, max: number): string {
     case 'boot': return label('BOOT ', Math.max(0, Math.ceil(v.timerS ?? 0)));
     default: break;
   }
-  if (v.running > 0) return v.family !== null ? jobText(familyKey(v.family), max) : label('RUN ', v.running);
+  if (v.running > 0) return label('RUN ', v.running);
   if (v.port?.active) return 'RECV';
   return 'IDLE';
 }
@@ -66,9 +72,17 @@ export function drawServer(g: G, x: number, y: number, w: number, h: number, v: 
   const lw = LW[tier], hiLcd = tier >= 2 ? 1 : 0;
   R(g, cx, y + 2, lw, 8, P.ink); R(g, cx + 1, y + 3, lw - 2, 6, dark ? P.ink : LCD_BG[hiLcd]);
   if (!dark && look !== 'paused') {
-    const line = lcdLine(v, look, lcdChars(lw));
-    const c = look === 'crash' ? HALT : look === 'noport' ? P.amber : look === 'offline' || line === 'IDLE' ? LCD_DIM[hiLcd] : LCD_FG[hiLcd];
-    lcdText(g, cx + 2, y + 3, line, c, cx + 1, cx + lw - 1);
+    // A19, set F: a running task shows as its type: the type's 5×5 mini and the type name.
+    // The 16 art px type icon does not fit the 6 px LCD window (a server face is one 12 px U).
+    const type = look === 'live' && v.running > 0 && v.family !== null ? typeOf(v.family) : null;
+    if (type) {
+      drawTypeMini(g, type, cx + 2, y + 3);
+      lcdText(g, cx + 8, y + 3, typeText(type, (lw - 8) >> 2), LCD_FG[hiLcd]!, cx + 1, cx + lw - 1);
+    } else {
+      const line = lcdLine(v, look, lcdChars(lw));
+      const c = look === 'crash' ? HALT : look === 'noport' ? P.amber : look === 'offline' || line === 'IDLE' ? LCD_IDLE[hiLcd]! : LCD_FG[hiLcd]!;
+      lcdText(g, cx + 2, y + 3, line, c, cx + 1, cx + lw - 1);
+    }
     // a task landing over its port: the line is the transfer's real progress
     if (live && v.port?.active) R(g, cx + 1, y + 9, Math.round((lw - 2) * Math.min(1, v.port.progress)), 1, P.net);
   }

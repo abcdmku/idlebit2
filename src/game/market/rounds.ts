@@ -9,6 +9,20 @@ import { dropAllWork } from '../exec';
 import { startIntensity } from './curve';
 import { clearFront, graceOf, prepareQueue } from './queue';
 import { countOutcomes, failCounts, resetCounters, slaBelowThreshold } from './sla';
+import { familyType, TASK_TYPE_IDS } from './taskTypes';
+import { FAMILIES } from './families';
+
+function roundTypes(w: World): RoundReport['byType'] {
+  const fam = w.hot.fam;
+  const rows = TASK_TYPE_IDS.map(type => ({ type, metWork: 0, failedWork: 0, dismissed: 0 }));
+  for (let f = 0; f < FAMILIES.length; f += 1) {
+    const row = rows[TASK_TYPE_IDS.indexOf(familyType(f))]!;
+    row.metWork += fam.metWorkRound[f]!;
+    row.failedWork += fam.failedWorkRound[f]!;
+    row.dismissed += fam.dismissedRound[f]!;
+  }
+  return rows.filter(r => r.metWork > 0 || r.failedWork > 0 || r.dismissed > 0);
+}
 
 /**
  * Rounds (program §3, D12.1, spec §4.1, §4.6, §4.7). A round starts at Return to market (the
@@ -54,8 +68,10 @@ function freezeReport(w: World): RoundReport {
   const durationTicks = w.tick + 1 - r.startTick;
   return {
     index: r.index, startTick: r.startTick, durationTicks, durationMs: durationTicks * TICK_MS,
+    byType: roundTypes(w),
     met: g[G.met]!, failedByCause: failCounts(w), ...roundDetails(w.hot.detailRound), peakIntensity: r.peakIntensity,
     dismissed: g[G.dismissed]!, deliveredWork: g[G.deliveredWork]!, failedWork: g[G.failedWork]!,
+    spill: { ramWork: g[G.ramWork]!, diskWork: g[G.diskWork]! },
     ...roundTotals(w), researchOps: r.researchOps,
   };
 }

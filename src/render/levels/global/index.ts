@@ -6,8 +6,10 @@ import { P, R, copyRect, resetHitTarget, setRect } from '../../core';
 import type { ChildView, HitTarget, LevelRegistry, LevelRenderer, NodeRef, Rect } from '../../core';
 import { siteId as toSiteId } from '../../../game';
 import type { GlobalSnapshot, PartRef, RoomId, SiteId, UnitRef } from '../../../game';
-import { CELLS, FOCUS, SIGN_H, SIZE, TILES, hubRect, landing } from './layout';
+import { CELLS, SIGN_H, SIZE, TILES, hubRect, landing } from './layout';
 import { drawGlobal, gatewayIndex, regionOfSite } from './world';
+import { WORLD_SNAP, worldCentre, worldFocus } from './pan';
+export { worldPan } from './pan';
 
 const OWNER: NodeRef = { level: 'global', id: 0 };
 const roomRefs = new Map<number, NodeRef>();
@@ -76,7 +78,10 @@ export function createGlobalRenderer(registry: LevelRegistry): LevelRenderer<'gl
   return {
     id: 'global', name: 'World',
     size: (_s, out) => copyRect(SIZE, out),
-    focus: (_s, _vp, out) => copyRect(FOCUS, out),
+    /** The owned sites plus a region of context; the core pans it when it doesn't fit at 2 (A09, pan.ts). */
+    focus: (s, _vp, out) => worldFocus(s, out),
+    restCentre: (s, out) => worldCentre(s, out),
+    panSnap: () => WORLD_SNAP,
     /** The pipe enters at the top of the backbone hub beside the gateway (L2 D17). */
     entry(s, out) { hubRect(gatewayIndex(s), scratch); out.x = scratch.x + 5; out.y = scratch.y - 1; return out; },
     draw: (g, s, _view, f) => drawGlobal(g, s, f, ctx),
@@ -88,6 +93,15 @@ export function createGlobalRenderer(registry: LevelRegistry): LevelRenderer<'gl
       }
     },
     children: globalChildren,
+    /** A payout pops on the site that ran it, over its hall tiles; the key is the region cell. */
+    payoutAnchor(s, c, out) {
+      if (c.site === null || c.site === undefined) return -1;
+      for (let i = 0; i < s.sites.length && i < CELLS.length; i++) if (s.sites[i].siteId === c.site) {
+        const t = TILES[i], a = t[0], b = t[t.length - 1];
+        setRect(out, a.x, a.y, b.x + b.w - a.x, a.h); return i;
+      }
+      return -1;
+    },
     targets: (s, _view, out, from) => globalTargets(s, out, from),
     faults(s, out: Rect[]) {
       let n = 0;

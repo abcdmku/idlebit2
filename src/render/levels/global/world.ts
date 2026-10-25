@@ -7,14 +7,15 @@ import type { LevelRegistry, Rect, WorldFrame } from '../../core';
 import { REGIONS, REGION_IDS } from '../../../game';
 import type { GlobalSnapshot, LinkView, SiteView } from '../../../game';
 import { drawLayer } from '../rack/art';
+import { drawGlobalFlows, drawGlobalForks } from './flows';
 import { CELLS, CLIMATE, REGION_SIGNS, SIGN_H, SIZE, TILES, climateOf, hubRect, landing, mapPixel } from './layout';
 
 type G = CanvasRenderingContext2D;
 const SHEATH = '#16253a', PLATE = mix(P.void, P.ink, 0.25), DP = mix(P.net, P.ink, 0.45);
 const hub: Rect = { x: 0, y: 0, w: 0, h: 0 };
 const BASE_PRICE = REGIONS[0].energyPrice;
-/** Climate sign per region: "70°F ×1.0" (outside air, energy price against the gateway region's). */
-const CLIMATE_SIGNS = REGIONS.map(r => `${r.outsideF}°F ×${(r.energyPrice / BASE_PRICE).toFixed(1)}`);
+/** Climate sign per region (A28): "70°F · cost ×1.0", outside air and the energy price against the first region's. */
+export const CLIMATE_SIGNS = REGIONS.map(r => `${r.outsideF}°F · cost ×${(r.energyPrice / BASE_PRICE).toFixed(1)}`);
 
 function drawMap(g: G): void {
   for (let y = 0; y < SIZE.h; y++) {
@@ -119,12 +120,15 @@ export function drawGlobal(g: G, s: GlobalSnapshot, frame: WorldFrame, ctx: Glob
     drawSign(g, i, site, frame.paused);
     if (site.siteId !== null) drawSite(g, i, site, frame, ctx, live);
   }
+  if (live) drawGlobalForks(g, s);
   // the scheduler hub beside the gateway: one LED per backbone link, lit while it carries a transfer
   hubRect(gw, hub);
   R(g, hub.x - 1, hub.y - 1, hub.w + 2, hub.h + 2, P.ink); R(g, hub.x, hub.y, hub.w, hub.h, mix(P.steelLo, P.wafer, 0.3));
   R(g, hub.x, hub.y, hub.w, 1, P.steel); R(g, hub.x + 1, hub.y + 2, hub.w - 2, 1, P.ink);
   for (let i = 0; i < Math.min(4, s.backbone.links.length); i++) px(g, hub.x + 2 + i * 2, hub.y + 5, live && s.backbone.links[i].active ? P.led : P.ledOff);
   if (s.scheduler && live && s.scheduler.lastTarget !== null) px(g, hub.x + hub.w - 2, hub.y + 8, P.amber);
+  // D25 shard flows over the cables (none before the sim sends them)
+  if (live) drawGlobalFlows(g, s, frame);
   // World → Room: everything but the entered site sinks into the room's floor colour
   const d = diveOf(s, frame);
   if (d.region >= 0) {

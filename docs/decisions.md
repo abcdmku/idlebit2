@@ -730,6 +730,300 @@ A task shows as its family icon and name, plus its values: ops, bits, payout and
 2. **Offline target.** The 2 h offline round at `fleetMax` must reach 10 s or less. The phys power phase becomes change-driven (contract R34: exec raises a per-system "touched" signal, and power recomputes only touched systems).
 3. **Fallback ship gate.** If the 10 s offline target isn't met in this pass, the game still ships when the 2 h offline round at `roomFull` (where players spend weeks) takes 10 s or less and `fleetMax` takes 60 s or less behind the catch-up progress display. Optimization then continues after ship.
 
+**D25, 25 Oct: divisible tasks and load-balancer queues (user).** Binding. It supersedes the fixed `threads` count (§4 task shape, D4.5), gang placement as a research gate (§6 "Distributed tasks", D1.5's gang notes), queued take (`reserveOnRoute`) and the per-member payload rule. Backlog item: the flat economy after Rack.
+
+The user's words:
+
+> tasks should be built from smaller tasks meaning all large tasks should be broken down to cpu/gpu ops eventually this is how tasks flow through larger systems down to you indivual components and is what makes having multiple systems worthwhile.
+
+> load balancers should have the queue slots upgradable menaing it can hold more tasks than one if all systems its balancing are occupied
+
+> pay is done for the full task only.
+
+Why it fixes the flat economy: a whole task runs on one system, so its latency is `W / rate` and its working set must fit one box, whatever the fleet size. Late tasks then outgrow a single server's memory and finish after the round has ended, and a second rack adds little. A split task finishes in about `W / (n × rate)` and needs only `1/n` of the memory per box. Each doubling of the fleet lets a task one size step larger (+1.18 `I`) both fit and finish, so income per round roughly doubles (§D25.10).
+
+1. **Divisible tasks.**
+   - Every task is divisible work made of **shards**. A router splits a task among its children. A system splits its shard among its hardware threads, and its GPU stages run on its GPU domain. Every large task is broken down to CPU and GPU ops in the end.
+   - A task has a **size** `s` in whole units. Its stage work is `coefficient × s`, and its work is `W = s × pay/unit`, as before. Shards hold whole units.
+   - Each family has a **grain** `g`: the fewest units that must run together. The grain's work is `g × pay/unit` ops and bits. The effective grain is `max(g, ceil(s / 256))`, so a task has at most 256 shards (§8). No shard is smaller than the effective grain, and a task smaller than one grain is a single shard.
+   - Shards keep the parent task's ID, family and descriptor, and add a shard index and their units. They are routed, transferred, admitted, queued and run as tasks are today.
+   - **Gates per shard.** Fixed gates apply to every shard: fixed working set, GPU cores, ECC, tensor and region. Size-scaling gates apply to the shard's units: working set `wsFixed + wsPerUnit × units`, VRAM and storage capacity.
+   - Grains (`docs/tasks.md` §5): Compute families are coarse (4,096 units). Parallel, GPU and distributed families are fine (16–64). Memory families are medium (256). A few are serial (65,536): JSON Parse, Backup and Payroll.
+   - **Accepted deviation (25 Oct, implementation):** task sizes are not raised to one grain. An ordinary task smaller than its grain is drawn as is and runs as one shard; only minimum-split tasks are sized to at least `members × grain`.
+2. **Base split: FIFO first-fit spread.**
+   - At take time the router walks its children in index order. Every child that has room takes one shard. The shard count is `n = max(1, min(children with room, floor(units / effective grain)))`. Shares are equal whole units, and the remainder goes to the first child.
+   - A child router **has room** if a system below it has room to take (§6.4 of the spec, first-link room included) or its own queue has a free slot (item 7).
+   - A share sent to a child router is split again by that router in the same step, over its own children with room. A child router whose systems are all full, but whose queue has a free slot, takes its share into that queue.
+   - Nothing else is checked: no gates, load or speed. A split that lands a shard on a system that can't run it misroutes, and the whole task fails (item 5). This keeps D1.5's dumb default.
+   - **Smarter splits are research** (item 9): shares in proportion to child rate (`weighted`), to free slots (`leastConn`) or to predicted finish (`leastWork`), link-aware shares (`topologyAware`), a wait-for-half rule (Gather), shard stealing, and a local filter that keeps a task in one rack, zone or site.
+3. **Inside a system.**
+   - A starting shard takes `min(free hardware threads, max(1, floor(units / g)))` threads, using the thread assignment order of spec §6.5. This replaces the family's fixed `threads`.
+   - With `workStealing`, free threads join running shards that hold fewer threads than `floor(units / g)`.
+   - GPU stages keep the domain rate model (GPU runtime ruling).
+   - Families differ by grain. Compute is coarse and serial-ish, so before Rack the Hz-era lesson still holds: extra cores pay off through the scheduler. Parallel is fine and fills every core.
+4. **Split at take.**
+   - The split tree is decided in the routing step that takes the head (or that dispatches a router-queue entry). It ends at systems, or at child-router queues. Every slot and queue reservation in it is made atomically, or none is.
+   - Each shard is its own transfer along its full path from the market, at `units × pay/unit` bits.
+   - A shared upper link carries the shards one after another by store-and-forward (FIFO, ties by shard index). Extra channels (`lag`) carry several shards at once. So a rack uplink carries the rack's whole share in turn, while the server ports carry their shards in parallel.
+   - The bandwidth hierarchy therefore matters: an uplink must be about as fast as the ports below it combined, or it becomes the rack's throttle.
+   - First-link room is unchanged: the router may take while its top link's backlog is under one tick of capacity. A take may then queue the whole task's bits on that link.
+5. **Pay for the full task only** (user ruling, revised). It replaces the earlier pay-per-shard draft.
+   - Shards pay nothing on their own. A finished shard frees its slot, threads, memory and VRAM at once, but its work earns nothing until the task is met.
+   - The task pays its full payout once, `W` Credits plus `W / dataRatio` Data, when its **last** shard completes. The task is met at that moment for the work-weighted SLA.
+   - The payout pop appears on the component that completed the last shard: its system, and the core or GPU card that ran the final stage.
+   - If any shard fails (misroute, power, heat, swap), the task fails at once with its full `W` and the shard's cause. Nothing is paid. Its other shards are aborted: queued, running and in-transfer shards and router-queue shares are freed and their work is discarded.
+   - Round end drops every shard and router-queue entry. A task with finished shards but no completed last shard pays nothing and counts as neither met nor failed.
+6. **Distributed families.**
+   - `members` becomes a **minimum split**: at least `members` shards on distinct systems, spanning at least `minZones` zones, all inside `region`. The whole split is placed atomically, as gang placement is today.
+   - Shares of a minimum-split task go only to systems with room, never into child-router queues.
+   - Owning enough systems, zones and regions is the gate. Placement needs no research. The `gang` placement and the `cantRun · gang` detail are removed. A task with more members than the static capability set has systems fails `cantRun · members`.
+   - When the split can't meet its minimum now, the task waits, either as the head with its clock running or in a router queue.
+   - Reconciling the gang nodes: gang placement becomes base, and the four `gang*` nodes become split research (item 9).
+7. **Load-balancer queues.**
+   - Every router has a **queue**: the rack LB, the room LB, the site data plane and the global scheduler. It holds whole tasks, or shares from a parent router, that are taken but not yet dispatched.
+   - A router queue is a logical hold. A queued entry moves no bits; its transfers start only when it is dispatched, along the full path from the market.
+   - **Take.** If the top router's queue is empty and the head can be split now, the head is split directly. Otherwise, if the queue has a free slot, the router takes the head into its queue. That is pickup: the head's clock stops and the entry is committed. Otherwise the head waits.
+   - **Dispatch.** At the start of every routing step, each router, from the top down and in index order within a scope, dispatches its queue strictly FIFO with its split rule, for as long as the front entry can be split. Nothing behind a blocked front entry dispatches.
+   - Queue entries have no deadline. If the router's own unit goes dark, crashes, takes a cold change or goes offline, its entries return to the market queue front (spec §6.9). At round end they are dropped.
+   - **Size.** The base queue holds 1 entry. It is upgradable one slot per level, `L = 1 … 32`, on the same 1→32 ladder as the CPU queue (D7.2). The upgrade is hot. It is bought by tapping the load balancer in its rack or room slot (the upgrade callout, D15.4), or on the LB plate.
+   - **Price.** Price parity (D14, spec §12.5) with `y = L × b` and `x = (L + 1) × b` per stream: `lbQueueStep(L → L+1) = ceil(m × u / 0.7 × ((L+1)^α − L^α))`. Each scope uses the era it opens in and the streams it carries:
+
+     | Router | `m` | Era (`b`, `u`) | L1→2 | L31→32 | 1 → 32 total |
+     |---|---:|---|---:|---:|---:|
+     | rack LB | 12 | kHz (1e3, 1.5e4) | 379,843 | 976,161 | 2.4e7 |
+     | room LB | 288 | MHz (1e6, 9e7) | 5.5e10 | 1.4e11 | 3.4e12 |
+     | data plane | 864 | GHz (1e9, 2.4e11) | 4.4e14 | 1.1e15 | 2.7e16 |
+     | global scheduler | 6,912 | GHz | 3.5e15 | 9.0e15 | 2.2e17 |
+
+   - **Queued take is retired.** `reserveOnRoute`, the 10 s first-link bound and the LB plate's reserve switch are deleted. A busy first link now simply means "no room", and the router queue absorbs it.
+   - The queue doesn't move the throughput wall; it absorbs stagger. In steady state it is full and drains at fleet rate. What it buys is fewer head timeouts while children free up unevenly, and a place for large minimum-split tasks to wait with their clock stopped.
+8. **Bounds and performance.**
+   - Shards per task are at most `min(systems with room, 256, floor(s / g))`, and since D25.11 at most `floor(W / (r × 1 s))`. Shards in flight are at most the total system slots, plus at most 32 queue entries per router (609 routers at the largest fleet). That is today's bound plus 19,488.
+   - Shard completions per tick stay low because a shard is at least 1/256 of its task. The model (§D25.10) measures 0.5–14 shard starts per tick from 1 rack to 3 rooms, flat above 1 room. The architecture's 13 events per task become about 10 per shard, plus one parent completion.
+   - **Data layout.** Each shard is a count-1 record in the existing SoA pool, with `parent` (the old `gang` column) and `units` (f64). The gang pool becomes the **parent pool**: one row per split task with shards placed, shards done, units, `W`, lost cause and checkpoint deadline. Router queues are fixed rings in `hot.rq` (32 per router). Sibling shards may share a cohort record while they wait on the same link with equal units, but only as an optional optimization (architecture §1.4).
+   - The `npm run bench` budgets stand unchanged: the boot frame, the largest-fleet frame and the 2 h offline round, with D24's fallback gate.
+9. **Research.** `docs/research.md` lists the node changes. In short:
+   - `gangRack` becomes **Gather** (`splitGather`). A router dispatches only when at least half its eligible children have room, or when the entry has waited 10 s.
+   - `lbReserve` becomes **Shard stealing** (`shardSteal`). A free system takes a not-yet-started shard queued on a sibling in its rack.
+   - `gangRoom` becomes **Cross-rack stealing** (`stealRoom`).
+   - `topologyAware` becomes the **link-aware** split strategy: shares in proportion to what each child's link and compute can absorb.
+   - `zoneAware` becomes the **local** filter: keep a task in one rack, zone or site when that child can take the whole split.
+   - `globalGang` is deleted: cross-site placement is base. The tree has 161 nodes.
+   - `checkpointing` now covers any lost shard.
+   - `workStealing` and `lbCapability` get new text. `lbCapability` also turns would-be misroutes into waits: a capability-aware router never dispatches a split whose shards don't fit their targets.
+10. **Model check** (`npx tsx scripts/market-model.ts --fleet`, `--horizon=100`; `docs/tasks.md` §9 F–G). The fleet is homogeneous kHz L8 servers, the round is the settled round, and the figures are the mean of 3 seeds:
+
+    | Systems | 12 | 24 | 48 | 96 | 288 | 576 | 864 |
+    |---|---:|---:|---:|---:|---:|---:|---:|
+    | Peak `I`, split | 33.1 | 34.0 | 35.1 | 36.0 | 37.6 | 38.6 | 39.3 |
+    | Credits/round, split | 1.4e11 | 2.7e11 | 5.6e11 | 1.1e12 | 3.2e12 | 6.3e12 | 9.5e12 |
+    | First round after the step, split | — | 30:03 | 30:43 | 29:42 | 32:15 | 29:46 | 27:51 |
+    | Credits/round, whole (pre-D25) | 1.2e11 | 2.3e11 | 4.2e11 | 7.9e11 | 4.0e11 | 8.2e11 | 3.0e9 |
+
+    - **Each doubling** adds about 1 `I` and ×2 income per round. The first round after a step is about 5 min longer; settled rounds return to about 25 min, set by the D12 start-back.
+    - **Whole tasks** collapse from one room on, on `Can't run · RAM`.
+    - **The opening** is unchanged, because one system has no router: an un-upgraded round 1 ends at 0:48 in the model (the real sim measures 55–67 s), and an active round 1 at 4:27.
+    - **D19 milestones** stay in band: System 0:51, Rack 6:48, Room 2 d 7 h, Data center 9 d 18 h, Regions 18 d 18 h, every data center 92 d 18 h. The last needed the Max fleet rung's `payMin` raised from 1.3e6 to 4.3e6.
+
+11. **Split floor** (lead amendment, after the sim's perf run). Top hardware finishes 1/256 of a task in microseconds. At max links the 6,912-server fleet ran about 421,000 live shard transfers and about 20 s per take tick.
+    - **Rule.** Every shard carries at least 1 second of work at its target's nominal rate. For a system that is its compute rate, or its GPU domain rate for families with GPU stages. For a child router it is the fastest system rate in its subtree, read from the D24 summaries.
+    - **Count.** `n = max(1, min(children with room, floor(units / ĝ), floor(W_entry / (r_target × 1 s))))`.
+    - **Exceptions.** The floor never cuts below the minimum split (`members`), or below the shards needed to fit the hierarchy and VRAM (D26).
+    - **Item 2, the no-disk term** (approved by the lead with D26). The floor also never cuts below `nNoDisk = ceil(wsPerUnit × units / ((cache + RAM) / Keff − wsFixed))`, the split that keeps every shard's working set off disk, as far as the grain and 256 caps allow. The target's cache + RAM comes from the same per-router memo as `r`: the most conservative (smallest) value in the subtree. Without this term the 1 s floor kept small-RAM, fast-CPU boxes on few big shards that spilled to disk, and splitting stopped reducing spill: model H2 had whole and split at 63–71% disk work. With it, split spills 13–20% (D26.6). The shard-event bound still holds, because each such shard holds about one machine's fast memory of data.
+    - **Why.** Only tasks that are big for the machine get split. Every shard is visible for at least 10 ticks, and the shard-event bound holds.
+    - **Fleet scaling.** The model (`--fleet` against `--fleet --nofloor`, `docs/tasks.md` §9 F) shows the floor leaves D25.10's fleet scaling intact. It caps splits only where a task is small relative to one machine, which is never the throughput or latency wall.
+
+**Implementation contract (D25).** Three owners work in parallel. The names below are binding; anything else is the owner's choice. Bump `SAVE_VERSION` from 6 to 7 with a pre-live reset (no migration).
+
+*Sim (`src/game/**`):*
+- **Types** (`types/`). Changes:
+  - `FamilyDef`: drop `threads`; add `grain: number` (size units). `members` keeps its name with the minimum-split meaning.
+  - `TaskRequirementsView`: `threads` becomes `grain`; add `size: number` (units).
+  - `RouterBuild`: drop `placements` and `reserveOnRoute`; add `queueLevel: number` (1–32).
+  - Remove `PlacementId`, the `placement` research effect, the `setPlacement` and `setReserveOnRoute` actions and the `reserveOnRoute` rule.
+  - `RuleId`: add `gather`, `shardSteal`, `stealRoom`. `FilterId`: add `local`. `RouteStrategyId`: add `linkAware`.
+  - New action `{ type: 'upgradeRouterQueue'; unit: ScopeRef }`. New quote request `{ kind: 'routerQueue'; unit: ScopeRef }`, returning one quote: next level, `cost` from `lbQueueStep`, effect `{ slots: L → L+1 }`, locked at 32.
+- **Records.**
+  - The record pool keeps `count = 1` for shards. Rename `gang` → `parent` (i32, −1 for an unsplit task) and add `units: f64`. The record's `payout` is unused for shards; pay comes from the parent row.
+  - The parent pool (was `GANG`) has columns: `taskId f64`, `family u16`, `units f64`, `work f64`, `minShards u16`, `placed u16`, `done u16`, `lostCause u8`, `replaceDeadline i32`, `next i32`.
+  - An unsplit task (`n = 1`) has no parent row.
+- **Router queues.**
+  - `hot.rq`: per router, ring columns `rqTask f64`, `rqParent i32`, `rqUnits f64`, `rqSince i32`, plus `rqHead`/`rqLen` per router.
+  - Router index order: global 0, then sites, zones, racks.
+  - Saved with `hot`. `compiled.<scope>.lbQueueSlots u8` comes from `queueLevel`.
+- **Routing** (`net/`). One `split(router, entry) → SplitTree | null` used for both takes and dispatch:
+  - The candidates are the children with room, after filters.
+  - Then the strategy's shares: equal for `firstFit` and `roundRobin`; proportional for `weighted`, `leastConn` and `linkAware`; water-filled for `leastWork`; one site for `latency` and `price`.
+  - The effective grain and minimum split are enforced, and the share rounding follows spec §7.7.
+  - The tree is reserved atomically. Then one transfer per shard on its path.
+  - The routing step: dispatch the router queues top-down, then take heads (spec §7.6).
+  - Delete `hops.ts`'s `QUEUED_TAKE_TICKS` path and `gang.ts`; their callers move to `split`.
+- **Exec.**
+  - Admission is per shard, and gates are per shard.
+  - Threads at start are `min(free, max(1, floor(units / grain)))`.
+  - On completion: free the shard; `done += 1`. When `done === placed`, the task is met: tally its full `W` and Data once in the ledger tallies, raise one completion event at that system and part, and free the parent row.
+  - On any shard loss, fail the task once with the full `W` and abort its siblings (records, transfers, router-queue shares), unless `checkpointing` re-places the shard.
+- **Static capability** (spec §4.3, §7.8). A task can run when some `k` in `[members, min(capable systems, 256, floor(s / g))]` gives shards of `ceil(s / k)` units that fit the `k`-th largest capable system. It also needs the zone and region conditions.
+- **Tests that matter.** No other unit tests.
+  1. Delta invariance on a 2-rack fixture with splits and router queues, random partitions, including RNG words.
+  2. Owned-vs-pure equivalence on the same fixture.
+  3. A 4-system rack takes a 4,000-unit Parallel task as 4 shards of 1,000, and pays `W` once on the tick the last shard completes, not before.
+  4. One misrouted shard fails the task with its full `W`, pays nothing and frees all its siblings.
+  5. With all systems full, a 1-slot LB queue takes the head (its clock stops) and dispatches it FIFO when a system frees. A full queue leaves the head's clock running.
+  6. A `members = 8` task waits until 8 systems have room, then places all 8 in one step.
+  7. Shard work at 1, 2 and 4 systems: completion time halves per doubling within ±1 tick.
+  8. Save round-trip mid-split.
+  9. `lbQueueStep(1 → 2)` on a rack LB is 379,843 Credits.
+
+  Each new strategy, filter and rule keeps the existing distinct-effect test (architecture §7.4), rewritten for splits.
+- **Snapshot** (`view/`). See the render items below. No quotes in snapshots.
+
+*Render (`src/render/**`):*
+- `TransferView` gains:
+  - `shard: number` (index), `shards: number` (task total) and `units: number`;
+  - `from: NodeRef | null` (null for the market) and `to: NodeRef`;
+  - `key: number`, stable per shard transfer;
+  - `link` adds `'uplink'`.
+  
+  `FeedSnapshot.transfers` stays capped at 16. Each level snapshot instead carries its own flows:
+  - `RackSnapshot.flows: readonly TransferView[]` covers the rack uplink and every port, at most 12 + uplinks × 4.
+  - `RoomSnapshot.flows` covers the zone link and the rack uplinks.
+  - `GlobalSnapshot.flows` covers the data plane and backbone.
+  - `SystemSnapshot.inbound: TransferView | null` covers the system's port.
+- **Split animation.** A task arrives from the top, then visibly splits.
+  - Rack: shards cross the uplink in turn, enter the switch, then fan out over the ports in parallel to their servers.
+  - Room: the zone link, then the rack uplinks.
+  - Global: the data plane, then the zones.
+  - Group transfers by `taskId`. All shards of a take appear in the same tick with the same `taskId` and consecutive `shard` indices. Draw the fork at the router where the shard paths diverge.
+  - No synthetic motion: positions come from `bitsSent / bits`. Shorter than one frame is a landing flash (D12.4).
+- **Inside a system.** `TaskView` gains `taskId`, `shard`, `shards`, `units`, `threads` (held now) and `accelDomain` (exists). Draw one shard entering the board on the port, splitting to the CPU (as `threads` lanes on the CPU mini) and the GPU card for GPU stages.
+- **CPU level.** `CoreView` gains `shard: number | null` and `shardThreads: number`, so the cores running one shard are drawn as one group.
+- **Completion pops.**
+  - `CompletionView` gains `taskId`, `shards` and `work`. It is raised **only when a task is met** (its last shard), at the system, CPU/core or GPU card of that last shard.
+  - `credits` and `data` are the full task payout.
+  - Finished non-final shards raise `ShardDoneView { seq, tick, system, cpu, core, gpu, taskId, shard, tau }` in `RenderSnapshot.shardsDone` (newest 2,048). These are a no-pay "slot freed" tick, never a payout pop.
+- **Router queues.** `LbView` gains `queue: { slots: number; level: number; entries: readonly LbQueueEntryView[] }` with `LbQueueEntryView { taskId, family, units, shard: number | null, sinceTick }`. Draw queued entries in the LB's slot. `LbView.reserveOnRoute` and `placements` are removed.
+
+*UI (`src/ui/**`):*
+- **LB plate and callout.**
+  - Show "Queue L/32" with filled wells for `lb.queue.entries`.
+  - The callout on tapping the LB in its rack or room slot offers "Queue L → L+1", price and Buy, from `quote({ kind: 'routerQueue', unit })`. Use the same stable geometry as other callouts, and show it locked at 32.
+  - Remove the queued-take (reserve) switch and the placement toggles. Add the `local` filter and the `linkAware` strategy to the existing lists.
+- **Queue strip** (`FeedSnapshot.window`).
+  - A head taken into a router queue leaves the window like any taken task. It then shows in the LB's wells, so "taken" reads from the LB, not the strip.
+  - Taken counts include router-queue takes.
+  - The head's clock row reads "In LB queue" for a returned or queued entry only if it is shown in the strip. It never shows a countdown for a taken task.
+- **Task cards.** Show `grain` in place of `threads` ("Grain 64"). Show `members` as "Min split 8". Delete the `gang` icon text; the cluster type icon (D23) stays.
+- **Round report and feed.** `cantRun · gang` no longer exists; `members` names the shortfall ("Can't run · members 8").
+
+**D26, 25 Oct: memory hierarchy, spill and completion windows (user).** Binding. It supersedes D1.1's "cache or RAM" capacity gate, the `virtualMemory` rule, the `storage` stage resource and the storage gates (spec §6.3, §6.10), and the six-cause list of D4.1, which now has seven.
+
+The user's words:
+
+> I think we might need to rethink storage. because cpu cache can overflow to ram and ram can overflow to hard drives. obviously ram has much more storage than cache but its much slower and same with hdd. so a task shouldn't need an hdd but it might require a lot of bits to be sorted / processed which hdds would help do that task sooner but it will take longer to complete of course. gpu ram is seprate until much later when you do reaserch to have unified ram (which can overflow to hdds as well) some tasks later on should have a time frame to co.plete them as well so you can't co tinue to rely on slow hardware
+
+1. **Memory hierarchy with spill.**
+   - A system's memory tiers are cache (Σ L1+L2+L3 over its CPUs), RAM (Σ modules) and disk (Σ drives, plus the rack storage node's free capacity with `sharedStorage`).
+   - At start, a shard's working set (`wsFixed + wsPerUnit × units`) is placed fastest tier first in the system's free capacity. Whatever doesn't fit spills to the next tier. The placement is fixed for the shard's life and released when it completes or is lost.
+   - The only memory gate is the whole hierarchy, cache + RAM + disk. A shard that doesn't fit the free hierarchy waits, skipped and not blocking. Statically, a task the fleet can't hold fails `cantRun`.
+   - **Refined:** the detail names the deepest tier the system has: `cache` (cache only), `RAM` (no drive) or `disk` (the whole hierarchy). This keeps the D20 opening's `Can't run · cache` word exactly. A generic `memory` word would lose the hint about the next purchase.
+   - **Queue cap (lead ruling, implementation):** while a task waits in a system's queue with a running slot free (memory or threads hold it back), the system admits only while queued + reserved < Q, so the queue never holds more than the Q the player bought (spec §6.4).
+   - At boot the only tier is 1 bit of cache. The opening is unchanged: an un-upgraded round 1 ends at 0:48 in the model (the real sim measures 55–67 s), on `Can't run · cache`.
+2. **Spill costs time, never correctness.**
+   - The `ram` stream and `storage` IO stage resources fold into one `mem` resource: bits touched.
+   - At start, a `mem` stage of `M` bits splits by the placement fractions `f_c, f_r, f_d` into parts run in order. The cache part is free. The RAM part, `M f_r` bits, runs at RAM bandwidth, pooled with channels as before. The disk part, `M f_d` bits, runs at disk IO (Σ drives with striping, `ioConcurrency` holds, `ncq`).
+   - So per stage: `time = compute / rate + M f_r / ramRate + M f_d / diskRate`.
+   - **Refined:** cache traffic has no time term. Cache serves at core speed, inside the compute time, and the catalog gives cache no bandwidth. The opening families have no memory traffic, so nothing early changes.
+   - The fractions are frozen at start, so the parts are ordinary stages on the existing RAM and IO clocks: deterministic and delta-invariant.
+   - **Drive IO is re-based** so disk is much slower than RAM. Its L1 rate is 1/16 (HDD, SSD), 1/4 (NVMe) or 1/2 (SCM) of the era's RAM bandwidth: 1, 2,000, 1.6e7 and 6.4e10 bit/s. They were equal to RAM before, which made spill free. These are starting values.
+   - Bits touched still pay 1 Credit each (D2). Where they sit changes only time.
+3. **Storage is data-heavy work.**
+   - No family needs a drive. The old `disk b/u` capacity gates join each family's working set (`wsPerUnit` + old `diskPerUnit`), and the old IO coefficients join its memory traffic.
+   - The `storage` band becomes **data-heavy** work: 8–16 b/u working sets and many bits touched. Big RAM runs it fast. A drive lets a small machine hold it, slowly. A box with neither walls on `Can't run · RAM`.
+   - Spill to disk is base. `virtualMem` becomes **Hot pages** (`hotPages`): a spilled shard's disk traffic is `f_d²` of its memory traffic instead of `f_d`.
+   - `memController`, `storageCtl`, `ssd`, `nvme`, `scm`, `raid0`, `ncq`, `dma`, `prefetch` and `sharedStorage` keep their places with tier text (research doc §10).
+4. **GPU memory is separate.**
+   - GPU stages need their VRAM need (`vramPerUnit × units`) on one compatible domain. VRAM stays a hard gate with no spill.
+   - **`unifiedMemory`** (GHz W14, Acceleration, requires `hbm` and `gpuGen8`) pools VRAM with system RAM and disk. A VRAM need beyond the card's free VRAM is placed in free RAM, then on disk. The GPU stage's `G` ops then add RAM and disk parts of `G × v_r` and `G × v_d` bits, at those tiers' rates.
+   - The tree has 162 nodes.
+5. **Completion windows.**
+   - **Band.** Every family whose window opens at `I ≥ 26` carries a window, starting with `rackDist`; that is the four distributed bands, 18 families. Nothing before Rack does, so the opening and the pre-Rack lessons stay intact.
+   - **Formula.** `deadline = ceil(windowS_f × j / dt)` ticks, where `j` is the task's frozen size jitter and `windowS_f` is 120 s for `rackDist`, 180 s for `roomDist`, 240 s for `multiAz`, 120 s for `region`, and 60 s for Exchange Feed. These are starting values.
+   - **Why constant seconds.** The window scales with task size through `j`. Across intensity, the market's own size scale is the era's reference: a fleet that holds the 10 s head clock at `I` finishes a mean task there in about one take interval. So a fleet that keeps up meets a fixed window, and one that has fallen behind on hardware doesn't.
+   - **Clock.** It runs from take (pickup), router-queue time included. A task not met by the end of tick `takeTick + deadline − 1` fails `late`, with its full `W` in the SLA and no pay. Its shards and router-queue shares are aborted. Under D25 the window covers the whole task, up to its last shard.
+   - **Detail.** `late` takes `disk` or `RAM`: the slowest tier its shards' traffic touched.
+   - **Cards.** They show the window ("done in 2 min"); a taken task shows its time left.
+   - **Window size: why 2× the first draft.** At 60 / 90 / 120 / 60 s, the D25.11 floor's smaller shards queued behind full K+Q system queues, and even well-built split fleets went flat (peak about 30.4 at every size). We tested two fixes, measuring from the first shard's start and doubling the windows, and both restored D25.10's scaling. We kept "from take", as recommended, and doubled the windows.
+6. **It works with D25.**
+   - Size-scaling gates are per shard, so a wider split shrinks each shard's working set: it spills less and runs faster.
+   - D25.11 item 2 (the floor never cuts below the no-disk split) keeps that true under the floor.
+   - In the model, splitting cuts disk work from 66–72% to 18–23% on a small-RAM fleet, and income rises up to 2.7× at 288 systems. More systems also means more fast memory: the second reason fleets matter.
+7. **What the player sees.**
+   - The System and CPU views show the tiers filling: cache, then RAM, then disk, with spilled bits hatched.
+   - A running shard shows where its data sits and which tier its current memory part is on.
+   - Cards show "Done in 2 min"; taken tasks count down.
+   - The round report counts `late` with its detail, and the share of work that ran from RAM and from disk.
+8. **Model check** (`docs/tasks.md` §9, D26 run; `npx tsx scripts/market-model.ts --memory`, `--fleet`, `--horizon=100`).
+   - **Opening:** unchanged.
+   - **D19 milestones:** in band. System 0:54, Rack 6:51, Room 2 d 13 h, Data center 9 d 18 h, Regions 18 d 8 h, every data center 86 d 20 h.
+   - **Spill against fast memory** (one rack): 3.5e10 against 1.0e11 Credits per round. With an HDD-speed drive, 4.8e9.
+   - **Windows force upgrades:**
+     - an under-levelled room loses 1.2 `I` and its rounds end on `Late`;
+     - whole tasks go flat at about 31 `I` with thousands of `Late` per round;
+     - a well-built split fleet loses about 0.6 `I`.
+   - **D25.10 scaling holds** with the floor and windows: 32.4 → 37.5 peak `I`, and ×65 income from 1 rack to 3 rooms.
+
+**Implementation contract (D26).** Three owners work in parallel. The names are binding. Bump `SAVE_VERSION` by one with a pre-live reset, after D25's bump.
+
+*Sim (`src/game/**`):*
+- **Types.**
+  - `Resource = 'compute' | 'mem' | 'gpu'`; `ram` and `storage` are removed. `MemTier = 'cache' | 'ram' | 'disk'`.
+  - `FamilyDef`: drop `diskPerUnit` and the `storage` stage (fold both per `docs/tasks.md` §5). Add `windowS: number | null`.
+  - `TaskInstance` / descriptor: add `deadline: number | null` (ticks, frozen at draw) and `takeTick: number | null`.
+  - `FailCause` adds `'late'`. `FailDetail` adds `'disk'` and drops `'storage'`.
+  - `RuleId`: `virtualMemory` becomes `hotPages`; add `unifiedMemory`.
+  - `RoundReport` gains `spill: { ramWork: number; diskWork: number }`: the `W` of met tasks weighted by RAM and disk traffic share.
+- **Catalog.** Drive IO bases are 1, 2,000, 1.6e7 and 6.4e10 bit/s.
+- **Exec.**
+  - Hot per system: `usedDisk`.
+  - Record columns `memC`, `memR`, `memD` (f64), written at start by fastest-first placement and released once.
+  - Expand `mem` stages into RAM and disk parts at start (the cache part is skipped). `hotPages` uses the `f_d²` traffic split.
+  - With `unifiedMemory`, place VRAM overflow and append the parts after the GPU stage.
+  - The static capability check uses the hierarchy (spec §6.3).
+- **Net.** Extend `floorShards` / `split` (`src/game/net/floor.ts`) with the D25.11 item 2 `nNoDisk` term. It uses the target's cache + RAM and `Keff` from the same per-router memo as `r`, taking the subtree's smallest value.
+- **Market.**
+  - Draw `deadline` from `windowS × j`.
+  - Set `takeTick` on split or router-queue take; router-queue entries keep it.
+  - The deadlines phase pops a 4,096-bucket ring of parent IDs (architecture §1.4) and fails unmet tasks `late`, aborting siblings and router-queue shares.
+- **Tests that matter.** No other unit tests.
+  1. Delta invariance and owned-vs-pure on a small-RAM spill fixture with windows, under random partitions, including RNG words.
+  2. Boot round 1 with no purchases ends on `Can't run · cache` within 45–75 s.
+  3. A shard whose working set is 2× RAM on a box with a drive runs its `mem` stage in `M/2 / ramRate + M/2 / diskRate` (±1 tick). The same box without a drive gets `Can't run · RAM`.
+  4. Splitting a spilling task over 4 systems with room removes its disk part entirely: each shard fits cache + RAM.
+  5. A task not met by `takeTick + deadline − 1` fails `late` with its full `W`, pays nothing and frees all its shards. Time in a router queue counts.
+  6. With `unifiedMemory`, a VRAM need 2× the card runs. Without it, it is `cantRun · VRAM`.
+  7. Save round-trip mid-spill.
+
+*Render (`src/render/**`):*
+- `SystemSnapshot.memory: { tiers: readonly MemTierView[] }` with `MemTierView { tier: MemTier; capacityBits: number; usedBits: number; spilledBits: number; rateBits: number | null }`. `spilledBits` counts bits that sit in this tier because they didn't fit a faster one. `rateBits` is null for cache. Draw the three bars filling cache → RAM → disk with spilled bits hatched.
+- `ChipSnapshot.cache` gains `spilledOutBits`: bits of running shards that didn't fit cache.
+- `TaskView` gains:
+  - `placement: { cache: number; ram: number; disk: number }` (bits);
+  - `memTier: MemTier | null` (the tier its current `mem` part runs on);
+  - `windowEndTick: number | null` (`takeTick + deadline − 1`).
+
+  Draw the shard's data where it sits, and a traffic light on the tier it is reading now, at the real rate.
+- GPU `PartView` gains `unifiedSpillBits`.
+- Every light and animation is real state at its real rate. Spill hatching is state, not decoration.
+
+*UI (`src/ui/**`):*
+- **Cards.** Queue cards for families with a window show "Done in 2 min" (`windowS × j`). Taken tasks show the time left, in the LB queue wells and in the running/now card, and turn warning at 25% left. Requirements show "Memory 2.1 Mb" (the working set), never "storage". Stable geometry.
+- **Failures.** `Late` and `Late · disk` / `Late · RAM` in the feed. `Can't run · disk` is the new hierarchy word.
+- **Report and plates.**
+  - The round report shows the late count and "From disk: 18% of work".
+  - The system plate gets a memory row: three tier bars with capacity, use and spill. The drive plate shows IO as "spill speed".
+  - The research view shows `hotPages` and `unifiedMemory` with their effects.
+
 ## 16. Shared rules for agents
 
 - **Shared checkout.** Other agents work in the same checkout at the same time. Edit only the files your brief gives you. Never revert someone else's edits. Run no git command that changes state.

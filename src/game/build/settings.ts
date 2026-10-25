@@ -1,12 +1,14 @@
 import type { BuildState, RouterBuild, SystemSettings } from '../types/build';
-import { QUEUE_STRATEGY_IDS, type FilterId, type PlacementId, type QueueStrategyId, type RouteStrategyId } from '../types/catalog';
+import { QUEUE_STRATEGY_IDS, type FilterId, type QueueStrategyId, type RouteStrategyId } from '../types/catalog';
 import type { PartRef, RackId, RoomId, ScopeRef, SystemId } from '../types/ids';
 import type { GameState } from '../types/state';
+import { ROUTER_QUEUE_MAX } from '../core/constants';
+import { lbQueueStep } from './catalog/network';
 import { optionLock, ruleLock } from './locks';
 import { withSpec } from './partAccess';
 import { fail, locked, planned, type Plan } from './plan';
 
-/* Strategy, filter, placement, setpoint and switch changes are hot and free (program D1.6, spec §4.5). */
+/* Strategy, filter, setpoint and switch changes are hot and free (program D1.6, spec §4.5). */
 
 export const SETPOINT_MIN_F = 55;
 export const SETPOINT_MAX_F = 80;
@@ -57,16 +59,15 @@ export function planFilter(state: GameState, unit: ScopeRef, filter: FilterId, o
   return editRouter(state, unit, (lb) => ({ ...lb, filters: toggle(lb.filters, filter, on) }), filter);
 }
 
-export function planPlacement(state: GameState, unit: ScopeRef, mode: PlacementId, on: boolean): Plan {
-  const lock = on ? optionLock(state.research.unlocks, mode, 'placement') : null;
-  if (lock) return locked(lock, mode, 0n);
-  return editRouter(state, unit, (lb) => ({ ...lb, placements: toggle(lb.placements, mode, on) }), mode);
-}
-
-export function planReserveOnRoute(state: GameState, unit: ScopeRef, on: boolean): Plan {
-  const lock = on ? ruleLock(state.research.unlocks, 'reserveOnRoute') : null;
-  if (lock) return locked(lock, 'Reserve on route', 0n);
-  return editRouter(state, unit, (lb) => ({ ...lb, reserveOnRoute: on }), 'Reserve on route');
+/** D25.7: the router's queue one slot larger, L → L + 1 (at most 32). Hot; never research-gated (spec §12.7). */
+export function planRouterQueue(state: GameState, unit: ScopeRef): Plan {
+  const lb = routerOf(state.build, unit);
+  if (!lb || unit.kind === 'system') return fail('invalid', 'No router here');
+  const level = lb.queueLevel;
+  const label = `Queue ${level} → ${level + 1}`;
+  if (level >= ROUTER_QUEUE_MAX) return fail('cap', `Queue at ${ROUTER_QUEUE_MAX}/${ROUTER_QUEUE_MAX}`, `Queue ${level}`);
+  const price = lbQueueStep(unit.kind, level);
+  return planned({ build: withRouter(state.build, unit, { ...lb, queueLevel: level + 1 }), price }, label);
 }
 
 /** Cooler setpoint, 55–80 °F, with rackSetpoint / roomSetpoint (spec §10.5). */

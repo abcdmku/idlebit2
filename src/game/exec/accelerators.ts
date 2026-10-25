@@ -1,4 +1,4 @@
-import { accelNeed, chooseAccel, type AccelChoice } from '../core/accelerators';
+import { accelNeed, readAccelDomain, type AccelChoice } from '../core/accelerators';
 import { ACCEL_CLOCKS, ACCEL_DOMAINS, MAX_ACCELS, POOL_DOMAIN } from '../core/constants';
 import { dirtySystem } from '../core/touch';
 import type { World } from '../core/world';
@@ -6,6 +6,12 @@ import { sortedInsert, sortedUnlink } from './lists';
 import { taskShare } from './research';
 import { GPU, NRES, shapeOf } from './shape';
 import { runsTasks } from './slots';
+
+/** Free VRAM on domain d of system s. */
+function readFree(w: World, s: number, d: number): number {
+  const dom = readAccelDomain(w.compiled, s, d);
+  return dom ? dom.vramBits - w.hot.sys.accelUsedVram[s * ACCEL_DOMAINS + d]! : 0;
+}
 
 export const accelClockIndex = (s: number, domain: number, tensor: boolean): number => s * ACCEL_CLOCKS + 2 * domain + Number(tensor);
 export const recordAccelClock = (w: World, s: number, r: number): number =>
@@ -106,20 +112,24 @@ export function removeAccelStage(w: World, s: number, r: number, e: number): voi
   anchorAccelDomain(w, s, w.hot.rec.accelDomain[r]!, e);
 }
 
-/** Reserve the selected physical card/pool for the record's entire lifetime. */
+/** VRAM one task of record r holds on its card: its need less any unified-memory overflow (D26.4). */
+export const heldVram = (w: World, r: number): number =>
+  Math.max(0, accelNeed(shapeOf(w.hot.rec.family[r]!).def, w.hot.rec.units[r]!).vramBits - w.hot.rec.vramR[r]! - w.hot.rec.vramD[r]!);
+
+/** Reserve the selected physical card/pool for the record's entire lifetime (before its memory is placed). */
 export function holdAccel(w: World, s: number, r: number, choice: AccelChoice): void {
   const rec = w.hot.rec, h = w.hot.sys, k = rec.count[r]!;
-  const need = accelNeed(shapeOf(rec.family[r]!).def, rec.scale[r]!);
+  const need = accelNeed(shapeOf(rec.family[r]!).def, rec.units[r]!);
   if (!need.required) return;
-  const valid = chooseAccel(w.compiled, w.hot, s, need, k);
-  if (rec.accelDomain[r] !== -1 || !valid || valid.domain !== choice.domain || valid.take < k || choice.take < k) {
+  const free = Math.max(0, readFree(w, s, choice.domain));
+  if (rec.accelDomain[r] !== -1 || choice.take < k || choice.held * k > free + 1e-9 || (choice.held < need.vramBits && k !== 1)) {
     throw new Error('holdAccel: invalid accelerator reservation');
   }
   const i = s * ACCEL_DOMAINS + choice.domain;
   rec.accelDomain[r] = choice.domain;
   h.accelHolders[i] = h.accelHolders[i]! + k;
-  h.accelUsedVram[i] = h.accelUsedVram[i]! + k * need.vramBits;
-  h.usedVram[s] = h.usedVram[s]! + k * need.vramBits;
+  h.accelUsedVram[i] = h.accelUsedVram[i]! + k * choice.held;
+  h.usedVram[s] = h.usedVram[s]! + k * choice.held;
   dirtySystem(w, s);
 }
 
@@ -128,7 +138,7 @@ export function releaseAccel(w: World, s: number, r: number): void {
   const rec = w.hot.rec, h = w.hot.sys, domain = rec.accelDomain[r]!;
   if (domain < 0) return;
   const i = s * ACCEL_DOMAINS + domain, k = rec.count[r]!;
-  const bits = accelNeed(shapeOf(rec.family[r]!).def, rec.scale[r]!).vramBits * k;
+  const bits = heldVram(w, r) * k;
   h.accelHolders[i] = h.accelHolders[i]! - k;
   h.accelUsedVram[i] = h.accelHolders[i] === 0 ? 0 : h.accelUsedVram[i]! - bits;
   rec.accelDomain[r] = -1;

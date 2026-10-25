@@ -4,6 +4,7 @@ import type { RackSnapshot } from '../types/snapshot';
 import type { GameState } from '../types/state';
 import type { ServerSlotView, SwitchView } from '../types/views';
 import { containerMode, coolerView, lbView, modeName, probeTimerS, rackProbe, rackSurroundF, siteEnergyPrice, supplyView, switchPorts, systemCoreActivity, systemLoad, systemTimerS, ticksToS } from './common';
+import { rackFlows } from './flows';
 import { rackSlot } from './room';
 import { forEachRunning } from './tasks';
 
@@ -88,8 +89,9 @@ export function rackSnapshot(state: GameState, id: RackId, parent: NodeRef | nul
       capacityW: c.pduCapW[id] ?? 0, usage: h.pduUsage[id] ?? 0, overTicks: h.pduOverTicks[id] ?? 0, failed,
       rebootTicks: h.pduRebootTicks[id] ?? 0, loss: c.pduLoss[id] ?? 0, capSwitch: (c.pduCapSwitch[id] ?? 0) === 1 && b.pdu.capped, capFactor: 1,
     }, siteEnergyPrice(state, state.compiled.room.site[c.room[id] ?? 0] ?? 0)),
-    lb: lbView(b.lb, { strategy: c.lbStrategy[id] ?? 0, filters: c.lbFilters[id] ?? 0, placements: c.lbPlacements[id] ?? 0, reserve: c.reserveOnRoute[id] ?? 0, routed: h.lbRouted[id] ?? 0, last: h.lbLast[id] ?? -1 }),
+    lb: lbView(state, b.lb, { kind: 0, id, strategy: c.lbStrategy[id] ?? 0, filters: c.lbFilters[id] ?? 0, routed: h.lbRouted[id] ?? 0, last: h.lbLast[id] ?? -1 }),
     switch: sw, servers,
     saveable: state.research.unlocks.rules.includes('configSave'),
+    flows: rackFlows(state, id),
   };
 }

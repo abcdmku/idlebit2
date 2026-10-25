@@ -5,7 +5,7 @@ import type { GpuGeneration, GpuStats } from './gpu';
 
 export type QuoteRequest =
   | { readonly kind: 'gpuModels'; readonly system: SystemId; readonly index: number | null; readonly generation: GpuGeneration }
-  /** The 4 tray items for the visible level. */
+  /** The 4 primary tray items, followed by per-core upgrade quotes at chip level. */
   | { readonly kind: 'tray'; readonly at: NodeRef }
   /** Upgrade, replace options, add/remove for one part. */
   | { readonly kind: 'part'; readonly part: PartRef }
@@ -23,7 +23,12 @@ export type QuoteRequest =
    * rack's slowest uplink; room: the room's slowest uplink; global: the cheapest backbone step.
    * Empty when the level has no such link.
    */
-  | { readonly kind: 'inbound'; readonly at: NodeRef };
+  | { readonly kind: 'inbound'; readonly at: NodeRef }
+  /**
+   * D25.7: the router's queue, one quote: `upgradeRouterQueue` to the next level, cost
+   * lbQueueStep(L → L + 1), effect `slots` L → L + 1; locked (code 'cap') at 32.
+   */
+  | { readonly kind: 'routerQueue'; readonly unit: ScopeRef };
 
 export type Currency = 'credits' | 'data';
 export type LockCode = 'research' | 'ceiling' | 'cap' | 'fit' | 'roundState' | 'occupied';
@@ -34,7 +39,7 @@ export interface LockReason {
   /** Short copy, e.g. "Needs Rack water". */
   readonly text: string;
 }
-export type CapacityUnit = 'ops/s' | 'bits' | 'bit/s' | 'W' | 'tasks/s' | 'lanes' | 'slots' | 'ports' | 'ops';
+export type CapacityUnit = 'ops/s' | 'bits' | 'bit/s' | 'Hz' | 'W' | 'tasks/s' | 'lanes' | 'slots' | 'ports' | 'ops';
 export interface EffectPreview {
   readonly capacityBefore: number;
   readonly capacityAfter: number;

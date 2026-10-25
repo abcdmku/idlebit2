@@ -16,7 +16,7 @@ import { researchLock } from './research/actions';
 import { researchDef } from './research/tree';
 import { addQuotes } from './quotesAdd';
 import { backboneOptions, trayQuotes } from './quotesTray';
-import { planFilter, planSetpoint, planStrategy } from './settings';
+import { planFilter, planRouterQueue, planSetpoint, planStrategy } from './settings';
 import { GPU_MODEL_IDS, gpuModel } from './catalog/gpuModels';
 import { installedGpuStats } from './gpu';
 import { planInstallGpu } from './gpuPlans';
@@ -42,6 +42,29 @@ function quotesFor(state: GameState, r: QuoteRequest): Quote[] {
     case 'research': return [researchQuote(state, r.project)];
     case 'pipe': return pipeQuotes(state, r.system);
     case 'inbound': return inboundQuotes(state, r.at);
+    case 'routerQueue': return routerQueueQuotes(state, r.unit);
+  }
+}
+
+/** D25.7: the router queue's next level, effect `slots` L → L + 1; locked ('cap') at 32. */
+function routerQueueQuotes(state: GameState, unit: ScopeRef): Quote[] {
+  const plan = planRouterQueue(state, unit);
+  if (!plan.ok && plan.code === 'invalid') return [];
+  const level = routerQueueLevel(state, unit);
+  const effect: EffectPreview = {
+    capacityBefore: level, capacityAfter: plan.ok ? level + 1 : level, unit: 'slots',
+    wattsBefore: 0, wattsAfter: 0, energyPerMinuteDelta: amount('0'), paybackS: null,
+  };
+  return [toQuote(state, { type: 'upgradeRouterQueue', unit }, plan, effect)];
+}
+function routerQueueLevel(state: GameState, unit: ScopeRef): number {
+  const b = state.build;
+  switch (unit.kind) {
+    case 'rack': return b.racks[unit.id]?.lb.queueLevel ?? 1;
+    case 'room': return b.rooms[unit.id]?.lb.queueLevel ?? 1;
+    case 'site': return b.sites[unit.id]?.dataPlane.router.queueLevel ?? 1;
+    case 'global': return b.global.scheduler?.queueLevel ?? 1;
+    default: return 1;
   }
 }
 

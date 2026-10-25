@@ -1,4 +1,4 @@
-import type { CeilingId, FilterId, PartId, PlacementId, ResearchDef, RuleId, StrategyId } from '../../types/catalog';
+import type { CeilingId, FilterId, PartId, ResearchDef, RuleId, StrategyId } from '../../types/catalog';
 import { researchId, type ResearchId } from '../../types/ids';
 import { TREE_ROWS, WORK_TIER_OPS, RESEARCH_CREDITS } from './tree.data';
 import { amount } from '../../amount';
@@ -32,7 +32,7 @@ for (const node of RESEARCH) {
   for (const e of node.effects) {
     if (e.kind === 'gen' && !genNode.has(`${e.part}:${e.gen}`)) genNode.set(`${e.part}:${e.gen}`, node);
     else if (e.kind === 'rule' && !ruleNode.has(e.id)) ruleNode.set(e.id, node);
-    else if ((e.kind === 'strategy' || e.kind === 'filter' || e.kind === 'placement') && !optionNode.has(e.id)) optionNode.set(e.id, node);
+    else if ((e.kind === 'strategy' || e.kind === 'filter') && !optionNode.has(e.id)) optionNode.set(e.id, node);
     else if (e.kind === 'ceiling') {
       const list = ceilingNodes.get(e.key) ?? [];
       list.push({ value: e.value, node });
@@ -44,7 +44,7 @@ for (const list of ceilingNodes.values()) list.sort((a, b) => a.value - b.value)
 
 export const nodeForGen = (part: PartId, gen: number): ResearchDef | null => genNode.get(`${part}:${gen}`) ?? null;
 export const nodeForRule = (rule: RuleId): ResearchDef | null => ruleNode.get(rule) ?? null;
-export const nodeForOption = (id: StrategyId | FilterId | PlacementId): ResearchDef | null => optionNode.get(id) ?? null;
+export const nodeForOption = (id: StrategyId | FilterId): ResearchDef | null => optionNode.get(id) ?? null;
 /** The first node whose ceiling effect reaches `value`. */
 export const nodeForCeiling = (key: CeilingId, value: number): ResearchDef | null =>
   ceilingNodes.get(key)?.find((c) => c.value >= value)?.node ?? null;

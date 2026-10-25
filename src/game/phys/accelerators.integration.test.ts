@@ -20,8 +20,8 @@ vi.mock('../market/families', async (original) => {
   const families: FamilyDef[] = [false, true].map((tensor, id) => ({
     id: familyId(id), key: `phys-${id}`, name: `phys-${id}`, band: 'bits', note: '',
     window: { from: 0, to: 0 }, weight: 0, stages: [{ resource: 'gpu', work: { fixed: 0, perSize: 1 } }],
-    threads: 1, workingSet: { fixed: 0, perSize: 0 }, vramBits: { fixed: 50, perSize: 0 },
-    storageBits: { fixed: 0, perSize: 0 }, payloadBits: { fixed: 0, perSize: 0 },
+    grain: 2 ** 40, threads: 1, workingSet: { fixed: 0, perSize: 0 }, vramBits: { fixed: 50, perSize: 0 },
+    windowS: null, payloadBits: { fixed: 0, perSize: 0 },
     members: 1, minZones: 1, region: { kind: 'any' }, tensor, ecc: false,
     gpuCoresMin: tensor ? 0 : 2, affinity: 'accelerator', dataRatio: 10,
   }));

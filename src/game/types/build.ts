@@ -1,4 +1,4 @@
-import type { FilterId, PlacementId, QueueStrategyId, RegionId, RouteStrategyId } from './catalog';
+import type { FilterId, QueueStrategyId, RegionId, RouteStrategyId } from './catalog';
 import type { RackId, RoomId, SiteId, SystemId } from './ids';
 import type { AccelBuild } from './gpu';
 export type { AccelBuild, GpuBuild, NpuBuild } from './gpu';
@@ -66,8 +66,8 @@ export interface SystemBuild {
 export interface RouterBuild extends PartLevel {
   readonly strategy: RouteStrategyId;
   readonly filters: readonly FilterId[];
-  readonly placements: readonly PlacementId[];
-  readonly reserveOnRoute: boolean;
+  /** D25.7: router queue slots, 1–32 (`upgradeRouterQueue`, one slot per level). */
+  readonly queueLevel: number;
 }
 export interface SwitchBuild {
   readonly gen: number;

@@ -3,17 +3,17 @@
 // The view scrolls along the row (row.ts, rackRowScroll); the camera rests on the active rack.
 // Inside the active rack: four infrastructure slots (cooling roof, switch, load balancer, PDU)
 // and up to twelve servers; tap a server and its sled slides out into the System board.
-import { P, R, copyRect, px, setRect } from '../../core';
+import { P, R, copyRect, partVersionOf, px, setRect } from '../../core';
 import type { LevelRegistry, LevelRenderer, Rect } from '../../core';
 import { createFanBank } from './art';
 import { CAB_RECT, FOCUS, PLINTH, ROW_W, U0, UP_X, WORLD, colX, serverRect } from './layout';
 import { drawRackMini } from './mini';
 import { rackCol, rackRowScroll } from './row';
-import { rackChildren, rackTargets, rackUnitAnchor } from './targets';
+import { rackChildren, rackTargets, rackPayoutAnchor, rackShardAnchor } from './targets';
 import { drawRow } from './world';
 import { rackDark } from './sprites';
 
-export { rackRowScroll, clampScroll, createRowScroll } from './row';
+export { rackRowScroll, clampScroll, createRowScroll, snapScroll } from './row';
 export type { RackRowScroll } from './row';
 
 function icon(g: CanvasRenderingContext2D): void {
@@ -31,10 +31,12 @@ export function createRackRenderer(registry: LevelRegistry): LevelRenderer<'rack
     id: 'rack', name: 'Rack',
     size: (_s, out) => setRect(out, 0, 0, ROW_W, WORLD.h),
     /** The active rack, shifted by the row scroll (clamped to the row's built racks). */
-    focus(s, _vp, out) {
-      copyRect(FOCUS, out); out.x += colX(rackCol(s)) + rackRowScroll.apply(s);
+    focus(s, _vp, out, _form, area) {
+      copyRect(FOCUS, out); out.x += colX(rackCol(s)) + rackRowScroll.apply(s, area);
       return out;
     },
+    /** The row snaps, and a tapped neighbour settles, in 0.15 s (A06). */
+    restEaseS: () => 0.15,
     /** The pipe enters at the active rack's ceiling uplink (L2 D17: x 120, y 0). */
     entry(s, out) { out.x = colX(rackCol(s)) + UP_X; out.y = 0; return out; },
     /** The camera tracks a drag or wheel along the row live. */
@@ -43,7 +45,18 @@ export function createRackRenderer(registry: LevelRegistry): LevelRenderer<'rack
     drawMini: (g, v, rect, frame) => drawRackMini(g, v, rect, frame.paused),
     children: rackChildren,
     targets: (s, _view, out, from) => rackTargets(s, out, from),
-    unitAnchor: rackUnitAnchor,
+    payoutAnchor: rackPayoutAnchor,
+    shardAnchor: rackShardAnchor,
+    /** Purchase flash (A10): cooler, PDU, balancer and switch generations and levels. */
+    partVersion(s, id) {
+      switch (id) {
+        case 'cooler': return partVersionOf(s.cooler);
+        case 'pdu': case 'plinth': return partVersionOf(s.pdu);
+        case 'lb': return partVersionOf(s.lb);
+        case 'switch': return partVersionOf(s.switch);
+        default: return null;
+      }
+    },
     faults(s, out: Rect[]) {
       const ax = colX(rackCol(s));
       let n = 0;

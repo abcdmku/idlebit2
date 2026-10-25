@@ -4,6 +4,7 @@ import { rackId, roomId, siteId, type NodeRef, type RoomId } from '../types/ids'
 import type { RoomSnapshot } from '../types/snapshot';
 import type { GameState } from '../types/state';
 import type { RackSlotView, SupplyView } from '../types/views';
+import { roomFlows } from './flows';
 import { containerMode, coolerView, lbView, outsideF, probeTimerS, rackProbe, roomProbe, siteEnergyPrice, supplyView, switchPorts, systemLoad, ticksToS } from './common';
 
 /** One rack in a room grid slot: mode, load, °F, PDU usage and its 12 server mode codes. */
@@ -70,9 +71,10 @@ export function roomSnapshot(state: GameState, id: RoomId, parent: NodeRef | nul
     ups: roomUps(state, id),
     network: {
       switch: { generation: b.switch.gen, topHz, sameSpeed: b.switch.sameSpeed, portCeiling: state.research.unlocks.ceilings.roomPorts, ports, uplinks },
-      lb: lbView(b.lb, { strategy: c.lbStrategy[id] ?? 0, filters: c.lbFilters[id] ?? 0, placements: c.lbPlacements[id] ?? 0, reserve: c.reserveOnRoute[id] ?? 0, routed: h.lbRouted[id] ?? 0, last: h.lbLast[id] ?? -1 }),
+      lb: lbView(state, b.lb, { kind: 1, id, strategy: c.lbStrategy[id] ?? 0, filters: c.lbFilters[id] ?? 0, routed: h.lbRouted[id] ?? 0, last: h.lbLast[id] ?? -1 }),
     },
     rows, maxRows: state.research.unlocks.ceilings.roomRows, racks,
     saveable: state.research.unlocks.rules.includes('configSave'),
+    flows: roomFlows(state, id),
   };
 }

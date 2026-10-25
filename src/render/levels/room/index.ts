@@ -8,7 +8,8 @@ import { MINI_SIZE, drawRoomMini } from './mini';
 import { roomChildren, roomTargets } from './targets';
 import { drawWorld } from './world';
 import { roomPowered } from './state';
-import { COLS, GATEWAY, IY, RACK_RECTS, UPS_HITS, WORLD_W, WORLD_X, focusRect, hallOf, worldH } from './layout';
+import { roomLabels } from './labels';
+import { COLS, GATEWAY, IY, RACK_RECTS, ROW_PITCH, UPS_HITS, WORLD_W, WORLD_X, focusRect, hallOf, worldH } from './layout';
 
 
 function icon(g: CanvasRenderingContext2D): void {
@@ -32,6 +33,26 @@ export function createRoomRenderer(registry: LevelRegistry): LevelRenderer<'room
     /** The World's tile shows the two-row hall, so World ↔ Room lands the hall on it. */
     miniRect: (_s, out) => copyRect(MINI_SIZE, out),
     children: roomChildren,
+    labels: (s, _view, frame, out) => roomLabels(s, frame, out),
+    /** A payout pops just above the rack that ran it (A20); the key is its room slot. */
+    payoutAnchor(s, c, out) {
+      if (c.rack === null || c.rack === undefined) return -1;
+      for (let i = 0; i < Math.min(s.racks.length, s.rows * COLS); i++) if (s.racks[i].rackId === c.rack) {
+        const r = RACK_RECTS[i];
+        setRect(out, r.x, r.y - 6, r.w, 0); return i;
+      }
+      return -1;
+    },
+    /** One pop per rack per second (A20). */
+    popWindowMs: () => 1000,
+    /** A hall too tall for the view rests on the row of the rack the player came from (or the home rack), and pans by rows. */
+    restCentre(s, out, hint) {
+      if (hint?.level !== 'rack') return;
+      for (let i = 0; i < Math.min(s.racks.length, s.rows * COLS); i++) if (s.racks[i].rackId === hint.id) {
+        const r = RACK_RECTS[i]; out.y = r.y + (r.h >> 1); return;
+      }
+    },
+    panSnap: () => ({ x: 0, y: ROW_PITCH }),
     targets: (s, _view, out, from) => roomTargets(s, out, from),
     faults(s, out: Rect[]) {
       let n = 0;

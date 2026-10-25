@@ -1,14 +1,15 @@
 import { readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { EFFECT_TEXT, SHORT_TEXT } from './tree.text';
 
 /**
- * Keeps the generated reference research files in step with docs/research.md (§9 appendix, §5 effect
- * column). On drift this test fails; regenerate with:
+ * Keeps research mechanics in step with docs/research.md (§9 appendix). Player copy is authored
+ * separately in tree.text.ts; regeneration must never replace it with technical spec prose.
+ * On mechanical drift this test fails; regenerate with:
  *   WRITE_TREE=1 npx vitest run src/game/build/research/tree.sync.test.ts
  */
 const DOC = join(__dirname, '../../../../docs/research.md');
 const DATA_FILE = join(__dirname, 'tree.data.ts');
-const TEXT_FILE = join(__dirname, 'tree.text.ts');
 
 const doc = readFileSync(DOC, 'utf8');
 const appendix = doc.slice(doc.indexOf('## 9. Machine-readable appendix'));
@@ -33,7 +34,7 @@ for (const line of treeSection.split('\n')) {
 const HEADER = '// GENERATED from docs/research.md by tree.sync.test.ts (WRITE_TREE=1). Do not edit by hand.';
 
 const dataSource = `${HEADER}
-import type { CeilingId, FilterId, PartId, PlacementId, ResearchEffect, RuleId, Scope, StrategyId, WorkTier } from '../../types/catalog';
+import type { CeilingId, FilterId, PartId, ResearchEffect, RuleId, Scope, StrategyId, WorkTier } from '../../types/catalog';
 import type { LevelId } from '../../types/ids';
 import type { TreeRow } from './treeRow';
 
@@ -47,7 +48,6 @@ const gen = (part: PartId, g: number): ResearchEffect => ({ kind: 'gen', part, g
 const cap = (key: CeilingId, value: number): ResearchEffect => ({ kind: 'ceiling', key, value });
 const strat = (scope: Scope, id: StrategyId): ResearchEffect => ({ kind: 'strategy', scope, id });
 const filt = (scope: Scope, id: FilterId): ResearchEffect => ({ kind: 'filter', scope, id });
-const place = (scope: Scope, id: PlacementId): ResearchEffect => ({ kind: 'placement', scope, id });
 const view = (level: LevelId): ResearchEffect => ({ kind: 'view', level });
 /** Reference rule ids may precede runtime RULE_IDS; tree.ts applies deferred hardware overrides. */
 const rule = (id: RuleId | (string & {}), params?: Record<string, number>): ResearchEffect => (params ? { kind: 'rule', id: id as RuleId, params } : { kind: 'rule', id: id as RuleId });
@@ -59,24 +59,11 @@ ${nodeLines.join('\n')}
 ];
 `;
 
-const textSource = `${HEADER}
-/** One-line effect per node, from the Effect column of docs/research.md §5. */
-export const EFFECT_TEXT: Readonly<Record<string, string>> = {
-${[...effectText].map(([id, text]) => `  ${id}: ${JSON.stringify(text)},`).join('\n')}
-};
-
-/** R45: the short effect line, at most about 40 characters, from the Short column of §5. */
-export const SHORT_TEXT: Readonly<Record<string, string>> = {
-${[...shortText].map(([id, text]) => `  ${id}: ${JSON.stringify(text)},`).join('\n')}
-};
-`;
-
 const read = (file: string) => { try { return readFileSync(file, 'utf8'); } catch { return ''; } };
 
 describe('research tree sync with docs/research.md', () => {
   if (process.env.WRITE_TREE === '1') {
     writeFileSync(DATA_FILE, dataSource);
-    writeFileSync(TEXT_FILE, textSource);
   }
   it('finds 162 nodes in the appendix', () => expect(nodeLines.length).toBe(162));
   it('has an effect line for every node', () => {
@@ -88,5 +75,15 @@ describe('research tree sync with docs/research.md', () => {
     expect(ids.filter((id) => !shortText.get(id) || shortText.get(id)!.length > 40)).toEqual([]);
   });
   it('tree.data.ts matches the doc', () => expect(read(DATA_FILE)).toBe(dataSource));
-  it('tree.text.ts matches the doc', () => expect(read(TEXT_FILE)).toBe(textSource));
+  it('keeps player descriptions for every authored node without exposing design notation', () => {
+    const ids = nodeLines.map(line => line.match(/n\("([^"]+)"/)![1]!);
+    expect(Object.keys(EFFECT_TEXT).sort()).toEqual([...ids].sort());
+    expect(Object.keys(SHORT_TEXT).sort()).toEqual([...ids].sort());
+    for (const id of ids) {
+      expect(EFFECT_TEXT[id]).toMatch(/^[A-Z][^.!?]*\.$/);
+      expect(EFFECT_TEXT[id]).not.toMatch(/[^\x20-\x7e]|[=+*/<>\x60]|\bD\d+\./);
+      expect(SHORT_TEXT[id]).toMatch(/^[A-Z][^.!?]*\.$/);
+      expect(SHORT_TEXT[id]!.length).toBeLessThanOrEqual(40);
+    }
+  });
 });

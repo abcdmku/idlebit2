@@ -1,6 +1,7 @@
 import { G } from '../core/buffers';
 import { RATE_RING_TICKS, SLA_THRESHOLD } from '../core/constants';
 import { tallyFailed } from '../core/events';
+import { recordFailures } from '../core/failures';
 import { slaValue } from '../core/sla';
 import type { World } from '../core/world';
 import { FAIL_CAUSES, NO_DETAIL, type FailCause } from '../types/events';
@@ -19,8 +20,10 @@ export const slaBelowThreshold = (w: World): boolean =>
   slaValue(w.hot.g[G.deliveredWork]!, w.hot.g[G.failedWork]!, w.round.grace) < SLA_THRESHOLD;
 
 /** Fails `count` tasks of `family` (`work` ops in total) with `cause` and a FAIL_DETAILS index (D5.3). */
-export function failTasks(w: World, family: number, cause: FailCause, count: number, work: number, detail: number = NO_DETAIL): void {
-  if (count > 0) tallyFailed(w, family, CAUSE_INDEX[cause], count, work, detail);
+export function failTasks(w: World, family: number, cause: FailCause, count: number, work: number, detail: number = NO_DETAIL, taskId?: number): void {
+  if (count <= 0) return;
+  tallyFailed(w, family, CAUSE_INDEX[cause], count, work, detail);
+  if (w.completions?.failures && taskId !== undefined) recordFailures(w, family, CAUSE_INDEX[cause], count, taskId);
 }
 
 /** Adds this tick's met and failed tallies and work to the round counters and this tick's rate row. */
@@ -54,9 +57,12 @@ export function countOutcomes(w: World): void {
 export function resetCounters(w: World): void {
   const g = w.hot.g;
   g[G.met] = 0; g[G.failed] = 0; g[G.taken] = 0; g[G.dismissed] = 0;
-  g[G.deliveredWork] = 0; g[G.failedWork] = 0; g[G.metWorkTick] = 0; g[G.failWorkTick] = 0;
+  g[G.deliveredWork] = 0; g[G.failedWork] = 0; g[G.metWorkTick] = 0; g[G.failWorkTick] = 0; g[G.ramWork] = 0; g[G.diskWork] = 0;
   for (let c = 0; c < CAUSES; c += 1) g[G.fail + c] = 0;
   w.hot.detailRound.fill(0);
+  w.hot.fam.metWorkRound.fill(0);
+  w.hot.fam.failedWorkRound.fill(0);
+  w.hot.fam.dismissedRound.fill(0);
 }
 
 export function failCounts(w: World): Record<FailCause, number> {

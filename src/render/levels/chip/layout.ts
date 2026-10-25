@@ -1,5 +1,5 @@
 ﻿// CPU floorplan (layout-L2/layout.js `floorplan`, D17). Art px. Top to bottom: IN pad, queue, cache,
-// cores + clock, OUT pad: a task falls through the die in the order it is handled. Every block edge
+// cores + clock: a task falls through the die in the order it is handled; it pays on its core. Every block edge
 // sits on the art lattice. The world is wider and taller than any viewport, so the board fills it.
 import type { Point, Rect, WorldForm } from '../../core';
 
@@ -7,8 +7,8 @@ export interface Floor {
   readonly world: Rect; readonly focus: Rect;
   readonly pkg: Rect; readonly die: Rect;
   readonly queue: Rect; readonly cache: Rect; readonly cores: Rect; readonly clock: Rect;
-  /** IN pad (the pipe's entry) at the die top, OUT pad at its foot. */
-  readonly inp: Point; readonly out: Point;
+  /** IN pad (the pipe's entry) at the die top. */
+  readonly inp: Point;
   /** The two big core sites' width and gap. */
   readonly coreW: number; readonly gapX: number;
 }
@@ -28,9 +28,9 @@ function floorplan(s: Spec): Floor {
   const dieH = cores.y + s.S + 8 - dieY, pkg = r(pkgX, s.top, s.pkgW, dieH + 16);
   return {
     world: r(0, 0, s.w, s.h), pkg, die: r(pkgX + 8, dieY, s.pkgW - 16, dieH), queue, cache, cores, clock,
-    // The rest frame: the package, its socket lip and the OUT pad's first copper.
-    focus: r(pkg.x - 8, pkg.y - 16, pkg.w + 16, pkg.h + 24),
-    inp: { x: cx, y: dieY }, out: { x: cx, y: dieY + dieH }, coreW: s.coreW, gapX: s.gapX,
+    // The rest frame: the package, its shadow and its socket lip. The pipe runs in the gutter above.
+    focus: r(pkg.x - 4, pkg.y - 8, pkg.w + 8, pkg.h + 16),
+    inp: { x: cx, y: dieY }, coreW: s.coreW, gapX: s.gapX,
   };
 }
 const FLOORS: Readonly<Record<WorldForm, Floor>> = { desktop: floorplan(SPEC.desktop), phone: floorplan(SPEC.phone) };
@@ -67,8 +67,16 @@ export function queueWells(f: Floor, q: number, form: WorldForm = 'desktop'): re
   return out;
 }
 const r_ = (x: number, y: number, w: number, h: number): Rect => ({ x, y, w, h });
-/** Inside a big core site (L2): the icon cell, the task number beside it, the line under that, the bar. */
-export function coreText(r: Rect, form: WorldForm = 'desktop') {
-  const desk = form !== 'phone', ix = r.x + (desk ? 8 : 4), iy = r.y + (desk ? 16 : 20);
-  return { icon: { x: ix, y: iy }, id: { x: ix + (desk ? 19 : 18), y: iy }, line: desk ? { x: ix + 19, y: iy + 8 } : { x: ix, y: iy + 20 }, bar: r.y + (desk ? 40 : 48) };
+/**
+ * How a big core site arranges its text, by the art scale the world rests at (A01), not by form:
+ * 'wide' at N >= 3 (name and Hz on one line, the task beside its icon); 'stacked' at N <= 2
+ * (name / Hz / icon / task / bar, one 8 art px text line each). No scale: desktop 3, phone 2.
+ */
+export type CoreArrangement = 'wide' | 'stacked';
+export const arrangementOf = (scale: number | undefined, form: WorldForm = 'desktop'): CoreArrangement =>
+  (scale ?? (form === 'phone' ? 2 : 3)) >= 3 ? 'wide' : 'stacked';
+/** Inside a big core site (L2): the icon cell, the task name beside it (wide), the line under that, the bar. */
+export function coreText(r: Rect, a: CoreArrangement = 'wide') {
+  const wide = a === 'wide', ix = r.x + (wide ? 8 : 4), iy = r.y + (wide ? 16 : 20);
+  return { pad: ix - r.x, icon: { x: ix, y: iy }, id: { x: ix + 19, y: iy }, line: wide ? { x: ix + 19, y: iy + 8 } : { x: ix, y: iy + 20 }, bar: r.y + (wide ? 40 : 48) };
 }

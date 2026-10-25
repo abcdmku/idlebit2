@@ -46,6 +46,30 @@ export function portSpeedPrice(fromHz: number | string, toHz: number | string, s
   return BigInt(price.toSignificantDigits(64).ceil().toFixed(0));
 }
 
+/**
+ * D25.7 router-queue streams and price era per router scope (spec §12.7): the rack LB carries 12
+ * streams priced in the kHz era, the room LB 288 in MHz, the data plane 864 and the global
+ * scheduler 6,912 in GHz.
+ */
+export const ROUTER_QUEUE_PRICE = { rack: { m: 12, era: 1 }, room: { m: 288, era: 2 }, site: { m: 864, era: 3 }, global: { m: 6912, era: 3 } } as const;
+export type RouterScope = keyof typeof ROUTER_QUEUE_PRICE;
+
+/** lbQueueStep(L → L + 1) = ceil(m × u / 0.7 × ((L + 1)^α − L^α)), exact decimal (spec §12.7). */
+export function lbQueueStep(scope: RouterScope, level: number): bigint {
+  if (!Number.isSafeInteger(level) || level < 1) throw new RangeError('Expected a router queue level of at least 1');
+  const { m, era } = ROUTER_QUEUE_PRICE[scope];
+  const price = new PriceDecimal(level + 1).pow(ALPHA).minus(new PriceDecimal(level).pow(ALPHA))
+    .times(CLOCK_UPGRADE[era]!).times(m).div('0.7');
+  return BigInt(price.toSignificantDigits(64).ceil().toFixed(0));
+}
+
+/** Σ lbQueueStep from level 1 to `level`: what a configuration with that queue level adds (spec §13.3). */
+export function lbQueueStepsTo(scope: RouterScope, level: number): bigint {
+  let total = 0n;
+  for (let l = 1; l < level; l += 1) total += lbQueueStep(scope, l);
+  return total;
+}
+
 /** Exact 1-2-5 speed, avoiding binary rounding of the largest catalog rungs. */
 const priceSpeed = (k: number): string => {
   if (!Number.isSafeInteger(k) || k < 0) throw new RangeError('Expected a nonnegative whole ladder index');

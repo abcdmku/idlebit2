@@ -21,11 +21,11 @@ export function restCam(focus: Rect, vp: Rect, ratio: PixelRatio, out: Camera, s
 /** Layout form: the L2 desktop deck or the folded phone deck. Levels may lay out per form. */
 export type WorldForm = 'desktop' | 'phone';
 /**
- * L2 rest framing (layout-L2 README "D17 spec"). Every rest state draws 1:1 at the integer art
- * scale N: one art px is N CSS px (3 desktop, 2 phone). The focus rect is centred in the viewport
- * below `top` (the HUD band plus the queue strip); a focus taller than that keeps its top, where
- * the link enters, and runs off the bottom. The level's entry point (or its world origin) snaps to
- * the lattice lcm(8, N), measured from the viewport origin.
+ * L2 rest framing (D17, A05). Every rest draws 1:1 at an integer art scale: one art px is n CSS px.
+ * The focus is contain-fitted, whole, in the free world: the viewport below `top` (the HUD band and
+ * the queue strip) minus the gutters. n is the shell's N (3 desktop, 2 phone) when the focus fits,
+ * else the largest lower integer that fits (D15.2: never cropped). The focus centres in the free
+ * world, and the level's entry point (or its world origin) snaps to the lattice lcm(8, N).
  */
 export interface RestFraming {
   readonly form: WorldForm;
@@ -40,20 +40,53 @@ export interface RestFraming {
    * across, then drops into the level's entry. The core draws it at rest; during a zoom only the first drop.
    */
   readonly pipe?: { readonly x: number; readonly y: number; readonly runY: number } | null;
+  /** Optional CSS px kept clear around the focus; `gutters()` gives the defaults. */
+  readonly gutters?: Gutters | null;
 }
-/** L2 D17: world 24,24 1392×648, free below y 120, pipe from (72, 120) to run y 144 (stage px). */
-export const DESKTOP_FRAMING: RestFraming = { form: 'desktop', scale: 3, lattice: 24, top: 96 };
-/** L2 D17: world 8,8 368×600, free below y 136, pipe from (32, 136) to run y 144. */
-export const PHONE_FRAMING: RestFraming = { form: 'phone', scale: 2, lattice: 8, top: 128 };
+/** CSS px. Left carries the pipe's vertical run and its tag, right the docked callout (desktop). */
+export interface Gutters { readonly left: number; readonly right: number; readonly top: number; readonly bottom: number }
+/** Desktop: the right gutter holds the UI's docked callout, 288 px plus a lattice. */
+export const CALLOUT_DOCK_W = 288;
+/** Desktop: the left gutter fits the pipe's vertical run and its tag (Pipe 1 kHz, the packet under it). */
+export const PIPE_TAG_W = 168;
+/**
+ * The framing's gutters, or the defaults. Desktop: the pipe's vertical run and its tag on the left, the
+ * callout dock on the right. Phone: a lattice each side (the run is short and the tag sits beside it).
+ * Both: the pipe's run on top.
+ */
+export function gutters(vp: Rect, f: RestFraming): Gutters {
+  if (f.gutters) return f.gutters;
+  const lat = f.lattice, p = f.pipe, desk = f.form !== 'phone';
+  const left = p && desk ? p.x - vp.x + PIPE_TAG_W : lat;
+  const runBottom = p ? p.runY + 2 * f.scale - (vp.y + f.top) : 0;
+  const top = Math.max(lat, Math.ceil(runBottom / lat) * lat);
+  return { left: Math.ceil(left / lat) * lat, right: desk ? CALLOUT_DOCK_W + lat : lat, top, bottom: 0 };
+}
+/** The largest integer art scale, at most the framing's N, at which `focus` fits whole in `vp` minus the gutters. */
+export function fitScale(focus: Rect, vp: Rect, f: RestFraming): number {
+  const g = gutters(vp, f), w = vp.w - g.left - g.right, h = vp.h - f.top - g.top - g.bottom;
+  let n = f.scale;
+  while (n > 1 && (focus.w * n > w || focus.h * n > h)) n--;
+  return n;
+}
+/** 1440×900: world 24,24 1392×708, free below y 168, pipe from (72, 168) to run y 192 (stage px). */
+export const DESKTOP_FRAMING: RestFraming = { form: 'desktop', scale: 3, lattice: 24, top: 144 };
+/** 390×780: world 8,8 368×692, free below y 200, pipe from (32, 200) to run y 208. */
+export const PHONE_FRAMING: RestFraming = { form: 'phone', scale: 2, lattice: 8, top: 192 };
 
-/** The rest camera at scale N under `framing`. Scale is N × device ratio. */
+/** The rest camera under `framing`, at `fitScale`. Scale is n × device ratio. */
 export function framedRest(focus: Rect, vp: Rect, ratio: PixelRatio, f: RestFraming, out: Camera, entry: Point | null = null): Camera {
-  const n = f.scale, lat = f.lattice, visTop = vp.y + f.top, visH = vp.h - f.top;
+  const n = fitScale(focus, vp, f), lat = f.lattice, g = gutters(vp, f);
+  const freeX = vp.x + g.left, freeW = vp.w - g.left - g.right, freeY = vp.y + f.top + g.top, freeH = vp.h - f.top - g.top - g.bottom;
   const ex = (entry?.x ?? 0) * n, ey = (entry?.y ?? 0) * n;
-  let ox = vp.x + vp.w / 2 - (focus.x + focus.w / 2) * n;
-  let oy = focus.h * n <= visH ? visTop + (visH - focus.h * n) / 2 - focus.y * n : visTop - focus.y * n;
+  let ox = freeX + freeW / 2 - (focus.x + focus.w / 2) * n;
+  let oy = focus.h * n <= freeH ? freeY + (freeH - focus.h * n) / 2 - focus.y * n : freeY - focus.y * n;
   ox = vp.x + Math.round((ox + ex - vp.x) / lat) * lat - ex;
   oy = vp.y + Math.floor((oy + ey - vp.y) / lat) * lat - ey;
+  // The snap may push the art a part-lattice into a gutter; step it back when the slack allows.
+  const left = ox + focus.x * n, right = left + focus.w * n, top = oy + focus.y * n, bottom = top + focus.h * n;
+  if (left < freeX && right + lat <= freeX + freeW) ox += lat; else if (right > freeX + freeW && left - lat >= freeX) ox -= lat;
+  if (top < freeY && bottom + lat <= freeY + freeH) oy += lat;
   const s = n * ratio.x, vx = (vp.x + vp.w / 2) * ratio.x, vy = (vp.y + vp.h / 2) * ratio.y;
   out.s = s; out.cx = (vx - ox * ratio.x) / s; out.cy = (vy - oy * ratio.y) / s;
   return out;

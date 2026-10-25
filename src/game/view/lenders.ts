@@ -1,7 +1,7 @@
 import { amount, ZERO_AMOUNT, type Amount } from '../amount';
 import { REGIONS } from '../core/constants';
 import { MODE } from '../core/timers';
-import { RESOURCES } from '../types/catalog';
+import { RES_CLOCKS } from '../core/constants';
 import { rackId, roomId, systemId, type UnitRef } from '../types/ids';
 import type { GameState } from '../types/state';
 import type { LenderView } from '../types/views';
@@ -11,7 +11,7 @@ import { systemLoad } from './rack';
 
 /** The wafer shows at most this many fab-line gauges. */
 export const MAX_LENDERS = 24;
-const R = RESOURCES.length;
+const R = RES_CLOCKS;
 
 /** Task and lent fractions of one system (spec §11.2). Offline, paused and research-only systems lend everything. */
 function systemShares(state: GameState, s: number): { task: number; lent: number } {

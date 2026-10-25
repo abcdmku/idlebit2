@@ -1,5 +1,5 @@
 // GENERATED from docs/research.md by tree.sync.test.ts (WRITE_TREE=1). Do not edit by hand.
-import type { CeilingId, FilterId, PartId, PlacementId, ResearchEffect, RuleId, Scope, StrategyId, WorkTier } from '../../types/catalog';
+import type { CeilingId, FilterId, PartId, ResearchEffect, RuleId, Scope, StrategyId, WorkTier } from '../../types/catalog';
 import type { LevelId } from '../../types/ids';
 import type { TreeRow } from './treeRow';
 
@@ -29,7 +29,6 @@ const gen = (part: PartId, g: number): ResearchEffect => ({ kind: 'gen', part, g
 const cap = (key: CeilingId, value: number): ResearchEffect => ({ kind: 'ceiling', key, value });
 const strat = (scope: Scope, id: StrategyId): ResearchEffect => ({ kind: 'strategy', scope, id });
 const filt = (scope: Scope, id: FilterId): ResearchEffect => ({ kind: 'filter', scope, id });
-const place = (scope: Scope, id: PlacementId): ResearchEffect => ({ kind: 'placement', scope, id });
 const view = (level: LevelId): ResearchEffect => ({ kind: 'view', level });
 /** Reference rule ids may precede runtime RULE_IDS; tree.ts applies deferred hardware overrides. */
 const rule = (id: RuleId | (string & {}), params?: Record<string, number>): ResearchEffect => (params ? { kind: 'rule', id: id as RuleId, params } : { kind: 'rule', id: id as RuleId });
@@ -56,7 +55,7 @@ export const TREE_ROWS: readonly TreeRow[] = [
   n("smt", "SMT", "compute", ["timeSlice", "octaCore"], "cpu", "khz", 7, 1_000_000, [cap("threadsPerCore", 2), rule("smt", { shareRate: 0.6 })], ["pickup"]),
   n("dualSocket", "Dual socket", "compute", ["octaCore", "rack"], "system", "khz", 8, 4_000_000, [cap("cpuSockets", 2), rule("socketFactor", { s2: 0.92 }), rule("socketSpanPenalty", { ramBandwidth: 0.5 })], ["density", "threads"]),
   n("quadSocket", "4 sockets", "compute", ["dualSocket"], "system", "khz", 9, 1.5e7, [cap("cpuSockets", 4), rule("socketFactor", { s3: 0.85, s4: 0.78 })], ["density", "rackDist"]),
-  n("dma", "DMA engine", "compute", ["memController"], "system", "hz", 5, 15_000, [rule("dma")], ["ram", "storage"]),
+  n("dma", "DMA engine", "compute", ["memController"], "system", "hz", 5, 15_000, [rule("dma")], ["ram", "storage"]), // D26: RAM and disk parts
   n("prefetch", "Prefetcher", "compute", ["dma", "l3Cache"], "system", "khz", 6, 50_000, [rule("prefetch")], ["ram"]),
   n("memController", "Memory ctrl", "memory", ["systemBoard"], "system", "hz", 4, 12_000, [gen("ram", 0)], ["ram", "gate"]),
   n("ddr", "DDR", "memory", ["memController"], "system", "hz", 5, 15_000, [gen("ram", 1)], ["ram"]),
@@ -70,7 +69,7 @@ export const TREE_ROWS: readonly TreeRow[] = [
   n("ecc", "ECC memory", "memory", ["ddr2", "rack"], "rack", "khz", 8, 4_000_000, [rule("ecc", { price: 1.25, watts: 1.1 })], ["storage", "rackDist", "gate"]),
   n("rdimm", "Registered DIMM", "memory", ["quadChannel", "ecc"], "rack", "mhz", 9, 1.5e7, [rule("registeredCapacity", { factor: 2 })], ["rackDist", "roomDist"]),
   n("lowVoltRam", "Low-voltage RAM", "memory", ["ddr2"], "system", "khz", 7, 1_000_000, [rule("ramWatts", { factor: 0.7 })], ["energy", "overload"]),
-  n("virtualMem", "Virtual memory", "memory", ["memController", "storageCtl"], "system", "hz", 5, 15_000, [rule("virtualMemory", { ioPerExcessBit: 2 })], ["gate", "ram"]),
+  n("hotPages", "Hot pages", "memory", ["memController", "storageCtl"], "system", "hz", 5, 15_000, [rule("hotPages", { diskExponent: 2 })], ["storage", "ram"]),
   n("gpuGen1", "GPU gen 1, 1 kHz", "accel", ["memController"], "system", "hz", 5, 15_000, [gen("gpu", 0)], ["gpu"]),
   n("gpuGen2", "GPU gen 2, 10 kHz", "accel", ["gpuGen1", "fabKhz"], "system", "khz", 7, 1_000_000, [gen("gpu", 1), gen("npu", 1)], ["gpu"]),
   n("gpuGen3", "GPU gen 3, 100 kHz", "accel", ["gpuGen2", "rack"], "system", "khz", 8, 4_000_000, [gen("gpu", 2)], ["gpu"]),
@@ -83,6 +82,7 @@ export const TREE_ROWS: readonly TreeRow[] = [
   n("tensorCores", "Tensor cores", "accel", ["gpuGen4"], "system", "mhz", 10, 4e7, [gen("npu", 2), rule("tensorRate", { factor: 4, minGpuGen: 4 })], ["gpu", "rackDist"]),
   n("matrixGpu", "Matrix engines", "accel", ["tensorCores", "gpuGen6"], "system", "ghz", 12, 2e8, [gen("npu", 3), rule("tensorRate", { factor: 8, minGpuGen: 6 })], ["roomDist", "multiAz"]),
   n("gddr6", "GDDR6", "accel", ["gpuGen2"], "system", "khz", 7, 1_000_000, [rule("vramPerLevel", { factor: 4 })], ["gpu"]),
+  n("unifiedMemory", "Unified memory", "accel", ["hbm", "gpuGen8"], "system", "ghz", 14, 3e9, [rule("unifiedMemory")], ["gpu", "roomDist"]),
   n("hbm", "HBM", "accel", ["gddr6", "fabMhz"], "system", "mhz", 10, 4e7, [rule("vramPerLevel", { factor: 16 }), rule("vramScale", { idle: 0.5 })], ["roomDist"]),
   n("dualGpu", "Dual GPU", "accel", ["gpuGen2", "fabKhz"], "system", "khz", 7, 1_000_000, [cap("gpuSlots", 2)], ["gpu"]),
   n("accelSystem", "Accelerator box", "accel", ["dualSocket", "quadChannel", "dualGpu"], "rack", "khz", 8, 4_000_000, [rule("accelBoard", { sockets: 2, ramSlots: 8, gpuSlots: 8 })], ["gpu", "rackDist", "roomDist", "density"]),
@@ -103,7 +103,7 @@ export const TREE_ROWS: readonly TreeRow[] = [
   n("workStealing", "Work stealing", "scheduling", ["quadCore"], "cpu", "hz", 3, 1_000, [rule("workStealing")], ["threads"]),
   n("numaAware", "NUMA-aware", "scheduling", ["dualSocket"], "system", "khz", 8, 4_000_000, [rule("numaAware")], ["ram", "rackDist"]),
   n("lbCapability", "Capability-aware", "scheduling", ["rack"], "rack", "khz", 8, 4_000_000, [filt("net", "capability")], ["misroute"]),
-  n("lbHealth", "Health checks", "scheduling", ["lbCapability"], "rack", "khz", 8, 4_000_000, [filt("net", "health")], ["pickup", "misroute"]),
+  n("lbHealth", "Health checks", "scheduling", ["lbCapability"], "rack", "khz", 8, 4_000_000, [filt("net", "health")], ["overload", "heat"]),
   n("lbRoundRobin", "Round robin", "scheduling", ["rack"], "rack", "khz", 8, 4_000_000, [strat("net", "roundRobin")], ["overload", "heat"]),
   n("lbLeastConn", "Least conns", "scheduling", ["lbRoundRobin"], "rack", "khz", 8, 4_000_000, [strat("net", "leastConn")], ["pickup", "overload"]),
   n("lbWeighted", "Weighted", "scheduling", ["lbLeastConn"], "rack", "khz", 8, 4_000_000, [strat("net", "weighted")], ["pickup"]),
@@ -111,16 +111,15 @@ export const TREE_ROWS: readonly TreeRow[] = [
   n("lbPowerAware", "Power-aware", "scheduling", ["lbHealth", "telemetry"], "rack", "mhz", 9, 1.5e7, [filt("net", "power")], ["overload"]),
   n("binPacking", "Bin packing", "scheduling", ["lbRoundRobin", "s3Sleep", "telemetry"], "rack", "mhz", 9, 1.5e7, [strat("net", "binPack")], ["energy", "overload"]),
   n("lbAffinity", "Workload affinity", "scheduling", ["accelSystem", "lbCapability"], "rack", "khz", 8, 4_000_000, [strat("net", "affinity")], ["gpu", "pickup", "energy"]),
-  n("lbReserve", "Queued take", "scheduling", ["lbHealth"], "rack", "mhz", 9, 1.5e7, [rule("reserveOnRoute")], ["transfer", "pickup"]),
-  n("gangRack", "Gang scheduling", "scheduling", ["lbCapability"], "rack", "khz", 8, 4_000_000, [place("rack", "gang")], ["rackDist"]),
-  n("gangRoom", "Cross-rack gang", "scheduling", ["gangRack", "room"], "room", "mhz", 11, 6e7, [place("room", "gang")], ["roomDist"]),
+  n("shardSteal", "Shard stealing", "scheduling", ["lbHealth"], "rack", "mhz", 9, 1.5e7, [rule("shardSteal")], ["pickup", "transfer"]),
+  n("splitGather", "Gather", "scheduling", ["lbCapability"], "rack", "khz", 8, 4_000_000, [rule("gather", { share: 0.5, waitS: 10 })], ["rackDist", "pickup"]),
+  n("stealRoom", "Cross-rack stealing", "scheduling", ["shardSteal", "room"], "room", "mhz", 11, 6e7, [rule("stealRoom")], ["roomDist", "pickup"]),
   n("thermalAware", "Thermal-aware", "scheduling", ["lbPowerAware", "room"], "room", "mhz", 11, 6e7, [filt("room", "thermal")], ["heat"]),
-  n("topologyAware", "Topology-aware", "scheduling", ["gangRoom"], "room", "ghz", 11, 6e7, [place("room", "topology")], ["transfer", "roomDist"]),
-  n("zoneAware", "Zone-aware", "scheduling", ["gangRoom", "dataCenter"], "global", "ghz", 12, 2e8, [place("site", "zone"), place("site", "gang")], ["multiAz"]),
+  n("topologyAware", "Topology-aware", "scheduling", ["stealRoom"], "room", "ghz", 11, 6e7, [strat("net", "linkAware")], ["transfer", "roomDist"]),
+  n("zoneAware", "Zone-aware", "scheduling", ["stealRoom", "dataCenter"], "global", "ghz", 12, 2e8, [filt("net", "local")], ["multiAz", "overload", "heat"]),
   n("regionAware", "Region-aware", "scheduling", ["regions"], "global", "ghz", 14, 3e9, [filt("global", "region")], ["region", "misroute"]),
   n("latencyAware", "Latency-aware", "scheduling", ["regionAware"], "global", "ghz", 14, 3e9, [strat("global", "latency")], ["transfer"]),
   n("priceAware", "Price-aware", "scheduling", ["latencyAware"], "global", "ghz", 14, 3e9, [strat("global", "price")], ["energy"]),
-  n("globalGang", "Global gang", "scheduling", ["zoneAware", "regionAware"], "global", "ghz", 15, 1e10, [place("global", "gang")], ["region"]),
   n("sw100k", "Switch gen 1", "network", ["rack"], "rack", "khz", 8, 4_000_000, [gen("switch", 1)], ["transfer"]),
   n("sw1M", "Switch gen 2", "network", ["sw100k", "fabMhz"], "rack", "mhz", 10, 4e7, [gen("switch", 2)], ["transfer", "rackDist"]),
   n("sw10M", "Switch gen 3", "network", ["sw1M", "room"], "room", "mhz", 11, 6e7, [gen("switch", 3)], ["roomDist"]),
@@ -178,7 +177,7 @@ export const TREE_ROWS: readonly TreeRow[] = [
   n("rack", "Rack", "structure", ["fabKhz"], "rack", "khz", 6, 150_000, [view("rack"), gen("rackCooler", 0), gen("pdu", 0), gen("lb", 0), gen("switch", 0)], ["density", "rackDist"]),
   n("room", "Room", "structure", ["rack", "fabMhz"], "room", "mhz", 10, 1.2e8, [view("room"), gen("roomCooler", 0), gen("ups", 0), gen("row", 0)], ["density", "roomDist"]),
   n("hallExpansion", "Third row", "structure", ["room", "spineLeaf"], "room", "ghz", 11, 6e7, [cap("roomRows", 3)], ["density"]),
-  n("dataCenter", "Data center", "structure", ["room", "gangRoom"], "global", "ghz", 12, 6e8, [view("global"), gen("dataPlane", 0), gen("grid", 0), gen("zone", 0), cap("siteZones", 2)], ["multiAz"]),
+  n("dataCenter", "Data center", "structure", ["room", "stealRoom"], "global", "ghz", 12, 6e8, [view("global"), gen("dataPlane", 0), gen("grid", 0), gen("zone", 0), cap("siteZones", 2)], ["multiAz"]),
   n("zoneExpansion", "Third zone", "structure", ["dataCenter", "zoneAware"], "global", "ghz", 13, 4e8, [cap("siteZones", 3)], ["multiAz", "density"]),
   n("regions", "Regions", "structure", ["dataCenter", "zoneAware"], "global", "ghz", 13, 1.2e9, [gen("site", 0), gen("backbone", 0), cap("sites", 4)], ["region"]),
   n("intercontinental", "Global reach", "structure", ["regions", "bbDarkFiber"], "global", "ghz", 14, 9e9, [cap("sites", 8)], ["region"]),
@@ -198,5 +197,5 @@ export const TREE_ROWS: readonly TreeRow[] = [
   n("hotPlug", "Hot-plug drives", "operations", ["storageCtl", "rack"], "rack", "khz", 8, 4_000_000, [rule("hotPlug")], ["downtime"]),
   n("liveMigration", "Live migration", "operations", ["gracefulDrain", "sw1M"], "rack", "mhz", 10, 4e7, [rule("liveMigration")], ["downtime", "heat"]),
   n("hotSwap", "Hot swap", "operations", ["rollingUpgrade", "room"], "room", "ghz", 11, 6e7, [rule("hotSwap")], ["downtime"]),
-  n("checkpointing", "Checkpointing", "operations", ["gangRoom"], "room", "ghz", 11, 6e7, [rule("checkpointing", { windowS: 10 })], ["roomDist", "overload", "heat"]),
+  n("checkpointing", "Checkpointing", "operations", ["stealRoom"], "room", "ghz", 11, 6e7, [rule("checkpointing", { windowS: 10 })], ["roomDist", "overload", "heat"]),
 ];

@@ -1,11 +1,13 @@
 // System value labels (L2 main.js systemLabels): every installed part carries its size and speed.
 // Desktop: two-line labels in the board's side margins, with silkscreen leaders that end on the
 // part. Phone: one-line tags on the board beside each part. Values are snapshot fields, formatted.
+import { formatHertz, formatSize } from '../../../game';
 import type { SystemSnapshot } from '../../../game';
-import { P, R, bitRate, bitsText, hertz, wattsText, whole } from '../../core';
+import { P, R, wattsText, whole } from '../../core';
 import type { LabelWriter, Rect, WorldForm, WorldFrame } from '../../core';
 import { BOARD, PORT, PSU, siteRect } from './layout';
 import { boardModel } from './model';
+import { tierOf } from './memory';
 import type { Site } from './model';
 
 export type LabelKey = 'port' | 'cpu' | 'psu' | 'ram' | 'drive' | 'gpu';
@@ -14,6 +16,8 @@ export interface PartLabel {
   readonly name: string;
   readonly value: string;
   readonly side: 'L' | 'R';
+  /** D26: the tier's use beside the name ("4.1 kb used"), and its spilled bits, which read as a warning. */
+  readonly used?: string; readonly spilled?: string;
   /** The part's rect (hit rect union) in board art px. */
   readonly r: Rect;
   /** Desktop: label top and middle line, the label's inner edge and where the leader meets the part. */
@@ -33,37 +37,48 @@ function union(sites: readonly Site[], b: Parameters<typeof siteRect>[0]): Rect 
   return { x: x0, y: y0, w: x1 - x0, h: y1 - y0 };
 }
 const times = (n: number) => (n > 1 ? ` ×${n}` : '');
-/** "2 + 1 KiB" when the sizes share a unit, else "512 bits + 1 KiB". */
+/** "16.4 + 8.19 kb" when the sizes share a unit, else "512 b + 8.19 kb" (formatSize). */
 export function sizes(bits: readonly number[]): string {
-  const parts = bits.map(bitsText), unit = parts[0]!.slice(parts[0]!.indexOf(' ') + 1);
+  const parts = bits.map(formatSize), unit = parts[0]!.slice(parts[0]!.indexOf(' ') + 1);
   if (parts.every(p => p.endsWith(` ${unit}`))) return `${parts.map(p => p.slice(0, p.indexOf(' '))).join(' + ')} ${unit}`;
   return parts.join(' + ');
 }
 
+/** A tier's use and spill for its label (D26), from `SystemSnapshot.memory`. */
+function tierNote(s: SystemSnapshot, tier: 'ram' | 'disk'): { used?: string; spilled?: string } {
+  const t = tierOf(s, tier);
+  if (!t || t.usedBits <= 0) return {};
+  // RAM shows its use. On disk every used bit is spilled, so the drive shows only "spilled" (warning).
+  if (tier === 'disk') return t.spilledBits > 0 ? { spilled: formatSize(t.spilledBits) } : {};
+  return { used: formatSize(t.usedBits) };
+}
 /** The label values, all read from the snapshot. */
 function values(s: SystemSnapshot): Omit<PartLabel, 'top' | 'mid' | 'lx' | 'end' | 'tagX' | 'tagY' | 'right'>[] {
   const m = boardModel(s), b = m.b, out: Omit<PartLabel, 'top' | 'mid' | 'lx' | 'end' | 'tagX' | 'tagY' | 'right'>[] = [];
   const cores = s.chip.cores.length;
-  out.push({ key: 'port', name: 'Port', value: hertz(s.chip.pipe.speed), side: 'L', r: { x: PORT.x, y: PORT.y - PORT.z, w: PORT.w, h: PORT.h + PORT.z } });
-  out.push({ key: 'cpu', name: 'CPU', value: `${hertz(s.chip.clock.hz)} · ${whole(cores)} ${cores === 1 ? 'core' : 'cores'}${times(s.cpuCount)}`,
+  out.push({ key: 'port', name: 'Port', value: formatHertz(s.chip.pipe.speed), side: 'L', r: { x: PORT.x, y: PORT.y - PORT.z, w: PORT.w, h: PORT.h + PORT.z } });
+  out.push({ key: 'cpu', name: 'CPU', value: `${formatHertz(s.chip.clock.hz)} · ${whole(cores)} ${cores === 1 ? 'core' : 'cores'}${times(s.cpuCount)}`,
     side: 'L', r: siteRect(b, 'cpu', 0) });
   out.push({ key: 'psu', name: 'PSU', value: wattsText(s.psu.capacityW), side: 'R', r: { ...PSU } });
   const ram = m.installed.ram, drive = m.installed.drive, gpu = m.installed.gpu;
-  // R40: per-stick capacity and the slowest channel (L2 "2 + 1 KiB · 1 kHz"); per-drive size and IO.
+  // R40: per-stick capacity and the slowest channel ("16.4 + 16.4 kb · 1 kHz"); per-drive size and IO.
   if (ram.length) {
     let rate = Infinity;
     for (const q of ram) rate = Math.min(rate, q.part!.rateBits ?? 0);
-    out.push({ key: 'ram', name: 'RAM', value: `${sizes(ram.map(q => q.part!.capacityBits ?? 0))} · ${hertz(rate)}`, side: 'R', r: union(ram, b) });
+    out.push({ key: 'ram', name: 'RAM', value: `${sizes(ram.map(q => q.part!.capacityBits ?? 0))} · ${formatHertz(rate)}`, side: 'R', r: union(ram, b), ...tierNote(s, 'ram') });
   }
   if (drive.length) {
     const d = drive[0]!.part!;
-    out.push({ key: 'drive', name: 'Drive', value: `${bitsText(d.capacityBits ?? 0)} · ${bitRate(d.rateBits ?? 0)}${times(drive.length)}`, side: 'R', r: union(drive, b) });
+    out.push({ key: 'drive', name: 'Drive', value: `${formatSize(d.capacityBits ?? 0)} · ${formatHertz(d.rateBits ?? 0)}${times(drive.length)}`, side: 'R', r: union(drive, b), ...tierNote(s, 'disk') });
   }
   if (gpu.length) {
     const p = gpu[0]!.part!, stats = p.gpu;
-    const value = stats ? `G${stats.model} · ${whole(stats.cores)} cores · ${bitsText(stats.vramBits)}${times(gpu.length)}`
+    const value = stats ? `G${stats.model} · ${whole(stats.cores)} cores · ${formatSize(stats.vramBits)}${times(gpu.length)}`
       : `NPU · level ${whole(p.level)}${times(gpu.length)}`;
-    out.push({ key: 'gpu', name: 'GPU', value, side: 'L', r: union(gpu, b) });
+    // D26 unifiedMemory: VRAM need beyond the cards, placed in RAM and on disk.
+    let spill = 0;
+    for (const q of gpu) spill += q.part?.unifiedSpillBits ?? 0;
+    out.push({ key: 'gpu', name: 'GPU', value, side: 'L', r: union(gpu, b), ...(spill > 0 ? { spilled: formatSize(spill) } : {}) });
   }
   return out;
 }
@@ -125,8 +140,15 @@ export function drawLeaders(g: CanvasRenderingContext2D, s: SystemSnapshot, firs
 export function writeLabels(s: SystemSnapshot, frame: WorldFrame, out: LabelWriter): void {
   const form = frame.form;
   for (const it of partLabels(s, form, firstRow(frame))) {
-    if (form === 'phone') { out.label(it.key, it.tagX, it.tagY, it.right ? 'right' : 'left', true).text(it.name, 'silk', true).text(it.value, 'value'); continue; }
+    if (form === 'phone') {
+      out.label(it.key, it.tagX, it.tagY, it.right ? 'right' : 'left', true).text(it.name, 'silk', true).text(it.value, 'value');
+      if (it.spilled) out.text(`· ${it.spilled} spilled`, 'warn');
+      continue;
+    }
     const left = it.side === 'L';
-    out.label(it.key, left ? it.lx - 3 : it.lx + 3, it.top, left ? 'right' : 'left').text(it.name, 'silk', true).br().text(it.value, 'value');
+    out.label(it.key, left ? it.lx - 3 : it.lx + 3, it.top, left ? 'right' : 'left').text(it.name, 'silk', true);
+    if (it.used) out.text(`· ${it.used} used`, 'mute');
+    if (it.spilled) out.text(`· ${it.spilled} spilled`, 'warn');
+    out.br().text(it.value, 'value');
   }
 }

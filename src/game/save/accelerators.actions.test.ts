@@ -60,8 +60,7 @@ function linkedRayTrace(): GameState {
   const running = act(hardware(), { type: 'returnToMarket' });
   const w = openWorld(running), r = allocRecord(w.hot);
   const family = FAMILIES.find((f) => f.key === 'rayTrace')!, scale = 2000;
-  w.hot.rec.family[r] = family.id; w.hot.rec.count[r] = 1; w.hot.rec.scale[r] = scale;
-  w.hot.rec.threads[r] = family.threads;
+  w.hot.rec.family[r] = family.id; w.hot.rec.count[r] = 1; w.hot.rec.units[r] = scale;
   w.hot.rec.taskId[r] = w.hot.g[G.nextTaskId]!; w.hot.g[G.nextTaskId] = w.hot.g[G.nextTaskId]! + 1;
   w.hot.rec.payout[r] = payoutAt(family, scale);
   enqueue(w, 0, r); noteAdmitted(w, 0, 1);

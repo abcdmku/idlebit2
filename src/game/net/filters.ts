@@ -13,7 +13,8 @@ import { GLOBAL, RACK, ROOM, SITE } from './scope';
  * a filter that would remove every candidate is skipped for that decision. Health, power and
  * thermal read the previous tick's phys state.
  */
-export const FILTER_BIT = { region: 1, capability: 2, health: 4, power: 8, thermal: 16 } as const;
+/** FILTER_IDS bits. `local` (D25.9) needs the split's shard count, so net/split.ts applies it after the rest. */
+export const FILTER_BIT = { region: 1, capability: 2, health: 4, power: 8, thermal: 16, local: 32 } as const;
 export const POWER_LIMIT = 0.9;
 export const THERMAL_LIMIT_F = 90;
 
@@ -30,7 +31,7 @@ function regionOk(w: World, kind: number, u: number, r: number): boolean {
  * same answer without visiting their systems (net/summary.ts).
  */
 export const capable = (w: World, kind: number, u: number, r: number): boolean =>
-  (kind === SITE || kind === GLOBAL) && memo.exact && shapeOf(w.hot.rec.family[r]!).members === 1
+  (kind === SITE || kind === GLOBAL) && memo.exact
     ? summaryCapable(w, kind, u, r)
     : someAdmitting(w, kind, u, (s) => canAdmit(w, s) && canRunOn(w, s, r) === 0);
 

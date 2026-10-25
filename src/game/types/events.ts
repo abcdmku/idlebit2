@@ -1,11 +1,11 @@
 import type { FamilyId, RackId, ResearchId, RoomId, SiteId, SystemId } from './ids';
 
 /**
- * Exactly six failure causes (program D4.1). `swap` covers a cold change or an offline toggle
+ * Exactly seven failure causes (program D4.1; D26.5 adds late). `swap` covers a cold change or an offline toggle
  * that kills work. A distributed task records the root cause of the member loss.
  * Index in FAIL_CAUSES = the u8 stored in buffers and tallies.
  */
-export const FAIL_CAUSES = ['timeout', 'cantRun', 'misroute', 'power', 'heat', 'swap'] as const;
+export const FAIL_CAUSES = ['timeout', 'cantRun', 'misroute', 'power', 'heat', 'swap', 'late'] as const;
 export type FailCause = (typeof FAIL_CAUSES)[number];
 export type FailCounts = Readonly<Record<FailCause, number>>;
 
@@ -13,11 +13,12 @@ export type FailCounts = Readonly<Record<FailCause, number>>;
  * The detail word after a cause (D5.3, spec §4.2): "Can't run · RAM", "Timed out · link". Index =
  * the u8 in hot fam.failDetail; 255 = none. cantRun and misroute use the gate words in check order
  * (cache … link); timeout: link (still in transfer); power: psu … grid; heat: rack, room;
- * swap: cold, offline. The GPU core detail is appended last; check order is the spec's,
+ * swap: cold, offline; late: disk, ram (D26.5). A cantRun memory detail names the deepest tier the
+ * system has (D26.1). The GPU core detail is appended last; check order is the spec's,
  * not this index order. The UI maps detail codes to readable labels.
  */
 export const FAIL_DETAILS = [
-  'cache', 'ram', 'gpu', 'vram', 'storage', 'ecc', 'members', 'gang', 'zones', 'region', 'link',
+  'cache', 'ram', 'gpu', 'vram', 'disk', 'ecc', 'members', 'zones', 'region', 'link',
   'psu', 'pdu', 'ups', 'grid', 'rack', 'room', 'cold', 'offline', 'gpuCores',
 ] as const;
 export type FailDetail = (typeof FAIL_DETAILS)[number];

@@ -13,7 +13,7 @@ import { MAX_ZONES_PER_SITE, RACK_SLOTS_PER_ROW, SERVERS_PER_RACK, SETPOINT_DEFA
 export const L1 = (gen: number): PartLevel => ({ gen, level: 1 });
 const supply = (gen: number): SupplyBuild => ({ gen, level: 1, capped: false });
 const cooler = (gen: number): CoolerBuild => ({ gen, level: 1, setpointF: SETPOINT_DEFAULT_F });
-export const baseRouter = (gen = 0): RouterBuild => ({ gen, level: 1, strategy: 'firstFit', filters: [], placements: [], reserveOnRoute: false });
+export const baseRouter = (gen = 0): RouterBuild => ({ gen, level: 1, strategy: 'firstFit', filters: [], queueLevel: 1 });
 /**
  * Starter switches (D13): ports at the generation's default rung (rack gen 0: 1 kHz, k = 0), and
  * one uplink on the upstream device's default port: a rack on a gen 0 room network-rack port, a

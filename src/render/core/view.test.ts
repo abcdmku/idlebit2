@@ -7,7 +7,7 @@ import { P } from './palette';
 import { recordingContext } from './testCanvas';
 import type { Recording } from './testCanvas';
 import type { CanvasRendererDebug, LevelRegistry, ViewPresentation, WorldFrame } from './types';
-import type { GameEvent } from '../../game';
+import type { Completion } from './pops';
 
 const VIEW: ViewPresentation = { selectedId: null, picked: null, quotes: null, reducedMotion: false };
 const VP = rect(0, 138, 390, 492);
@@ -120,15 +120,31 @@ describe('canvas renderer', () => {
     expect(main.fills.some(f => f.c === P.steelLo)).toBe(false);
   });
 });
-it('pops one coin per new met event on a visible system, and none for replays or other systems', () => {
-  const { renderer, main } = setup();
-  const met = (seq: number, system: number | null) => ({ seq, tick: seq, kind: 'met', family: 0, count: 1, system }) as unknown as GameEvent;
-  const coins = () => main.images;
-  renderer.draw(fixtureSnapshot(fixtureSystem(), null, { events: [met(1, 0)] }), VIEW, { nowS: 0, sincePublishMs: 0 });
-  const base = coins();
-  renderer.draw(fixtureSnapshot(fixtureSystem(), null, { events: [met(1, 0), met(2, 0), met(3, 5), met(4, null)] }), VIEW, { nowS: 0.01, sincePublishMs: 0 });
-  const after = coins();
-  renderer.draw(fixtureSnapshot(fixtureSystem(), null, { events: [met(2, 0)] }), VIEW, { nowS: 0.02, sincePublishMs: 0 });
-  // One world blit per frame plus one coin draw for seq 2 only, which stays alive across the replay frame.
-  expect(after - base).toBe(2); expect(coins() - after).toBe(2);
+describe('payout pops', () => {
+  const done = (seq: number, system: number, credits: number, data = 0, tick = 9): Completion =>
+    ({ seq, tick, system, cpu: 0, core: 0, gpu: null, type: 'compute', credits, data, tau: 0.5, rack: null, room: null, site: null, taskId: seq, shards: 1, work: credits });
+  const pops = (main: Recording) => main.texts.filter(t => t.text.startsWith('+')).map(t => t.text);
+  const at = (ms: number, completions: Completion[], round: 'running' | 'ended' = 'running') =>
+    fixtureSnapshot(fixtureSystem(), null, { simTimeMs: ms, completions, round });
+  it('pops the sum of one component completions once, and never for replays or other systems', () => {
+    const { renderer, main } = setup();
+    renderer.draw(at(1000, []), VIEW, { nowS: 0, sincePublishMs: 0 });
+    renderer.draw(at(1000, [done(1, 0, 12, 1.5), done(2, 0, 30, 0.2), done(3, 5, 99)]), VIEW, { nowS: 0.01, sincePublishMs: 0 });
+    expect(pops(main)).toEqual(['+42', '+1']);
+    main.texts.length = 0;
+    // A republished list: seq 1 to 3 are already shown; the pop stays up with the same values.
+    renderer.draw(at(1100, [done(2, 0, 30), done(3, 0, 99)]), VIEW, { nowS: 0.1, sincePublishMs: 0 });
+    expect(pops(main)).toEqual(['+42', '+1']);
+    main.texts.length = 0;
+    renderer.draw(at(2200, []), VIEW, { nowS: 1.2, sincePublishMs: 0 });
+    expect(pops(main)).toEqual([]);
+  });
+  it('drops completions older than a pop lifetime and pops nothing while the round is over', () => {
+    const { renderer, main } = setup();
+    renderer.draw(at(1000, []), VIEW, { nowS: 0, sincePublishMs: 0 });
+    renderer.draw(at(5000, [done(1, 0, 7, 0, 10)]), VIEW, { nowS: 0.01, sincePublishMs: 0 });
+    renderer.draw(at(5000, [done(2, 0, 8, 0, 49)], 'ended'), VIEW, { nowS: 0.02, sincePublishMs: 0 });
+    renderer.draw(at(5100, []), VIEW, { nowS: 0.03, sincePublishMs: 0 });
+    expect(pops(main)).toEqual([]);
+  });
 });

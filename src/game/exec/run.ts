@@ -17,6 +17,7 @@ import { keffOf, runsTasks } from './slots';
 import { stealThreads } from './stealing';
 import { leaveStage, promoteIo, releaseRunning, enterStage } from './stages';
 import { CPU, GPU, IO, NRES, RAM, shapeOf } from './shape';
+import { diskRate, firstPart } from './memory';
 
 /**
  * Run phase: allocate, then process completion events, stage transitions and in-tick chaining.
@@ -64,7 +65,7 @@ function anchorRates(w: World, s: number, sp: Span, share: number, runs: boolean
   setRate(w, s, CPU, sp.x0[CPU]!, cpu);
   setRate(w, s, RAM, sp.x0[RAM]!, c.ramBw[s]! / Math.max(1, h.active[i + RAM]!));
   setRate(w, s, GPU, sp.x0[GPU]!, 0);
-  setRate(w, s, IO, sp.x0[IO]!, c.ioRate[s]! / Math.max(1, h.ioHolds[s]!));
+  setRate(w, s, IO, sp.x0[IO]!, diskRate(w, s) / Math.max(1, h.ioHolds[s]!));
 }
 
 /** The lone system's take at τ (spec §6.4): at allocation, at a completion and when a transfer lands. */
@@ -147,12 +148,20 @@ function runEvents(w: World, s: number, share: number): number {
     const r = accel >= 0 ? h.accelHead[s * ACCEL_CLOCKS + accel]! : h.head[s * NRES + res]!;
     const doneW = rec.finish[r]!;
     leaveStage(w, s, r, axisAt(span, GPU, tau));
-    if (rec.stage[r]! + 1 < shapeOf(rec.family[r]!).stages) {
+    // D26.2: a stage runs its parts in order (main, RAM, disk), each on its own clock; then the next stage.
+    const shape = shapeOf(rec.family[r]!);
+    const part = firstPart(w, r, shape, rec.stage[r]!, rec.part[r]! + 1);
+    if (part >= 0) {
+      rec.part[r] = part;
+      enterStage(w, s, r, tau, span, res, doneW);
+    } else if (rec.stage[r]! + 1 < shape.stages) {
       rec.stage[r] = rec.stage[r]! + 1;
+      rec.part[r] = firstPart(w, r, shape, rec.stage[r]!, 0);
       enterStage(w, s, r, tau, span, res, doneW);
     } else {
+      const domain = rec.accelDomain[r]!;
       releaseRunning(w, s, r);
-      completeRecord(w, s, r);
+      completeRecord(w, s, r, tau, domain);
       if (chain) allocate(w, s, tau);
     }
     if (res === IO) promoteIo(w, s, tau, span);

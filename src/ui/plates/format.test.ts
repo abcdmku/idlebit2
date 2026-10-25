@@ -59,3 +59,25 @@ describe('measurements: at most 3 significant figures', () => {
     expect(span(3 * 86400 + 4 * 3600)).toBe('3d 4h');
   });
 });
+
+describe('one number scheme at every scale (A13)', () => {
+  it('names the bands to Dc with three significant digits, then goes scientific', () => {
+    expect([1.8e17, 1.8e20, 4.2e23, 1e33, 9.99e35].map(n => wholeText(n))).toEqual(['180Q', '180Qi', '420Sx', '1Dc', '999Dc']);
+    expect(wholeText(1.8e36)).toBe('1.80e36');
+    expect(wholeText(9.996e35)).toBe('1.00e36');
+  });
+  it('steps speeds through Z and Y, then scientific', () => {
+    expect([quantity(1e20, 'Hz'), quantity(2.5e22, 'Hz'), quantity(3e24, 'Hz'), quantity(1e29, 'Hz')]).toEqual(['100 EHz', '25 ZHz', '3 YHz', '1.00e29 Hz']);
+  });
+});
+
+describe('memory tiers (D26, lead ruling)', () => {
+  it('cache and RAM read used of capacity; disk reads only what spilled, or its capacity when empty', async () => {
+    const { tierText } = await import('./MemoryTiers');
+    const t = (tier: 'cache' | 'ram' | 'disk', usedBits: number, capacityBits: number) => ({ tier, usedBits, capacityBits, spilledBits: tier === 'cache' ? 0 : usedBits, rateBits: null });
+    expect(tierText(t('ram', 65_536, 131_072))).toEqual({ text: '65.5 kb / 131 kb', tone: '' });
+    expect(tierText(t('disk', 1_200_000, 8e6))).toEqual({ text: '1.2 Mb spilled', tone: 'warn' });
+    expect(tierText(t('disk', 0, 8e6))).toEqual({ text: '8 Mb', tone: 'dim' });
+    expect(tierText(t('disk', 0, 0))).toEqual({ text: 'none', tone: 'dim' });
+  });
+});

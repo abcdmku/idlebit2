@@ -48,7 +48,7 @@ function task(state: GameState, tensor: boolean, domain: number, count = 1): num
   const r = allocRecord(state.hot);
   state.hot.rec.family[r] = family.id;
   state.hot.rec.stage[r] = family.stages.findIndex((stage) => stage.resource === 'gpu');
-  state.hot.rec.scale[r] = 13.25;
+  state.hot.rec.units[r] = 13.25;
   state.hot.rec.count[r] = count;
   state.hot.rec.owner[r] = 0;
   state.hot.rec.accelDomain[r] = domain;
@@ -98,7 +98,7 @@ describe('GPU system views', () => {
     state.hot.sys.accelUsedVram[0] = 26.5;
     state.hot.rec.stage[r] = 0;
     const snap = systemSnapshot(state, systemId(0), null);
-    expect(snap.running[0]).toMatchObject({ resource: 'cpu', accelDomain: 0, vramBits: 13.25 });
+    expect(snap.running[0]).toMatchObject({ resource: 'compute', accelDomain: 0, vramBits: 13.25 });
     expect(snap.gpu[0]).toMatchObject({ active: false, resourceBusy: 0, vramUsedBits: 26.5 });
   });
 });

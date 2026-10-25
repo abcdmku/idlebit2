@@ -48,13 +48,13 @@ export function drawFamilyGlyph(g: G, family: FamilyId | string, x: number, y: n
 }
 
 const REQ: Readonly<Record<ReqIcon, readonly string[]>> = {
-  cpu: ['###', '#.#', '###'], ram: ['#.#', '#.#', '###'], gpu: ['###', '###', '#.#'], io: ['###', '...', '###'],
-  vram: ['#.#', '#.#', '.#.'], storageCap: ['###', '###', '###'], ecc: ['.#.', '###', '.#.'], tensor: ['#.#', '.#.', '#.#'],
-  gang: ['#.#', '...', '#.#'], zones: ['##.', '...', '.##'], region: ['.#.', '#.#', '.#.'],
+  compute: ['###', '#.#', '###'], mem: ['#.#', '#.#', '###'], gpu: ['###', '###', '#.#'], window: ['###', '.#.', '###'],
+  vram: ['#.#', '#.#', '.#.'], ecc: ['.#.', '###', '.#.'], tensor: ['#.#', '.#.', '#.#'],
+  zones: ['##.', '...', '.##'], region: ['.#.', '#.#', '.#.'],
 };
 export const REQ_COLOR: Readonly<Record<ReqIcon, string>> = {
-  cpu: KIND.compute, ram: P.ram, gpu: P.gpu, io: P.stor, vram: P.gpu, storageCap: P.stor, ecc: P.ram, tensor: P.rnd,
-  gang: P.bit, zones: P.cool, region: P.coolHi,
+  compute: KIND.compute, mem: P.ram, gpu: P.gpu, window: P.amber, vram: P.gpu, ecc: P.ram, tensor: P.rnd,
+  zones: P.cool, region: P.coolHi,
 };
 /** A 3×3 requirement pip. */
 export function drawReq(g: G, req: ReqIcon, x: number, y: number): void {
@@ -69,6 +69,8 @@ const CAUSE: Readonly<Record<CauseMark, readonly string[]>> = {
   power: ['..##.', '.##..', '#####', '..##.', '.##..'],
   heat: ['..#..', '.##..', '.###.', '#####', '.###.'],
   swap: ['.#...', '#####', '.#..#', '#..#.', '#####'],
+  // D26.5: missed its completion window: a clock face with its hands at the deadline.
+  late: ['.###.', '#.#.#', '#.###', '#...#', '.###.'],
 };
 /** A 5×5 failure-cause mark (D4.1's six causes). */
 export function drawCause(g: G, cause: CauseMark, x: number, y: number, color: string = P.paper): void {

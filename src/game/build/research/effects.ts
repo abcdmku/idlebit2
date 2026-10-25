@@ -2,7 +2,7 @@ import { secondsToTicks } from '../../core/constants';
 import { baseRouter } from '../../core/defaults';
 import { baseUnlocks } from '../../core/state';
 import type { BuildState } from '../../types/build';
-import type { CeilingId, FilterId, PartId, PlacementId, QueueStrategyId, RouteStrategyId, RuleId } from '../../types/catalog';
+import type { CeilingId, FilterId, PartId, QueueStrategyId, RouteStrategyId, RuleId } from '../../types/catalog';
 import type { LevelId, ResearchId } from '../../types/ids';
 import type { GameState, Unlocks } from '../../types/state';
 import { researchDef, TREE_INDEX } from './tree';
@@ -25,7 +25,6 @@ export function deriveUnlocks(completed: readonly ResearchId[]): Unlocks {
   const queue = new Set<QueueStrategyId>(base.queueStrategies);
   const route = new Set<RouteStrategyId>(base.routeStrategies);
   const filters = new Set<FilterId>(base.filters);
-  const placements = new Set<PlacementId>(base.placements);
   const rules = new Set<RuleId>(base.rules);
   const params: Partial<Record<RuleId, Params>> = {};
 
@@ -44,7 +43,6 @@ export function deriveUnlocks(completed: readonly ResearchId[]): Unlocks {
           if (e.scope === 'system') queue.add(e.id as QueueStrategyId); else route.add(e.id as RouteStrategyId);
           break;
         case 'filter': filters.add(e.id); break;
-        case 'placement': placements.add(e.id); break;
         case 'view': levels[e.level] = true; break;
         case 'rule': {
           rules.add(e.id);
@@ -60,7 +58,7 @@ export function deriveUnlocks(completed: readonly ResearchId[]): Unlocks {
   const p = (rule: RuleId, key: string) => params[rule]?.[key];
   return {
     levels, gens, ceilings,
-    queueStrategies: [...queue], routeStrategies: [...route], filters: [...filters], placements: [...placements],
+    queueStrategies: [...queue], routeStrategies: [...route], filters: [...filters],
     rules: [...rules], ruleParams: params,
     bootTicks: p('bootSeconds', 'seconds') !== undefined ? secondsToTicks(p('bootSeconds', 'seconds')!) : base.bootTicks,
     autoReturnDelayTicks: p('autoReturn', 'delayS') !== undefined ? secondsToTicks(p('autoReturn', 'delayS')!) : base.autoReturnDelayTicks,

@@ -29,7 +29,7 @@ it('veils the whole canvas at the mockup alpha', () => {
   expect(fills).toEqual([{ x: 0, y: 0, w: 390, h: 780, c: P.veil, a: VEIL_ALPHA }]); expect(g.globalAlpha).toBe(1);
 });
 it('draws cartridge countdowns from the real deadline and marks failures with their cause', () => {
-  const art: CartArt = { family: 'json', color: P.op, reqs: ['cpu', 'ram'], state: 'wait', cause: null, leftS: 10, totalS: 10, group: false };
+  const art: CartArt = { family: 'json', color: P.op, reqs: ['compute', 'mem'], state: 'wait', cause: null, leftS: 10, totalS: 10, group: false };
   const bar = (leftS: number) => { const { g, fills } = recordingContext(); drawCart(g, 0, 0, { ...art, leftS }); return fills; };
   expect(colorAt(bar(10), CART - 3, 14)).toBe(P.bit);
   expect(colorAt(bar(5), 8, 14)).toBe(P.bit); expect(colorAt(bar(5), 9, 14)).toBe(P.ink);
@@ -38,4 +38,10 @@ it('draws cartridge countdowns from the real deadline and marks failures with th
   expect(colorAt(failed.fills, 1, 1)).toBe(P.fault); expect(colorAt(failed.fills, 3, 4)).toBe(P.fault);
   expect(colorAt(failed.fills, 2, 14)).toBe(P.ink);
   const well = recordingContext(); drawCartWell(well.g, 0, 0); expect(colorAt(well.fills, 5, 5)).toBe(P.well);
+});
+it('marks a late failure (D26.5) with its own clock-face cause mark', async () => {
+  const { drawCause } = await import('./feed');
+  const a = recordingContext(), b = recordingContext();
+  drawCause(a.g, 'late', 0, 0); drawCause(b.g, 'timeout', 0, 0);
+  expect(a.fills.length).toBeGreaterThan(8); expect(a.fills).not.toEqual(b.fills);
 });

@@ -1,15 +1,18 @@
+import { formatHertz, formatSize } from '../../../game';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { familyId } from '../../../game';
 import type { RenderSnapshot, SystemSnapshot, TransferView } from '../../../game';
-import { LabelBuffer, P, bitRate, bitsText, createHitTarget, createLevelRegistry, hertz, wattsText, whole } from '../../core';
+import { LabelBuffer, P, createHitTarget, createLevelRegistry, flowColor, rect, wattsText, whole } from '../../core';
+import type { Completion } from '../../core/pops';
 import type { ChildView, ViewPresentation, WorldForm, WorldFrame, ZoomState } from '../../core';
 import { createFixtureLevels } from '../../core/fixtureLevels';
 import type { Fill } from '../../core/testCanvas';
 import { recordingContext } from '../../core/testCanvas';
 import { createSystemRenderer } from '.';
-import { BOARD, BOARDS, FOCUS, PSU, WORLD, packageRect } from './layout';
+import { BOARD, BOARDS, CABLE_X, FOCUS, PSU, WORLD, packageRect, siteRect } from './layout';
 import { boardModel } from './model';
 import { sizes } from './labels';
-import { chipScene, systemScene } from './scenes';
+import { chipScene, sceneInbound, systemScene } from './scenes';
 
 const VIEW: ViewPresentation = { selectedId: null, picked: null, quotes: null, reducedMotion: false };
 beforeEach(() => {
@@ -81,16 +84,16 @@ describe('original system board', () => {
 
 describe('system value labels', () => {
   it('joins stick sizes the way L2 prints them', () => {
-    expect(sizes([16384, 8192])).toBe('2 + 1 KiB'); expect(sizes([512, 8192])).toBe('512 bits + 1 KiB');
+    expect(sizes([16384, 8192])).toBe('16.4 + 8.19 kb'); expect(sizes([512, 8192])).toBe('512 b + 8.19 kb');
   });
   const s = systemScene('system'), gpu = s.gpu[0]!.gpu!;
   const expected = {
-    port: `Port|${hertz(s.chip.pipe.speed)}`,
-    cpu: `CPU|${hertz(s.chip.clock.hz)} · ${whole(s.chip.cores.length)} cores`,
+    port: `Port|${formatHertz(s.chip.pipe.speed)}`,
+    cpu: `CPU|${formatHertz(s.chip.clock.hz)} · ${whole(s.chip.cores.length)} cores`,
     psu: `PSU|${wattsText(s.psu.capacityW)}`,
-    ram: `RAM|${sizes(s.ram.map(p => p.capacityBits!))} · ${hertz(Math.min(...s.ram.map(p => p.rateBits!)))}`,
-    drive: `Drive|${bitsText(s.storage[0]!.capacityBits!)} · ${bitRate(s.storage[0]!.rateBits!)}`,
-    gpu: `GPU|G${gpu.model} · ${whole(gpu.cores)} cores · ${bitsText(gpu.vramBits)}`,
+    ram: `RAM|${sizes(s.ram.map(p => p.capacityBits!))} · ${formatHertz(Math.min(...s.ram.map(p => p.rateBits!)))}`,
+    drive: `Drive|${formatSize(s.storage[0]!.capacityBits!)} · ${formatHertz(s.storage[0]!.rateBits!)}`,
+    gpu: `GPU|G${gpu.model} · ${whole(gpu.cores)} cores · ${formatSize(gpu.vramBits)}`,
   };
   it.each(['desktop', 'phone'] as const)('labels every installed part with its snapshot values on %s', form => {
     const list = labels(s, form);
@@ -124,13 +127,55 @@ describe('system motion audit (v2 program §7)', () => {
     expect(fills.some(f => f.c === P.ram || f.c === P.gpu || f.c === P.stor || f.c === P.op || f.c === P.cacheOn)).toBe(false);
     expect(fills.filter(f => f.c === P.led).every(f => inside(f, PSU))).toBe(true);
   });
-  it('rides a transfer down the cable at its real progress, and hides sub-0.25 s transfers', () => {
-    const transfer = (bits: number, bitsSent: number): TransferView => ({ taskId: 1, family: 0 as TransferView['family'], systemId: 0 as TransferView['systemId'], link: 'pipe', bits, bitsSent, speed: 1000 });
+  it('rides a shard down the cable at its real progress in its type colour; a sub-0.25 s one is a landing flash', () => {
+    const transfer = (bits: number, bitsSent: number): TransferView => sceneInbound({ link: 'pipe', family: familyId(0), bits, bitsSent, speed: 1000 });
     const withT = (t: TransferView) => ({ ...quiet(), chip: { ...quiet().chip, pipe: { speed: 1000, transfer: t, waiting: true } } });
-    const bit = (fills: Fill[]) => fills.filter(f => f.c === P.bit).map(f => f.y);
-    const early = bit(draw(withT(transfer(2000, 200), ), 0, { idleChip: true })), later = bit(draw(withT(transfer(2000, 200)), 500, { idleChip: true, simTimeMs: 0 }));
+    const colour = flowColor(transfer(1, 0)), bit = (fills: Fill[]) => fills.filter(f => f.c === colour).map(f => f.y);
+    const early = bit(draw(withT(transfer(2000, 200)), 0, { idleChip: true })), later = bit(draw(withT(transfer(2000, 200)), 500, { idleChip: true, simTimeMs: 0 }));
     expect(early.length).toBeGreaterThan(0);
     expect(Math.min(...later)).toBeGreaterThan(Math.min(...early));
-    expect(bit(draw(withT(transfer(100, 0)), 0, { idleChip: true }))).toHaveLength(0);
+    const flash = draw(withT(transfer(100, 0)), 0, { idleChip: true });
+    expect(bit(flash)).toHaveLength(0);
+    const end = BOARDS.general.sites.cpu[0]!.y + 4;
+    expect(flash.filter(f => f.w === 4 && f.h === 4 && f.x === CABLE_X - 2 && f.y === end - 2)).toHaveLength(1);
+  });
+  it('draws the port shard from SystemSnapshot.inbound (D25) before the pipe transfer', () => {
+    const s = { ...quiet(), inbound: sceneInbound(), chip: { ...quiet().chip, pipe: { speed: 1000, transfer: sceneInbound({ family: familyId(0) }), waiting: true } } };
+    const fills = draw(s, 0, { idleChip: true });
+    expect(fills.some(f => f.c === flowColor(sceneInbound()))).toBe(true);
+    expect(fills.some(f => f.c === flowColor({ family: familyId(0) }))).toBe(false);
+  });
+});
+
+describe('system payout anchors (D25: only a task\'s last shard pops)', () => {
+  const at = (s: SystemSnapshot, c: Partial<Completion>) => {
+    const out = rect(), key = setup().payoutAnchor!(s, { system: 0, cpu: 0, core: 0, gpu: null, ...c } as Completion, out, 'desktop');
+    return { key, out };
+  };
+  it('lands a GPU completion on the card in that slot, and a CPU completion on its package', () => {
+    const full = systemScene('full');
+    expect(at(full, { cpu: null, core: null, gpu: 6 })).toEqual({ key: 14, out: siteRect(BOARDS.accelerator, 'gpu', 6, rect()) });
+    expect(at(full, { cpu: 0, core: 2 })).toEqual({ key: 0, out: packageRect(BOARDS.accelerator, 0) });
+    expect(at(full, { system: 3 }).key).toBe(-1);
+  });
+});
+
+describe('D26 memory tiers', () => {
+  it('fills RAM and the drive, hatches spilled bits, lights the tier being read, and labels the spill', async () => {
+    const { drawTiers, drawReadLights, tierOf } = await import('./memory');
+    const { boardModel } = await import('./model');
+    const s = systemScene('spill'), m = boardModel(s), rec = recordingContext();
+    drawTiers(rec.g, s, m, true);
+    expect(rec.fills.some(f => f.c === P.ram)).toBe(true); expect(rec.fills.some(f => f.c === P.stor)).toBe(true);
+    expect(rec.fills.filter(f => f.c === P.ink && f.w === 1 && f.h === 1).length).toBeGreaterThan(10);
+    const lights = recordingContext();
+    drawReadLights(lights.g, s, m, 1100, true);
+    expect(lights.fills.some(f => f.c === P.amber)).toBe(true);
+    expect(tierOf(s, 'disk')!.spilledBits).toBeGreaterThan(0);
+    const level = createSystemRenderer(createLevelRegistry()), out = new LabelBuffer();
+    level.labels!(s, VIEW, { snapshot: { focus: s } as never, timeMs: 1000, paused: false, reducedMotion: false, zoom: null, form: 'desktop', visible: null }, out);
+    const texts: string[] = [];
+    for (let i = 0; i < out.count; i++) { const l = out.labels[i]!; for (let k = l.first; k < l.end; k++) texts.push(out.runs[k]!.text); }
+    expect(texts.some(t => t.endsWith('spilled'))).toBe(true);
   });
 });

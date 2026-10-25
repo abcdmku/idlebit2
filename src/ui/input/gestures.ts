@@ -3,15 +3,16 @@ export interface GestureHandlers {
   renderer(): CanvasRendererDebug | null;
   tap(hit: HitTarget | null): void;
   zoom(direction: 'in' | 'out', hit: HitTarget | null): void;
-  /** A horizontal pan of the view (the rack row, D17.2), when the level at rest has one. */
+  /** A pan of the resting view (the rack row, D17.2; a level larger than the view, A05/A09/A20), when it has one. */
   pan?: PanHandler;
 }
 export interface PanHandler {
-  /** True while the resting level pans (the Rack level). */
+  /** True while the resting level pans. */
   active(): boolean;
-  /** CSS px since the drag began (drag), or one wheel step's delta (wheel). */
-  drag(dxCss: number, phase: 'start' | 'move' | 'end'): void;
-  wheel(dCss: number): void;
+  /** CSS px since the drag began. At 'end', the finger's last velocity in CSS px/s. */
+  drag(dxCss: number, dyCss: number, phase: 'start' | 'move' | 'end', vxCss?: number, vyCss?: number): void;
+  /** One wheel step's delta, CSS px. */
+  wheel(dxCss: number, dyCss: number): void;
 }
 /** A drag longer than this many CSS px is a pan, not a tap (L2). */
 export const PAN_SLOP = 6;
@@ -22,6 +23,14 @@ export function wheelUnits(event: Pick<WheelEvent, 'deltaY' | 'deltaMode'>, heig
 export function bindGestures(canvas: HTMLCanvasElement, handlers: GestureHandlers): () => void {
   const pointers = new Map<number, { x: number; y: number; startX: number; startY: number }>();
   let pinched = false, baseline = 0, wheel = 0, panning = false;
+  // The pan's recent samples (event ms, CSS px): the finger's velocity at release carries a flick.
+  let samples: { t: number; x: number; y: number }[] = [];
+  const velocity = (): [number, number] => {
+    const last = samples[samples.length - 1], first = samples.find(s => last && last.t - s.t <= 100);
+    if (!last || !first || last.t <= first.t) return [0, 0];
+    const dt = (last.t - first.t) / 1000;
+    return [(last.x - first.x) / dt, (last.y - first.y) / dt];
+  };
   const local = (x: number, y: number) => { const r = canvas.getBoundingClientRect(); return { x: x - r.left, y: y - r.top }; };
   const hit = (x: number, y: number) => { const p = local(x, y); return handlers.renderer()?.hit(p.x, p.y) ?? null; };
   const down = (event: PointerEvent) => {
@@ -37,9 +46,13 @@ export function bindGestures(canvas: HTMLCanvasElement, handlers: GestureHandler
     pointer.x = event.clientX; pointer.y = event.clientY;
     const pan = handlers.pan;
     if (pointers.size === 1 && pan && (panning || (pan.active() && !handlers.renderer()?.transition))) {
-      const dx = event.clientX - pointer.startX;
-      if (!panning && Math.abs(dx) > PAN_SLOP) { panning = true; pan.drag(0, 'start'); }
-      if (panning) { pan.drag(dx, 'move'); event.preventDefault(); }
+      const dx = event.clientX - pointer.startX, dy = event.clientY - pointer.startY;
+      if (!panning && Math.hypot(dx, dy) > PAN_SLOP) { panning = true; samples = []; pan.drag(0, 0, 'start'); }
+      if (panning) {
+        samples.push({ t: event.timeStamp, x: event.clientX, y: event.clientY });
+        if (samples.length > 8) samples.shift();
+        pan.drag(dx, dy, 'move'); event.preventDefault();
+      }
       return;
     }
     if (pointers.size !== 2 || !baseline) return;
@@ -59,13 +72,13 @@ export function bindGestures(canvas: HTMLCanvasElement, handlers: GestureHandler
     pointers.delete(event.pointerId);
     if (canvas.hasPointerCapture?.(event.pointerId)) canvas.releasePointerCapture(event.pointerId);
     if (!pointers.size) {
-      if (panning) handlers.pan?.drag(0, 'end');
+      if (panning) handlers.pan?.drag(0, 0, 'end', ...velocity());
       pinched = false; baseline = 0; panning = false;
     }
   };
   const onWheel = (event: WheelEvent) => {
     event.preventDefault();
-    if (handlers.pan?.active() && !handlers.renderer()?.transition) { handlers.pan.wheel(event.deltaX || wheelUnits(event, canvas.clientHeight)); return; }
+    if (handlers.pan?.active() && !handlers.renderer()?.transition) { handlers.pan.wheel(event.deltaX, wheelUnits(event, canvas.clientHeight)); return; }
     wheel += wheelUnits(event, canvas.clientHeight);
     // One step per threshold; a large wheel gesture can cross the entire reachable hierarchy.
     let steps = Math.min(4, Math.floor(Math.abs(wheel) / 120));

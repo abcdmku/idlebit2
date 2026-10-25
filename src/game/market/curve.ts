@@ -17,9 +17,13 @@ export const sizeScale = (I: number): number => 2 ** (CURVE.sizeExp * I);
 /** The next round's opening intensity (D12.1). */
 export const startIntensity = (peak: number): number => Math.max(0, peak - CURVE.startBack);
 
-/** Frozen per-member size, in whole units. */
-export const memberSize = (I: number, jitter: number, members: number): number =>
-  Math.max(1, Math.round((sizeScale(I) * jitter) / members));
+/**
+ * Frozen task size s in whole units (D25.1, docs/tasks.md §2): round(U(I) × j), and at least
+ * members × grain for a minimum-split task so every one of its shards holds a grain. An ordinary
+ * task may be smaller than its grain: it is then one shard.
+ */
+export const taskSize = (I: number, jitter: number, members: number, grain: number): number =>
+  Math.max(members > 1 ? members * grain : 1, Math.round(sizeScale(I) * jitter));
 export const sizeJitter = (u: number): number => 1 + CURVE.sizeJit * (2 * u - 1);
 
 /** Authored family weight at I, before round jitter. */

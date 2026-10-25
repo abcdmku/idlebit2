@@ -18,9 +18,11 @@ import { PlateLayer } from './plates';
 import { QueueStrip } from './QueueStrip';
 import { ResearchDrawer } from './research';
 import { RoundPlate } from './RoundPlate';
-import { box, LayoutContext, useLayout } from './shell/geometry';
-import { ShellContext, createShellValue, usePlatformStatus, type ShellContextValue, type ShellSurface } from './storeHooks';
+import { box, LayoutContext } from './shell/geometry';
+import { ShellContext, createShellValue, type ShellContextValue, type ShellSurface } from './storeHooks';
+import { PlatformLine } from './shell/PlatformLine';
 import { createViewStore, initialView, type ViewStore } from './viewState';
+import { openingLevel, writeLastLevel } from './prefs';
 import './styles/tokens.css';
 import './styles/shell.css';
 import './styles/plates.css';
@@ -90,6 +92,23 @@ export function GameShell({ store, registry, level, view, size, children }: Game
     w.__brShell = shell;
     return () => { if (w.__brShell === shell) delete w.__brShell; };
   }, [shell]);
+  // A29: once the save is read, open at the last level the player looked at (UI prefs), else the
+  // highest unlocked one; from then on remember each level they settle on.
+  useEffect(() => {
+    let opened = false, stopView: (() => void) | null = null;
+    const open = () => {
+      const life = store.getLifecycle();
+      if (opened || !life.hydrated || life.catchingUp) return;
+      opened = true;
+      const s = store.getSnapshot(), v = shell.view.getState();
+      const want = level ?? openingLevel(s);
+      if (!level && want !== v.focus.level && v.focus.level === 'chip' && !v.goal) shell.view.reset(initialView(s, want, v.reducedMotion));
+      stopView = shell.view.subscribe(() => { const f = shell.view.getState(); if (!f.goal && !f.partner) writeLastLevel(f.focus.level); });
+    };
+    open();
+    const stop = store.subscribe(open);
+    return () => { stop(); stopView?.(); };
+  }, [shell, store, level]);
   // A reset (new epoch) starts over at the home CPU.
   useEffect(() => {
     let epoch = store.getSnapshot().epoch;
@@ -109,7 +128,7 @@ export function GameShell({ store, registry, level, view, size, children }: Game
     r: () => shell.view.dispatch({ type: 'toggleSheet', sheet: 'research' }),
   });
 
-  const vars = { '--body': `${layout.body}px`, '--lh': `${layout.lh}px`, '--big': `${layout.big}px`, '--mid': `${layout.mid}px`,
+  const vars = { '--body': `${layout.body}px`, '--lh': `${layout.lh}px`, '--big': `${layout.big}px`,
     '--head': `${layout.body + 2}px`, '--n': `${layout.N}px` } as CSSProperties;
   return <ShellContext.Provider value={shell}>
     <LayoutContext.Provider value={layout}>
@@ -123,21 +142,13 @@ export function GameShell({ store, registry, level, view, size, children }: Game
           <OffersScope>
             <Deck />
             <Callout />
+            <PlateLayer />
+            <ResearchDrawer />
+            <RoundPlate />
           </OffersScope>
-          <PlateLayer />
-          <ResearchDrawer />
-          <RoundPlate />
           {children}
         </div>
       </main>
     </LayoutContext.Provider>
   </ShellContext.Provider>;
-}
-
-/** Save notices and offline catch-up progress, one line at the top of the free world. */
-function PlatformLine() {
-  const p = usePlatformStatus(), L = useLayout();
-  const text = p.catchingUp ? `Catching up${p.progress === null ? '' : ` · ${p.progress}%`}` : p.notice;
-  return <p className="platform-line" role="status" hidden={!text}
-    style={{ left: L.view.x + L.lat, top: L.view.y + L.lat, width: L.view.w - 2 * L.lat, height: L.lh }}>{text}</p>;
 }

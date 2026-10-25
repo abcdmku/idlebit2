@@ -61,15 +61,15 @@ const ownCls = new Int32Array(OWN_MAX), ownEff = new Float64Array(OWN_MAX), ownE
 const ownClock = new Float64Array(OWN_MAX), ownVal = new Float64Array(OWN_MAX);
 function ownOf(w: World, s: number, r: number): number {
   const rec = w.hot.rec;
-  if (!memo.exact) return estOn(w, s, rec.family[r]!, rec.scale[r]!, 0);
+  if (!memo.exact) return estOn(w, s, rec.family[r]!, rec.units[r]!, 0);
   const cls = classOf[s] ?? -1;
-  if (cls < 0) return estOn(w, s, rec.family[r]!, rec.scale[r]!, 0);
+  if (cls < 0) return estOn(w, s, rec.family[r]!, rec.units[r]!, 0);
   if (ownDecision !== memo.decision || ownEpoch !== memo.epoch) { ownDecision = memo.decision; ownEpoch = memo.epoch; ownN = 0; }
   const eff = w.hot.rack.eff[w.compiled.sys.rack[s]!]!, eta = w.compiled.sys.etaCfg[s]!, clock = w.hot.sys.clockFactor[s]!;
   for (let i = 0; i < ownN; i += 1) {
     if (ownCls[i] === cls && Object.is(ownEff[i], eff) && Object.is(ownEta[i], eta) && Object.is(ownClock[i], clock)) return ownVal[i]!;
   }
-  const value = estOn(w, s, rec.family[r]!, rec.scale[r]!, 0);
+  const value = estOn(w, s, rec.family[r]!, rec.units[r]!, 0);
   if (ownN < OWN_MAX) { ownCls[ownN] = cls; ownEff[ownN] = eff; ownEta[ownN] = eta; ownClock[ownN] = clock; ownVal[ownN] = value; ownN += 1; }
   return value;
 }

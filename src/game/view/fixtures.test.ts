@@ -1,4 +1,8 @@
-import { FIXTURE_NAMES, FIXTURE_ROUNDS, fixtureSnapshot, fixtureState } from './fixtures';
+import { advanceGame } from '../core/advance';
+import type { GlobalSnapshot, RackSnapshot, RoomSnapshot } from '../types/snapshot';
+import type { TransferView } from '../types/views';
+import { FIXTURE_NAMES, FIXTURE_ROUNDS, fixtureScope, fixtureSnapshot, fixtureState } from './fixtures';
+import { deriveRenderSnapshot } from './snapshot';
 
 // Top-hardware fixtures do 600 warm-up ticks of real work under D10 (the fleet pulls continuously).
 vi.setConfig({ testTimeout: 60_000 });
@@ -6,6 +10,7 @@ vi.setConfig({ testTimeout: 60_000 });
 const LEVEL_OF = {
   chipBoot: 'chip', chipTop: 'chip', systemBoot: 'system', systemTop: 'system',
   rack: 'rack', room: 'room', global: 'global', globalGroup: 'global',
+  rackSplit: 'rack', roomSplit: 'room', globalSplit: 'global', spillSystem: 'system', spillRack: 'rack',
 } as const;
 
 describe('snapshot fixtures', () => {
@@ -60,5 +65,22 @@ describe('snapshot fixtures', () => {
     // rackFull opens no room, so the rack has no parent to zoom out to.
     expect(fixtureSnapshot('rack', 'running', true).partner).toBeNull();
     expect(fixtureState('rack')).toBe(fixtureState('rack'));
+  });
+
+  it('split fixtures show a task split 4+ ways crossing a link for 0.25 s or more, on positive credits', () => {
+    for (const [name, links] of [['rackSplit', ['server']], ['roomSplit', ['rack']], ['globalSplit', ['zone']]] as const) {
+      let state = fixtureState(name), seen: TransferView | undefined;
+      expect(state).not.toBe(fixtureState(name));
+      for (let t = 0; t < 100 && !seen; t += 1) {
+        const focus = deriveRenderSnapshot(state, fixtureScope(name)).focus as RackSnapshot | RoomSnapshot | GlobalSnapshot;
+        seen = focus.flows.find((f) => (links as readonly string[]).includes(f.link) && f.shards >= 4 && f.bits / f.speed >= 0.25);
+        state = advanceGame(state, 100).state;
+      }
+      expect(seen, name).toBeDefined();
+      expect(BigInt(fixtureSnapshot(name).hud.credits) > 0n, name).toBe(true);
+      // A minute on: still earning more than the hardware burns.
+      const start = fixtureState(name);
+      expect(BigInt(advanceGame(start, 60_000).state.wallet.credits) > BigInt(start.wallet.credits), name).toBe(true);
+    }
   });
 });

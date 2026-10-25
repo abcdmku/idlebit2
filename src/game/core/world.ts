@@ -6,6 +6,7 @@ import type { RoundReport } from '../types/report';
 import type { GameState, LedgerSample, MarketState, QueuedTask, ResearchState, RoundState } from '../types/state';
 import { cloneHot, type CompiledBuffers, type HotBuffers } from './buffers';
 import type { TouchLog } from './touch';
+import { completionLog, type CompletionLog } from './completions';
 
 export type Mutable<T> = { -readonly [K in keyof T]: T[K] };
 /** The market draft: the window is an owned array the tick shifts and refills in place. */
@@ -51,6 +52,8 @@ export interface ReportWork {
  * directly.
  */
 export interface World {
+  /** Cosmetic buffer for this hot-buffer owner; never committed into GameState. */
+  completions?: CompletionLog;
   /** Index of the tick being run (= ticks completed before it). */
   tick: number;
   readonly seed: number;
@@ -81,14 +84,17 @@ const big = (value: Amount) => BigInt(value);
 
 /** `owned`: the caller gives up `state`, so its hot buffers are updated in place (D9). */
 export function openWorld(state: GameState, owned = false): World {
+  const hot = owned ? state.hot : cloneHot(state.hot);
   return {
+    // Keep World's shape stable when its first completion arrives on the exec hot path.
+    completions: completionLog(hot),
     tick: state.clock.tick,
     seed: state.seed,
     epoch: state.epoch,
     build: state.build,
     compiled: state.compiled,
     configs: state.configs,
-    hot: owned ? state.hot : cloneHot(state.hot),
+    hot,
     round: { ...state.round },
     market: { ...state.market, window: [...state.market.window] },
     research: { ...state.research },

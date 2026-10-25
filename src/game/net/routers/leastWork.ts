@@ -1,21 +1,25 @@
-import { finishBelow } from '../finish';
+import { beginDecision } from '../routeMemo';
+import { finish } from '../finish';
 import { summarized, summaryRank } from '../summary';
-import { argmin, type RouteStrategy } from './types';
+import { sortBy, type RouteStrategy } from './types';
 
 /**
- * leastWork: the lowest predicted finish (backlog / Keff + own est + transfer time); ties lowest slot.
- * Each candidate is scored below the best so far (finishBelow), which picks as exact scores would.
- * At site and global scope candidates rank by their maintained summary instead (D24, net/summary.ts).
+ * leastWork: lowest predicted finish first (backlog / Keff + own est + transfer time). A child's
+ * weight is the inverse of its predicted finish for the share, so faster and emptier children take
+ * more and the chosen children's last shards finish close together. At site and global scope
+ * candidates rank by their maintained summary (D24, net/summary.ts).
  */
 export const leastWork: RouteStrategy = {
   id: 'leastWork',
-  choose(w, kind, _id, r, cand, _slot, n) {
-    if (summarized(kind)) return argmin(n, (i) => summaryRank(w, kind, cand[i]!, r));
-    let best = 0, bestScore = finishBelow(w, kind, cand[0]!, r, Infinity);
-    for (let i = 1; i < n; i += 1) {
-      const score = finishBelow(w, kind, cand[i]!, r, bestScore);
-      if (score < bestScore) { best = i; bestScore = score; }
+  weighted: true,
+  plan(w, kind, _id, r, cand, slot, weight, n) {
+    beginDecision();
+    const score = new Float64Array(n);
+    for (let i = 0; i < n; i += 1) {
+      score[i] = summarized(kind) ? summaryRank(w, kind, cand[i]!, r) : finish(w, kind, cand[i]!, r);
+      weight[i] = Number.isFinite(score[i]!) ? 1 / Math.max(1e-9, score[i]!) : 1e-300;
     }
-    return best;
+    sortBy(cand, slot, weight, n, (i) => score[i]!);
+    return n;
   },
 };

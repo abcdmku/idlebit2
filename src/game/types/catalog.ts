@@ -7,15 +7,12 @@ import type { Amount } from '../amount';
 export const QUEUE_STRATEGY_IDS = ['fifo', 'sjf', 'timeSlice', 'priority', 'mlfq'] as const;
 export type QueueStrategyId = (typeof QUEUE_STRATEGY_IDS)[number];
 /** Network strategies, spec §8.3. Index 0 is the free base (D1.5). */
-export const ROUTE_STRATEGY_IDS = ['firstFit', 'roundRobin', 'leastConn', 'weighted', 'leastWork', 'binPack', 'latency', 'price', 'affinity'] as const;
+export const ROUTE_STRATEGY_IDS = ['firstFit', 'roundRobin', 'leastConn', 'weighted', 'leastWork', 'binPack', 'latency', 'price', 'affinity', 'linkAware'] as const;
 export type RouteStrategyId = (typeof ROUTE_STRATEGY_IDS)[number];
 export type StrategyId = QueueStrategyId | RouteStrategyId;
 /** Filters in application order (spec §8.4). Bit i of a filter mask = FILTER_IDS[i]. */
-export const FILTER_IDS = ['region', 'capability', 'health', 'power', 'thermal'] as const;
+export const FILTER_IDS = ['region', 'capability', 'health', 'power', 'thermal', 'local'] as const;
 export type FilterId = (typeof FILTER_IDS)[number];
-/** Bit i of a placement mask = PLACEMENT_IDS[i]. */
-export const PLACEMENT_IDS = ['gang', 'topology', 'zone'] as const;
-export type PlacementId = (typeof PLACEMENT_IDS)[number];
 
 export const REGION_IDS = ['us-east', 'us-west', 'eu-west', 'eu-north', 'sa-east', 'af-south', 'ap-southeast', 'ap-northeast'] as const;
 export type RegionId = (typeof REGION_IDS)[number];
@@ -29,9 +26,12 @@ export interface RegionDef {
   readonly energyPrice: number;
 }
 
-/** Task resources. Spec §5.1 calls cpu "compute" and io "storage"; the code uses these four names. */
-export const RESOURCES = ['cpu', 'ram', 'gpu', 'io'] as const;
+/** Task stage resources (spec §5.1, D26.3): compute ops, mem bits touched (the old RAM stream and storage IO), GPU ops. */
+export const RESOURCES = ['compute', 'mem', 'gpu'] as const;
 export type Resource = (typeof RESOURCES)[number];
+/** D26.1: the memory tiers, fastest first. A shard's working set is placed cache, then RAM, then disk. */
+export const MEM_TIERS = ['cache', 'ram', 'disk'] as const;
+export type MemTier = (typeof MEM_TIERS)[number];
 
 /* ---------- Parts (spec Appendix A) ---------- */
 
@@ -96,13 +96,16 @@ export interface FamilyDef {
   /** Intensity window [from, to) in which the family is in the mix. */
   readonly window: { readonly from: number; readonly to: number };
   readonly weight: number;
-  /** Per member, run in order. Work is whole ops/bits after the size draw and rounding. */
+  /** Per unit of size, run in order: a shard of u units has stage work perSize × u (D25.1). */
   readonly stages: readonly StageDef[];
-  /** A maximum, never a gate (D4.5). */
-  readonly threads: number;
+  /**
+   * D25.1: the fewest size units that must run together. A task has at most floor(s / ĝ) shards,
+   * ĝ = max(grain, ceil(s / 256)); a shard of u units runs on max(1, floor(u / grain)) threads.
+   */
+  readonly grain: number;
   readonly workingSet: SizeTerm;
   readonly vramBits: SizeTerm;
-  readonly storageBits: SizeTerm;
+  /** D25.6 minimum split: at least this many shards on distinct systems; 1 for ordinary tasks. */
   readonly members: number;
   readonly minZones: number;
   readonly region: RegionReq;
@@ -116,6 +119,8 @@ export interface FamilyDef {
   readonly affinity: 'general' | 'accelerator';
   /** Credits per Data, 10 to 100 (D3.2). Jittered per round by the market. */
   readonly dataRatio: number;
+  /** D26.5 completion window in seconds from take, before size jitter; null before rackDist. */
+  readonly windowS: number | null;
 }
 
 /* ---------- Research (docs/research.md §9) ---------- */
@@ -132,12 +137,16 @@ export type CeilingId =
 export type Scope = 'system' | 'rack' | 'room' | 'site' | 'global' | 'net';
 export const RULE_IDS = [
   'workStealing', 'numaAware', 'smt', 'socketSpanPenalty', 'dma', 'prefetch', 'multiChannel', 'ecc',
-  'virtualMemory', 'tensorRate', 'gpuLink', 'npuTensorOnly', 'vramPerLevel', 'vramScale', 'ramWatts', 'ncq',
-  'sharedStorage', 'reserveOnRoute', 'cutThrough', 'qos', 'routingCapacity', 'linkScale', 'subseaLatency',
+  'hotPages', 'tensorRate', 'gpuLink', 'npuTensorOnly', 'vramPerLevel', 'vramScale', 'ramWatts', 'ncq',
+  'sharedStorage', 'cutThrough', 'qos', 'routingCapacity', 'linkScale', 'subseaLatency',
   'coreIdle', 'packageIdle', 's3Sleep', 'dvfs', 'turbo', 'powerCap', 'loadShed', 'lossFraction',
   'supplyCapacity', 'dualFeed', 'upsRideThrough', 'thermalThrottle', 'rackSetpoint', 'rackWater', 'roomLeak',
   'roomSetpoint', 'economizer', 'telemetry', 'autoReturn', 'autoSkip', 'gracefulDrain', 'bootSeconds', 'offlineCap',
   'configSave', 'rollingUpgrade', 'hotPlug', 'liveMigration', 'hotSwap', 'checkpointing',
+  /** D25.9 split rules (spec §8.5). */
+  'gather', 'shardSteal', 'stealRoom',
+  /** D26.4: VRAM overflows to RAM, then disk. */
+  'unifiedMemory',
 ] as const;
 export type RuleId = (typeof RULE_IDS)[number];
 export type ResearchEffect =
@@ -145,7 +154,6 @@ export type ResearchEffect =
   | { readonly kind: 'ceiling'; readonly key: CeilingId; readonly value: number }
   | { readonly kind: 'strategy'; readonly scope: Scope; readonly id: StrategyId }
   | { readonly kind: 'filter'; readonly scope: Scope; readonly id: FilterId }
-  | { readonly kind: 'placement'; readonly scope: Scope; readonly id: PlacementId }
   | { readonly kind: 'view'; readonly level: LevelId }
   | { readonly kind: 'rule'; readonly id: RuleId; readonly params?: Readonly<Record<string, number>> };
 export type AnswerCode =

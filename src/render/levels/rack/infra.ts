@@ -1,11 +1,12 @@
 // The four infrastructure slots (mockup levels/rack/infra.js): cooler (roof), switch and load
 // balancer (top two U), PDU (right post and plinth head). Each light is real snapshot state.
 import { P, R, frame as outline, mix, px } from '../../core';
+import { drawWells } from './flowkit';
 import type { RackSnapshot } from '../../../game';
 import { ROOF } from './cabinet';
 import { LB_SHORT, OFF, disc, ears, fan, fanAt, label, lcdText, lcdWidth, tempCol, unitCol } from './art';
 import type { FanBank } from './art';
-import { CAB, LB_RECT, NU, OPEN, PLINTH, READOUT, SERVER_SLOTS, STRIP, SWITCH_RECT, U, U0, UPLINK_JACK, portX, slotY } from './layout';
+import { CAB, LB_RECT, LB_WELLS, NU, OPEN, PLINTH, READOUT, SERVER_SLOTS, STRIP, SWITCH_RECT, U, U0, UPLINK_JACK, portX, slotY } from './layout';
 
 type G = CanvasRenderingContext2D;
 const ROOF_FAN = mix(ROOF, P.steel, 0.25);
@@ -57,7 +58,9 @@ function drawReadout(g: G, s: RackSnapshot, quiet: boolean): void {
   let l2: string, c2: string;
   if (s.crashed) { l2 = 'HALT'; c2 = P.fault; }
   else if (s.crashS > 0) { l2 = label('CRSH ', Math.ceil(s.crashS)); c2 = P.fault; }
-  else { const e = Math.round(s.eff * 100); l2 = label('E', e, '%'); c2 = e < 100 ? P.amber : mix(P.led, P.ink, 0.25); }
+  // A28: the efficiency reads as a bare percent under the °F (the callout names it). The 29 px
+  // display holds 6 LCD glyphs a line, so "59°F · 101%" stacks as two lines with no separator.
+  else { const e = Math.round(s.eff * 100); l2 = label('', e, '%'); c2 = e < 100 ? P.amber : mix(P.led, P.ink, 0.25); }
   lcdText(g, r.x + Math.max(2, (r.w - lcdWidth(l2)) >> 1), r.y + 8, l2, c2);
 }
 
@@ -104,6 +107,8 @@ export function drawLB(g: G, s: RackSnapshot, quiet: boolean): void {
     const has = s.servers[i]?.systemId != null;
     R(g, mx + i * 3, r.y + 4, 2, 4, off || !has ? OFF : lb.lastTarget === i ? P.bit : mix(P.net, P.ink, 0.55));
   }
+  // D25.7: the router queue's wells, between the routing lights and the status LED
+  drawWells(g, lb.queue, LB_WELLS.x, r.y + LB_WELLS.dy, LB_WELLS.w, LB_WELLS.h, !off);
 }
 
 // ---------- PDU: outlet strip on the right post, readout head on the plinth ----------

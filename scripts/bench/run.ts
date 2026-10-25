@@ -1,4 +1,4 @@
-// npm run bench [-- --gate=G1|G2|G3|G4] [--only=boot,rackFull,fleetMax,offline,campaign,gpuPowered]
+// npm run bench [-- --gate=G1|G2|G3|G4] [--only=boot,rackFull,fleetMax,fleetMaxLinks,offline,campaign,gpuPowered]
 // Architecture §7: one Node process plus one worker_threads worker for the offline case.
 // Writes artifacts/qa/perf/<stamp>/report.{json,md}. Exits 1 if a budget binding at
 // --gate (default G4: all of them) fails. Later-gate budgets are reported as advisory.
@@ -20,11 +20,17 @@ const CASES: readonly { id: string; run(): CaseResult | Promise<CaseResult> }[] 
   { id: 'boot', run: () => benchBoot(gate) },
   { id: 'rackFull', run: () => benchFleet(gate, ['rackFull'], BUDGETS.rackFull, ['chip', 'system', 'rack']) },
   { id: 'fleetMax', run: () => benchFleet(gate, ['fleetMax', 'fleetMaxHot'], BUDGETS.fleetMax) },
+  // Informational, never gating: fleetMax with top-tier links at I 42 (testkit/fleets MAX_LINK_FLEET), global scope.
+  { id: 'fleetMaxLinks', run: () => informational(benchFleet(gate, ['fleetMaxLinks'], BUDGETS.fleetMax, ['global'])) },
   { id: 'offline', run: () => benchOffline(gate) },
   { id: 'campaign', run: () => benchCampaign(gate, root) },
   // Explicit --only=gpuPowered opts into the populated GPU workload after integration approval.
   { id: 'gpuPowered', run: () => benchPoweredGpu(gate, arg('max-wall-ms') === undefined ? 30_000 : Number(arg('max-wall-ms'))) },
 ];
+
+/** Reports a case against a budget it does not gate. */
+const informational = (result: CaseResult): CaseResult =>
+  ({ ...result, id: 'fleetMaxLinks', budget: 'Top-link fleet frame p95 (informational)', status: 'advisory', note: [result.note, 'informational'].filter(Boolean).join('; ') });
 
 function crashed(id: string, error: unknown): CaseResult {
   const message = error instanceof Error ? error.message : String(error);

@@ -2,7 +2,7 @@
 // Tap a part to select it (the UI opens its upgrade callout); a CPU target also carries `drill`, so
 // a second tap or Open dives into the socket. The PSU is a fixed board part; nothing on a board cools.
 import type { SystemSnapshot } from '../../../game';
-import { P, R, copyRect, resetHitTarget, setRect } from '../../core';
+import { P, R, copyRect, partVersionOf, resetHitTarget, setRect } from '../../core';
 import type { HitTarget, LevelRegistry, LevelRenderer, Rect } from '../../core';
 import { writeLabels } from './labels';
 import { CABLE_X, FOCUS, PORT, PSU, SAVE, WORLD, packageRect, siteRect, worldRect } from './layout';
@@ -18,7 +18,8 @@ function chipRef(s: SystemSnapshot) {
   return ref;
 }
 const CPU_IDS = ['cpu0', 'cpu1', 'cpu2', 'cpu3'];
-const pkg: Rect = { x: 0, y: 0, w: 0, h: 0 };
+/** Pop keys: CPU k is k (at most 4 sockets), GPU slot g is GPU_KEY + g. */
+const GPU_KEY = 8;
 
 function unitTarget(s: SystemSnapshot, out: HitTarget[], i: number, id: string, kind: 'unit' | 'link', r: Rect): number {
   if (i >= out.length) return i;
@@ -32,6 +33,8 @@ const PORT_RECT: Rect = { x: PORT.x, y: PORT.y - PORT.z, w: PORT.w, h: PORT.h + 
 export function createSystemRenderer(registry: LevelRegistry): LevelRenderer<'system'> {
   return {
     id: 'system', name: 'System',
+    /** Shown whole, never panned (D15.2). */
+    wholeAtRest: true,
     size: (_s, out, form) => worldRect(form, out),
     focus: (_s, _vp, out) => copyRect(FOCUS, out),
     miniRect: (_s, out) => copyRect(WORLD, out),
@@ -78,10 +81,27 @@ export function createSystemRenderer(registry: LevelRegistry): LevelRenderer<'sy
       return i;
     },
     labels: (s, _view, frame, out) => writeLabels(s, frame, out),
-    unitAnchor(s, id, out) {
-      if (id !== s.systemId) return false;
-      packageRect(boardModel(s).b, 0, pkg);
-      setRect(out, pkg.x + pkg.w - 10, pkg.y + 2, 8, 8); return true;
+    // A payout pops on the part that ran it: the GPU card (key 8 + slot) or the CPU package (key k).
+    payoutAnchor(s, c, out) {
+      if (c.system !== s.systemId) return -1;
+      const m = boardModel(s);
+      if (c.gpu !== null) {
+        for (const site of m.installed.gpu) if (site.part!.slot === c.gpu) { siteRect(m.b, 'gpu', site.index, out); return GPU_KEY + c.gpu; }
+        return -1;
+      }
+      const k = c.cpu ?? 0;
+      if (k >= m.installed.cpu.length) return -1;
+      packageRect(m.b, k, out); return k;
+    },
+    /** Purchase flash (A10): the part on each site, by its generation and level. */
+    partVersion(s, id) {
+      if (id === 'psu') return partVersionOf(s.psu);
+      if (id.startsWith('cpu')) return Number(id.slice(3)) < s.cpuCount ? partVersionOf(s.cpu) : null;
+      const list = id.startsWith('ram') ? s.ram : id.startsWith('gpu') ? s.gpu : id.startsWith('drive') ? s.storage : null;
+      if (!list) return null;
+      const slot = Number(id.replace(/^D+/, ''));
+      for (const p of list) if (p.slot === slot) return partVersionOf(p);
+      return null;
     },
     faults(s, out) {
       let n = 0;

@@ -5,9 +5,10 @@ import { useGameSelector, useQuote, useShell, useViewState } from '../storeHooks
 import { ConfigPlate } from './ConfigPlate';
 import type { ConfigKind } from './configArt';
 import { CoolerPlate } from './CoolerPlate';
-import { rackLetter, zoneLetter } from './copy';
+import { rackLetter, regionName, zoneLetter } from './copy';
 import { fahrenheit, percent } from './format';
 import { LbPlate } from './LbPlate';
+import { MemoryTiers } from './MemoryTiers';
 import { NetworkRackPlate } from './NetworkRackPlate';
 import { PartPlate } from './PartPlate';
 import { PlateFrame } from './PlateFrame';
@@ -60,6 +61,15 @@ export function plateRequest(t: HitTarget, focus: LevelSnapshot): QuoteRequest |
   return null;
 }
 
+/** The router a target is (D25.7): the rack LB, the room LB in the network rack, or the global scheduler. */
+export function routerOf(t: HitTarget, focus: LevelSnapshot): ScopeRef | null {
+  const s = t.part?.slot.kind;
+  if (s === 'lb' && focus.level === 'rack') return { kind: 'rack', id: focus.rackId };
+  if ((s === 'roomLb' || s === 'roomSwitch') && focus.level === 'room') return { kind: 'room', id: focus.roomId };
+  if (s === 'globalScheduler' && focus.level === 'global' && focus.scheduler) return { kind: 'global' };
+  return null;
+}
+
 /** Empty targets carry their slot kind in the renderer's stable target ID. */
 export function gpuPlateSlot(t: HitTarget, focus: LevelSnapshot): number | null | undefined {
   if (focus.level !== 'system') return undefined;
@@ -89,6 +99,9 @@ function TargetPlate({ target: t, focus }: { target: HitTarget; focus: LevelSnap
   const quotes = useQuote(plateRequest(t, focus));
   const netRack = focus.level === 'room' && (t.part?.slot.kind === 'roomSwitch' || (t.kind === 'port' && t.sw?.kind === 'room'));
   const roomLb = useQuote(netRack && focus.level === 'room' ? { kind: 'infra', unit: { kind: 'room', id: focus.roomId }, slot: 'lb' } : null);
+  // The router queue's next slot (D25.7) for whichever load balancer this plate shows.
+  const lbUnit = routerOf(t, focus) ?? (netRack && focus.level === 'room' ? { kind: 'room', id: focus.roomId } as const : null);
+  const queueQuote = useQuote(lbUnit ? { kind: 'routerQueue', unit: lbUnit } : null)?.quotes[0] ?? null;
   const readAnchor = useCallback((out: Rect) => surface.renderer?.anchor(t.id, out) ?? false, [surface, t.id]);
   const subscribeFrame = useCallback((update: () => void) => {
     const l = () => update(); surface.frameListeners.add(l); return () => { surface.frameListeners.delete(l); };
@@ -125,7 +138,7 @@ function TargetPlate({ target: t, focus }: { target: HitTarget; focus: LevelSnap
   if (t.kind === 'port' && t.sw) {
     if (focus.level === 'rack' && t.sw.kind === 'rack') return <SwitchPlate {...common} quotes={quotes} sw={t.sw} view={focus.switch}
       units={focus.servers.filter((s) => s.systemId !== null).length} initialPort={t.port} />;
-    if (focus.level === 'room' && t.sw.kind === 'room') return <NetworkRackPlate {...common} quotes={quotes} lbQuotes={roomLb}
+    if (focus.level === 'room' && t.sw.kind === 'room') return <NetworkRackPlate {...common} quotes={quotes} lbQuotes={roomLb} queueQuote={queueQuote}
       room={focus.roomId} zone={focus.zone} network={focus.network} racks={focus.racks.filter((r) => r.rackId !== null).length} initialPort={t.port} />;
     return null;
   }
@@ -149,13 +162,13 @@ function TargetPlate({ target: t, focus }: { target: HitTarget; focus: LevelSnap
       cooler={focus.cooler} lump={{ tempF: focus.tempF, crashS: focus.crashS, crashed: focus.crashed, eff: focus.eff }} />;
     if (s.kind === 'roomCooler' && focus.level === 'room') return <CoolerPlate {...common} quotes={quotes} unit={{ kind: 'room', id: focus.roomId }}
       cooler={focus.cooler} lump={{ tempF: focus.tempF, crashS: focus.crashS, crashed: focus.crashed, outsideF: focus.outsideF }} />;
-    if (s.kind === 'lb' && focus.level === 'rack') return <LbPlate {...common} quotes={quotes} unit={{ kind: 'rack', id: focus.rackId }} view={focus.lb} />;
+    if (s.kind === 'lb' && focus.level === 'rack') return <LbPlate {...common} quotes={quotes} queueQuote={queueQuote} unit={{ kind: 'rack', id: focus.rackId }} view={focus.lb} />;
     if (s.kind === 'switch' && focus.level === 'rack') return <SwitchPlate {...common} quotes={quotes} sw={{ kind: 'rack', id: focus.rackId }}
       view={focus.switch} units={focus.servers.filter((x) => x.systemId !== null).length} />;
     if ((s.kind === 'roomSwitch' || s.kind === 'roomLb') && focus.level === 'room') return <NetworkRackPlate {...common}
-      quotes={s.kind === 'roomSwitch' ? quotes : null} lbQuotes={s.kind === 'roomLb' ? quotes : roomLb} initialView={s.kind === 'roomLb' ? 'lb' : 'ports'}
+      quotes={s.kind === 'roomSwitch' ? quotes : null} lbQuotes={s.kind === 'roomLb' ? quotes : roomLb} queueQuote={queueQuote} initialView={s.kind === 'roomLb' ? 'lb' : 'ports'}
       room={focus.roomId} zone={focus.zone} network={focus.network} racks={focus.racks.filter((r) => r.rackId !== null).length} />;
-    if (s.kind === 'globalScheduler' && focus.level === 'global' && focus.scheduler) return <LbPlate {...common} quotes={quotes}
+    if (s.kind === 'globalScheduler' && focus.level === 'global' && focus.scheduler) return <LbPlate {...common} quotes={quotes} queueQuote={queueQuote}
       unit={{ kind: 'global' }} view={focus.scheduler} child="site" title="Global scheduler" />;
     const facts = partFacts(focus, s);
     if (facts && s.kind === 'core') return <PlateFrame {...common} title={facts.title} sub={facts.sub} className="part core">
@@ -207,7 +220,9 @@ function unitPlate(unit: UnitRef, focus: LevelSnapshot, all: Omit<PlateCommon, '
     return <UnitPlate {...common} unit={unit} title={`System ${unit.id + 1}`} sub={focus.level === 'system' && focus.kind === 'storageNode' ? 'storage node' : 'one server'}
       status={focus.level === 'system' ? `${focus.running.length} running · ${focus.queue.count} queued` : 'Chip'} mode={mode} timerS={timerS} bootS={total ?? common.bootS}
       onSave={saveKey(focus.level === 'system' && focus.saveable)} saveLabel="Save this server"
-      lines={[{ text: 'Pick a part in the tray, then tap a glowing spot.', tone: 'muted' }]} />;
+      lines={[{ text: 'Pick a part in the tray, then tap a glowing spot.', tone: 'muted' }]}>
+      {focus.level === 'system' && <MemoryTiers tiers={focus.memory.tiers} />}
+    </UnitPlate>;
   }
   if (unit.kind === 'rack' && focus.level === 'rack') {
     const linked = focus.servers.filter((s) => s.port !== null && s.systemId !== null).length, n = focus.servers.filter((s) => s.systemId !== null).length;
@@ -223,7 +238,7 @@ function unitPlate(unit: UnitRef, focus: LevelSnapshot, all: Omit<PlateCommon, '
   if (unit.kind === 'site' && focus.level === 'global') {
     const site = focus.sites.find((s) => s.siteId === unit.id);
     if (!site) return null;
-    return <UnitPlate {...common} unit={unit} title={site.region} sub={`${site.zones.length} ${site.zones.length === 1 ? 'zone' : 'zones'}`}
+    return <UnitPlate {...common} unit={unit} title={regionName(site.region)} sub={`${site.zones.length} ${site.zones.length === 1 ? 'zone' : 'zones'}`}
       status={`${fahrenheit(site.outsideF)} outside · hottest ${fahrenheit(site.hottestF)}`} mode={site.online} timerS={site.timerS} onSave={saveKey(site.open)} saveLabel="Save this site" />;
   }
   return null;

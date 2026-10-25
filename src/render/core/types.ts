@@ -1,10 +1,11 @@
 import type {
-  GlobalSnapshot, SystemId, LevelId, LevelSnapshot, NodeRef, PartRef, QuoteResult, RackSlotView, RenderSnapshot,
+  GlobalSnapshot, LevelId, ShardDoneView, LevelSnapshot, NodeRef, PartRef, QuoteResult, RackSlotView, RenderSnapshot,
   ServerSlotView, SwitchRef, SystemSnapshot, UnitRef, ZoneView,
 } from '../../game';
 import type { RestFraming, WorldForm } from './camera';
 import type { Point, Rect } from './geom';
 import type { LabelWriter } from './labels';
+import type { Completion } from './pops';
 import type { ZoomState } from './transition';
 
 export type { LevelId, LevelSnapshot, NodeRef, RenderSnapshot } from '../../game';
@@ -70,6 +71,8 @@ export interface ViewPresentation {
   /** The level a multi-level zoom is heading for (ViewState.goal), so its steps play as one move. */
   readonly zoomGoal?: LevelId | null;
 }
+/** The free world at rest, CSS px (the view below the strip, minus the gutters), and the shell's N. */
+export interface RestArea { readonly w: number; readonly h: number; readonly scale: number }
 /** Per-frame context for level drawing. Hardware motion reads `timeMs` only. */
 export interface WorldFrame {
   readonly snapshot: RenderSnapshot;
@@ -84,6 +87,11 @@ export interface WorldFrame {
   readonly form?: WorldForm;
   /** At rest: the world rect (art px) visible below the band and strip. Null during a zoom or before framing. */
   readonly visible?: Rect | null;
+  /**
+   * The art scale this world rests at, CSS px per art px. It is the shell's N, or lower when the level
+   * does not fit whole at N (A05). Levels arrange their labels by it (A01): stacked at 2 and below.
+   */
+  readonly scale?: number;
 }
 
 export interface LevelRenderer<L extends LevelId = LevelId> {
@@ -91,8 +99,12 @@ export interface LevelRenderer<L extends LevelId = LevelId> {
   readonly name: string;
   /** World size in art px. Stable for one layout and form; it sizes the world buffer. */
   size(snapshot: SnapshotOf<L>, out: Rect, form?: WorldForm): Rect;
-  /** The rect the rest camera frames, inside `size`. */
-  focus(snapshot: SnapshotOf<L>, viewport: Rect, out: Rect, form?: WorldForm): Rect;
+  /**
+   * The rect the rest camera frames, inside `size`; the core contain-fits it whole (A05). `area` is the
+   * free world at rest (CSS px) and the shell's N, for levels that frame part of a wide world (rack
+   * row, world map); it is absent during zoom planning.
+   */
+  focus(snapshot: SnapshotOf<L>, viewport: Rect, out: Rect, form?: WorldForm, area?: RestArea): Rect;
   /** Optional: the rect of this world that a parent's mini of it shows (CPU: its package). Defaults to `size`. */
   miniRect?(snapshot: SnapshotOf<L>, out: Rect, form?: WorldForm): Rect;
   /**
@@ -117,8 +129,35 @@ export interface LevelRenderer<L extends LevelId = LevelId> {
   followFocus?(snapshot: SnapshotOf<L>): boolean;
   /** Optional: value labels, drawn crisp by the core at the body size, at rest only. */
   labels?(snapshot: SnapshotOf<L>, view: ViewPresentation, frame: WorldFrame, out: LabelWriter): void;
-  /** Optional: where system `id` sits in this world, for its payout coins. False if not visible here. */
-  unitAnchor?(snapshot: SnapshotOf<L>, id: SystemId, out: Rect): boolean;
+  /**
+   * Optional: the component that completed `c` in this world (CPU core, socket or GPU card, sled,
+   * rack, site). Writes its rect in art px to `out`; the payout pop centres on it. Returns a key that is
+   * stable per component (pops on one key aggregate), or -1 when the component is not shown here.
+   */
+  payoutAnchor?(snapshot: SnapshotOf<L>, c: Completion, out: Rect, form?: WorldForm): number;
+  /**
+   * Optional: where a finished non-final shard (`ShardDoneView`) empties: a rect it drains across
+   * (Rack: the sled's LCD). Without it the core drains the `payoutAnchor` component's rims.
+   */
+  shardAnchor?(snapshot: SnapshotOf<L>, d: ShardDoneView, out: Rect): number;
+  /** Optional: how long completions on one component join its live pop (default 250 ms; Room 1 s). */
+  popWindowMs?(snapshot: SnapshotOf<L>): number;
+  /**
+   * Optional: a number that rises when part target `id` is upgraded (generation, then level), or null
+   * for no part. The core flashes the part gold for 300 ms when it rises or the part appears (A10).
+   */
+  partVersion?(snapshot: SnapshotOf<L>, id: string): number | null;
+  /** Optional: seconds the rest camera eases to a new focus (default 0.25; the rack row snaps in 0.15). */
+  restEaseS?(snapshot: SnapshotOf<L>): number;
+  /** The level is always shown whole at rest (System, D15.2): never panned, even below scale 2 on phone. */
+  readonly wholeAtRest?: boolean;
+  /**
+   * Optional: where a panned rest centres (art px), when the focus doesn't fit at 2. `hint` is the node
+   * the player came from, or the home node of the level below. Defaults to the focus centre.
+   */
+  restCentre?(snapshot: SnapshotOf<L>, out: Point, hint: NodeRef | null): void;
+  /** Optional: the panned rest's snap pitch in art px per axis (Room: the row pitch). */
+  panSnap?(snapshot: SnapshotOf<L>): { readonly x: number; readonly y: number };
   /** Optional: world rects currently faulted (crashed, failed supply). Each gets real smoke. */
   faults?(snapshot: SnapshotOf<L>, out: Rect[]): number;
   /** 16×16 zoom rail icon. */

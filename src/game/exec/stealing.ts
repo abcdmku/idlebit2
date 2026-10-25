@@ -5,11 +5,11 @@ import { hwThreads } from './est';
 import { runInsert, runUnlink } from './lists';
 import { hasRule } from './rules';
 import { strategyOf } from './schedulers';
-import { CPU, NRES, shapeOf } from './shape';
+import { CPU, NRES, shapeOf, wantThreads } from './shape';
 
 /**
- * workStealing (spec §6.5, §8.2): at allocation, free threads join running compute-stage tasks
- * that hold fewer than their `threads`, oldest first. A task's remaining work is preserved: its
+ * workStealing (spec §6.5, §8.2): at allocation, free threads join running compute-stage shards
+ * that hold fewer than they want (max(1, floor(units / grain)), D25.3), oldest first. A task's remaining work is preserved: its
  * finish moves to W + (finish − W) × old / new threads.
  */
 export function stealThreads(w: World, s: number, span: Span): boolean {
@@ -22,12 +22,12 @@ export function stealThreads(w: World, s: number, span: Span): boolean {
     if (free <= 0) return changed;
     let best = -1;
     for (let r = h.head[s * NRES + CPU]!; r >= 0; r = rec.next[r]!) {
-      if (rec.threads[r]! >= Math.min(shapeOf(rec.family[r]!).threads, H) || rec.count[r]! > free) continue;
+      if (rec.threads[r]! >= Math.min(wantThreads(shapeOf(rec.family[r]!), rec.units[r]!), H) || rec.count[r]! > free) continue;
       if (best < 0 || rec.taken[r]! < rec.taken[best]! || (rec.taken[r] === rec.taken[best] && rec.taskId[r]! < rec.taskId[best]!)) best = r;
     }
     if (best < 0) return changed;
     const k = rec.count[best]!, have = rec.threads[best]!;
-    const add = Math.min(Math.min(shapeOf(rec.family[best]!).threads, H) - have, Math.floor(free / k));
+    const add = Math.min(Math.min(wantThreads(shapeOf(rec.family[best]!), rec.units[best]!), H) - have, Math.floor(free / k));
     const W = clockAt(w, s, CPU, span.x0[CPU]!);
     runUnlink(w.hot, s, CPU, best);
     rec.finish[best] = W + ((rec.finish[best]! - W) * have) / (have + add);

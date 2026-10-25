@@ -6,6 +6,7 @@ import {
   LINK_HOT, RACK_HOT, ROOM_HOT, SITE_HOT, SYS_HOT, allocCompiled, type CompiledBuffers, type FleetSize, type HotBuffers,
 } from './buffers';
 import { MAX_ZONES_PER_SITE, RACKS_PER_ROOM, SERVERS_PER_RACK } from './constants';
+import { syncRouterQueues } from './routerQueue';
 import { ensureRows } from './table';
 
 export const fleetSize = (build: BuildState): FleetSize => ({
@@ -66,4 +67,5 @@ export function syncHotSizes(hot: HotBuffers, c: CompiledBuffers): void {
   ensureRows(ROOM_HOT, hot.room, c.room.len);
   ensureRows(SITE_HOT, hot.site, c.site.len);
   ensureRows(LINK_HOT, hot.link, c.link.len);
+  syncRouterQueues(hot, c);
 }

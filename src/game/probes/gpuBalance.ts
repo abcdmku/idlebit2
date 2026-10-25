@@ -13,7 +13,7 @@ import type { CatalogRow } from '../build/catalog/types';
 import { quote } from '../build/quotes';
 import { researchDef } from '../build/research/tree';
 import { FAMILIES } from '../market/families';
-import { memberSize } from '../market/curve';
+import { taskSize } from '../market/curve';
 import { supplyLossW } from '../phys/supplies';
 import { buildState } from '../testkit/builders';
 import type { GpuGeneration, GpuModelId } from '../types/gpu';
@@ -138,7 +138,8 @@ function observation(state: GameState) {
     rackCoolingHeadroomVsSystemHeatW: c.rack.coolerQc[0]! - systemInputW,
     gates: FAMILIES.filter((f) => f.stages.some((st) => st.resource === 'gpu')).map((family) => {
       const { window: intensityWindow } = family;
-      const size = memberSize((intensityWindow.from + intensityWindow.to) / 2, 1, family.members);
+      // D25: the shard one system holds when the task is cut its minimum number of ways.
+      const size = Math.ceil(taskSize((intensityWindow.from + intensityWindow.to) / 2, 1, family.members, family.grain) / family.members);
       const need = accelNeed(family, size), gate = accelGate(c, 0, need), choice = chooseAccel(c, null, 0, need, 1);
       const gpuWork = family.stages.filter((st) => st.resource === 'gpu').reduce((n, st) => n + st.work.fixed + st.work.perSize * size, 0);
       return { family: family.key, size, gpuCores: need.gpuCores, vramBits: need.vramBits, gate,

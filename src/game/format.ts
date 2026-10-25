@@ -88,10 +88,42 @@ export function formatCountdownMs(milliseconds:AmountInput):string {
 export function formatSeconds(seconds:AmountInput):string {
   const d=D.max(0,decimal(seconds));return (d.lt(10)?d.toFixed(1):d.toDecimalPlaces(0).toFixed())+'s';
 }
-/** Bit quantities keep explicit bit units; this is not a Credit abbreviation. */
-export function formatBits(bits:AmountInput):string {
-  const d=decimal(bits),abs=d.abs();
-  for(const [scale,unit] of [['1e15','Pb'],['1e12','Tb'],['1e9','Gb'],['1e6','Mb'],['1e3','Kb']])
-    if(abs.gte(scale))return formatMetric(d.div(scale))+' '+unit;
-  return formatMetric(d)+' b';
+/* ---------- Unit quantities: one string per quantity on the board, deck, callouts and cards ---------- */
+
+const SI = ['', 'k', 'M', 'G', 'T', 'P', 'E', 'Z', 'Y'] as const;
+/** Up to 3 significant figures of a coefficient below 1000, trailing zeros dropped. */
+const sig3 = (x: number): string => {
+  const t = x >= 100 ? x.toFixed(0) : x >= 10 ? x.toFixed(1) : x >= 1 ? x.toFixed(2) : x.toPrecision(3);
+  return t.includes('.') ? t.replace(/0+$/, '').replace(/\.$/, '') : t;
+};
+/**
+ * A plain number as [number, SI prefix]: 3 significant figures, trailing zeros dropped, k M G T P
+ * E Z Y. A coefficient that rounds to 1000 carries to the next prefix. Past Y it is scientific,
+ * "1.80e36", with no prefix (the UI's fallback).
+ */
+function siParts(n: number): [string, string] {
+  if (!Number.isFinite(n)) return ['—', ''];
+  const sign = n < 0 ? MINUS : '', a = Math.abs(n);
+  if (a === 0) return ['0', ''];
+  let i = a < 1000 ? 0 : Math.min(SI.length - 1, Math.floor(Math.log10(a) / 3));
+  let text = sig3(a / 1000 ** i);
+  if (Number(text) >= 1000) { i += 1; text = i < SI.length ? '1' : text; }
+  if (i >= SI.length || a >= 1000 ** SI.length) return [sign + a.toExponential(2).replace('e+', 'e'), ''];
+  return [sign + text, SI[i]!];
+}
+
+/** Bits: "1 b", "64 b", "21.4 kb", "197 kb", "2.5 Mb", "1 Gb". */
+export function formatSize(bits: number): string {
+  const [num, prefix] = siParts(bits);
+  return `${num} ${prefix}b`;
+}
+/** Clocks and link speeds: "1 Hz", "1.02 kHz", "8 kHz", "50 kHz", "1.28 GHz". */
+export function formatHertz(hz: number): string {
+  const [num, prefix] = siParts(hz);
+  return `${num} ${prefix}Hz`;
+}
+/** Work, the prefix on the number (the queue cards' style): "1 op", "3 ops", "53.4k ops", "1.2M ops". */
+export function formatOps(n: number): string {
+  const [num, prefix] = siParts(n);
+  return `${num}${prefix} ${num === '1' && prefix === '' ? 'op' : 'ops'}`;
 }

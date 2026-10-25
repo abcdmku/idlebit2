@@ -1,5 +1,5 @@
 import { partName } from '../../game';
-import type { CoolTech, FilterId, PartId, PartSlotKind, PlacementId, QueueStrategyId, RouteStrategyId, UnitKind } from '../../game';
+import type { CoolTech, FilterId, PartId, PartSlotKind, QueueStrategyId, RouteStrategyId, UnitKind } from '../../game';
 
 /** Player-facing names and one-line notes. Copy only: no rule here decides anything. */
 
@@ -13,6 +13,7 @@ export const ROUTE_NAMES: Readonly<Record<RouteStrategyId, { name: string; short
   latency: { name: 'Latency-aware', short: 'LAT', note: 'Least backbone latency plus queue time.', blind: true },
   price: { name: 'Price-aware', short: 'PRICE', note: 'Cheapest energy that can take the task.', blind: true },
   affinity: { name: 'Workload affinity', short: 'AFF', note: 'GPU and big-memory work to accelerator servers first.', blind: false },
+  linkAware: { name: 'Link-aware', short: 'LINK', note: 'Splits by what each link and server can absorb.', blind: true },
 };
 
 export const FILTER_NAMES: Readonly<Record<FilterId, { name: string; note: string }>> = {
@@ -21,10 +22,7 @@ export const FILTER_NAMES: Readonly<Record<FilterId, { name: string; note: strin
   health: { name: 'Health checks', note: 'Skips units in an overload or crash countdown.' },
   power: { name: 'Power-aware', note: 'Skips units whose supply is near its limit.' },
   thermal: { name: 'Thermal-aware', note: 'Steers work off hot units.' },
-};
-
-export const PLACEMENT_NAMES: Readonly<Record<PlacementId, string>> = {
-  gang: 'Gang scheduling', topology: 'Topology-aware', zone: 'Zone-aware',
+  local: { name: 'Keep local', note: 'Keeps a task in one rack, zone or site when it fits there whole.' },
 };
 
 export const QUEUE_NAMES: Readonly<Record<QueueStrategyId, string>> = {
@@ -57,3 +55,9 @@ export const genName = (part: PartId, generation: number) => partName(part, gene
 /** Rack letters: A..Z, then numbers. */
 export const rackLetter = (slot: number) => (slot < 26 ? String.fromCharCode(65 + slot) : String(slot + 1));
 export const zoneLetter = (zone: number) => 'abcdef'[zone] ?? String(zone + 1);
+
+/** A region's display name: "us-west" → "US West", "ap-southeast" → "AP Southeast" (A23). */
+export function regionName(id: string): string {
+  const [area = '', ...rest] = id.split('-');
+  return [area.toUpperCase(), ...rest.map(w => w.charAt(0).toUpperCase() + w.slice(1))].join(' ');
+}

@@ -12,6 +12,7 @@ import { cpuLanes, cpuPrice, partFromNothing } from './pricing';
 import { ruleLock } from './locks';
 import { findSaved } from './units';
 import { mergeAccels } from './configAccels';
+import { lbQueueStepsTo } from './catalog/network';
 
 /* ---------- Save and delete (spec §13.5) ---------- */
 
@@ -134,12 +135,15 @@ export function planApplyConfig(state: GameState, unit: UnitRef, name: string): 
     const cooler = { ...mergePart(PARTS.rackCooler, rack.cooler, want.cooler, m)!, setpointF: want.cooler.setpointF };
     const pdu = { ...mergePart(PARTS.pdu, rack.pdu, want.pdu, m)!, capped: want.pdu.capped };
     const lbPart = mergePart(PARTS.lb, rack.lb, want.lb, m)!;
+    // Queue slots only grow, like part levels: the steps from the rack's level to the saved one.
+    const queueLevel = Math.max(rack.lb.queueLevel, want.lb.queueLevel);
+    m.price += lbQueueStepsTo('rack', queueLevel) - lbQueueStepsTo('rack', rack.lb.queueLevel);
     const sw = rack.switch.gen === want.switch.gen ? rack.switch : null;
     if (!sw) return fail('invalid', 'Replace the switch first');
     const row = LADDERS.switch;
     const ports = sw.ports.map((k, i) => Math.max(k, want.switch.ports[i] ?? k));
     for (let i = 0; i < ports.length; i += 1) m.price += networkStepsBetween(row, sw.ports[i]!, ports[i]!);
-    let build: BuildState = { ...state.build, racks: state.build.racks.map((r, i) => (i === unit.id && r ? { ...r, cooler, pdu, lb: { ...want.lb, gen: lbPart.gen, level: lbPart.level }, switch: { ...sw, ports, sameSpeed: want.switch.sameSpeed } } : r)) };
+    let build: BuildState = { ...state.build, racks: state.build.racks.map((r, i) => (i === unit.id && r ? { ...r, cooler, pdu, lb: { ...want.lb, gen: lbPart.gen, level: lbPart.level, queueLevel }, switch: { ...sw, ports, sameSpeed: want.switch.sameSpeed } } : r)) };
     const cold = new Set<number>();
     const kill: UnitRef[] = [];
     const inventoryChangedSystems: number[] = [];

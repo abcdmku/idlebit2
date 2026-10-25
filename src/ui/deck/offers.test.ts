@@ -40,10 +40,10 @@ describe('deck quote contracts R42/R43', () => {
 
   it('reads all four tray effects, including counts and research-locked adds', () => {
     const tray = [offer(effect('slots', 3, 4)), offer(effect('bits', 8, 16)),
-      offer(effect('ops/s', 1000, 2000)), offer(effect('slots', 2, 4))];
+      offer(effect('Hz', 1000, 2000)), offer(effect('slots', 2, 4))];
     tray[0] = { ...tray[0]!, locked: { code: 'research', node: null, text: 'Needs Dual core' } };
     const rows = buildOffers('chip', tray, null).rows;
-    expect(rows.slice(0, 4).map(r => r.change)).toEqual(['3 → 4 slots', '8 → 16 bits', '1 → 2 kHz', '2 → 4 slots']);
+    expect(rows.slice(0, 4).map(r => r.change)).toEqual(['3 → 4 slots', '8 → 16 b', '1 → 2 kHz', '2 → 4 slots']);
     expect(rows[0].price).toBeNull();
     expect(rows[0].lock).toBe('Needs Dual core');
     expect(rows[1].quote).toBe(tray[1]);
@@ -55,7 +55,7 @@ describe('deck quote contracts R42/R43', () => {
     const rows = buildOffers(at.level, tray, null).rows;
     for (const [i, q] of tray.slice(0, 3).entries()) {
       expect(q.effect).not.toBeNull();
-      expect(rows[i]!.change).toBe(changeText(q.effect!, i === 2));
+      expect(rows[i]!.change).toBe(changeText(q.effect!));
     }
     // The absent, research-locked scheduler has no preview yet.
     expect(rows[3].change).toBe(tray[3]!.effect ? changeText(tray[3]!.effect) : tray[3]!.label);
@@ -65,5 +65,50 @@ describe('deck quote contracts R42/R43', () => {
     const quotes = quote(createInitialState(42), linkRequest(nodes[4]!)).quotes;
     expect(quotes).toEqual([]);
     expect(buildOffers('global', null, quotes[0] ?? null).rows[4].quote).toBeNull();
+  });
+});
+
+describe('one grammar and one list (A08, A14)', () => {
+  const slots = (before: number, after: number): EffectPreview => ({ ...effect('slots', before, after) });
+  it('words a first add as "Add RAM", hides invalid quotes, and names the right column', () => {
+    const lock = (code: 'research' | 'ceiling' | 'fit', text: string) => ({ code, node: code === 'research' ? 'dualSocket' as never : null, text });
+    const tray = [{ ...offer(slots(1, 2)), locked: lock('research', 'Needs Dual socket') }, offer(slots(0, 1)),
+      { ...offer(slots(0, 1)), locked: lock('fit', 'No such part') }, { ...offer(slots(1, 2)), locked: lock('ceiling', 'Max') }];
+    const rows = buildOffers('system', tray, null).rows;
+    expect(rows.map(r => r.key)).toEqual(['cpu', 'ram', 'storage', 'link', 'psu']);
+    expect(rows.map(r => [r.name, r.change, r.right.kind])).toEqual([
+      ['CPU', '1 → 2 slots', 'research'], ['Add RAM', '', 'price'], ['Storage', '1 → 2 slots', 'max'], ['Pipe', '—', 'none'], ['PSU', '—', 'none']]);
+    expect(rows[0]!.right).toEqual({ kind: 'research', node: 'Dual socket' });
+  });
+  it('the System lists its PSU from the part quote, and the tile names the next unlock when nothing is priced', () => {
+    const psu = offer(effect('W', 32_800, 65_500));
+    const o = buildOffers('system', null, null, [psu]);
+    expect(o.rows.at(-1)).toMatchObject({ key: 'psu', slot: 'psu', name: 'PSU', price: 12 });
+    expect(o.next?.key).toBe('psu');
+    const locked = { ...offer(slots(1, 2)), locked: { code: 'research' as const, node: 'dualSocket' as never, text: 'Needs Dual socket' } };
+    const none = buildOffers('system', [locked, locked, locked, locked], null);
+    expect([none.next, none.unlock?.key]).toEqual([null, 'cpu']);
+  });
+});
+
+describe('router queue offers (D25.7)', () => {
+  it('the rack sells its LB queue as a row the LB callout reads, locked as Max at 32', () => {
+    const next = { ...offer(effect('slots', 1, 2)), action: { type: 'upgradeRouterQueue', unit: { kind: 'rack', id: rackId(0) } } } as Quote;
+    const row = buildOffers('rack', null, null, [next]).rows.find(r => r.key === 'lbQueue')!;
+    expect([row.name, row.change, row.slot, row.price]).toEqual(['LB queue', '1 → 2 slots', 'lb', 12]);
+    const top = { ...next, effect: effect('slots', 32, 32), locked: { code: 'cap' as const, node: null, text: 'Queue at 32/32' } };
+    const max = buildOffers('rack', null, null, [top]).rows.find(r => r.key === 'lbQueue')!;
+    expect([max.change, max.right]).toEqual(['32 slots', { kind: 'max' }]);
+  });
+});
+
+describe('cache levels', () => {
+  const cacheQuote = (kind: 'l1' | 'l2', before: number, after: number): Quote => ({ ...offer(effect('bits', before, after)),
+    action: { type: 'upgradePart', part: { unit: { kind: 'system', id: systemId(0) }, slot: { kind, socket: 0 } } } } as Quote);
+  it('one level reads "Cache"; with several, the row names the level its quote upgrades', () => {
+    const tray = (q: Quote) => [offer(effect('slots', 1, 2)), q, offer(effect('Hz', 1, 2)), offer(effect('slots', 0, 1))];
+    expect(buildOffers('chip', tray(cacheQuote('l1', 1, 2)), null).rows[1]).toMatchObject({ name: 'Cache', change: '1 → 2 b', slot: 'l1' });
+    expect(buildOffers('chip', tray(cacheQuote('l2', 65_536, 131_072)), null, [], { cacheLevels: 2 }).rows[1])
+      .toMatchObject({ name: 'L2 cache', change: '65.5 → 131 kb', slot: 'l2' });
   });
 });

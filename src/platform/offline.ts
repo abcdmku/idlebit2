@@ -1,4 +1,4 @@
-import { advanceGameOwned, applyAction, copyGameState, type AdvanceReport, type GameAction, type GameState } from '../game';
+import { advanceGameOwned, applyAction, copyOfflineState, type AdvanceReport, type GameAction, type GameState } from '../game';
 import type { OfflineEngine } from './offlineHandler';
 import { createOfflineRunner, wrapBrowserWorker, type OfflineRunner } from './offlineRunner';
 import { mergeReports } from './reports';
@@ -9,7 +9,7 @@ export type GameOfflineRunner = OfflineRunner<GameState, AdvanceReport, GameActi
 export const gameOfflineEngine: OfflineEngine<GameState, AdvanceReport, GameAction> = {
   // Every session owns its state (offlineHandler, offlineRunner), so no slice copies the hot buffers.
   advance: (state, elapsedMs) => advanceGameOwned(state, elapsedMs),
-  own: copyGameState,
+  own: copyOfflineState,
   merge: mergeReports,
   // A rejected action leaves the state as it was, as a rejected dispatch would.
   apply: (state, action) => applyAction(state, action).state,

@@ -30,6 +30,8 @@ export interface ShellContextValue {
   readonly surface: ShellSurface;
   /** The sim re-quotes every action; presentation never grants a purchase. */
   dispatch(action: GameAction): ActionOutcome | null;
+  /** Told the whole Credits an accepted action spent (A10: the HUD shows "−3" for a moment). */
+  readonly spent: Set<(credits: number) => void>;
   /** Lazy quotes for the deck, the callout or the open plate. Never call per frame. */
   quote(request: QuoteRequest): QuoteResult;
 }
@@ -42,9 +44,15 @@ export function useShell(): ShellContextValue {
 }
 
 export function createShellValue(store: GameStore, view: ViewStore, registry: LevelRegistry, surface: ShellSurface): ShellContextValue {
+  const spent = new Set<(credits: number) => void>();
   return {
-    store, view, registry, surface,
-    dispatch: action => store.dispatch(action),
+    store, view, registry, surface, spent,
+    dispatch(action) {
+      const before = Number(store.getState().wallet.credits), outcome = store.dispatch(action);
+      const paid = outcome?.ok ? before - Number(outcome.state.wallet.credits) : 0;
+      if (paid > 0) for (const listener of spent) listener(paid);
+      return outcome;
+    },
     quote: request => quote(store.getState(), request),
   };
 }

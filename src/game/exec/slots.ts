@@ -4,6 +4,7 @@ import { noteAdmitChange, noteBacklog, noteRackAdmits } from './backlog';
 import { drainSummaries, touchSummary, touchSystem, type TouchLog } from '../core/touch';
 import type { CompiledBuffers, HotBuffers } from '../core/buffers';
 import type { World } from '../core/world';
+import { wakeRouters } from '../core/routerQueue';
 
 /**
  * Room and free-slot summaries (spec §4.3, architecture §1.3). A system **can admit now** when it
@@ -36,6 +37,16 @@ export const admittedOf = (w: World, s: number): number => {
   return h.running[s]! + h.queueLen[s]! + h.reserved[s]!;
 };
 
+/**
+ * D26 (spec §6.4): while a task waits in the queue with a running slot free (memory or threads hold it
+ * back), the system admits only while queued + reserved < Q, so the queue never holds more than Q.
+ * Derived from live counts, never stored.
+ */
+export function queueCapped(w: World, s: number): boolean {
+  const h = w.hot.sys, q = w.compiled.sys.Q[s]!;
+  return q > 0 && h.queueLen[s]! > 0 && h.running[s]! < keffOf(w, s) && h.queueLen[s]! + h.reserved[s]! >= q;
+}
+
 /** Without a rack switch port a system has no link and gets no tasks (spec §7.2). Before Rack the link is integrated. */
 export const hasLink = (w: World, s: number): boolean =>
   w.compiled.rack.opened[w.compiled.sys.rack[s]!] !== 1 || w.compiled.sys.port[s]! >= 0;
@@ -51,6 +62,7 @@ export function canAdmit(w: World, s: number): boolean {
   // hasLink, admittedOf, slotsOf and takesLeft, inlined for the routing scans.
   if (w.compiled.rack.opened[c.rack[s]!] === 1 && c.port[s]! < 0) return false;
   const slots = Math.max(1, c.slots[s]!, c.keff[s]!);
+  if (queueCapped(w, s)) return false;
   return h.running[s]! + h.queueLen[s]! + h.reserved[s]! < slots && slots - (h.takeTick[s] === w.tick ? h.takes[s]! : 0) > 0;
 }
 
@@ -59,6 +71,7 @@ export function noteAdmit(w: World, s: number, before: boolean): void {
   const after = canAdmit(w, s);
   if (after === before) return;
   noteAdmitChange(w, w.compiled.sys.rack[s]!);
+  if (after) wakeRouters(w, 0, w.compiled.sys.rack[s]!);
   const d = after ? 1 : -1;
   const c = w.compiled.sys, h = w.hot;
   const rack = c.rack[s]!, room = c.room[s]!, site = c.site[s]!;
@@ -193,8 +206,10 @@ export function noteTake(w: World, s: number): void {
   if (h.takeTick[s] !== w.tick) { h.takeTick[s] = w.tick; h.takes[s] = 0; }
   h.takes[s] = h.takes[s]! + 1;
   noteAdmit(w, s, before);
-  // The take limit resets next tick, which can flip canAdmit with no write: recount the rack then.
+  // The take limit resets next tick, which can flip canAdmit with no write: recount the rack then,
+  // and try its routers' blocked entries again.
   touchSummary(w, w.compiled.sys.rack[s]!);
+  wakeRouters(w, 0, w.compiled.sys.rack[s]!);
 }
 
 /** Reserves k slots on system s for taken tasks in transfer (reserved counts as admitted for every room check). */

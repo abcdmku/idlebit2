@@ -1,4 +1,4 @@
-import { advanceGame } from '../core/advance';
+import { advanceGame, advanceGameOwned, copyOfflineState } from '../core/advance';
 import { applyAction } from '../core/actions';
 import { G, LOC } from '../core/buffers';
 import { commitWorld, openWorld } from '../core/world';
@@ -7,6 +7,7 @@ import { runPhase } from '../exec/run';
 import { systemId, familyId } from '../types/ids';
 import type { GameState, QueuedTask } from '../types/state';
 import { queueWindow } from '../view/feed';
+import { deriveRenderSnapshot } from '../view/snapshot';
 import { FAMILIES } from './families';
 import { primeMarket } from './prime';
 import { BOOT_CAPS, marketState } from './testState';
@@ -21,6 +22,7 @@ function withHead(s: GameState, family: number, size: number): GameState {
   return { ...s, market: { ...s.market, window: [head, ...s.market.window.slice(1)] } };
 }
 const failedBy = (s: GameState, cause: number) => s.hot.g[G.fail + cause]!;
+const scope = { focus: { level: 'chip' as const, id: systemId(0) }, partner: null };
 
 describe('the endless queue (program D10, spec §5.2)', () => {
   it('starts round 1 with five saved tasks and the head on the clock from tick 0', () => {
@@ -44,23 +46,46 @@ describe('the endless queue (program D10, spec §5.2)', () => {
   it('times out an untaken head at the end of headTick + 99 and promotes the next with a fresh 10 s', () => {
     // A 100-op head keeps the lone 1 Hz core busy, so head #2 waits from tick 0.
     const s = withHead(marketState(), BIT_FLIP, 100);
+    const previous = deriveRenderSnapshot(s, scope);
     const before = advanceGame(s, 9_900).state;
+    expect(deriveRenderSnapshot(before, scope, previous).failures).toEqual([]);
     expect(failedBy(before, CAUSE.timeout)).toBe(0);
     const after = advanceGame(before, 100).state;
     expect(failedBy(after, CAUSE.timeout)).toBe(1);
     expect(after.market.headTick).toBe(100);
     expect(after.hot.g[G.failedWork]).toBe(1);
     expect(after.market.window[0]!.taskId).toBe(3);
+    expect(deriveRenderSnapshot(after, scope, previous).failures).toMatchObject([
+      { taskId: 2, family: BIT_FLIP, type: 'compute', cause: 'timeout', tick: 99, tau: 1 },
+    ]);
+    const unobserved = advanceGame(withHead(marketState(), BIT_FLIP, 100), 10_000).state;
+    expect(unobserved).toEqual(after);
+    expect(deriveRenderSnapshot(unobserved, scope).failures).toEqual([]);
+    const offline = advanceGameOwned(copyOfflineState(s), 10_000).state;
+    expect(offline).toEqual(after);
+    const offlineSnapshot = deriveRenderSnapshot(offline, scope);
+    expect(offlineSnapshot.failures).toEqual([]);
+    expect(offlineSnapshot.completions).toEqual([]);
   });
 
   it('a head no hardware can run blocks the line and fails as cantRun with its gate', () => {
     // AND Mask needs 2 bits; the boot core has 1 bit of cache.
-    const s = advanceGame(withHead(marketState(), AND_MASK, 1), 9_900).state;
+    const initial = withHead(marketState(), AND_MASK, 1);
+    const previous = deriveRenderSnapshot(initial, scope);
+    const s = advanceGame(initial, 9_900).state;
     expect(s.hot.g[G.taken]).toBe(0);
     expect(queueWindow(s)[0]).toMatchObject({ blockedBy: 'cache', dismissible: true });
     const after = advanceGame(s, 1_100).state;
     expect(failedBy(after, CAUSE.cantRun)).toBe(1);
     expect(after.hot.g[G.taken]).toBeGreaterThan(0);
+    const snapshot = deriveRenderSnapshot(after, scope, previous);
+    expect(snapshot.failures).toMatchObject([
+      { taskId: 1, family: AND_MASK, type: 'compute', cause: 'cantRun', tick: 99, tau: 1 },
+    ]);
+    expect(deriveRenderSnapshot(after, scope, previous).failures).toEqual(snapshot.failures);
+    expect(deriveRenderSnapshot(after, scope, snapshot).failures).toEqual([]);
+    const payload = (state: GameState) => deriveRenderSnapshot(state, scope, previous).failures.map(({ seq: _seq, ...failure }) => failure);
+    expect(payload(advanceGame(initial, 11_000).state)).toEqual(payload(after));
   });
 
   it('Auto-skip dismisses a head no hardware can run, and never runnable work (D12.3)', () => {

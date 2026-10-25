@@ -80,14 +80,21 @@ describe('published views never alias live hot buffers (decisions D9)', () => {
     state = advanceGameOwned(state, 5_000).state;
     for (const { snapshot, frozen } of published) expect(snapshot).toEqual(frozen);
     expect(views).toEqual(frozenViews);
-  });
+  // roomFull advances 288 servers 8 s and snapshots every scope: allow parallel-suite contention.
+  }, 30_000);
 
   it('rebuilds a level after an owned advance that ticked, as from a pure advance', () => {
     const start = FIXTURES.rackFull!(), scope = SCOPES[2]!;
     const first = deriveRenderSnapshot(start, scope);
     const pure = deriveRenderSnapshot(advanceGame(start, 1_000).state, scope, first);
     const owned = deriveRenderSnapshot(advanceGameOwned(copyGameState(start), 1_000).state, scope, first);
-    expect(owned).toEqual(pure);
+    // New completions have session-unique cosmetic IDs, even on independent pure/owned branches.
+    const payload = (s: RenderSnapshot) => ({ ...s,
+      completions: s.completions.map(({ seq: _seq, ...c }) => c),
+      failures: s.failures.map(({ seq: _seq, ...f }) => f),
+      shardsDone: s.shardsDone.map(({ seq: _seq, ...d }) => d),
+    });
+    expect(payload(owned)).toEqual(payload(pure));
     expect(owned.focus).not.toBe(first.focus);
   });
 });

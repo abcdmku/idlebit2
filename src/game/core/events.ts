@@ -24,6 +24,7 @@ export function tallyMet(w: World, family: number, count: number, system: number
   const fam = w.hot.fam;
   const c = w.compiled.sys;
   fam.metTick[family] = fam.metTick[family]! + count;
+  fam.metWorkRound[family] = fam.metWorkRound[family]! + work;
   w.hot.g[G.metWorkTick] = w.hot.g[G.metWorkTick]! + work;
   fold(fam.metSys, family, system);
   fold(fam.metRack, family, c.rack[system]!);
@@ -40,6 +41,7 @@ export function tallyFailed(w: World, family: number, cause: number, count: numb
   const fam = w.hot.fam;
   const i = family * CAUSES + cause;
   fam.failTick[i] = fam.failTick[i]! + count;
+  fam.failedWorkRound[family] = fam.failedWorkRound[family]! + work;
   w.hot.g[G.failWorkTick] = w.hot.g[G.failWorkTick]! + work;
   if (detail === NO_DETAIL) return;
   fam.failDetail[i] = detail;

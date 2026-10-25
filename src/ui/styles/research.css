@@ -36,8 +36,8 @@
 .rl-state { color: #a99be6; flex: none; }
 .rl-item.active .rl-state, .rl-item.queued .rl-state { color: #ff6bd6; }
 .rl-item.available .rl-state { color: #efeaff; }
-.rl-item.locked b, .rl-item.locked .rl-state { color: #6e6698; }
+.rl-item.locked b, .rl-item.locked .rl-state { color: var(--dim); }
 .rl-go { min-height: 44px; background: #7a2a6e; color: #fff; box-shadow: inset 0 -3px #4a244d, inset 0 2px #ff6bd6; }
-.rl-go:disabled { background: #29234b; color: #6e6698; box-shadow: inset 0 -3px #15122a; cursor: default; }
+.rl-go:disabled { background: #29234b; color: var(--dim); box-shadow: inset 0 -3px #15122a; cursor: default; }
 .rl-item.active .rl-go, .rl-item.queued .rl-go { background: #332767; color: #ffab98; box-shadow: inset 0 -3px #271f55; }
-.rl-empty { color: #6e6698; text-align: center; margin-top: 24px; }
+.rl-empty { color: var(--dim); text-align: center; margin-top: 24px; }

@@ -60,7 +60,7 @@ export function reconcileAccelerators(w: World, oldCompiled: CompiledBuffers, in
     if (converting[s] !== 1 || d < 0) continue;
     if (d < MAX_ACCELS && oldCompiled.sys.accelKind[s * MAX_ACCELS + d] === 1) rec.accelDomain[r] = POOL_DOMAIN;
     const i = s * ACCEL_DOMAINS + rec.accelDomain[r]!, k = rec.count[r]!;
-    const bits = vramOf(shapeOf(rec.family[r]!), rec.scale[r]!) * k;
+    const bits = Math.max(0, vramOf(shapeOf(rec.family[r]!), rec.units[r]!) - rec.vramR[r]! - rec.vramD[r]!) * k;
     h.accelHolders[i] = h.accelHolders[i]! + k;
     h.accelUsedVram[i] = h.accelUsedVram[i]! + bits;
     h.usedVram[s] = h.usedVram[s]! + bits;
@@ -69,7 +69,7 @@ export function reconcileAccelerators(w: World, oldCompiled: CompiledBuffers, in
     const shape = shapeOf(rec.family[r]!), e = w.hot.rack.effClock[c.rack[s]!]!;
     const i = accelClockIndex(s, POOL_DOMAIN, shape.tensor);
     rec.finish[r] = accelClockAt(w, i, e) + remaining;
-    rec.start[r] = rec.finish[r]! - stageWorkAt(shape, rec.stage[r]!, rec.scale[r]!);
+    rec.start[r] = rec.finish[r]! - stageWorkAt(shape, rec.stage[r]!, rec.units[r]!);
     sortedInsert(w.hot, h.accelHead, i, r);
     h.accelActive[i] = h.accelActive[i]! + rec.count[r]!;
   }

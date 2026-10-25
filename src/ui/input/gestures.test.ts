@@ -34,12 +34,27 @@ describe('world viewport and gestures', () => {
       Object.assign(event, { pointerId: 1, clientX: x, clientY: 50, pointerType: 'touch' }); canvas.dispatchEvent(event);
     };
     send('pointerdown', 100); send('pointermove', 104); send('pointermove', 70); send('pointerup', 70);
-    expect(drag.mock.calls).toEqual([[0, 'start'], [-30, 'move'], [0, 'end']]);
+    expect(drag.mock.calls).toEqual([[0, 0, 'start'], [-30, 0, 'move'], [0, 0, 'end', 0, 0]]);
     expect(tap).not.toHaveBeenCalled();
     send('pointerdown', 100); send('pointerup', 102);
     expect(tap).toHaveBeenCalledOnce();
     canvas.dispatchEvent(new WheelEvent('wheel', { deltaY: 120, cancelable: true }));
-    expect(wheel).toHaveBeenCalledWith(120); expect(zoom).not.toHaveBeenCalled();
+    expect(wheel).toHaveBeenCalledWith(0, 120); expect(zoom).not.toHaveBeenCalled();
+    dispose();
+  });
+});
+
+describe('pan release', () => {
+  it('reports the finger\'s last velocity, so a flick carries on (A06)', () => {
+    const canvas = document.createElement('canvas'), drag = vi.fn();
+    const dispose = bindGestures(canvas, { renderer: () => null, tap: vi.fn(), zoom: vi.fn(), pan: { active: () => true, drag, wheel: vi.fn() } });
+    const send = (type: string, x: number, t: number) => {
+      const event = new Event(type, { cancelable: true });
+      Object.defineProperty(event, 'timeStamp', { value: t });
+      Object.assign(event, { pointerId: 1, clientX: x, clientY: 50, pointerType: 'touch' }); canvas.dispatchEvent(event);
+    };
+    send('pointerdown', 100, 0); send('pointermove', 90, 10); send('pointermove', 60, 40); send('pointermove', 40, 60); send('pointerup', 40, 60);
+    expect(drag.mock.calls.at(-1)).toEqual([0, 0, 'end', -1000, 0]);
     dispose();
   });
 });

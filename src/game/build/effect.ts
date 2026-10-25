@@ -37,16 +37,33 @@ function compileFigures(spec: SystemSpec, u: Unlocks): SysFigures {
   let load = c.coreLoadW[0]! + c.clockLoadW[0]!;
   for (let r = 0; r < 4; r += 1) { idle += c.idleW[r]!; load += c.loadW[r]!; }
   return {
-    rate: c.threadRate[0]! * c.cores[0]! * c.etaCfg[0]!, mem: c.memCap[0]!, cache: c.cacheBits[0]!, gpu: c.gpuOps[0]!,
+    rate: c.threadRate[0]! * c.cores[0]! * c.etaCfg[0]!, mem: c.ramCap[0]!, cache: c.cacheBits[0]!, gpu: c.gpuOps[0]!,
     store: c.storageCap[0]!, psu: c.psuCapW[0]!, slots: c.slots[0]!, idle, load,
   };
 }
 
 const CAPACITY: Record<string, [keyof SysFigures, CapacityUnit, boolean]> = {
-  cpu: ['rate', 'ops/s', true], core: ['rate', 'ops/s', true], clock: ['rate', 'ops/s', true],
+  cpu: ['rate', 'Hz', true], core: ['rate', 'ops/s', true], clock: ['rate', 'Hz', true],
   l1: ['cache', 'bits', false], l2: ['cache', 'bits', false], l3: ['cache', 'bits', false], scheduler: ['slots', 'slots', false],
   ram: ['mem', 'bits', false], gpu: ['gpu', 'ops/s', true], npu: ['gpu', 'ops/s', true], drive: ['store', 'bits', false], psu: ['psu', 'W', false],
 };
+/**
+ * A part's shown x → y is the number the board prints on that part (coordinator rule): the clock's
+ * Hz and, for the package, the CPU's headline clock (ChipSnapshot.clock.hz, the System board's CPU
+ * label); a core's own rate, lanes × its socket clock (CoreView.rate); a cache level's, RAM stick's
+ * or drive's own bits (CacheLevelView.bits, PartView.capacityBits). Payback still uses the
+ * system figures: an upgrade's gain is the rate it adds.
+ */
+const OWN_VALUE = new Set(['cpu', 'clock', 'core', 'l1', 'l2', 'l3', 'ram', 'drive']);
+function ownValue(build: BuildState, ref: PartRef): number {
+  const cpu = ref.unit.kind === 'system' ? build.systems[ref.unit.id]?.spec.cpu : null;
+  const hz = cpu ? capacity(PARTS.clock, cpu.clock.gen, cpu.clock.level) : 0;
+  if (ref.slot.kind === 'cpu' || ref.slot.kind === 'clock') return hz;
+  const p = readPart(build, ref);
+  if (!p || !isLeveled(p.id)) return 0;
+  const own = capacity(PARTS[p.id as LeveledPartId], p.gen, p.level);
+  return ref.slot.kind === 'core' ? own * hz : own;
+}
 
 /** Credits per joule where a unit sits (spec §9.6). */
 export function energyPrice(state: GameState, ref: PartRef): number {
@@ -102,7 +119,9 @@ export function partEffect(state: GameState, ref: PartRef, after: BuildState, co
     const fa = figures(a, u), fb = figures(b, u);
     const [field, unit, isRate] = key;
     const wa = fa.idle + fa.load * use, wb = fb.idle + fb.load * use;
-    return preview(fa[field], fb[field], unit, wa, wb, price, cost, isRate ? (fb[field] - fa[field]) * use : null);
+    const gain = isRate ? (fb[field] - fa[field]) * use : null;
+    if (OWN_VALUE.has(ref.slot.kind)) return preview(ownValue(state.build, ref), ownValue(after, ref), unit, wa, wb, price, cost, gain);
+    return preview(fa[field], fb[field], unit, wa, wb, price, cost, gain);
   }
   const pa = readPart(state.build, ref), pb = readPart(after, ref);
   if (!pa || !pb || !isLeveled(pa.id)) return null;

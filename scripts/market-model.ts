@@ -11,15 +11,31 @@
  * It prints the D19 long-horizon table. With --tune it fits rungs to the D19 `at` hours.
  * --start=offset (default) is program D12: a round opens at the previous peak minus startBack.
  * --start=zero is the superseded D10 rule: every round restarts the curve at I = 0.
+ * D25 (default): tasks are divisible. A take splits the head into equal whole-unit shards over the
+ * systems that have room (lockstep for a homogeneous fleet), at most 256 and never below the family's
+ * grain; size-scaling gates (working set, VRAM, disk) apply per shard. --whole replays the pre-D25
+ * rule (one system per member) for comparison. --fleet prints the D25 fleet sweep (section F; PROF=0|1 and
+ * SYS=12,24 limit it). --skipA skips the section A ladders (slow for large fleets under D25).
+ * D26 (default): memory is a hierarchy. A shard's working set sits in cache, then RAM, then disk (its slot's
+ * share of each); the only memory gate is the whole hierarchy. RAM stream and storage IO stages fold into
+ * one memory-traffic coefficient: bits touched in cache are free, in RAM they run at RAM bandwidth, on disk
+ * at drive IO. Families from rackDist on carry a completion window from take; a task not met in it fails Late.
+ * --memory prints section H (spill, splitting, deadlines). --nodl turns completion windows off.
  */
 type Res = "cpu" | "ram" | "gpu" | "io";
 type Fam = { id: string; name: string; band: number; i0: number; i1: number; w: number;
   st: [Res, number][]; th: number; wsF: number; wsP: number; vram: number; disk: number;
   m: number; z: number; reg: string; tensor: boolean; ecc: boolean; dataRatio: number; pay: number; note: string;
-  gpuCoresMin: number; accel: boolean }; // fixed per-member core gate; accel: workload affinity
+  gpuCoresMin: number; accel: boolean; g: number;   // fixed per-member core gate; accel: workload affinity; g: grain (D25)
+  mem: number; wsT: number; dl: number };          // D26: memory traffic bits/unit (old ram + storage stages), working set/unit incl. old disk, window s
 
 const arg = (k: string) => process.argv.find(a => a.startsWith(`--${k}`));
 const MODE = (arg("start")?.split("=")[1] ?? "offset") as "zero" | "offset"; // D12: offset is the rule
+let SPLIT = !arg("whole");          // D25: divisible tasks (default); --whole = pre-D25 whole tasks
+const MAX_SHARDS = 256;             // D25.8: shards per task (the architecture's members cap)
+// D25.1 grain classes, in size units: a shard is never smaller than one grain.
+const GRAIN = { serial: 65536, coarse: 4096, medium: 256, fine: 64, tile: 16 } as const;
+const BAND_GRAIN = [GRAIN.coarse, GRAIN.coarse, GRAIN.fine, GRAIN.medium, GRAIN.fine, GRAIN.coarse, GRAIN.fine, GRAIN.fine, GRAIN.fine, GRAIN.fine];
 
 // ---- Curve constants (starting values; docs/tasks.md §3) ----
 export const C = {
@@ -42,13 +58,17 @@ const RES: Record<string, Res> = { c: "cpu", r: "ram", g: "gpu", d: "io" };
 const REGION_MIN: Record<string, number> = { "": 1, "eu-west": 4, "ap-southeast": 4, "ap-northeast": 8 }; // open regions needed (spec 3.3)
 const sig2 = (x: number) => Number(x.toPrecision(2));
 
+// D26.5: completion window (s, from take) by band: rackDist 120, roomDist 180, multiAz 240, region 120; none before.
+// WINX scales them for tuning. Measured from take (pickup), router-queue time included.
+const BAND_WINDOW = [0, 0, 0, 0, 0, 0, 120, 180, 240, 120].map(x => x * Number(process.env.WINX ?? 1));
 function fam(id: string, name: string, band: number, i0: number, i1: number, w: number, stages: string,
   o: Partial<Fam>, note: string): Fam {
   const st = stages.split(" ").map(s => [RES[s[0]!]!, Number(s.slice(1))] as [Res, number]);
   const g = st.find(s => s[0] === "gpu")?.[1] ?? 0, pay = st.reduce((s, [, k]) => s + k, 0); // D2: 1 Credit per unit of work
-  const base = { th: 1, wsF: 0, wsP: 0, vram: 0, disk: 0, m: 1, z: 1, reg: "", tensor: false, ecc: false, dataRatio: 100, gpuCoresMin: 0, ...o };
+  const base = { th: 1, wsF: 0, wsP: 0, vram: 0, disk: 0, m: 1, z: 1, reg: "", tensor: false, ecc: false, dataRatio: 100, gpuCoresMin: 0, g: BAND_GRAIN[band]!, ...o };
   const accel = base.tensor || base.gpuCoresMin > 0 || 2 * g >= pay || base.wsP >= 4; // GPU-heavy, tensor or big-memory
-  return { id, name, band, i0, i1, w, st, ...base, pay, note, accel };
+  const mem = st.reduce((a, [r, k]) => a + (r === "ram" || r === "io" ? k : 0), 0); // D26.3: RAM stream + storage IO = bits touched
+  return { id, name, band, i0, i1, w, st, ...base, pay, note, accel, mem, wsT: base.wsP + base.disk, dl: o.dl ?? BAND_WINDOW[band]! };
 }
 // ---- Catalog: windows in I; stage coefficients per unit of size are task totals (members split them) ----
 export const FAMS: Fam[] = [
@@ -67,27 +87,27 @@ export const FAMS: Fam[] = [
   fam("intSort", "Integer Sort", 1, 8.8, 16, 6, "c4", { wsF: 64, wsP: 0.25, dataRatio: 60 }, "Sort a small array in place."),
   fam("hashBatch", "Hash Batch", 2, 10, 18, 6, "c6", { wsF: 768, th: 4, dataRatio: 80 }, "SHA-256 over a batch, one block per thread."),
   fam("lzCompress", "LZ Compress", 2, 10.8, 18.5, 6, "c5", { wsF: 512, th: 4, dataRatio: 40 }, "Deflate logs, one window per thread."),
-  fam("monteCarlo", "Monte Carlo", 2, 11.6, 18, 5, "c6", { wsF: 64, th: 8, dataRatio: 100 }, "Estimate pi with independent samples."),
-  fam("jsonParse", "JSON Parse", 3, 12.5, 20, 7, "c5", { wsF: 256, wsP: 1, dataRatio: 40 }, "Parse a big API response into a tree."),
+  fam("monteCarlo", "Monte Carlo", 2, 11.6, 18, 5, "c6", { wsF: 64, th: 8, g: GRAIN.tile, dataRatio: 100 }, "Estimate pi with independent samples."),
+  fam("jsonParse", "JSON Parse", 3, 12.5, 20, 7, "c5", { wsF: 256, wsP: 1, g: GRAIN.serial, dataRatio: 40 }, "Parse a big API response into a tree."),
   fam("mergeSort", "Merge Sort", 3, 13.1, 21, 8, "c2 r3", { wsP: 2, dataRatio: 60 }, "Sort an array too big for cache."),
-  fam("kvGet", "KV Cache Get", 3, 13.7, 22, 7, "c1 r4", { wsP: 4, dataRatio: 50 }, "Serve hot keys from an in-RAM map."),
+  fam("kvGet", "KV Cache Get", 3, 13.7, 22, 7, "c1 r4", { wsP: 4, g: GRAIN.fine, dataRatio: 50 }, "Serve hot keys from an in-RAM map."),
   fam("sqlJoin", "SQL Join", 3, 14.5, 23, 7, "c2 r4", { th: 2, wsP: 4, dataRatio: 15 }, "Hash-join two tables in RAM."),
   fam("graphBfs", "Graph BFS", 3, 18, 26, 5, "c1 r5", { th: 4, wsP: 8, dataRatio: 20 }, "Walk a social graph level by level."),
-  fam("matmul", "Matrix Multiply", 3, 20, 28, 6, "c4 r2", { th: 4, wsP: 2, dataRatio: 70 }, "Dense float matrix product."),
+  fam("matmul", "Matrix Multiply", 3, 20, 28, 6, "c4 r2", { th: 4, wsP: 2, g: GRAIN.fine, dataRatio: 70 }, "Dense float matrix product."),
   fam("imageBlur", "Image Blur", 4, 15, 24, 7, "r1 g10", { wsP: 1, gpuCoresMin: 1, vram: 1, dataRatio: 60 }, "Gaussian blur on a photo."),
-  fam("thumbnail", "Thumbnail", 4, 15.6, 23, 6, "c1 r1 g6", { wsP: 1, gpuCoresMin: 1, vram: 1, dataRatio: 70 }, "Resize uploads for a feed."),
-  fam("transcode", "Video Transcode", 4, 19.5, 28, 7, "c1 r2 g10", { th: 2, wsP: 1, gpuCoresMin: 4, vram: 2, dataRatio: 60 }, "H.264 to AV1, one segment."),
+  fam("thumbnail", "Thumbnail", 4, 15.6, 23, 6, "c1 r1 g6", { wsP: 1, gpuCoresMin: 1, vram: 1, g: GRAIN.tile, dataRatio: 70 }, "Resize uploads for a feed."),
+  fam("transcode", "Video Transcode", 4, 19.5, 28, 7, "c1 r2 g10", { th: 2, wsP: 1, gpuCoresMin: 4, vram: 2, g: GRAIN.coarse, dataRatio: 60 }, "H.264 to AV1, one segment."),
   fam("inference", "ML Inference", 4, 17, 29, 8, "r1 g12", { wsP: 1, gpuCoresMin: 0, vram: 4, tensor: true, dataRatio: 12 }, "Run a trained model on a batch."),
-  fam("rayTrace", "Ray Trace Tile", 4, 22, 30, 5, "g14", { gpuCoresMin: 16, vram: 2, dataRatio: 80 }, "Render one 64x64 tile."),
-  fam("logIngest", "Log Ingest", 5, 16.5, 26, 7, "c1 d4", { disk: 8, dataRatio: 10 }, "Append and index server logs."),
-  fam("backup", "Backup", 5, 17.2, 27, 6, "d6", { disk: 16, dataRatio: 40 }, "Snapshot a volume to disk."),
+  fam("rayTrace", "Ray Trace Tile", 4, 22, 30, 5, "g14", { gpuCoresMin: 16, vram: 2, g: GRAIN.tile, dataRatio: 80 }, "Render one 64x64 tile."),
+  fam("logIngest", "Log Ingest", 5, 16.5, 26, 7, "c1 d4", { disk: 8, g: GRAIN.medium, dataRatio: 10 }, "Append and index server logs."),
+  fam("backup", "Backup", 5, 17.2, 27, 6, "d6", { disk: 16, g: GRAIN.serial, dataRatio: 40 }, "Snapshot a volume to disk."),
   fam("indexBuild", "Index Build", 5, 18.5, 29, 6, "c2 r2 d3", { wsP: 2, disk: 4, dataRatio: 12 }, "Build a B-tree over a table."),
   fam("compaction", "LSM Compaction", 5, 21, 31, 5, "c1 r2 d4", { wsP: 1, disk: 8, dataRatio: 30 }, "Merge sorted runs into one."),
-  fam("sqlScan", "SQL Scan", 5, 23, 33, 6, "c2 r3 d3", { th: 4, wsP: 2, disk: 2, dataRatio: 12 }, "Full table scan with filters."),
+  fam("sqlScan", "SQL Scan", 5, 23, 33, 6, "c2 r3 d3", { th: 4, wsP: 2, disk: 2, g: GRAIN.medium, dataRatio: 12 }, "Full table scan with filters."),
   fam("replWrite", "Replicated Write", 6, 26, 35, 7, "c2 d5", { disk: 4, m: 3, ecc: true, dataRatio: 40 }, "Commit one write to three replicas."),
-  fam("cdnFill", "CDN Fill", 6, 26.6, 35, 6, "d5", { disk: 4, dataRatio: 60 }, "Pull an object into an edge cache."),
+  fam("cdnFill", "CDN Fill", 6, 26.6, 35, 6, "d5", { disk: 4, g: GRAIN.coarse, dataRatio: 60 }, "Pull an object into an edge cache."),
   fam("apiFanout", "API Fan-out", 6, 27.4, 36, 6, "c3 r3", { wsP: 1, m: 4, dataRatio: 70 }, "One request, four backend calls."),
-  fam("payroll", "Payroll Run", 6, 28.2, 38, 5, "c3 r2 d3", { wsP: 2, disk: 2, ecc: true, dataRatio: 40 }, "Nightly batch where a flipped bit costs money."),
+  fam("payroll", "Payroll Run", 6, 28.2, 38, 5, "c3 r2 d3", { wsP: 2, disk: 2, ecc: true, g: GRAIN.serial, dataRatio: 40 }, "Nightly batch where a flipped bit costs money."),
   fam("mapReduce", "MapReduce", 6, 29, 39, 7, "c3 r3 d3", { wsP: 2, disk: 2, m: 8, dataRatio: 12 }, "Map, shuffle, reduce on 8 nodes."),
   fam("trainShard", "Training Shard", 6, 29.8, 40, 6, "r2 g18", { wsP: 1, gpuCoresMin: 256, vram: 8, m: 8, tensor: true, dataRatio: 10 }, "One data-parallel step across 8 systems."),
   fam("teraSort", "TeraSort", 7, 32, 42, 6, "c2 r3 d4", { wsP: 2, disk: 4, m: 32, dataRatio: 25 }, "Sort a huge file across 32 nodes."),
@@ -96,12 +116,12 @@ export const FAMS: Fam[] = [
   fam("bigTrain", "Large Training", 7, 34.6, 44, 5, "r2 g20", { wsP: 2, gpuCoresMin: 1024, vram: 64, m: 48, tensor: true, ecc: true, dataRatio: 10 }, "A model too big for one rack."),
   fam("activeActive", "Active-Active DB", 8, 41, 51, 7, "c3 r3 d3", { wsP: 2, disk: 2, m: 4, z: 2, ecc: true, dataRatio: 30 }, "Accept writes in two zones at once."),
   fam("quorumWrite", "Quorum Write", 8, 41.8, 51, 6, "c2 d5", { disk: 4, m: 3, z: 3, ecc: true, dataRatio: 40 }, "Raft commit across three zones."),
-  fam("drBackup", "DR Backup", 8, 42.6, 51, 5, "d8", { disk: 16, m: 2, z: 2, dataRatio: 30 }, "Copy a snapshot to another zone."),
+  fam("drBackup", "DR Backup", 8, 42.6, 51, 5, "d8", { disk: 16, m: 2, z: 2, g: GRAIN.coarse, dataRatio: 30 }, "Copy a snapshot to another zone."),
   fam("hallTrain", "Multi-hall Train", 8, 43.6, 53, 5, "r3 g22", { wsP: 2, gpuCoresMin: 4096, vram: 128, m: 96, z: 2, tensor: true, ecc: true, dataRatio: 10 }, "Training that spans two halls."),
   fam("euResidency", "EU Residency", 9, 46.5, 57, 7, "c3 r3 d3", { wsP: 1, disk: 2, m: 4, reg: "eu-west", ecc: true, dataRatio: 20 }, "EU personal data stays in the EU."),
   fam("llmTrain", "LLM Training", 9, 48.5, 59, 5, "r4 g26", { wsP: 2, gpuCoresMin: 8192, vram: 256, m: 256, z: 2, tensor: true, ecc: true, dataRatio: 10 }, "Pretrain on 256 systems; any region."),
   fam("apacPayments", "APAC Payments", 9, 47.5, 57, 6, "c4 r3 d3", { wsP: 1, disk: 2, m: 4, reg: "ap-southeast", ecc: true, dataRatio: 40 }, "Card payments settled in-region."),
-  fam("exchangeFeed", "Exchange Feed", 9, 50, 59, 6, "c4 r2", { wsP: 0.5, m: 2, reg: "ap-northeast", ecc: true, dataRatio: 15 }, "Match orders next to the Tokyo exchange."),
+  fam("exchangeFeed", "Exchange Feed", 9, 50, 59, 6, "c4 r2", { wsP: 0.5, m: 2, reg: "ap-northeast", ecc: true, dl: 60 * Number(process.env.WINX ?? 1), dataRatio: 15 }, "Match orders next to the Tokyo exchange."),
 ];
 
 // ---- Capacity ladder (model assumption; spec owner owns real parts/prices) ----
@@ -123,20 +143,22 @@ add({ name: "System + RAM", ms: "System", at: 0.85, need: 14.5, payMin: 1.3, rs:
 add({ name: "kHz fab", at: 3.5, need: 15, payMin: 3.5, lvlMin: 0.5, rs: 90, reset: true, cpu: 8000, cache: 2 ** 14, ram: 2 ** 20, ramBw: 32000 }); // D15: GPU and drives come after Rack
 add({ name: "Rack, 4 servers", ms: "Rack", at: 6.8, need: 25, payMin: 0.002, lvlMin: 1.5, rs: 120, sys: 4, pipe: -1, uplink: 1e10, route: 16, gang: 4, ecc: true }); // D15: ports upgradable; uplink fixed at the room default until Room
 add({ name: "GPU", at: 7.5, need: 14.5, payMin: 45, rs: 90, gpuGeneration: 3, gpuSlots: 1 });
-add({ name: "Storage", at: 8, need: 14.5, payMin: 130, rs: 90, disk: 2 ** 24, io: 32000 });
+add({ name: "Storage", at: 8, need: 14.5, payMin: 130, rs: 90, disk: 2 ** 24, io: 2000 }); // D26.2: SSD IO = 1/16 of DDR2 bandwidth
 add({ name: "Rack, 12 servers", at: 14, need: 27, payMin: 110, rs: 60, sys: 12, route: 160, gang: 12 });
 add({ name: "Accelerators", at: 30, need: 29, payMin: 350, rs: 120, gpuSlots: 8, gpuLinked: true }); // Assumed link research and eight premium cards.
 add({ name: "MHz fab", at: 45, need: 29, payMin: 400, lvlMin: 3, rs: 150, reset: true, cpu: 1.6e7, cache: 2 ** 24, ram: 2 ** 30, ramBw: 6.4e7,
-  gpuGeneration: 6, disk: 2 ** 34, io: 6.4e7, tensor: 4 });
+  gpuGeneration: 6, disk: 2 ** 34, io: 1.6e7, tensor: 4 }); // D26.2: NVMe IO = 1/4 of DDR3
 add({ name: "Room, 4 racks", ms: "Room", at: 72, need: 33.5, payMin: 99, lvlMin: 5, rs: 180, sys: 48, gang: 48, route: 256, uplink: Infinity }); // D15: rack uplinks upgradable on the network rack
 add({ name: "Room, 8 racks", at: 120, need: 40.5, payMin: 570, rs: 60, sys: 96, gang: 96, route: 1280 });
 add({ name: "GHz fab", at: 170, need: 41.5, payMin: 2700, lvlMin: 8, rs: 180, reset: true, cpu: 3.2e10, cache: 2 ** 30, ram: 2 ** 38, ramBw: 1.28e11,
-  gpuGeneration: 9, disk: 2 ** 44, io: 1.28e11, tensor: 8, route: 12800 });
+  gpuGeneration: 9, disk: 2 ** 44, io: 6.4e10, tensor: 8, // D26.2: SCM IO = 1/2 of DDR5
+  route: 12800 });
 add({ name: "Data center, 2 AZ", ms: "Data center", at: 260, need: 42, payMin: 7200, lvlMin: 12, rs: 240, sys: 192, gang: 192, zones: 2, route: 25600 });
 add({ name: "3 AZ", at: 340, need: 43, payMin: 12000, rs: 120, sys: 288, gang: 288, zones: 3, route: 38400 });
 add({ name: "Regions", ms: "Regions", at: 504, need: 48.5, payMin: 32000, lvlMin: 16, rs: 300, sys: 384, gang: 384, regions: 4, route: 32768 });
 add({ name: "Intercontinental", at: 1100, need: 50, payMin: 380000, rs: 120, sys: 576, gang: 576, regions: 8, route: 65536 });
-add({ name: "Max fleet", ms: "All data centers", at: 2200, need: 52, payMin: 1300000, rs: 120, sys: 6912, gang: 6912, zones: 3, regions: 8 }); // D19: every site, 3 zones, 24 racks, 12 servers
+add({ name: "Max fleet", ms: "All data centers", at: 2200, need: 52, payMin: 4300000, // D25: was 1.3e6 before divisible tasks
+  rs: 120, sys: 6912, gang: 6912, zones: 3, regions: 8 }); // D19: every site, 3 zones, 24 racks, 12 servers
 for (const r of R) r.route = 1e12; // D12.5: load balancers have no routing budget; transfer speed is the only throttle
 
 type Prof = Rung & { L: number; gpu: number; vram: number; gpuCores: number };
@@ -149,14 +171,20 @@ export function portStepCost(Y: number, X: number, m = 1): number {
   const x = X / m, y = Y / m, c = Math.max(0, Math.min(3, Math.floor(Math.log10(x) / 3 + 1e-9))), b = 10 ** (3 * c);
   return Math.ceil(m * CLOCK_U[c]! / 0.7 * ((x / b) ** ALPHA - (y / b) ** ALPHA));
 }
+let FLEET: Partial<Rung> | null = null; // section F: override fleet shape (sys, gang, zones, uplink) on a rung's hardware
+let MEMX: { ram?: number; disk?: number; io?: number } | null = null; // section H: per-system memory after level scaling
+let DEADLINES = !arg("nodl");
+const SPLIT_FLOOR = !arg("nofloor");
+const GATHER = !arg("nogather"); // model player has splitGather from Rack; --nogather = base first-fit spread // D25.11; --nofloor replays D25 as first written
 function prof(r: number, L: number, pk = 0): Prof {
-  const p = { ...R[r]!, L } as Prof;
+  const p = { ...R[r]!, ...(FLEET ?? {}), L } as Prof;
   for (const k of SCALED) p[k] = R[r]![k] * 2 ** L;
   const g = p.gpuGeneration, u = Math.min(5, L), pool = p.gpuLinked ? p.gpuSlots : 1;
   p.gpuCores = g ? 2 ** (g - 1) * 4 * 32 * 2 ** u * pool : 0;
   p.vram = g ? 2 ** (13 + 4 * (g - 1)) * 4 * 32 * 2 ** u * pool : 0;
   p.gpu = p.gpuCores * (g ? 10 ** (g + 2) * 2 * 1.5 * 1.25 ** u : 0);
-  p.pipe = R[r]!.pipe === C.pipe0 ? C.pipe0 : Math.min(speedK(pk), R[r]!.uplink / p.sys); // D15: fixed 1 kHz before Rack
+  if (MEMX) Object.assign(p, MEMX);
+  p.pipe = R[r]!.pipe === C.pipe0 ? C.pipe0 : Math.min(speedK(pk), p.uplink / p.sys); // D15: fixed 1 kHz before Rack
   return p;
 }
 const capOps = (p: Prof) => p.sys * p.cores * p.cpu;
@@ -184,7 +212,7 @@ function buyPipe(s: State, t: number): boolean { // D15: ports upgrade on the ra
 // While ports lag the CPU, compute levels are wasted; a sensible player buys ports first.
 const pipeLags = (s: State) => { const rr = R[s.r]!; if (rr.pipe >= 0) return false; const P = prof(s.r, s.L, s.pk); return speedK(s.pk) < Math.min(P.cores * P.cpu, rr.uplink / P.sys); };
 const matchPk = (r: number, L: number) => { let k = 0; const P = prof(r, L, 0); if (R[r]!.pipe >= 0) return 0;
-  while (speedK(k) < Math.min(P.cores * P.cpu, R[r]!.uplink / P.sys)) k++; return k; };
+  while (speedK(k) < Math.min(P.cores * P.cpu, P.uplink / P.sys)) k++; return k; };
 function buyLevels(s: State): boolean {
   let b = false;
   const cap = s.r + 1 < R.length ? C.levelShare * rungCost(s.r + 1) : Infinity;
@@ -199,25 +227,55 @@ function rng(seed: number) {
     t ^= t + Math.imul(t ^ (t >>> 7), t | 61); return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
 }
 
-// ---- One task against the fleet: gates in report order, then per-member transfer and compute time ----
-type Task = { w: number; m: number; t: number; c: number; data: number };
-function plan(f: Fam, size: number, P: Prof, ratio: number): Task | string {
-  const per = size / f.m, has = (r: Res) => f.st.some(s => s[0] === r);
-  const ws = f.wsF + f.wsP * per, mem = Math.max(P.cache, P.ram);
-  if (ws > mem || (has("ram") && !P.ramBw)) return P.ram || f.wsP || has("ram") ? "Can't run: RAM" : "Can't run: cache";
+// ---- One task against the fleet: gates in report order, then per-shard transfer and compute time ----
+type Task = { w: number; m: number; t: number; c: number; data: number; nMin: number; nMax: number; disk: number };
+// D26.1: the hierarchy is the only memory gate; its detail names the deepest tier the system has.
+const hier = (P: Prof) => P.cache + P.ram + P.disk;
+const memFail = (P: Prof) => P.disk ? "Can't run: disk" : P.ram ? "Can't run: RAM" : "Can't run: cache";
+// D26.2: place a shard's working set fastest tier first in its running slot's share (capacity / K); the last
+// tier present takes the rest. Bits touched follow the placement: cache free, RAM at bandwidth, disk at drive IO.
+function memTime(f: Fam, per: number, P: Prof): { t: number; disk: number } {
+  const M = f.mem * per, ws = f.wsF + f.wsT * per;
+  if (M <= 0 || ws <= 0) return { t: 0, disk: 0 };
+  const K = P.K, c = Math.min(ws, P.cache / K);
+  const r = P.disk ? Math.min(ws - c, P.ram / K) : ws - c, d = Math.max(0, ws - c - r);
+  return { t: (r > 0 ? M * (r / ws) / (P.ramBw / K) : 0) + (d > 0 ? M * (d / ws) / (P.io / K) : 0), disk: d / ws };
+}
+function plan(f: Fam, size: number, P: Prof, ratio: number, nAt?: number): Task | string {
+  const has = (r: Res) => f.st.some(s => s[0] === r), H = hier(P);
+  if (f.wsF > H) return memFail(P);
   if (f.ecc && !P.ecc) return "Can't run: ECC";
   if (has("gpu") && !P.gpu) return "Can't run: GPU";
   if (f.gpuCoresMin > P.gpuCores) return "Can't run: GPU cores";
-  if (f.vram * per > P.vram) return "Can't run: VRAM";
-  if ((has("io") || f.disk) && (!P.io || f.disk * per > P.disk)) return "Can't run: storage";
   if (f.m > P.sys) return "Can't run: members";
-  if (f.m > P.gang) return "Can't run: gang";
+  if (!SPLIT && f.m > P.gang) return "Can't run: gang";
   if (f.z > P.zones) return "Can't run: zones";
   if (P.regions < REGION_MIN[f.reg]!) return "Can't run: region";
-  const rate: Record<Res, number> = { cpu: P.cpu * Math.max(1, Math.min(f.th, P.cores / P.K)),
-    ram: P.ramBw / P.K, gpu: P.gpu * (f.tensor ? P.tensor : 1) / P.K, io: P.io / P.K };
-  const work = f.pay * size, c = f.st.reduce((s, [r, k]) => s + k * per / rate[r], 0);
-  return { w: work, m: f.m, t: (work / f.m) / P.pipe, c, data: work / ratio }; // D10: transfer bits = work
+  const need = (perUnit: number, fixed: number, cap: number) => perUnit <= 0 ? 1 : cap <= fixed ? Infinity : Math.ceil(perUnit * size / (cap - fixed));
+  let n: number, nMin: number, nMax: number, th: number;
+  if (SPLIT) {
+    const eg = Math.max(f.g, Math.ceil(size / MAX_SHARDS));
+    // D25.11 split floor: every shard carries at least 1 s of work at its target's nominal rate (GPU rate for GPU families).
+    const rTarget = has("gpu") ? P.gpu : P.cores * P.cpu, nFloor = SPLIT_FLOOR ? Math.floor(f.pay * size / (rTarget * 1)) : Infinity;
+    const nCap = Math.max(f.m, Math.min(P.sys, Math.floor(size / eg)));
+    const nWs = need(f.wsT, f.wsF, H), nV = need(f.vram, 0, P.vram);
+    if (nWs > nCap) return memFail(P);
+    if (nV > nCap) return "Can't run: VRAM";
+    nMin = Math.max(f.m, nWs, nV); // the floor never cuts below the minimum split or the shards needed to fit
+    // D25.11 item 2: the floor never cuts below the split that keeps each shard out of disk (cache + RAM per running slot).
+    const fast = (P.cache + P.ram) / P.K, nNoDisk = f.mem > 0 && fast > f.wsF ? Math.ceil(f.wsT * size / (fast - f.wsF)) : 1;
+    nMin = Math.max(nMin, Math.min(nCap, nNoDisk)); // a capability-aware split waits rather than spill (model player)
+    nMax = Math.max(nMin, Math.min(nCap, Math.max(nFloor, nNoDisk))); n = Math.min(nMax, Math.max(nMin, nAt ?? nMax));
+    th = Math.max(1, Math.floor(size / n / f.g)); // D25.3: threads = min(free threads, floor(units / grain))
+  } else {
+    n = nMin = nMax = f.m; th = f.th;
+    if (f.wsF + f.wsT * size / n > H) return memFail(P);
+    if (f.vram * size / n > P.vram) return "Can't run: VRAM";
+  }
+  const per = size / n, rate = { cpu: P.cpu * Math.max(1, Math.min(th, P.cores / P.K)), gpu: P.gpu * (f.tensor ? P.tensor : 1) / P.K };
+  const mt = memTime(f, per, P), work = f.pay * size;
+  const c = f.st.reduce((a, [r, k]) => a + (r === "cpu" ? k * per / rate.cpu : r === "gpu" ? k * per / rate.gpu : 0), 0) + mt.t;
+  return { w: work, m: n, t: (work / n) / P.pipe, c, data: work / ratio, nMin, nMax, disk: mt.disk };
 }
 const I_LAST = 58.9; // past the last window the mix stays as it was at I_LAST; sizes keep growing
 const wt = (f: Fam, I0: number) => { const I = Math.min(I0, I_LAST);
@@ -245,13 +303,15 @@ class Heap { k: number[] = []; v: number[] = [];
 
 let TRACE_ROUND = false;
 type Out = { len: number; warm: number; met: number; fail: number; causes: Map<string, number>; earned: number; data: number;
-  peakI: number; startI: number; data1: number; pipeS: number; delivered: number; failedWork: number };
+  peakI: number; startI: number; data1: number; pipeS: number; delivered: number; failedWork: number; shards: number; ticks: number;
+  diskShare: number; late: number };
 function playRound(s: State, seed: number, startI: number, shop?: (t: number) => boolean): Out {
   const rnd = rng(seed), jit = FAMS.map(() => 1 + C.wJit * (2 * rnd() - 1));
   const ratio = FAMS.map(f => f.dataRatio * (1 + C.dataJit * (2 * rnd() - 1)));
-  const causes = new Map<string, number>(), wts = new Float64Array(FAMS.length), done = new Heap(), doneW: number[] = [], doneD: number[] = [];
-  let P = prof(s.r, s.L, s.pk), I = startI, tick = 0, hs = 0, head: { f: number; size: number } | null = null, carry = 0;
-  let met = 0, fail = 0, earned = 0, data = 0, data1 = -1, delivered = 0, failedWork = 0, warm = 0, pipeS = 0;
+  const causes = new Map<string, number>(), wts = new Float64Array(FAMS.length), done = new Heap(), doneW: number[] = [], doneD: number[] = [], doneLate: boolean[] = [];
+  let diskW = 0, takenW = 0, late = 0;
+  let P = prof(s.r, s.L, s.pk), I = startI, tick = 0, hs = 0, head: { f: number; size: number; win: number } | null = null, carry = 0;
+  let met = 0, fail = 0, earned = 0, data = 0, data1 = -1, delivered = 0, failedWork = 0, warm = 0, pipeS = 0, shards = 0;
   // Systems: inbound link free time, K run-slot free times, sorted finish times of admitted tasks, per-tick take count.
   let N = 0, cap = 1, K = 1, linkFree = new Float64Array(0), runFree = new Float64Array(0), fin: number[][] = [];
   let tickOf = new Int32Array(0), takes = new Int32Array(0), ready = new Heap();
@@ -261,11 +321,12 @@ function playRound(s: State, seed: number, startI: number, shop?: (t: number) =>
     runFree = new Float64Array(N * K).fill(now); fin = Array.from({ length: N }, () => []); tickOf = new Int32Array(N).fill(-1);
     takes = new Int32Array(N); ready = new Heap(); for (let j = 0; j < N; j++) ready.push(now, j); };
   reset(0);
-  const failWith = (c: string, w: number) => { fail++; failedWork += w; causes.set(c, (causes.get(c) ?? 0) + 1); };
+  const failWith = (c: string, w: number) => { if (TRACE_ROUND) console.log(`  fail ${c} I ${I.toFixed(2)} w ${eng(w)} fam ${head ? FAMS[head.f]!.id : "?"}`); fail++; failedWork += w; causes.set(c, (causes.get(c) ?? 0) + 1); };
   const draw = () => { // the next queue task at the current intensity: one family draw, one size draw
     let tot = 0; for (let i = 0; i < FAMS.length; i++) { wts[i] = wt(FAMS[i]!, I) * jit[i]!; tot += wts[i]!; }
     let u = rnd() * tot, f = 0; if (tot > 0) { while (u >= wts[f]!) { u -= wts[f]!; f++; } }
-    return { f, size: Math.max(1, Math.round(unit(I) * (1 + C.sizeJit * (2 * rnd() - 1)))) };
+    const j = 1 + C.sizeJit * (2 * rnd() - 1); // D26.5: window = family seconds × size jitter, frozen at the draw
+    return { f, size: Math.max(1, Math.round(unit(I) * j)), win: DEADLINES ? FAMS[f]!.dl * j : 0 };
   };
   // Mix statistics at the mean size: gated count share, mean work, fleet takes/s with and without take caps.
   const mix = () => { let wsum = 0, gated = 0, wbar = 0, wmax = 1, sys = 0, mbar = 0, dbar = 0, pipeW = 0;
@@ -274,10 +335,10 @@ function playRound(s: State, seed: number, startI: number, shop?: (t: number) =>
       if (typeof t === "string") { gated += x; wmax = Math.max(wmax, FAMS[i]!.pay * unit(I) * (1 + C.sizeJit)); continue; }
       const iv = cap === 1 ? t.t + t.c : Math.max(t.t, t.c / K);
       wbar += x * t.w; wmax = Math.max(wmax, t.w * (1 + C.sizeJit)); sys += x * iv * t.m; mbar += x * t.m; dbar += x * t.data; if (t.t > (cap === 1 ? 0.5 * iv : t.c / K)) pipeW += x; }
-    if (!wsum) { const t = plan(FAMS[0]!, Math.max(1, Math.round(unit(I))), P, ratio[0]!) as Task; return { gated: 0, wbar: t.w, dbar: t.data, hw: N / (t.t + t.c), cappedL: Math.min(N / (t.t + t.c), P.route, 10 * N * cap), pipe: false }; }
-    const ok = wsum - gated; if (!ok) return { gated: 1, wbar: 0, dbar: 0, hw: 0, cappedL: 0, pipe: false };
+    if (!wsum) { const t = plan(FAMS[0]!, Math.max(1, Math.round(unit(I))), P, ratio[0]!) as Task; return { gated: 0, wbar: t.w, dbar: t.data, hw: N / (t.t + t.c), cappedL: Math.min(N / (t.t + t.c), P.route, 10 * N * cap), pipe: false, nbar: 1 }; }
+    const ok = wsum - gated; if (!ok) return { gated: 1, wbar: 0, dbar: 0, hw: 0, cappedL: 0, pipe: false, nbar: 1 };
     const hw = N * ok / sys, cappedL = Math.min(hw, P.route, 10 * N * cap * ok / mbar);
-    return { gated: gated / wsum, wmax, wbar: wbar / ok, dbar: dbar / ok, hw, cappedL, pipe: pipeW > ok / 2 };
+    return { gated: gated / wsum, wmax, wbar: wbar / ok, dbar: dbar / ok, hw, cappedL, pipe: pipeW > ok / 2, nbar: mbar / ok };
   };
   const G = C.grace * (mix().wmax ?? 1); // grace prior: 10 times the largest opening task
   for (;;) {
@@ -288,39 +349,53 @@ function playRound(s: State, seed: number, startI: number, shop?: (t: number) =>
     if (mx.pipe) pipeS += C.dt;
     let budget = Math.min(1, carry) + P.route * C.dt;
     if (mx.gated === 0 && mx.cappedL * C.dt > C.fluidTasks) { // aggregate tick: no head can wait 10 s here
-      const n = mx.cappedL * C.dt; met += n; delivered += n * mx.wbar; const g = n * mx.wbar * (1 - C.energy);
+      const n = mx.cappedL * C.dt; met += n; shards += n * mx.nbar; delivered += n * mx.wbar; const g = n * mx.wbar * (1 - C.energy);
       earned += g; s.cr += g; data += n * mx.dbar; if (s.data < 1 && s.data + n * mx.dbar >= 1) data1 = t1; s.data += n * mx.dbar;
       head = null; hs = t1; reset(t1); budget = 0;
     } else for (;;) { // discrete: take the head while some system has room before its 10 s run out
       head ??= draw();
       const f = FAMS[head.f]!, D = hs + C.headS, task = plan(f, head.size, P, ratio[head.f]!);
       if (typeof task === "string") { if (D < t1) { failWith(task, f.pay * head.size); hs = D; head = null; continue; } break; }
-      if (task.m > N) { if (D < t1) { failWith("Can't run: members", task.w); hs = D; head = null; continue; } break; }
+      if (task.nMin > N) { if (D < t1) { failWith("Can't run: members", task.w); hs = D; head = null; continue; } break; }
       const picked: number[] = []; let a = 0;
-      while (picked.length < task.m) { const [, j] = ready.pop(); picked.push(j); a = Math.max(a, accept(j, t0), tickOf[j] === tick && takes[j]! >= cap ? t1 : 0); }
+      const rt = (j: number) => Math.max(accept(j, t0), tickOf[j] === tick && takes[j]! >= cap ? t1 : 0);
+      if (SPLIT) { // D25.2: every system with room at the take time takes a shard (≤ nMax); wait for nMin to fit
+        const [, j0] = ready.pop(); picked.push(j0); a = rt(j0); const tau0 = Math.max(hs, a);
+        while (picked.length < task.nMax && ready.size && ready.peek() <= tau0) { const [, j] = ready.pop(); picked.push(j); a = Math.max(a, rt(j)); }
+        // splitGather (kHz W8, which the model player owns from Rack): wait for half the legal split
+        const want = GATHER ? Math.max(task.nMin, Math.ceil(task.nMax / 2)) : task.nMin;
+        while (picked.length < want && ready.size) { const [, j] = ready.pop(); picked.push(j); a = Math.max(a, rt(j)); }
+      } else while (picked.length < task.m) { const [, j] = ready.pop(); picked.push(j); a = Math.max(a, rt(j)); }
       const tau = Math.max(hs, a);
+      const tk = SPLIT ? plan(f, head.size, P, ratio[head.f]!, picked.length) as Task : task;
       if (tau > D || budget < 1 || tau >= t1) { for (const j of picked) ready.push(Math.max(accept(j, t0), tickOf[j] === tick && takes[j]! >= cap ? t1 : 0), j);
         if (D < t1 && tau > D) { failWith("Timed out", task.w); hs = D; head = null; continue; } break; }
       let F = 0;
       for (const j of picked) {
-        const land = tau + task.t; linkFree[j] = land;
+        const land = tau + tk.t; linkFree[j] = land;
         let si = j * K; for (let q = j * K + 1; q < (j + 1) * K; q++) if (runFree[q]! < runFree[si]!) si = q;
-        const S = Math.max(land, runFree[si]!), fj = S + task.c; runFree[si] = fj; F = Math.max(F, fj);
+        const S = Math.max(land, runFree[si]!), fj = S + tk.c; runFree[si] = fj; F = Math.max(F, fj);
         const fl = fin[j]!; let p = fl.length; fl.push(fj); while (p && fl[p - 1]! > fj) { fl[p] = fl[p - 1]!; p--; } fl[p] = fj;
         if (tickOf[j] !== tick) { tickOf[j] = tick; takes[j] = 0; } takes[j]!++;
         ready.push(Math.max(accept(j, t0), takes[j]! >= cap ? t1 : 0), j);
       }
-      done.push(F, doneW.length); doneW.push(task.w); doneD.push(task.data); budget -= 1; hs = tau; head = null;
+      // D25.5 (revised): the task pays its full W once, when its last shard completes (F = the latest shard finish).
+      // D26.5: a task whose last shard lands after take + window fails Late at that moment, with its full W.
+      const from = tau; // D26.5: the window runs from take
+      const isLate = head.win > 0 && F - from > head.win; diskW += tk.w * tk.disk; takenW += tk.w;
+      done.push(isLate ? from + head.win : F, doneW.length); doneW.push(tk.w); doneD.push(tk.data); doneLate.push(isLate);
+      budget -= 1; hs = tau; head = null; shards += picked.length;
     }
     carry = budget - Math.floor(budget);
-    while (done.size && done.peek() < t1) { const [, i] = done.pop(); met++; delivered += doneW[i]!; const g = doneW[i]! * (1 - C.energy);
+    while (done.size && done.peek() < t1) { const [, i] = done.pop(); if (doneLate[i]) { late++; failWith("Late", doneW[i]!); continue; } met++; delivered += doneW[i]!; const g = doneW[i]! * (1 - C.energy);
       earned += g; s.cr += g; data += doneD[i]!; if (s.data < 1 && s.data + doneD[i]! >= 1) data1 = t1; s.data += doneD[i]!; }
     if (TRACE_ROUND && tick % 100 === 0) console.log(`${ms(t1)} I ${I.toFixed(2)} ops ${eng(mx.wbar)} takes/s ${eng(mx.cappedL)} (hw ${eng(mx.hw)}) pipe ${mx.pipe ? "yes" : "no"} met ${eng(met)} fail ${fail} SLA ${(100 * (delivered + G) / (delivered + failedWork + G)).toFixed(1)}`);
     if (shop && tick % 10 === 0 && shop(t1)) { const nP = prof(s.r, s.L, s.pk); if (nP.sys !== P.sys || nP.K !== P.K || nP.Q !== P.Q) { P = nP; reset(t1); } else P = nP; }
     tick++;
     if ((delivered + G) / (delivered + failedWork + G) < C.slaEnd || tick * C.dt > 3 * 3600) break;
   }
-  return { len: tick * C.dt, warm, met, fail, causes, earned, data, peakI: I, startI, data1, pipeS, delivered, failedWork };
+  return { len: tick * C.dt, warm, met, fail, causes, earned, data, peakI: I, startI, data1, pipeS, delivered, failedWork, shards, ticks: tick,
+    diskShare: takenW ? diskW / takenW : 0, late };
 }
 
 // ---- Reporting ----
@@ -331,14 +406,14 @@ const top = (c: Map<string, number>, n = 2) => [...c].sort((a, b) => b[1] - a[1]
 const SEED = Number(arg("seed")?.split("=")[1] ?? 0xb17);
 
 if (arg("catalog")) {
-  console.log("| id | Band | Window I | w | Stages per unit | thr | Working set | Gates and tags | Members | AZ / region | Pay/unit |");
-  console.log("|---|---|---|---:|---|---:|---|---|---:|---|---:|");
+  console.log("| id | Band | Window I | w | Work per unit | Grain (units) | Working set | Gates and tags | Min split | AZ / region | Done in | Pay/unit |");
+  console.log("|---|---|---|---:|---|---:|---|---|---:|---|---:|---:|");
   for (const f of FAMS) {
-    const ws = [f.wsF ? `${f.wsF} b` : "", f.wsP ? `${f.wsP} b/u` : ""].filter(Boolean).join(" + ") || "0";
-    const g = [f.gpuCoresMin > 0 ? `${f.gpuCoresMin} GPU ${f.gpuCoresMin === 1 ? 'core' : 'cores'}` : "", f.vram ? `VRAM ${f.vram} b/u` : "", f.disk ? `disk ${f.disk} b/u` : "", f.ecc ? "ECC" : "",
-      f.m > 1 ? "gang" : "", f.tensor ? "*tensor*" : "", f.accel ? "**accel**" : ""].filter(Boolean).join(", ") || "-";
+    const ws = [f.wsF ? `${f.wsF} b` : "", f.wsT ? `${f.wsT} b/u` : ""].filter(Boolean).join(" + ") || "0";
+    const g = [f.gpuCoresMin > 0 ? `${f.gpuCoresMin} GPU ${f.gpuCoresMin === 1 ? 'core' : 'cores'}` : "", f.vram ? `VRAM ${f.vram} b/u` : "", f.ecc ? "ECC" : "",
+      f.m > 1 ? "min split" : "", f.tensor ? "*tensor*" : "", f.accel ? "**accel**" : ""].filter(Boolean).join(", ") || "-";
     const zr = [f.z > 1 ? `${f.z} AZ` : "", f.reg].filter(Boolean).join(", ") || "-";
-    console.log(`| \`${f.id}\` | ${BANDS[f.band]} | ${f.i0}-${f.i1} | ${f.w} | ${f.st.map(([r, k]) => `${({ cpu: "compute", ram: "ram", gpu: "gpu", io: "storage" } as const)[r]} ${k}`).join(", ")} | ${f.th} | ${ws} | ${g} | ${f.m} | ${zr} | ${f.pay} |`);
+    console.log(`| \`${f.id}\` | ${BANDS[f.band]} | ${f.i0}-${f.i1} | ${f.w} | ${[...f.st.filter(([r]) => r === "cpu").map(([, k]) => `compute ${k}`), f.mem ? `memory ${f.mem}` : "", ...f.st.filter(([r]) => r === "gpu").map(([, k]) => `gpu ${k}`)].filter(Boolean).join(", ")} | ${f.g.toLocaleString("en-US")} | ${ws} | ${g} | ${f.m} | ${zr} | ${f.dl ? `${f.dl} s` : "-"} | ${f.pay} |`);
   }
   console.log("\n| id | Name | Band | Credits per Data | Flavor |\n|---|---|---|---:|---|");
   for (const f of FAMS) console.log(`| \`${f.id}\` | ${f.name} | ${BANDS[f.band]} | ${f.dataRatio} | ${f.note} |`);
@@ -375,6 +450,85 @@ function reachCheck(): string[] {
 }
 if (reachCheck().length) process.exitCode = 1;
 
+// F. D25 fleet sweep: one hardware profile, fleets of 1, 2, 4, 8 racks, then 1, 2, 3 rooms. Each round opens at the
+// previous peak - startBack (D12) until the round shape settles; whole (pre-D25) against split (D25).
+if (arg("fleet")) {
+  const FLEETS: [string, number, number][] = [["1 rack", 12, 1], ["2 racks", 24, 1], ["4 racks", 48, 1], ["8 racks", 96, 1],
+    ["1 room (24 racks)", 288, 1], ["2 rooms (2 AZ)", 576, 2], ["3 rooms (3 AZ)", 864, 3]];
+  const PROFILES: [string, number, number][] = [["kHz server L8 (GPU, disk, RAM)", RI0("Storage"), 8], ["MHz server L6", RI0("MHz fab"), 6]];
+  for (const [pname, r, L] of PROFILES.filter((_, i) => !process.env.PROF || process.env.PROF === String(i))) {
+    console.log(`
+F. D25 fleet sweep, ${pname}: settled round (start = previous peak - ${C.startBack}), mean of 3 seeds
+`);
+    console.log("| Fleet | Systems | Rule | Peak I | Round | First round after the step | Credits/round | Credits/hour | Shards/tick | Top causes |");
+    console.log("|---|---:|---|---:|---:|---:|---:|---:|---:|---|");
+    const prevStart: Record<string, number[]> = {};
+    for (const [fname, sys, zones] of FLEETS.filter(x => !process.env.SYS || process.env.SYS.split(",").includes(String(x[1])))) for (const split of [false, true]) {
+      SPLIT = split; FLEET = { sys, gang: sys, zones, uplink: Infinity }; TRACE_ROUND = !!process.env.TR && split;
+      const st: State = { r, L, cr: 0, data: 0, pk: matchPk(r, L) };
+      const key = String(split), firsts: number[] = [], starts: number[] = [];
+      const outs = [0, 1, 2].map(k => { let start = 0, o: Out | null = null;
+        // The first round after buying the step opens where the smaller fleet's settled rounds open.
+        if (prevStart[key]) firsts.push(playRound({ ...st }, SEED * 13 + k, prevStart[key]![k]!).len);
+        for (let i = 0; i < 4; i++) { o = playRound({ ...st }, SEED * 11 + k * 101 + i, start); starts[k] = start; start = Math.max(0, o.peakI - C.startBack); } return o!; });
+      prevStart[key] = starts;
+      const first = firsts.length ? ms(firsts.reduce((a, b) => a + b, 0) / firsts.length) : "-";
+      const avg = (fn: (o: Out) => number) => outs.reduce((a, o) => a + fn(o), 0) / outs.length;
+      const causes = new Map<string, number>(); outs.forEach(o => o.causes.forEach((v, k) => causes.set(k, (causes.get(k) ?? 0) + v / 3)));
+      causes.forEach((v, k) => causes.set(k, Math.round(v)));
+      console.log(`| ${fname} | ${sys} | ${split ? "split (D25)" : "whole"} | ${avg(o => o.peakI).toFixed(1)} | ${ms(avg(o => o.len))} | ${first} | ${eng(avg(o => o.earned))} | ${eng(avg(o => o.earned / o.len * 3600))} | ${avg(o => o.shards / o.ticks).toFixed(1)} | ${top(causes)} |${process.env.DBG ? ` n/take ${avg(o => o.shards / Math.max(1, o.met + o.fail)).toFixed(1)}` : ""}`);
+    }
+  }
+  FLEET = null; SPLIT = !arg("whole");
+  process.exit(0);
+}
+
+// H. D26: memory hierarchy, spill and completion windows. Settled rounds (start = previous peak - startBack), mean of
+// 3 seeds, one homogeneous fleet per row. MEMX overrides per-system RAM, disk and drive IO after level scaling.
+if (arg("memory")) {
+  type Row = { label: string; r: number; L: number; sys: number; zones: number; mem?: { ram?: number; disk?: number; io?: number }; dl: boolean; split: boolean };
+  const run = (x: Row) => {
+    SPLIT = x.split; DEADLINES = x.dl; FLEET = { sys: x.sys, gang: x.sys, zones: x.zones, uplink: Infinity }; MEMX = x.mem ?? null;
+    const st: State = { r: x.r, L: x.L, cr: 0, data: 0, pk: matchPk(x.r, x.L) };
+    const outs = [0, 1, 2].map(k => { let start = 0, o: Out | null = null;
+      for (let i = 0; i < 4; i++) { o = playRound({ ...st }, SEED * 17 + k * 101 + i, start); start = Math.max(0, o.peakI - C.startBack); } return o!; });
+    const avg = (fn: (o: Out) => number) => outs.reduce((a, o) => a + fn(o), 0) / outs.length;
+    const causes = new Map<string, number>(); outs.forEach(o => o.causes.forEach((v, k) => causes.set(k, (causes.get(k) ?? 0) + v / 3)));
+    causes.forEach((v, k) => causes.set(k, Math.round(v)));
+    console.log(`| ${x.label} | ${x.sys} | ${x.split ? "split" : "whole"} | ${x.dl ? "on" : "off"} | ${avg(o => o.peakI).toFixed(1)} | ${ms(avg(o => o.len))} | ${eng(avg(o => o.earned))} | ${(100 * avg(o => o.diskShare)).toFixed(0)}% | ${avg(o => o.late).toFixed(1)} | ${top(causes)} |`);
+  };
+  const head = () => { console.log("| Build | Systems | Rule | Windows | Peak I | Round | Credits/round | Work spilled to disk | Late | Top causes |"); console.log("|---|---:|---|---|---:|---:|---:|---:|---:|---|"); };
+  const kr = RI0("Storage"), mr = RI0("MHz fab"), kL = 8;
+  const kP = (() => { FLEET = null; MEMX = null; return prof(kr, kL); })();
+  const SMALL = { ram: R[kr]!.ram * 2, disk: kP.disk, io: kP.io }; // RAM left at L1: a small-memory box with a drive
+  const sel = (i: number) => !process.env.HSEC || process.env.HSEC.split(",").includes(String(i));
+  if (sel(1)) {
+    console.log(`\nH1. Spill: one rack of kHz servers at L${kL}; only the memory differs\n`); head();
+    run({ label: "Fast memory (RAM L8, drive L8)", r: kr, L: kL, sys: 12, zones: 1, dl: true, split: true });
+    run({ label: "Small RAM (L1) + drive L8", r: kr, L: kL, sys: 12, zones: 1, mem: SMALL, dl: true, split: true });
+    run({ label: "Small RAM (L1) + HDD-speed drive", r: kr, L: kL, sys: 12, zones: 1, mem: { ...SMALL, io: kP.io / 16 }, dl: true, split: true });
+    run({ label: "Small RAM (L1), no drive", r: kr, L: kL, sys: 12, zones: 1, mem: { ram: SMALL.ram, disk: 0, io: 0 }, dl: true, split: true });
+  }
+  if (sel(2)) {
+    console.log("\nH2. Splitting reduces spill: the small-RAM build with a drive, whole tasks against D25 splits\n"); head();
+    for (const sys of [12, 48, 288]) for (const split of [false, true])
+      run({ label: "Small RAM (L1) + drive L8", r: kr, L: kL, sys, zones: 1, mem: SMALL, dl: true, split });
+  }
+  if (sel(3)) {
+    console.log("\nH3. Completion windows force upgrades: 2 rooms of MHz servers, windows off and on\n"); head();
+    const mP = (() => { FLEET = null; MEMX = null; return prof(mr, 6); })();
+    for (const [label, L, mem] of [["MHz L6, RAM L6", 6, undefined], ["MHz L6, RAM L1 + NVMe", 6, { ram: R[mr]!.ram * 2, disk: mP.disk, io: mP.io }], ["MHz L3 (under-leveled)", 3, undefined]] as const)
+      for (const dl of [false, true]) run({ label, r: mr, L, sys: 576, zones: 2, mem, dl, split: true });
+  }
+  if (sel(4)) {
+    console.log("\nH4. Completion windows at the Rack-to-Room transition: one room of kHz servers, windows off and on\n"); head();
+    for (const [label, L, mem] of [["kHz L8, RAM L8", 8, undefined], ["kHz L8, RAM L1 + SSD", 8, SMALL], ["kHz L4 (under-levelled)", 4, undefined]] as const)
+      for (const dl of [false, true]) run({ label, r: kr, L, sys: 288, zones: 1, mem, dl, split: true });
+  }
+  FLEET = null; MEMX = null; SPLIT = !arg("whole"); DEADLINES = !arg("nodl");
+  process.exit(0);
+}
+
 // B. 24 h active campaign. Rungs between rounds (cold changes); levels any time (hot).
 type Ctx = { st: State; t: number; n: number; peak: number; marks: Map<string, number>; bought: number[]; buys: number[];
   rounds: (Out & { t: number; r: number; L: number })[] };
@@ -408,6 +562,7 @@ function idleRound(s: State, seed: number, startI: number): Out {
   if (hit) { s.cr += hit.earned; s.data += hit.data; return hit; }
   const o = playRound(s, seed, startI); MEMO.set(key, o); return o;
 }
+function RI0(n: string) { return R.findIndex(r => r.name === n); }
 function campaign(c: Ctx, tEnd: number, stopRung = Infinity, log = false, seed = SEED): Ctx {
   let lastOnline = c.t;
   while (c.t < tEnd && c.st.r < stopRung) {
@@ -465,7 +620,7 @@ const LADDERS: [string, number, number][] = [["Fresh boot", 0, 0], ["Boot, 16 Hz
 console.log(`\nA. Ladders from I = 0, no purchases in round (mean of 3 seeds)\n`);
 console.log("| Ladder | Round | Low-load | Pipe-bound | Met | Failed | Top causes | Credits | Peak I | Band at end |");
 console.log("|---|---:|---:|---:|---:|---:|---|---:|---:|---|");
-for (const [name, r, L] of LADDERS) {
+for (const [name, r, L] of arg("skipA") ? [] : LADDERS.slice(0, Number(process.env.LADDERS ?? LADDERS.length))) {
   const outs = [0, 1, 2].map(k => playRound({ r, L, cr: 0, data: 0, pk: matchPk(r, L) }, SEED * 7 + k, 0));
   const avg = (f: (o: Out) => number) => outs.reduce((s, o) => s + f(o), 0) / outs.length;
   const causes = new Map<string, number>(); outs.forEach(o => o.causes.forEach((v, k) => causes.set(k, (causes.get(k) ?? 0) + v / 3)));

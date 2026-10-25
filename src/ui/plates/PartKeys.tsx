@@ -1,16 +1,9 @@
 import type { EffectPreview, GameAction, Quote } from '../../game';
-import { quantity, span, watts } from './format';
+import { measureUnit, span, watts } from './format';
 import { changeNote, QuoteKey } from './widgets';
 import type { PlateCommon } from './types';
 
-const UNIT: Readonly<Record<EffectPreview['unit'], string>> = {
-  'ops/s': 'ops/s', bits: 'b', 'bit/s': 'b/s', W: 'W', 'tasks/s': 'tasks/s', lanes: ' lanes', slots: ' slots', ports: ' ports', ops: 'ops',
-};
-const COUNT_UNITS = new Set<EffectPreview['unit']>(['lanes', 'slots', 'ports']);
-
-function amountOf(n: number, unit: EffectPreview['unit']) {
-  return COUNT_UNITS.has(unit) ? `${Math.round(n)}${UNIT[unit]}` : quantity(n, UNIT[unit]);
-}
+const amountOf = (n: number, unit: EffectPreview['unit']) => measureUnit(n, unit);
 
 /** "8 kops/s → 16 kops/s · +3 W". At most 3 significant figures. */
 export function effectText(e: EffectPreview | null): string {

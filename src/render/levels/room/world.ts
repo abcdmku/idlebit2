@@ -11,6 +11,7 @@ import { coolGrade, roomPowered } from './state';
 import { drawBack, drawFront } from './static';
 import { FIBRE, drawCrac, drawExhaust, drawGateway, drawPerf, drawTrayRun, drawTrunk } from './sprites';
 import type { CracArt } from './sprites';
+import { drawRoomFlows } from './flows';
 import { cracCount, drawDataPlane, drawJob, drawNetRack, drawPlumbing, drawPowerPath, drawThermo, drawUpsBank, drawZoneSign } from './infra';
 import { COLS, CRAC_FEET, GATEWAY, IY, JOB_PATHS, RACK, RACK_RECTS, WORLD_W, WORLD_X, exhaustY, hallOf, rackX, rowY, trayY, worldH } from './layout';
 
@@ -99,7 +100,8 @@ export function drawWorld(g: G, s: RoomSnapshot, view: ViewPresentation, frame: 
     drawGhost(g, r.x - 1, r.y - 1, r.w + 2, r.h + 2, ghostState(view));
     R(g, cx - 3, cy - 1, 7, 3, P.ink); R(g, cx - 1, cy - 3, 3, 7, P.ink); R(g, cx - 2, cy, 5, 1, P.paper); R(g, cx, cy - 2, 1, 5, P.paper);
   }
-  if (live) for (let i = 0; i < ports.length; i++) {
+  // D25 shard flows; before the sim sends them, each port's own transfer progress
+  if (live && !drawRoomFlows(g, s, frame)) for (let i = 0; i < ports.length; i++) {
     const p = ports[i], slot = p.peer;
     if (p.active && slot !== null && slot < JOB_PATHS.length && s.racks[slot]?.rackId != null) drawJob(g, JOB_PATHS[slot], p.progress);
   }

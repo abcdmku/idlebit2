@@ -1,12 +1,14 @@
 import { DT_S } from '../core/constants';
-import type { Resource } from '../types/catalog';
+
 
 /**
  * The naive clock oracle (architecture §1.5, §7.4): every task's remaining work is stepped each
  * tick with the same completion predicate exec uses. S3's cohort bookkeeping must match it on
  * randomized fixtures. Skeleton: compute and pooled resources, no in-tick carry yet.
  * TODO(S3, G1): in-tick carry from the queue, time slicing, research share, IO holds.
+ * Resources are clocks: a mem stage resident in RAM runs on 'ram', on disk on 'io' (D26.2).
  */
+export type Resource = 'compute' | 'ram' | 'gpu' | 'io';
 export interface OracleStage { readonly resource: Resource; readonly work: number }
 export interface OracleTask {
   readonly id: number;
@@ -36,7 +38,7 @@ export function oracleTick(sys: OracleSystem, tick: number): number[] {
   const live = sys.tasks.filter((t) => t.doneTick === null);
   const inStage = (r: Resource) => Math.max(1, live.filter((t) => t.stages[t.stage]!.resource === r).length);
   const share: Record<Resource, number> = {
-    cpu: sys.perThreadRate * sys.eff,
+    compute: sys.perThreadRate * sys.eff,
     ram: sys.ramBw / inStage('ram'),
     gpu: (sys.gpuOps * sys.eff) / inStage('gpu'),
     io: sys.ioRate / inStage('io'),
@@ -44,7 +46,7 @@ export function oracleTick(sys: OracleSystem, tick: number): number[] {
   const done: number[] = [];
   for (const task of live) {
     const resource = task.stages[task.stage]!.resource;
-    const rate = resource === 'cpu' ? share.cpu * Math.min(task.threads, sys.hardwareThreads) : share[resource];
+    const rate = resource === 'compute' ? share.compute * Math.min(task.threads, sys.hardwareThreads) : share[resource];
     task.remaining -= rate * DT_S;
     if (task.remaining > 0) continue;
     task.stage += 1;

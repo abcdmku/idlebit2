@@ -98,7 +98,7 @@ describe('system part-value contract (R40)', () => {
         capacityBits: capacity(PARTS.ram, p.gen, p.level), rateBits: capacity2(PARTS.ram, p.gen, p.level),
       });
     }
-    expect(sum(snap.ram, 'capacityBits')).toBe(c.memCap[id]);
+    expect(sum(snap.ram, 'capacityBits')).toBe(c.ramCap[id]);
     expect(sum(snap.ram, 'rateBits')).toBe(c.ramBw[id]);
     expect(sum(snap.storage, 'capacityBits')).toBe(c.storageCap[id]);
     expect(sum(snap.storage, 'rateBits')).toBe(c.ioRate[id]);
@@ -127,7 +127,7 @@ describe('system part-value contract (R40)', () => {
         expect(parts[i]).toMatchObject({ capacityBits: capacity(row, p.gen, p.level), rateBits: capacity2(row, p.gen, p.level) });
       }
     }
-    expect(snap.ram.reduce((total, p) => total + p.capacityBits!, 0)).toBe(compiled.sys.memCap[0]);
+    expect(snap.ram.reduce((total, p) => total + p.capacityBits!, 0)).toBe(compiled.sys.ramCap[0]);
     expect(Math.min(...snap.ram.map((p) => p.rateBits!))).toBe(compiled.sys.ramBw[0]);
     expect(snap.storage.reduce((total, p) => total + p.capacityBits!, 0)).toBe(compiled.sys.storageCap[0]);
     expect(snap.storage.reduce((total, p) => total + p.rateBits!, 0)).toBe(compiled.sys.ioRate[0]);

@@ -1,4 +1,4 @@
-import { MAX_ACTIVE_FAMILIES, MAX_GANG_MEMBERS } from '../core/constants';
+import { MAX_ACTIVE_FAMILIES, MAX_SHARDS } from '../core/constants';
 import { baseWeight } from './curve';
 import { FAMILIES } from './families';
 
@@ -11,6 +11,6 @@ describe('market constraints', () => {
       maxActive = Math.max(maxActive, FAMILIES.filter((f) => baseWeight(f, I) > 0).length);
     }
     expect(maxActive).toBe(MAX_ACTIVE_FAMILIES);
-    expect(Math.max(...FAMILIES.map((f) => f.members))).toBeLessThanOrEqual(MAX_GANG_MEMBERS);
+    expect(Math.max(...FAMILIES.map((f) => f.members))).toBeLessThanOrEqual(MAX_SHARDS);
   });
 });

@@ -1,4 +1,4 @@
-import type { CeilingId, FilterId, PartId, PlacementId, RuleId, StrategyId } from '../types/catalog';
+import type { CeilingId, FilterId, PartId, RuleId, StrategyId } from '../types/catalog';
 import type { LockReason } from '../types/quotes';
 import type { Unlocks } from '../types/state';
 import { isLadder, LADDERS, levelMax, PARTS, type LeveledPartId } from './catalog';
@@ -24,9 +24,9 @@ export function ceilingLock(u: Unlocks, key: CeilingId, value: number): LockReas
 
 export const ruleLock = (u: Unlocks, rule: RuleId): LockReason | null => (hasRule(u, rule) ? null : needs(nodeForRule(rule), rule));
 
-export function optionLock(u: Unlocks, id: StrategyId | FilterId | PlacementId, kind: 'queue' | 'route' | 'filter' | 'placement'): LockReason | null {
+export function optionLock(u: Unlocks, id: StrategyId | FilterId, kind: 'queue' | 'route' | 'filter'): LockReason | null {
   const have = kind === 'queue' ? (u.queueStrategies as readonly string[]) : kind === 'route' ? (u.routeStrategies as readonly string[])
-    : kind === 'filter' ? (u.filters as readonly string[]) : (u.placements as readonly string[]);
+    : (u.filters as readonly string[]);
   return have.includes(id) ? null : needs(nodeForOption(id), id);
 }
 

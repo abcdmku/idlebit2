@@ -32,7 +32,8 @@ export const NPU: CatalogRow = {
 /** base = bits, base2 = IO bit/s (the rated rate). */
 export const STORAGE: CatalogRow = {
   id: 'storage', scope: 'system', names: ['HDD', 'SSD', 'NVMe', 'SCM'], gates: [r('storageCtl'), r('ssd'), r('nvme'), r('scm')],
-  curve: 'flow', base: [2048, 2 ** 24, 2 ** 34, 2 ** 44], base2: [16, 3.2e4, 6.4e7, 1.28e11], watts: { kind: 'rate', wPerUnit: 1 },
+  // D26.2: IO re-based to 1/16 (HDD, SSD), 1/4 (NVMe) and 1/2 (SCM) of the era's RAM bandwidth, so spill to disk is slow.
+  curve: 'flow', base: [2048, 2 ** 24, 2 ** 34, 2 ** 44], base2: [1, 2000, 1.6e7, 6.4e10], watts: { kind: 'rate', wPerUnit: 1 },
   price: [2e6, 5e6, 3e10, 5e13], upgrade: UP,
 };
 /** Board PSU: a supply (capacity W, loss only). */

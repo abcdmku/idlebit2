@@ -32,7 +32,7 @@ export function baseSnapshot(): RenderSnapshot {
     unlocked: { chip: true, system: false, rack: false, room: false, global: false },
     home: { chip, system },
     focus: { ...LEVEL_FIXTURES.chip, parent: system },
-    partner: null, events: [], firstSeq: 0, lastSeq: 0,
+    partner: null, events: [], firstSeq: 0, lastSeq: 0, completions: [], failures: [], shardsDone: [],
   };
 }
 /** Shallow-merge each top-level section. */
@@ -98,21 +98,21 @@ export function mount(node: ReactNode, store: GameStore, size?: { width: number;
 
 export function entry(key: number, family = 0, committed = false): QueueEntryView {
   return { ...taskFacts(family), key, task: { epoch: 1, roundIndex: 1, taskId: key },
-    committed, dismissible: !committed, blockedBy: null, icons: ['cpu'], work: 1, transferS: 0.001 };
+    committed, dismissible: !committed, blockedBy: null, icons: ['compute'], work: 1, transferS: 0.001, windowEndTick: null };
 }
 
 function taskFacts(family = 0): TaskRequirementsView {
-  return { family: familyId(family), label: `Family ${family}`, stages: [{ resource: 'cpu', work: 1 }], threads: 1,
-    workingSetBits: 1, gpuCoresMin: 0, vramBits: 0, storageBits: 0, members: 1, minZones: 1, region: null, ecc: false, tensor: false };
+  return { family: familyId(family), label: `Family ${family}`, stages: [{ resource: 'compute', work: 1 }], grain: 1, size: 1,
+    workingSetBits: 1, gpuCoresMin: 0, vramBits: 0, members: 1, deadline: null, minZones: 1, region: null, ecc: false, tensor: false };
 }
 
 export function report(edit: Partial<RoundReport> = {}): RoundReport {
   return {
     index: 14, startTick: 0, durationTicks: 8450, durationMs: 845_000, met: 28_400,
-    failedByCause: { timeout: 2839, cantRun: 387, misroute: 3903, power: 0, heat: 0, swap: 0 },
-    failDetail: { timeout: null, cantRun: 'ram', misroute: null, power: null, heat: null, swap: null },
+    failedByCause: { timeout: 2839, cantRun: 387, misroute: 3903, power: 0, heat: 0, swap: 0, late: 0 },
+    failDetail: { timeout: null, cantRun: 'ram', misroute: null, power: null, heat: null, swap: null, late: null },
     details: [{ cause: 'cantRun', detail: 'ram', count: 387 }],
-    peakIntensity: 4.12, dismissed: 0, deliveredWork: 28_400, failedWork: 7_129, gross: amount(2_710_000), data: amount(30_100), energy: amount(0), net: amount(2_710_000), researchOps: 0,
+    peakIntensity: 4.12, dismissed: 0, deliveredWork: 28_400, failedWork: 7_129, gross: amount(2_710_000), data: amount(30_100), energy: amount(0), net: amount(2_710_000), researchOps: 0, byType: [], spill: { ramWork: 0, diskWork: 0 },
     ...edit,
   };
 }

@@ -1,23 +1,25 @@
 import { useRef, useState, type CSSProperties } from 'react';
-import { selectContextualResearchTree, type GameAction, type ResearchCategory, type ResearchId, type ResearchMode, type ResearchNodeView, type ResearchTreeView, type RoundPhase } from '../../game';
+import { formatOps, selectContextualResearchTree, type GameAction, type ResearchCategory, type ResearchId, type ResearchMode, type ResearchNodeView, type ResearchTreeView, type RoundPhase } from '../../game';
 import { useDialogFocus } from '../hooks/useDialogFocus';
 import { useGameSelector, useShell, useViewState } from '../storeHooks';
-import { perMinuteText, sig3, wholeText } from '../plates/format';
+import { perMinuteText, wholeText } from '../plates/format';
 import { GemIcon, LockIcon } from '../plates/icons';
 import { box, useLayout } from '../shell/geometry';
 import { exactAmount, lacksAmount } from '../plates/gpuModel';
 import type { Amount } from '../../game';
 import { ResearchSheet } from './ResearchSheet';
+import { ResearchAnswers } from './ResearchAnswers';
 import '../styles/research.css';
 
 /**
  * Research opens as a drawer (desktop, over the world above the fixture) or sheet (phone). It shows
  * only the relevant projects (ResearchSheet); "All research" swaps in the full list below.
  */
+/** The round priority, named with the share of compute research takes (A04; exec/research.ts task shares). */
 export const PRIORITY: Readonly<Record<ResearchMode, { name: string; line: string }>> = {
-  background: { name: 'Background', line: 'Each unit lends its idle share. Tasks come first.' },
-  shared: { name: 'Shared', line: 'Holds 25% of online capacity. SLA can dip.' },
-  focus: { name: 'Focus', line: 'Holds all online capacity. SLA will fall.' },
+  background: { name: 'Background 10%', line: 'Research takes 10% of compute. Tasks come first.' },
+  shared: { name: 'Shared 25%', line: 'Research takes 25% of compute. SLA can dip.' },
+  focus: { name: 'Focus 100%', line: 'Research takes all compute. SLA will fall.' },
 };
 export const PRIORITY_ORDER: readonly ResearchMode[] = ['background', 'shared', 'focus'];
 
@@ -74,7 +76,7 @@ export function ResearchList({ tree, phase, focusProject, onAction, onClose, cre
       <button type="button" className="rl-close" onClick={onClose}>Back</button>
     </header>
     <div className="rl-fab">
-      <div className="rl-row"><b>{active ? active.name : 'No project printing'}</b><span>{active ? `${Math.floor(active.progress * 100)}% · ${sig3(tree.opsPerSec)}ops/s` : ''}</span></div>
+      <div className="rl-row"><b>{active ? active.name : 'No project printing'}</b><span>{active ? `${Math.floor(active.progress * 100)}% · ${formatOps(tree.opsPerSec)}/s` : ''}</span></div>
       <i className="rl-bar"><b style={{ width: `${Math.round((active?.progress ?? 0) * 100)}%` }} /></i>
       {between
         ? <div className="rl-energy"><span>Full speed between rounds</span><b>{perMinuteText(-Number(tree.creditsPerMinute), false)}</b></div>
@@ -94,7 +96,8 @@ export function ResearchList({ tree, phase, focusProject, onAction, onClose, cre
             <div className="rl-text">
               <div className="rl-row"><b>{n.name}</b><span className="rl-state">{STATE_TEXT[n.state]}{n.state === 'active' ? ` ${Math.floor(n.progress * 100)}%` : ''}</span></div>
               {n.effect && <p className="rl-effect">{n.effect}</p>}
-              <p className="rl-meta">Work {sig3(n.workOps)}ops · <span className="rl-data"><GemIcon /> {wholeText(n.dataCost)} Data</span>
+              <ResearchAnswers answers={n.answers} />
+              <p className="rl-meta">Work {formatOps(n.workOps)} · <span className="rl-data"><GemIcon /> {wholeText(n.dataCost)} Data</span>
                 {n.creditCost && n.creditCost !== '0' && <> + <span className="rl-credits">{exactAmount(n.creditCost)} Credits</span></>}
                 {!unpaid && <span> · fees paid</span>}</p>
               <p className="rl-lock">{n.state === 'locked' && n.lockedBy && <><LockIcon /> Needs {names.get(n.lockedBy) ?? String(n.lockedBy)}</>}

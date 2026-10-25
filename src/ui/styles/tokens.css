@@ -1,6 +1,6 @@
 /* v3 tokens: font faces, colours and the one body text size (D2.1).
    Every label, value, plate line, tray caption, feed entry and button uses --body.
-   Only the HUD Credits (--big) and Data (--mid) figures and headers (--head) are larger. The stage sets
+   Only the HUD Credits and Data figures (--big) and headers (--head) are larger. The stage sets
    the sizes per layout (layout.ts). */
 @font-face {
   font-family: 'Chakra Petch'; src: url('/assets/fonts/chakra-petch/ChakraPetch-Regular.ttf') format('truetype');
@@ -19,9 +19,9 @@
   font-weight: 700; font-style: normal; font-display: block;
 }
 .br-shell {
-  --body: 13px; --lh: 16px; --head: 15px; --big: 24px; --mid: 16px; --n: 2px;
+  --body: 13px; --lh: 16px; --head: 15px; --big: 24px; --n: 2px;
   --ink: #0e0b1c; --void: #15122a; --panel: #1b1437; --panel-hi: #3a2f6e; --panel-lo: #120d26; --well: #120d28;
-  --paper: #efeaff; --muted: #a99be6; --dim: #6e6698; --cyan: #a6f6ff; --focus: #8ef5ff;
+  --paper: #efeaff; --muted: #a99be6; --dim: #a49cd2; --cyan: #a6f6ff; --focus: #8ef5ff;
   --gold: #ffcc3d; --gold-lo: #c4861c; --data: #27d9a0; --fault: #ff3b3b; --fault-text: #ff6a5a; --warn: #ffb03b; --ok: #7dff9a;
   --safe-top: env(safe-area-inset-top, 0px); --safe-right: env(safe-area-inset-right, 0px);
   --safe-bottom: env(safe-area-inset-bottom, 0px); --safe-left: env(safe-area-inset-left, 0px);

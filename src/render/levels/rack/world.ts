@@ -12,6 +12,7 @@ import type { FanBank } from './art';
 import { drawClips, drawPatch, drawUplink, shell, sledInterior } from './cabinet';
 import { drawCooler, drawLB, drawPdu, drawSwitch } from './infra';
 import { drawNeighbour } from './neighbour';
+import { drawRackFlows } from './flows';
 import { rackCol, rowViews } from './row';
 import { drawServer, rackDark, serverLook } from './sprites';
 
@@ -102,8 +103,9 @@ function drawActive(g: G, s: RackSnapshot, view: ViewPresentation, frame: WorldF
     drawGhost(g, r.x + 1, r.y + 1, r.w - 2, r.h - 2, ghostState(view));
     R(g, cx - 3, cy - 1, 7, 3, P.ink); R(g, cx - 1, cy - 3, 3, 7, P.ink); R(g, cx - 2, cy, 5, 1, P.paper); R(g, cx, cy - 2, 1, 5, P.paper);
   }
-  // real transfers: down the uplink, then along a patch cable to the server's NIC
-  if (!quiet) {
+  // real transfers: the D25 shard flows; before the sim sends them, each link's own transfer
+  // progress down the uplink, then along a patch cable to the server's NIC
+  if (!quiet && !drawRackFlows(g, s, frame)) {
     if (up && up.active) { pathAt(UPLINK_ROUTE, up.progress, point); glowBit(g, point.x, point.y, 64, P.bit); }
     for (let i = 0; i < ports.length && i < 12; i++) {
       const p = ports[i];

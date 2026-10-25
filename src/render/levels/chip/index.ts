@@ -1,14 +1,15 @@
 ﻿// CPU level (L2, D15/D17): only the CPU. The internal node id remains chip. The pipe enters at the
-// die's IN pad on top (the core draws the pipe); work falls through queue, cache and cores to OUT.
+// die's IN pad on top (the core draws the pipe); work falls through queue and cache to the cores,
+// and each payout pops on the core that ran it.
 import type { ChipSnapshot } from '../../../game';
-import { P, R, copyRect, resetHitTarget, setRect } from '../../core';
+import { P, R, copyRect, partVersionOf, resetHitTarget, setRect, sumVersions } from '../../core';
 import type { HitTarget, LevelRegistry, LevelRenderer, Rect, WorldForm, WorldFrame } from '../../core';
 import { chipLabels } from './labels';
 import { coreSites, floorOf } from './layout';
 import { CORE_IDS, SITE_IDS, partRef } from './model';
 import type { TargetId } from './model';
 import { drawChipMini } from './mini';
-import { bottomOf, drawWorld, siteCount } from './world';
+import { drawWorld, siteCount } from './world';
 
 const owner = (s: ChipSnapshot) => ({ level: 'chip', id: s.systemId }) as const;
 function part(s: ChipSnapshot, out: HitTarget[], i: number, id: Exclude<TargetId, `site${number}` | 'pipe'>, r: Rect): number {
@@ -32,7 +33,7 @@ export function createChipRenderer(_registry: LevelRegistry): LevelRenderer<'chi
     focus: (_s, _vp, out, form) => copyRect(floorOf(form).focus, out),
     miniRect: (_s, out, form) => copyRect(floorOf(form).pkg, out),
     entry(_s, out, form) { const f = floorOf(form); out.x = f.inp.x; out.y = f.inp.y; return out; },
-    draw(g, s, _view, frame) { lastFrame = frame; drawWorld(g, s, frame, frame.form ?? 'desktop'); },
+    draw(g, s, view, frame) { lastFrame = frame; drawWorld(g, s, frame, frame.form ?? 'desktop', view); },
     labels: (s, _view, frame, out) => chipLabels(s, frame, out, frame.form ?? 'desktop'),
     drawMini: drawChipMini,
     children: () => 0,
@@ -52,11 +53,22 @@ export function createChipRenderer(_registry: LevelRegistry): LevelRenderer<'chi
       }
       return i;
     },
-    // Payouts pop where OUT's copper meets the world's bottom edge (D17).
-    unitAnchor(s, id, out) {
-      if (id !== s.systemId) return false;
-      const form = lastFrame?.form ?? 'desktop', f = floorOf(form);
-      setRect(out, f.out.x - 2, bottomOf(f, lastFrame) - 12, 4, 4); return true;
+    // A payout pops on the core that ran it (the view shows CPU 1; every CPU's core i is drawn on
+    // site i). GPU work pops on the System board.
+    payoutAnchor(s, c, out, form) {
+      if (c.system !== s.systemId || c.core === null) return -1;
+      const f = floorOf(form), sites = coreSites(f, siteCount(s));
+      if (c.core >= sites.length) return -1;
+      const r = sites[c.core]!;
+      copyRect(r, out); return c.core;
+    },
+    /** Purchase flash (A10): each part's generation and level. */
+    partVersion(s, id) {
+      if (id === 'clock') return partVersionOf(s.clock);
+      if (id === 'cache') return sumVersions(s.cache.levels);
+      if (id === 'queue') return partVersionOf(s.scheduler);
+      if (id.startsWith('core')) return partVersionOf(s.cores[Number(id.slice(4))]);
+      return null;
     },
     faults(s, out) {
       if (!out.length || (s.online !== 'crashed' && s.online !== 'dark')) return 0;

@@ -1,11 +1,11 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { CompiledBuffers } from '../core/buffers';
 import { openWorld, type World } from '../core/world';
+import { completionLog } from '../core/completions';
+import { readFailures } from '../core/failures';
 import { CAUSE } from '../exec/outcome';
 import { F } from '../exec/testFamilies';
 import { execState, failedOf, feed, metOf, setAccels, step, steps, type Caps } from '../exec/testWorld';
-import { killSubtree } from '../exec/kill';
-import { systemId } from '../types/ids';
 import { FAIL_DETAILS } from '../types/events';
 import { FILTER_BIT } from './filters';
 
@@ -54,14 +54,17 @@ describe('rack load balancer strategies (spec §8.3): each differs from first-fi
     expect(run(S.leastConn)).toEqual([0, 2]);
   });
 
-  it('weighted sends tasks in proportion to rated speed', () => {
-    const count = (strategy: number) => {
+  it('weighted splits a task in proportion to rated speed (D25.2)', () => {
+    const shares = (strategy: number) => {
       const w = rack(2, strategy, 0, { K: 4, Q: 60, threads: 4 }, (c) => { c.sys.threadRate[1] = 3; });
-      const picks = routes(w, F.cpu, 500, 40);
-      return picks.filter((p) => p === 1).length;
+      feed(w, F.cpu2, 1, 4000);
+      step(w);
+      const rec = w.hot.rec, out = [0, 0];
+      for (let r = 0; r < rec.len; r += 1) if (rec.count[r] === 1 && rec.parent[r]! >= 0) out[rec.target[r]!]! += rec.units[r]!;
+      return out;
     };
-    expect(count(S.weighted)).toBe(30);
-    expect(count(S.roundRobin)).toBe(20);
+    expect(shares(S.weighted)).toEqual([1000, 3000]);
+    expect(shares(S.roundRobin)).toEqual([2000, 2000]);
   });
 
   it('leastWork prefers the server that finishes first', () => {
@@ -111,9 +114,12 @@ describe('filters (spec §8.4)', () => {
 
   it('first-fit misroutes a task the server cannot run; capability routes it right', () => {
     const blind = eccRack(0);
+    readFailures(blind.hot);
+    blind.completions = completionLog(blind.hot);
     feed(blind, F.ecc, 1, 0.5);
     steps(blind, 20);
     expect(failedOf(blind, F.ecc, CAUSE.misroute)).toBe(1);
+    expect(readFailures(blind.hot)).toMatchObject([{ taskId: 1, family: F.ecc, cause: 'misroute', tau: 0 }]);
     const aware = eccRack(FILTER_BIT.capability);
     feed(aware, F.ecc, 1, 0.5);
     steps(aware, 20);
@@ -128,7 +134,7 @@ describe('filters (spec §8.4)', () => {
     feed(w, F.gpu4, 1, 1);
     steps(w, 5);
     expect(failedOf(w, F.gpu4, CAUSE.misroute)).toBe(1);
-    expect(FAIL_DETAILS[w.hot.fam.failDetail[F.gpu4 * 6 + CAUSE.misroute]!]).toBe('gpuCores');
+    expect(FAIL_DETAILS[w.hot.fam.failDetail[F.gpu4 * 7 + CAUSE.misroute]!]).toBe('gpuCores');
   });
 
   it('capability filtering routes a whole cohort to real core capacity', () => {
@@ -137,7 +143,10 @@ describe('filters (spec §8.4)', () => {
         setAccels(c, 0, [{ cores: 1, ops: 1e6, vram: 16 }]);
         setAccels(c, 1, [{ cores: 4, ops: 4, vram: 16 }]);
       });
+      readFailures(w.hot);
+      w.completions = completionLog(w.hot);
       feed(w, F.gpu4, 3, 0.1); steps(w, 20);
+      expect(readFailures(w.hot).map(f => f.taskId)).toEqual(filters ? [] : [1, 2, 3]);
       return [failedOf(w, F.gpu4, CAUSE.misroute), metOf(w, F.gpu4)];
     };
     expect(run(0)).toEqual([3, 0]);
@@ -229,35 +238,5 @@ describe('ports, first-link room and links (spec §7.2–§7.6)', () => {
     for (let i = 0; i < 40 && at < 0; i += 1) { step(w); if (w.hot.sys.running[0] === 1) at = w.tick - 1; }
     // 150 bits at 1 kHz = 0.15 s per link: uplink ticks 1–2, server link ticks 3–4, admitted tick 4.
     expect(at).toBe(4);
-  });
-
-  it('queued take (reserveOnRoute) lets 10 s of backlog build on the first link', () => {
-    const w = rack(4, S.firstFit, 0, {}, (c) => { slowLinks(1000)(c); c.rack.reserveOnRoute[0] = 1; });
-    feed(w, F.cpu, 4, 150);
-    step(w);
-    expect(w.hot.g[3]).toBe(4);
-  });
-});
-
-describe('gang placement at rack scope (spec §7.8)', () => {
-  it('places all members at once with gang, pays once; without gang it waits', () => {
-    const run = (placements: number) => {
-      const w = rack(4, S.firstFit, 0, { K: 1, Q: 1 }, (c) => { c.rack.lbPlacements[0] = placements; });
-      feed(w, F.gang, 1, 1);
-      steps(w, 40);
-      return metOf(w, F.gang);
-    };
-    expect(run(0)).toBe(0);
-    expect(run(1)).toBe(1);
-  });
-
-  it('fails the whole gang once, with the root cause, when one member is lost', () => {
-    const w = rack(4, S.firstFit, 0, {}, (c) => { c.rack.lbPlacements[0] = 1; });
-    feed(w, F.gang, 1, 5);
-    steps(w, 6);
-    expect(w.hot.sys.running[3]).toBe(1);
-    killSubtree(w, { kind: 'system', id: systemId(3) }, 'power');
-    steps(w, 80);
-    expect([metOf(w, F.gang), failedOf(w, F.gang, CAUSE.power), [0, 1, 2, 3].map((s) => w.hot.sys.running[s])]).toEqual([0, 1, [0, 0, 0, 0]]);
   });
 });

@@ -19,7 +19,7 @@ describe('deferred CPU/RAM research boundary', () => {
       { kind: 'rule', id: 'registeredCapacity', params: { factor: 2 } },
     ]);
     expect(EFFECT_TEXT.ddr).toContain('36 levels');
-    expect(EFFECT_TEXT.rdimm).toContain('capacity ×2');
+    expect(EFFECT_TEXT.rdimm).toContain('Doubles ECC module capacity');
     expect(EFFECT_TEXT.rdimm).toContain('36 levels');
   });
 

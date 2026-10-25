@@ -8,7 +8,7 @@ The accepted task lifecycle rule in `decisions.md` and `v3-onboarding-task-plan.
 
 ## 0. Summary
 
-- **Sim.** A fixed 100 ms tick over struct-of-arrays typed buffers. A task record is a cohort with a count, and early-game records have count 1. Each system keeps one cumulative work clock per resource, so a tick costs O(racks + task events), not O(running tasks). The RNG is used only by the market. `Amount` appears only in the per-tick ledger.
+- **Sim.** A fixed 100 ms tick over struct-of-arrays typed buffers. A task record is a cohort with a count, and early-game records have count 1. Under D25 a routed task is cut into at most 256 shards, each a count-1 record with a parent row (§1.4). Each system keeps one cumulative work clock per resource, so a tick costs O(racks + task events), not O(running tasks). The RNG is used only by the market. `Amount` appears only in the per-tick ledger.
 - **Fleet caps.** 12 servers per rack, 24 racks per room (3 rows of 8), 3 zones per site, 8 sites (one per map region). The largest fleet is 6,912 servers. Exactly one logical task arrives every 20 simulation ticks while running, with five real saved future tasks.
 - **Contract.** `advanceGame`, `applyAction`, `deriveRenderSnapshot(state, scope)`, `quote(state, request)`. The snapshot covers only the visible level and its zoom partner. Quotes are a separate, lazy call.
 - **Delivery.** v3 is built in parallel `v3` trees. Twelve Wave 1 agents own disjoint paths, and one of them owns the shared types and the barrel. Wave 2 deletes v2 and hoists the `v3` trees in one scripted step.
@@ -40,9 +40,9 @@ The order is fixed, and each phase has one owning domain. Rates hold for the who
 | 1 | `timers` | core | Boot timers (one shared boot time covers online/offline transitions, post-failure reboot, mid-round add and cold change, D1.8), drain, auto-return, C-state and S3 timers. All are counted in ticks. |
 | 2 | `market` | market | Advances round-age difficulty, consumes each due saved slot every 20 ticks into pending work and refills the five-task schedule. Marked slots retire at arrival without an outcome. RNG is used only for plan generation, including initialization and round preparation. |
 | 3 | `links` | net | Advances every link clock. A transfer that finishes a hop enters the next link on its reserved path, or arrives at its server. |
-| 4 | `route` | net | Holds whole-fleet-impossible tasks pending for their pickup window; otherwise routes feed records top-down (backbone → data plane → room LB → rack LB → server). Each scope narrows the candidates to units that can admit now, applies its filters and strategy, and stays within its routing budget. The route reserves one admission slot on the chosen server and enqueues the first transfer. It also places gangs. A record with no admitting path stays in the feed (D1.5). |
-| 5 | `admit` | exec | Arriving transfers take their reserved slot (running or the scheduler queue). Before Rack the lone system pulls the oldest runnable feed task itself. Gates are checked here; a task the server cannot run fails as `misroute`. |
-| 6 | `run` | exec | Resource clocks advance; completions, stage transitions and in-tick carry happen; research compute is tallied. |
+| 4 | `route` | net | D25: shard stealing; then each router queue dispatches FIFO, top-down (global → data plane → room LB → rack LB); then the top router takes heads. One `split` builds the tree for a take or a dispatch. It narrows candidates to children with room (or a free queue slot), applies filters and strategy shares, and cuts whole-unit shards of at least the effective grain. It reserves every slot and queue entry atomically and enqueues one transfer per shard. Minimum splits (`members`) use the same path. A head with no split and a full top queue stays in the market (D1.5). No routing budget (D12.5). |
+| 5 | `admit` | exec | Arriving shard transfers take their reserved slot (running or the scheduler queue). Before Rack the lone system pulls the head itself. Gates are checked per shard here; a shard the server cannot run fails its whole task as `misroute` and aborts its siblings. |
+| 6 | `run` | exec | Resource clocks advance; shard completions, stage transitions and in-tick carry happen; a task whose last shard completes is met and tallied once with its full payout (D25.5); research compute is tallied. |
 | 7 | `deadlines` | market | At the end of `arrival + 99`, after pickup opportunities, fails unpicked work once: `cantRun` for still-unsupported pending work, `timeout` otherwise. Future slots have no active pickup clock. |
 | 8 | `power` | phys | Draws, usage, overload timers, supply failure and reboot, PSU heat multipliers, joules per site. |
 | 9 | `thermal` | phys | Rack and room lumps, cooling and setpoints, e(T) for the next tick, crash timers, crash and recovery. |
@@ -79,7 +79,7 @@ export interface GameState {
 - **`build`** is the player's configuration tree: sites, zones (rooms), racks, systems and installed parts, with generations, levels, port speeds, strategies, filters, setpoints and toggles. It changes only through actions and research effects. Configurations are snapshots of `build` subtrees.
 - **`compiled`** is typed arrays derived from `build` by `compileUnit` (owned by build): per-thread rates, capacities, watts, gate masks, scheduler Q and K, supply capacities and loss, link speeds, router capacity and strategy ids. The tick reads them and never writes them. Actions replace only the arrays they change.
 - **`market.plan`** is cold plain serializable data: target round, cursor and exactly five descriptors with reserved task IDs, frozen family/size/payout inputs, relative arrival offset and dismiss-on-arrival flag. Replace its array and entries on refill or action, never mutate data shared with the input state. Initialize before the first snapshot; save/load and snapshot reads never regenerate it or draw RNG. Bump the save version with a pre-live reset; the flow implementation owner sets the exact version.
-- **`hot`** is typed arrays the tick mutates: clocks, timers, temperatures, usage, the record pool, the gang pool, link FIFOs, slot reservations, the deadline ring, tallies and RNG words.
+- **`hot`** is typed arrays the tick mutates: clocks, timers, temperatures, usage, the record pool, the parent pool (was the gang pool), router-queue rings, link FIFOs, slot reservations, the deadline ring, tallies and RNG words.
 
 **Indices are ids.** A unit's index into its arrays is its id: `SystemId`, `RackId`, `RoomId` and `SiteId` are branded integers. Indices are never reused, and a removed unit leaves a dead slot. Arrays grow by doubling, so a boot state is a few hundred bytes and boot clones stay small.
 
@@ -89,14 +89,14 @@ export interface GameState {
 
 - `state` (u8: empty, offline, booting, idle, running, sleep, paused, dark, crashed, draining) and `timer` (u16 ticks) [timers, power, thermal]
 - for each resource `r` in {cpu, ram, gpu, io}: `wAnchor`, `eAnchor`, `rate`, `due` (f64), `head` (i32 record), `active` (u16) [exec]
-- `busyThreads`, `usedCache`, `usedRam`, `usedVram`, `queueHead`, `queueTail`, `queueLen`, `reserved`, `freeSlots` [exec]; one IO FIFO per drive (D1.2: a drive serves one IO stage at a time until `ncq`) [exec]
+- `busyThreads`, `usedCache`, `usedRam`, `usedDisk` (D26), `usedVram`, `queueHead`, `queueTail`, `queueLen`, `reserved` (shards), `freeSlots` [exec]; one IO FIFO per drive (D1.2: a drive serves one IO stage at a time until `ncq`) [exec]
 - `drawW`, `psuOverS`, `psuFailed` [power]; `idleSinceTick`, `cstate`, `turbo` [power]
 
 **Free-slot summaries.** Exec keeps `freeSlots` per rack, room and site: the number of servers below that can admit now. A server cannot admit when it is busy with no scheduler, its queue is full, or it is booting, crashed, dark or offline (D1.5). Routers read these summaries, so a first-fit route costs O(sites + zones + racks + 12), not a fleet scan.
 
 **Per-rack hot fields:** `tempF`, `eff`, `effClock` (cumulative Σ e·dt), `crashS`, `crashed`, `rebootTicks`, `coolerDuty`, `heatW`, `drawW`, `pduOverS`, `pduFailed`, `nextDue`, `dirty`. Rooms and sites have the same lump and supply fields: room `tempF`, `upsOverS`, cooler duty; site `gridOverS`, `outsideF`, joules this tick.
 
-**Hops and links.** A hop is any routing point: the system feed pull before Rack, the rack LB, the room LB, the site data plane and the backbone scheduler. Hops have no inboxes. A task waits only in the global feed, then travels a reserved path. Each hop has a strategy id, a filter mask, a placement mode, a per-tick routing budget and a cursor for strategies that need one. A link is any serial channel: a switch port, an uplink, a data-plane link or a backbone link. Each link has a speed, a cumulative bit clock, a latency in ticks and a transfer FIFO. QoS reorders that FIFO by payload.
+**Hops and links.** A hop is any routing point: the system feed pull before Rack, the rack LB, the room LB, the site data plane and the backbone scheduler. Under D25.7 every router hop has a **queue** of up to `L ≤ 32` taken-but-undispatched entries (a logical hold: no bits move until dispatch). Otherwise a task waits only in the global feed, then its shards travel reserved paths. Each hop has a strategy id, a filter mask, a queue level, its queue ring and a cursor for strategies that need one. Placement modes and the routing budget are gone (D25.6, D12.5). A link is any serial channel: a switch port, an uplink, a data-plane link or a backbone link. Each link has a speed, a cumulative bit clock, a latency in ticks and a transfer FIFO. QoS reorders that FIFO by payload.
 
 ### 1.4 Tasks and cohorts
 
@@ -112,23 +112,60 @@ A task record is a cohort: `count` identical tasks that share family, size jitte
 | `arrival` | u32 | Arrival tick. Pickup is legal through the end of `arrival + 99`, before that tick's deadline step. |
 | `loc`, `owner` | u8, i32 | Location (feed, link, queue, running) and owner (link or system index). `target` holds the reserved server while in transit. |
 | `prev`, `next` | i32 | Doubly linked list within the owner's FIFO or sorted run list |
-| `gang` | i32 | Gang index for a distributed task member, or -1 |
-| `picked` | u8 | Admitted (queued tasks have no deadline) or reserved on route (`lbReserve`) |
-| `taskId` | numeric ID | Reserved during schedule generation, preserved through arrival, split, gang members and execution. Pool indices are not task identities. |
-| `committed` | boolean flag | Monotonic after first admission or network reservation. Retained on split, gang members and requeue; guards dismissal even when `picked` resets. |
+| `parent` | i32 | Parent row of a split task (was `gang`), or -1 for an unsplit task |
+| `units` | f64 | Shard size in whole units (D25.1); stage work = per-unit coefficient × units |
+| `memC`, `memR`, `memD` | f64 | D26 placement: working-set bits this shard holds in cache, RAM and disk, fixed at start, released once at completion or loss |
+| `picked` | u8 | Admitted (queued tasks have no deadline) or reserved on route |
+| `taskId` | numeric ID | Reserved during schedule generation, preserved through arrival, split, shards and execution. Pool indices are not task identities. |
+| `committed` | boolean flag | Monotonic after first admission or network reservation. Retained on split, shards, router-queue holds and requeue; guards dismissal even when `picked` resets. |
 
 **New logical arrivals.** Each due slot materializes one record with `count = 1`, using its saved identity and frozen descriptor. Keep the existing cohort pool for execution, fixtures and distributed members; records may still split when they move. Five future descriptors stay outside the active pool and deadline ring. No per-family count draw, Poisson buffer, late-game cap or distributed carry creates extra arrivals.
 
-**Distributed tasks.** A gang record holds family, members needed, members admitted, members done, deadline and placement scope. Each member is an ordinary record with `gang` set and payload `payloadBits / members`. Placement reserves every target in one route phase or places none. Member completion increments the gang. The last member pays once. Losing any member fails the gang with cause `member`, unless `checkpointing` re-admits a replacement inside 10 s.
+**Split tasks (D25).**
+- The gang pool becomes the **parent pool**. A row holds `taskId`, `family`, `units` (the task size), `work` (`W`), `minShards` (`members`), `placed`, `done`, `lostCause` and `replaceDeadline`.
+- Each shard is an ordinary count-1 record with `parent` and `units` set. Its payload is `units × pay/unit` bits per hop.
+- `split` reserves every shard in one route phase or none.
+- A shard completion frees its record and increments `done`. When `done === placed`, the task is met: one tally of its full payout and Data, one completion event at that system and part, and the parent row is freed.
+- Losing any shard fails the task with the root cause (D4.1). It frees every sibling (records, link transfers, router-queue shares) and the parent row, unless `checkpointing` re-places the shard inside 10 s.
+- An unsplit task (`n = 1`) has no parent row and pays at its own completion, as before.
 
-**Pool bounds.** Five future descriptors are separate cold data. The ordinary uncommitted pending window contains at most five logical tasks at a published boundary. Transit, committed requeues, gang members and execution keep the existing pool. Running ≤ 6,912 × K and queued ≤ 6,912 × Q; the pool grows on demand. Round end frees active records and prepares the next-round plan once.
+**Memory hierarchy (D26).**
+- **Placement.** At shard start, exec writes `memC/memR/memD` from the system's free tiers, fastest first: three subtractions on `usedCache/usedRam/usedDisk`. The rack storage node's free disk is a per-rack summary.
+- **Stages.** A `mem` stage of `M` bits expands at start into up to three ordinary stages on existing clocks:
+  - the cache part, zero work, skipped;
+  - the RAM part, `M × memR/ws` on the RAM pool clock;
+  - the disk part, `M × memD/ws` on the IO pool with holds.
+  
+  The expansion is computed once at start from the frozen fractions, so the work-clock model (§1.5) is unchanged and delta invariance holds by construction.
+  The cost is at most two extra stage transitions per `mem` stage: about +2 events per shard in the §1.10 budget. A shard with no spill, the common well-built case, adds none.
+- **No migration.** Placement never changes after start. There is no per-tick rebalancing and no per-bit bookkeeping.
+- **Unified memory.** With `unifiedMemory`, a GPU stage's off-VRAM fractions expand the same way after the GPU stage.
+- **Report.** `round.spill` accumulates `W × memR/ws` and `W × memD/ws` per met task: two adds per completion.
+
+**Completion windows (D26.5).**
+- The parent row (or the record, for an unsplit task) carries `deadlineTick` (i32, −1 when the family has no window). It is set at take as `takeTick + deadline − 1`.
+- A bucketed deadline ring, keyed by tick mod 4,096, holds the parent IDs whose window ends that tick. Windows are at most 288 s × 1.2 = 3,456 ticks, so 4,096 buckets never wrap onto a live entry.
+- The deadlines phase pops only this tick's bucket, so the cost is O(expiring tasks). A met or failed task leaves a stale entry, and the pop skips it by checking the row's `taskId`.
+- Router-queue entries keep their task's `deadlineTick`, because the window runs from take.
+
+**Router queues (D25.7).** `hot.rq` is a fixed ring of 32 entries per router (`rqTask f64`, `rqParent i32`, `rqUnits f64`, `rqSince i32`), with `rqHead u8` and `rqLen u8` per router. Router order is global 0, then sites, zones and racks by id, so the top-down dispatch walk is index order. `compiled.<scope>.lbQueueSlots` (u8, 1–32) comes from the build's `queueLevel`. An entry holds a task ID and units, never a pool record. Its shards' records are created at dispatch. The ring is saved with `hot`.
+
+**Optional cohort for siblings.** Sibling shards with equal units waiting on the same link FIFO may share one record with `count = k` and a contiguous target range. They split into count-1 records where their paths diverge (the existing `splitRecord`). Use this only if the bench needs it; it changes no rule.
+
+**Pool bounds.** Five future descriptors are separate cold data. The ordinary uncommitted pending window contains at most five logical tasks at a published boundary.
+- Shards per task ≤ `min(systems with room, 256, floor(s / g), floor(W / (r × 1 s)))`: the D25.11 split floor keeps every shard at 1 s or more of its target's nominal rate, so shard events per tick are at most about 0.1 per system.
+- Shard records in flight ≤ Σ system slots (running ≤ 6,912 × K, queued ≤ 6,912 × Q, plus reserved in transfer). That is the same bound as before D25, because every shard holds a slot.
+- Parent rows ≤ the number of split tasks with a shard in flight, so ≤ shard records.
+- Router-queue entries ≤ 32 × 609 routers (576 racks, 24 rooms, 8 sites, 1 global) = 19,488 at the largest fleet, in fixed rings.
+
+The pool grows on demand. Round end frees active records, parent rows and router queues, and prepares the next-round plan once.
 
 ### 1.5 Execution: per-resource work clocks
 
 This is the part that makes the sim fast by construction.
 
 - Each system resource has a cumulative per-task-thread work clock `W`. On the CPU, `W` advances by `perThreadRate × eff × 0.1 s` per tick. `perThreadRate` already includes clock × lanes, the research share (§1.6), turbo, DVFS, throttle, power capping, and the time-slice share `min(1, cores / Σthreads)`. RAM, GPU and IO clocks advance by bandwidth divided by the number of tasks in that stage.
-- A record that starts a stage stores `finish = W_now + stageWork / threads`. RAM, GPU and IO stages divide by their share instead of threads. `finish` never changes after that.
+- A record that starts a stage stores `finish = W_now + stageWork / threads`, where `threads = min(free, max(1, floor(units / grain)))` at start (D25.3). RAM, GPU and IO stages divide by their share instead of threads. `finish` never changes after that.
 - `W` is stored lazily per system as `wAnchor + rate × (rack.effClock − eAnchor)`. A rate change re-anchors one system resource in O(1). The records on it are untouched, so sharing, throttle, turbo and e(T) all stay cheap.
 - `due` is the rack `effClock` value at which the resource's head record finishes. Each rack keeps `nextDue = min(due)` over its systems. In the run phase a rack whose `effClock < nextDue` and that is not `dirty` is skipped entirely. Otherwise the phase visits its 12 systems.
 - Completion is decided by one predicate only, `rack.effClock ≥ due`, so float rounding can't make two code paths disagree.
@@ -158,11 +195,14 @@ export interface RouteStrategy {
   choose(w: World, hop: number, rec: number, candidates: Int32Array, n: number): number;
 }
 export type RouteFilter = (w: World, hop: number, rec: number, candidates: Int32Array, n: number) => number; // returns kept count
-export interface GangPlacement { place(w: World, hop: number, gang: number, out: Int32Array): number }
+/** D25: one split for takes, router-queue dispatch and minimum splits. Writes leaves (system or child-router queue) and units; returns the leaf count, 0 when it can't split now. */
+export interface Splitter { split(w: World, hop: number, task: number, units: number, outLeaf: Int32Array, outUnits: Float64Array): number }
+/** D25: a strategy's share weights over the candidates (equal for firstFit and roundRobin). */
+export type ShareWeights = (w: World, hop: number, task: number, candidates: Int32Array, n: number, outWeight: Float64Array) => void;
 ```
 
-- The model is the research tree's split (research §1.5): one strategy per load balancer, any number of filters, one placement mode for distributed tasks. A scope passes in only children that can admit now. First-fit returns the first candidate in slot order. It checks no gates, load or speed, so misroutes happen until `lbCapability`.
-- Each strategy, filter and placement mode lives in its own file with a two-system fixture test that proves a distinct observable effect: a different SLA count, a different route sequence or a different energy bill (program §5).
+- The model is the research tree's split (research §1.5): one strategy per load balancer (walk order plus share weights under D25), any number of filters, and global split rules (`gather`, `shardSteal`, `stealRoom`, `checkpointing`). Placement modes are gone. A scope passes in only children that can admit now. First-fit returns the first candidate in slot order. It checks no gates, load or speed, so misroutes happen until `lbCapability`.
+- Each strategy, filter and split rule lives in its own file with a two-system fixture test that proves a distinct observable effect: a different SLA count, a different route sequence or a different energy bill (program §5).
 - Filters run before the strategy. A filter that would remove every candidate is skipped for that decision (research §1.5).
 - Strategies never draw RNG. Ties go to the lowest slot index, and round-robin cursors are hot state.
 - A strategy change is an action that writes one `compiled` byte. It is hot and loses no work (D1.6).
@@ -204,6 +244,10 @@ export interface GangPlacement { place(w: World, hop: number, gang: number, out:
 | Scheduler K per system | ≤ 32 | Scheduler levels |
 | Scheduler Q per system | ≤ 64 | Scheduler levels |
 | Members per distributed task | ≤ 256 | Task catalog |
+| Shards per task | ≤ 256 (D25.1: effective grain `max(g, ceil(s/256))`) | Spec §5.1 |
+| Router queue entries | ≤ 32 per router (D25.7) | Queue level, Credits |
+| Memory tiers per system | 3: cache, RAM, disk (D26) | Parts |
+| Completion window | ≤ 288 s (240 s × 1.2 jitter), deadline ring of 4,096 ticks (D26.5) | Task catalog |
 
 The largest fleet is 8 × 3 × 24 × 12 = **6,912 servers, 576 racks, 24 rooms, 8 sites**. The room's network rack sits in the top-left corner outside the 24-slot grid, as in the approved mockup. All caps live in `src/game/core/constants.ts`.
 
@@ -239,6 +283,27 @@ The constants come from the prototype in `docs/v3-arch-notes.md` (Node 24.14, th
 - **Boot frame:** a clone under 1 KB, one tick of about 2 µs and a chip snapshot of about 20 µs, ≈ 0.05 ms against 0.5 ms.
 - **24 h campaign:** most hours run on small fleets at under 10 µs per tick. 864,000 ticks plus bot decisions every 2 s of sim time (43,200 × ~1 ms of quotes) is about 60 s against 300 s.
 
+**D25 shard cost.** A split multiplies task events by the shard count, but a shard is never under 1/256 of its task, and per-shard work is the old per-task event chain: about 13 events at 0.1 µs. The design model (`scripts/market-model.ts --fleet`, `docs/tasks.md` §9) measures settled rounds on a homogeneous fleet:
+
+| Systems | 12 | 24 | 48 | 96 | 288 | 576 | 864 |
+|---|---:|---:|---:|---:|---:|---:|---:|
+| Shard starts per tick | 0.6 | 1.3 | 2.7 | 5.4 | 13.9 | 14.1 | 13.8 |
+| Whole tasks per tick (pre-D25) | 0.1 | 0.2 | 0.2 | 0.4 | 0.3 | 0.4 | 0.5 |
+
+Above one room the rate stops growing: the 256-shard cap keeps each shard large, so takes get rarer as the fleet grows. At the largest fleet, assume 15–30 shard starts per tick with headroom for round-start bursts. That is 15–30 × 13 × 0.1 µs ≈ 20–40 µs per tick, on top of the ~113 µs above, plus up to 609 router-queue dispatch checks. Each check is O(1) while a queue is empty and skipped through a non-empty-queue bitset. The estimate becomes ~150 µs per tick: about 11 s for a 2 h round, against the 10 s budget and D24's 60 s fallback. G3 must re-measure `fleetMax` with splits. If it fails, the fallback order is:
+
+1. the optional sibling cohort (§1.4);
+2. then the steps below.
+
+The 256 cap is not a fallback lever: lowering it weakens the economy.
+
+**D26 cost.**
+- Spill adds at most two stage events per spilled `mem` stage, and the D25.11 floor's `nNoDisk` term keeps well-built splits off disk.
+- The deadline phase is O(tasks expiring this tick), because met tasks are skipped lazily.
+- Placement is O(1) per shard start.
+
+Estimate at the largest fleet: under 5 µs per tick on top of the D25 figure above. No new per-tick loop over systems or shards.
+
 **If the Gate 3 bench fails,** change constants, not the design, and apply them in this order:
 
 1. Profile task events and report the measured bottleneck. The accepted 20-tick arrival cadence is fixed and cannot be lowered as a performance fallback.
@@ -265,7 +330,7 @@ core/                        S1
   constants.ts               TICK_MS, PICKUP_TICKS, caps, CREDIT_SCALE
   world.ts                   World: mutable transient over cloned hot buffers; open/commit
   buffers.ts                 typed-array layouts, growth, clone
-  pool.ts                    record and gang pools, free lists, list ops
+  pool.ts                    record and parent pools, router-queue rings, free lists, list ops
   rng.ts                     in-place xoshiro128**, splitmix reseed
   advance.ts                 carry, tick loop, quiescent skip
   tick.ts                    phase order (§1.2)
@@ -286,8 +351,8 @@ market/                      S2
 probes/                      S2  bot.ts, policies.ts, campaign.ts (balance)
 exec/                        S3
   clocks.ts                  per-resource work clocks, anchors, due, rack nextDue
-  admit.ts                   gates: summed working sets (D1.1), VRAM, storage, ECC, threads; queue, slot reservations, per-drive IO FIFO
-  run.ts                     completions, stage transitions, in-tick carry, gang member accounting
+  admit.ts                   per-shard gates: summed working sets (D1.1), VRAM, storage, ECC; queue, slot reservations, per-drive IO FIFO
+  run.ts                     completions, stage transitions, in-tick carry, parent (split task) accounting and met-on-last-shard
   kill.ts                    drop work in a subtree with a cause
   research.ts                background/shared/focus share and research op tally
   schedulers/                fifo.ts sjf.ts rr.ts priority.ts mlfq.ts index.ts (+ workStealing, numa rules)
@@ -296,7 +361,7 @@ net/                         S3
   hops.ts                    route phase: top-down path choice over free-slot summaries, reservations, routing budget
   routers/                   firstFit.ts roundRobin.ts leastConn.ts weighted.ts leastWork.ts binPacking.ts latency.ts price.ts index.ts
   filters.ts                 capability, health, power, thermal, region
-  gang.ts                    rack, room, topology, zone, global placement; checkpointing
+  split.ts                   D25 split: candidates, share weights, grain, minimum split, atomic reserve; stealing; checkpointing
 phys/                        S4
   draw.ts                    idle/load watts, C-states, package C, DVFS, turbo, S3, power capping
   supplies.ts                PSU, PDU, UPS, grid usage; overload timers; failure, reboot; loss; ×1/×1.5/×3; dual feed; ride-through
@@ -375,7 +440,7 @@ export function killSubtree(w: World, unit: UnitRef, cause: FailCause): void; //
 |---|---|
 | system/rack/room/site `state`, `timer`, auto-return | core (timers); power and thermal set `dark`/`crashed` through `core/timers.setUnitState` |
 | clocks, `due`, `nextDue`, `busyThreads`, used capacities, queues, reservations, `freeSlots` summaries, record `finish`/`stage` | exec |
-| link clocks and FIFOs, cursors, routing budget, gang reservations | net |
+| link clocks and FIFOs, cursors, router queues, split reservations | net |
 | feed, deadline ring, intensity, rng, round counters | market |
 | `drawW`, supply timers and flags, `tempF`, `eff`, `effClock`, crash timers, joules | phys |
 | wallet `Decimal`, ledger ring | core |
@@ -615,7 +680,7 @@ Fixtures are deterministic builders in `src/game/testkit/fleets.ts`. There are n
 | `boot` | `createInitialState(42)` |
 | `rackFull` | One rack, 12 max-tier servers, all rack research, round running at the curve point that loads it |
 | `roomFull` | One room, 24 racks |
-| `fleetMax` | 8 sites × 3 zones × 24 racks × 12 servers. Maximum compute parts with synthetic power/cooling capacity headroom, all research complete, `leastWork` + capability + health filters, gang modes on, auto-return at its minimum delay. Prime intensity 34 at the accepted one-task-per-20-ticks cadence, then warm 600 ticks so pools are populated. |
+| `fleetMax` | 8 sites × 3 zones × 24 racks × 12 servers. Maximum compute parts with synthetic power/cooling capacity headroom, all research complete, `leastWork` + capability + health filters, router queues at level 32, `gather` and `shardSteal` on (D25), auto-return at its minimum delay. Prime intensity 34 at the accepted one-task-per-20-ticks cadence, then warm 600 ticks so pools are populated. |
 | `fleetMaxHot` | `fleetMax` with undersized PDUs and coolers, so supplies cycle and racks crash. This exercises the failure and kill paths. |
 
 ### 7.3 Budgets
@@ -631,16 +696,16 @@ Fixtures are deterministic builders in `src/game/testkit/fleets.ts`. There are n
 
 ### 7.4 Correctness gates in `npm run verify`
 
-- **Delta invariance.** Random partitions (1 ms to 10 s pieces) of 10 min of sim on `boot`, `rackFull` and a 2-rack gang fixture produce `toEqual` states, including RNG words, draw counts and the event ring.
+- **Delta invariance.** Random partitions (1 ms to 10 s pieces) of 10 min of sim on `boot`, `rackFull`, a 2-rack split fixture with router queues (D25), and a small-RAM spill fixture with completion windows (D26) produce `toEqual` states, including RNG words, draw counts and the event ring. The owned-vs-pure equivalence test (D9) runs on the same split fixture.
 - **Save round-trip.** Save at random ticks mid-round, load, continue: the result equals an uninterrupted run.
 - **Clock oracle.** `testkit/oracle.ts` stepping matches `exec` on randomized system mixes, with rate changes, time slicing and RAM sharing.
-- **Strategy effects.** Every strategy, filter and placement mode has a test that fails if it is replaced by the base round robin.
+- **Strategy effects.** Every strategy, filter and split rule has a test that fails if it is replaced by the base `firstFit` spread.
 - **Market constraints** (§1.9) over the whole curve.
 - **Purity test**, unchanged.
 
 ## 8. Risks, ranked
 
-1. **Task events, not fleet size, set the cost.** The accepted cadence is fixed at one logical task per 20 ticks. The earlier warning about 50 arrivals per tick describes the historical stress model, not current demand. Existing gang-member limits and performance budgets remain.
+1. **Task events, not fleet size, set the cost.** The accepted cadence is fixed at one logical task per 20 ticks. The earlier warning about 50 arrivals per tick describes the historical stress model, not current demand. Existing member and shard limits (256) and performance budgets remain; D25 shard cost is in §1.10.
    - The §1.9 constraints are in this doc and a test enforces them.
    - Arrivals are counted per cohort.
    - G3 measures `fleetMax` before balance work starts.

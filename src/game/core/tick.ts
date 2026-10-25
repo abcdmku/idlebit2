@@ -1,5 +1,6 @@
 import { researchPhase } from '../build';
 import { admitPhase, runPhase } from '../exec';
+import { latePhase } from '../exec/outcome';
 import { deadlinePhase, marketPhase, roundPhase, startRound } from '../market';
 import { linkPhase, routePhase } from '../net';
 import { powerPhase, thermalPhase } from '../phys';
@@ -23,6 +24,12 @@ export function timersStep(w: World): void {
   }
 }
 
+/** Step 7: the head's clock, then completion windows (D26.5). */
+export function deadlinesStep(w: World): void {
+  deadlinePhase(w);
+  latePhase(w);
+}
+
 /**
  * The 13 tick phases in their fixed order (architecture §1.2, spec §14.1). A tick reads only
  * state at its start and earlier phases of the same tick; rates hold for the whole tick.
@@ -34,7 +41,7 @@ export const PHASES: readonly (readonly [name: string, phase: Phase])[] = [
   ['route', routePhase],
   ['admit', admitPhase],
   ['run', runPhase],
-  ['deadlines', deadlinePhase],
+  ['deadlines', deadlinesStep],
   ['power', powerPhase],
   ['thermal', thermalPhase],
   ['ledger', ledgerPhase],
@@ -53,7 +60,7 @@ export function runTick(w: World): void {
   routePhase(w);
   admitPhase(w);
   runPhase(w);
-  deadlinePhase(w);
+  deadlinesStep(w);
   powerPhase(w);
   thermalPhase(w);
   ledgerPhase(w);

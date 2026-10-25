@@ -1,0 +1,24 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+  <title>idlebit2 renderer · level cases in the L2 frame</title>
+  <link rel="icon" href="data:," />
+  <link rel="stylesheet" href="/src/ui/styles/tokens.css" />
+  <style>
+    html, body { margin: 0; height: 100%; background: #0e0b1c; overflow: hidden; }
+    #root { position: absolute; left: 0; top: 0; background: #0e0b1c; }
+    canvas { position: absolute; left: 0; top: 0; image-rendering: pixelated; }
+    .chrome { position: absolute; box-sizing: border-box; pointer-events: none; color: #a99be6; font: 500 16px/24px "Chakra Petch", sans-serif; }
+    .band { background: rgba(14, 11, 28, 0.86); border-bottom: 3px solid #2a2350; padding: 12px 24px; }
+    .strip { background: #15122a; border-bottom: 3px solid #29234b; padding: 12px 24px; }
+    .deck { background: #15122a; border: 3px solid #29234b; padding: 12px 24px; }
+    .dock { border: 2px dashed #3a3366; padding: 12px; color: #6e6698; }
+  </style>
+</head>
+<body>
+  <div id="root" class="stage"><canvas class="world" aria-label="World"></canvas></div>
+  <script type="module" src="./l2cases.ts"></script>
+</body>
+</html>

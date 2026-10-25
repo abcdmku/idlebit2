@@ -24,7 +24,7 @@ function gpuState(running = false): GameState {
   if (running) {
     const h = state.hot, r = allocRecord(h), family = FAMILIES.find((f) => f.key === 'imageBlur')!;
     h.rec.loc[r] = LOC.running; h.rec.owner[r] = 0; h.rec.accelDomain[r] = 0;
-    h.rec.family[r] = family.id; h.rec.stage[r] = 1; h.rec.count[r] = 1; h.rec.scale[r] = 60;
+    h.rec.family[r] = family.id; h.rec.stage[r] = 1; h.rec.count[r] = 1; h.rec.units[r] = 60;
     h.rec.start[r] = 3; h.rec.finish[r] = 103;
     h.sys.accelHead[0] = r; h.sys.accelActive[0] = 1; h.sys.active[2] = 1;
     h.sys.accelHolders[0] = 1; h.sys.accelUsedVram[0] = 60; h.sys.usedVram[0] = 60;
@@ -62,7 +62,8 @@ describe('GPU save validation', () => {
     const state: GameState = { ...base, research: { ...base.research, unlocks: { ...base.research.unlocks, rules: ['gpuLink'] } } };
     const h = state.hot.sys;
     state.compiled.sys.gpuLinked[0] = 1; state.hot.rec.accelDomain[0] = 8;
-    state.hot.rec.stage[0] = 0;
+    // Its mem stage's RAM part (D26.2).
+    state.hot.rec.stage[0] = 0; state.hot.rec.part[0] = 1;
     h.accelHead[0] = -1; h.accelActive[0] = 0; h.active[2] = 0;
     h.accelWAnchor[0] = 0; h.accelEAnchor[0] = 0; h.accelRate[0] = 0; h.accelDue[0] = Infinity;
     h.head[1] = 0; h.active[1] = 1;

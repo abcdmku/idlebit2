@@ -1,22 +1,25 @@
 import { G, LOC } from '../core/buffers';
 import { accelNeed, chooseAccel } from '../core/accelerators';
-import { splitRecord } from '../core/pool';
+import { addSibling, splitRecord } from '../core/pool';
+import { openParent } from '../net/hops';
 import type { World } from '../core/world';
 import { dropProbe, probeHead, returnToFront, takeHead } from '../market/queue';
 import { canRunOn } from '../market/fleet';
 import { addTransit } from '../net/fifo';
 import { type Span } from './clocks';
-import { hwThreads, memOf } from './est';
+import { hwThreads } from './est';
+import { freeHierarchy, unifiedRoom } from './memory';
 import { queueInsertAfter, queuePush, queueUnlink } from './lists';
 import { strategyOf } from './schedulers';
-import { memberPayload, shapeOf, workingSetOf } from './shape';
-import { admittedOf, keffOf, noteAdmit, noteAdmitted, noteTake, reserve, slotsOf, takesLeft, canAdmit } from './slots';
+import { memberPayload, shapeOf, wantThreads, workingSetOf } from './shape';
+import { admittedOf, keffOf, noteAdmit, noteAdmitted, noteTake, queueCapped, reserve, slotsOf, takesLeft, canAdmit } from './slots';
 import { startRecord } from './stages';
+import { CAUSE, returnTask } from './outcome';
 
 /**
  * Allocation (spec §6.4, §6.5, §6.7 steps 1 and 3): before Rack the lone system takes the head
  * over its pipe (its default rack-switch port, D13); then queued tasks start while the running
- * limit, a free thread (except time slicing) and memory (D1.1, summed working sets) allow, in
+ * limit, a free thread (except time slicing) and the free memory hierarchy (D1.1, D26.1) allow, in
  * strategy order. A task that does not fit is skipped.
  */
 
@@ -33,7 +36,8 @@ export function enqueue(w: World, s: number, r: number): void {
 
 /** Whether the lone system s may take now (spec §6.4): room, a free pipe, takes left this tick. */
 const canTakeLone = (w: World, s: number): boolean =>
-  w.hot.sys.pipeRec[s]! < 0 && w.compiled.sys.pipeSpeed[s]! > 0 && admittedOf(w, s) < slotsOf(w, s) && takesLeft(w, s) > 0;
+  w.hot.sys.pipeRec[s]! < 0 && w.compiled.sys.pipeSpeed[s]! > 0 && admittedOf(w, s) < slotsOf(w, s) && takesLeft(w, s) > 0
+  && !queueCapped(w, s);
 
 /**
  * Before Rack, at τ: takes the head over s's pipe if s has room and can run it (spec §6.4). The
@@ -47,6 +51,13 @@ export function pullLone(w: World, s: number, tau: number): void {
     if (head < 0) return;
     if (canRunOn(w, s, head) !== 0) { dropProbe(w, head); return; }
     const r = takeHead(w, head);
+    // D26.5: a windowed task owns a parent row from its take, so the deadline ring can find it.
+    if (rec.deadline[r]! >= 0) {
+      const p = openParent(w, rec.taskId[r]!, rec.family[r]!, rec.units[r]!, w.tick, rec.deadline[r]!);
+      w.hot.parent.placed[p] = 1;
+      addSibling(w.hot, p, r);
+      rec.shard[r] = 0;
+    }
     rec.loc[r] = LOC.link;
     rec.owner[r] = -1;
     rec.target[r] = s;
@@ -55,7 +66,7 @@ export function pullLone(w: World, s: number, tau: number): void {
     addTransit(w.hot, 1);
     h.pipeRec[s] = r;
     h.pipeT0[s] = tau;
-    h.pipeLeft[s] = memberPayload(shapeOf(rec.family[r]!), rec.scale[r]!);
+    h.pipeLeft[s] = memberPayload(shapeOf(rec.family[r]!), rec.units[r]!);
     // A zero-time transfer (an unbounded test pipe) lands at the τ it starts; a real one lands in run.ts.
     if (h.pipeLeft[s]! / w.compiled.sys.pipeSpeed[s]! !== 0) return;
     landPipe(w, s, tau);
@@ -88,14 +99,17 @@ export function startQueued(w: World, s: number, tau: number, span: Span): numbe
     const r = strategy.pickQueue(w, s);
     if (r < 0) break;
     const shape = shapeOf(rec.family[r]!);
-    const ws = workingSetOf(shape, rec.scale[r]!);
+    const ws = workingSetOf(shape, rec.units[r]!);
     const freeThreads = threads - h.busyThreads[s]!;
-    const perTask = strategy.timeSlice ? Math.min(shape.threads, threads) : Math.max(1, Math.min(shape.threads, freeThreads));
+    // D25.3: a shard takes min(free threads, max(1, floor(units / grain))) threads.
+    const want = wantThreads(shape, rec.units[r]!);
+    const perTask = strategy.timeSlice ? Math.min(want, threads) : Math.max(1, Math.min(want, freeThreads));
     let k = Math.min(rec.count[r]!, keff - h.running[s]!);
     if (!strategy.timeSlice) k = Math.min(k, Math.floor(freeThreads / perTask));
-    if (ws > 0) k = Math.min(k, Math.floor((memOf(w, s) - h.usedMem[s]!) / ws));
+    // D26.1: the free hierarchy (cache + RAM + disk) must hold the working set; it is placed at start.
+    if (ws > 0) k = Math.min(k, Math.floor(freeHierarchy(w, s) / ws));
     if (k <= 0) break;
-    const choice = chooseAccel(w.compiled, w.hot, s, accelNeed(shape.def, rec.scale[r]!), k);
+    const choice = chooseAccel(w.compiled, w.hot, s, accelNeed(shape.def, rec.units[r]!), k, unifiedRoom(w, s, ws));
     if (!choice) break;
     k = choice.take;
     if (k < rec.count[r]!) queueInsertAfter(w.hot, s, r, splitRecord(w.hot, r, rec.count[r]! - k));
@@ -107,13 +121,16 @@ export function startQueued(w: World, s: number, tau: number, span: Span): numbe
   return started;
 }
 
+
 /**
  * gracefulDrain (spec §4.4): a draining system admits nothing; its queued tasks return to the
- * queue front, still committed (spec §5.2).
+ * queue front, still committed (spec §5.2). A queued shard returns its whole task (or fails it
+ * with `swap` when a sibling already finished, spec §6.9).
  */
 export function drainQueue(w: World, s: number): void {
   const h = w.hot.sys, rec = w.hot.rec;
   for (let r = h.queueHead[s]!; r >= 0; r = h.queueHead[s]!) {
+    if (rec.parent[r]! >= 0) { returnTask(w, r, CAUSE.swap); continue; }
     const k = rec.count[r]!;
     queueUnlink(w.hot, s, r);
     h.queueLen[s] = h.queueLen[s]! - k;

@@ -19,7 +19,8 @@ vi.mock('../market/families', async (orig) => ({ ...(await orig<object>()), FAMI
 interface Task { id: number; family: number; scale: number; stage: number; remaining: number; threads: number; hold: boolean; domain: number }
 interface Sys { caps: Caps; timeSlice: boolean; feed: Task[]; queue: Task[]; running: Task[]; cards?: readonly AccelCaps[]; linked?: boolean }
 
-const RES: Record<Resource, number> = { cpu: 0, ram: 1, gpu: 2, io: 3 };
+/** Every working set here sits in RAM (no cache, no drive), so a mem stage runs on the RAM clock (D26.2). */
+const RES: Record<Resource, number> = { compute: 0, mem: 1, gpu: 2 };
 const famOf = (t: Task) => TEST_FAMILIES[t.family]!;
 const resOf = (t: Task) => RES[famOf(t).stages[t.stage]!.resource];
 const wsOf = (t: Task) => famOf(t).workingSet.fixed;
@@ -59,14 +60,18 @@ function refTick(s: Sys, metByFamily: number[]): void {
   // Pull admission (spec §6.4): the head is taken while there is room, at most one take per slot per tick.
   let takes = 0;
   const allocate = () => {
-    while (s.queue.length + s.running.length < keffOf(s) + c.Q && takes < keffOf(s) + c.Q && s.feed.length > 0) { s.queue.push(s.feed.shift()!); takes += 1; }
+    // D26 (spec §6.4): while a queued task was held back with a running slot free, the queue stops at Q.
+    while (s.queue.length + s.running.length < keffOf(s) + c.Q && takes < keffOf(s) + c.Q && s.feed.length > 0
+      && !(c.Q > 0 && s.queue.length > 0 && s.running.length < keffOf(s) && s.queue.length >= c.Q)) { s.queue.push(s.feed.shift()!); takes += 1; }
     for (let i = 0; i < s.queue.length && s.running.length < keffOf(s);) {
       const t = s.queue[i]!;
       const free = c.threads - busy();
       const domain = choice(t);
       if ((!s.timeSlice && free <= 0) || mem() + wsOf(t) > c.memCap || domain === -2) { i += 1; continue; }
       s.queue.splice(i, 1);
-      t.threads = s.timeSlice ? Math.min(famOf(t).threads, c.threads) : Math.min(famOf(t).threads, free);
+      // D25.3: a shard of u units wants max(1, floor(u / grain)) threads.
+      const want = Math.max(1, Math.floor(t.scale / famOf(t).grain));
+      t.threads = s.timeSlice ? Math.min(want, c.threads) : Math.min(want, free);
       s.running.push(t);
       t.domain = domain;
       enter(t);
@@ -126,8 +131,8 @@ function compare(seed: number, timeSlice: boolean, cards?: readonly AccelCaps[],
   const u = lcg(seed);
   const caps: Caps = {
     threads: 1 + Math.floor(u() * 4), cores: 4, K: 1 + Math.floor(u() * 4), Q: Math.floor(u() * 4), strategy: timeSlice ? 2 : 0,
-    threadRate: 0.5 + u() * 3, memCap: 4 + Math.floor(u() * 12), hasRam: 1, ramBw: 0.5 + u() * 3,
-    gpuOps: 0.5 + u() * 3, vram: 16, storageCap: 16, ioRate: 0.5 + u() * 3, ioConc: 1 + Math.floor(u() * 2), ecc: 0,
+    threadRate: 0.5 + u() * 3, memCap: 4 + Math.floor(u() * 12), cacheBits: 0, hasRam: 1, ramBw: 0.5 + u() * 3,
+    gpuOps: 0.5 + u() * 3, vram: 16, storageCap: 0, ioRate: 0.5 + u() * 3, ioConc: 1 + Math.floor(u() * 2), ecc: 0,
     pipeSpeed: Infinity,
   };
   const w = openWorld(execState({}, caps, cards ? (c) => setAccels(c, 0, cards, linked) : undefined));
@@ -190,7 +195,8 @@ describe('exec matches the clock oracle', () => {
     const sys: OracleSystem = { perThreadRate: 1.3, hardwareThreads: 4, ramBw: 2.2, gpuOps: 0.7, ioRate: 1.1, eff: 1, tasks: [] };
     fams.forEach((f, i) => {
       feed(w, f, 1, scales[i]!);
-      sys.tasks.push(oracleTask(i, [{ resource: TEST_FAMILIES[f]!.stages[0]!.resource, work: scales[i]! }]));
+      const res = TEST_FAMILIES[f]!.stages[0]!.resource;
+      sys.tasks.push(oracleTask(i, [{ resource: res === 'mem' ? 'ram' : res, work: scales[i]! }]));
     });
     const doneAt: number[] = [];
     const families = [...new Set(fams)];

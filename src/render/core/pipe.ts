@@ -2,9 +2,10 @@
 // It drops from under the head slot (RestFraming.pipe), runs under the strip, and drops into the
 // level's entry (LevelRenderer.entry). Drawn by the core in art px at N, so every level meets it the
 // same way. A transfer rides it at its real progress; one too short to see is a landing flash (D12.4).
+import { formatHertz, formatOps } from '../../game';
 import type { LevelSnapshot, RenderSnapshot, TransferView } from '../../game';
 import type { Camera, PixelRatio, RestFraming } from './camera';
-import { hertz, opsText, secondsText } from './format';
+import { secondsText } from './format';
 import type { Point, Rect } from './geom';
 import { LabelBuffer, drawLabels } from './labels';
 import type { Typography } from './labels';
@@ -35,16 +36,36 @@ function rackTransfer(s: RenderSnapshot, rack: Extract<LevelSnapshot, { level: '
   }
   return port;
 }
+/** D25: the level's own flows on its top link, the travelling shard first (FIFO by shard index). */
+function topFlow(f: LevelSnapshot, links: readonly string[]): TransferView | null {
+  let best: TransferView | null = null, bestShard = Infinity;
+  for (const t of (f as { readonly flows?: readonly (TransferView & { readonly shard?: number })[] }).flows ?? []) {
+    if (!links.includes(t.link)) continue;
+    if (t.bitsSent > 0) return t;
+    if ((t.shard ?? 0) < bestShard) { best = t; bestShard = t.shard ?? 0; }
+  }
+  return best;
+}
+const TOP: Readonly<Record<'rack' | 'room' | 'global', readonly string[]>> = { rack: ['uplink', 'rack'], room: ['zone'], global: ['backbone', 'zone'] };
 /** The focus level's inbound link: its name, speed and the transfer on it now. Snapshot fields only. */
 export function inbound(s: RenderSnapshot, out: Inbound): Inbound {
   const f = s.focus, link = LINK[f.level];
   out.name = link.name; out.transfer = null; out.speed = 0;
   switch (f.level) {
     case 'chip': out.speed = f.pipe.speed; out.transfer = f.pipe.transfer; break;
-    case 'system': out.speed = f.chip.pipe.speed; out.transfer = f.chip.pipe.transfer; break;
-    case 'rack': out.speed = f.switch.uplinks[0]?.speedHz ?? 0; out.transfer = rackTransfer(s, f); break;
-    case 'room': out.speed = f.network.switch.uplinks[0]?.speedHz ?? 0; out.transfer = firstOf(s, link.kind); break;
-    case 'global': out.speed = f.backbone.links[0]?.speedHz ?? 0; out.transfer = firstOf(s, link.kind); break;
+    case 'system': out.speed = f.chip.pipe.speed; out.transfer = (f as { readonly inbound?: TransferView | null }).inbound ?? f.chip.pipe.transfer; break;
+    case 'rack': out.speed = f.switch.uplinks[0]?.speedHz ?? 0; out.transfer = topFlow(f, TOP.rack) ?? rackTransfer(s, f); break;
+    case 'room': out.speed = f.network.switch.uplinks[0]?.speedHz ?? 0; out.transfer = topFlow(f, TOP.room) ?? firstOf(s, link.kind); break;
+    case 'global': {
+      out.transfer = topFlow(f, TOP.global) ?? firstOf(s, link.kind);
+      const bb = f.backbone.links[0];
+      if (bb) { out.speed = bb.speedHz; break; }
+      // One site, no backbone yet: tasks enter over the gateway site's data plane (its zone links).
+      out.name = 'Data plane';
+      for (const site of f.sites) if (site.region === f.gateway && site.dataPlane) { out.speed = site.dataPlane.bitsPerSec; break; }
+      if (!out.speed && out.transfer) out.speed = out.transfer.speed;
+      break;
+    }
   }
   return out;
 }
@@ -59,18 +80,19 @@ const at: Point = { x: 0, y: 0 }, link: Inbound = { name: '', speed: 0, transfer
 const tags = new LabelBuffer(), screen: Camera = { cx: 0, cy: 0, s: 1 };
 const lattice = (v: number, lat: number) => Math.round(v / lat) * lat;
 /**
- * Draw the pipe in CSS space. `entry` is the level's entry in CSS px, or null during a zoom (first drop only).
- * Returns nothing; reads only the snapshot and the presentation time.
+ * Draw the pipe in CSS space. `entry` is the level's entry in CSS px, or null (first drop only). `rest`:
+ * the entry snaps to the lattice and the link tags show; a zoom passes false, so the pipe follows the
+ * moving entry without tags. Reads only the snapshot and the presentation time.
  */
 export function drawPipe(g: CanvasRenderingContext2D, s: RenderSnapshot, timeMs: number, paused: boolean, f: RestFraming,
-  vp: Rect, ratio: PixelRatio, entry: Point | null, type: Typography): void {
+  vp: Rect, ratio: PixelRatio, entry: Point | null, type: Typography, rest = true): void {
   const p = f.pipe;
   if (!p) return;
   const n = f.scale, x0 = p.x / n, y0 = p.y / n, ry = p.runY / n;
   let count = 2;
   route[0][0] = x0; route[0][1] = y0; route[1][0] = x0; route[1][1] = ry;
   if (entry) {
-    const ex = lattice(entry.x, f.lattice) / n, ey = entry.y / n;
+    const ex = rest ? lattice(entry.x, f.lattice) / n : Math.round(entry.x / n), ey = rest ? entry.y / n : Math.round(entry.y / n);
     route[2][0] = ex; route[2][1] = ry; count = 3;
     if (ey > ry) { route[3][0] = ex; route[3][1] = ey; count = 4; }
   }
@@ -89,15 +111,15 @@ export function drawPipe(g: CanvasRenderingContext2D, s: RenderSnapshot, timeMs:
     } else { const e = pts[count - 1]; R(g, e[0] - 2, e[1] - 6, 4, 6, '#c6f7cf'); }
   }
   g.restore();
-  if (!entry) return;
-  // Labels under the run, beside the first drop (L2 D17): the link and its speed, then the packet
-  // tag in a fixed slot (desktop) or on the next line (phone), so neither moves with the text.
+  if (!entry || !rest) return;
+  // Labels in the left gutter under the run, beside the first drop (L2 D17, A05): the link and its
+  // speed, then the packet tag on the next line, so neither moves with the text or covers the art.
   tags.clear();
   const phone = f.form === 'phone', x = p.x + (phone ? 16 : 24), y = p.runY + (phone ? 8 : 24);
-  tags.label('pipe', x, y, 'left', true).text(`${link.name} ${hertz(link.speed)}`, 'net');
+  tags.label('pipe', x, y, 'left', true).text(`${link.name} ${formatHertz(link.speed)}`, 'net');
   if (t && live && seconds >= MIN_VISIBLE_TRANSFER_S) {
     const left = (1 - transferProgress(t, s.simTimeMs, timeMs)) * seconds;
-    tags.label('packet', phone ? x : x + 144, phone ? y + 16 : y, 'left', true).text(`${opsText(t.bits)} · ${secondsText(left)}`, 'net');
+    tags.label('packet', x, y + type.line, 'left', true).text(`${formatOps(t.bits)} · ${secondsText(left)}`, 'net');
   }
   screen.cx = vp.x + vp.w / 2; screen.cy = vp.y + vp.h / 2; screen.s = ratio.x;
   drawLabels(g, tags, screen, vp, ratio, type);

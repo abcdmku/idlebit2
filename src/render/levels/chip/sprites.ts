@@ -1,7 +1,7 @@
 ﻿// CPU art (layout-L2/art.js): board weave, package and die, and the die blocks. Static parts are
 // cached per form; per-frame blocks draw only what state changes.
 import type { ChipQueueEntryView } from '../../../game';
-import { P, R, brackets, cached, dotted, drawFamilyIcon, hash, mix, prism, px, shadow } from '../../core';
+import { P, R, SPR, brackets, cached, dotted, drawFamilyIcon, frame, hash, mix, prism, px, shadow, stamp } from '../../core';
 import type { Rect, WorldForm } from '../../core';
 import type { Floor } from './layout';
 
@@ -39,7 +39,7 @@ function cpuPackage(g: G, pkg: Rect, die: Rect): void {
 }
 export const PKG = '#1d3a2e', PKG_HI = '#2c5440';
 
-/** The board, the package and the die's bus metal: IN down to the queue, cache, then each core, and OUT. */
+/** The board, the package and the die's bus metal: IN down to the queue, cache, then each core. */
 export function staticCpu(f: Floor, form: WorldForm): HTMLCanvasElement {
   return cached(`v3-cpu:${form}`, f.world.w, f.world.h, g => {
     board(g, f.world); cpuPackage(g, f.pkg, f.die);
@@ -47,22 +47,17 @@ export function staticCpu(f: Floor, form: WorldForm): HTMLCanvasElement {
     R(g, cx - 1, f.die.y, 2, f.cores.y - f.die.y - 4, METAL);
   });
 }
-/** Bus metal from the shared spine to each core in use and from the cores to OUT (2 art wide). */
+/** Bus metal from the shared spine to each core in use (2 art wide). Work pays on its core. */
 export function drawMetal(g: G, f: Floor, centres: readonly number[]): void {
-  const cx = f.inp.x, joinY = f.cores.y - 4, outY = f.cores.y + f.cores.h + 4, foot = f.die.y + f.die.h;
+  const cx = f.inp.x, joinY = f.cores.y - 4;
   let xa = cx, xb = cx;
   for (const x of centres) { xa = Math.min(xa, x); xb = Math.max(xb, x); }
-  R(g, xa - 1, joinY - 1, xb - xa + 2, 2, METAL); R(g, xa - 1, outY - 1, xb - xa + 2, 2, METAL);
-  R(g, cx - 1, outY, 2, foot - outY, METAL);
-  for (const x of centres) { R(g, x - 1, joinY, 2, 4, METAL); R(g, x - 1, outY - 4, 2, 4, METAL); }
+  R(g, xa - 1, joinY - 1, xb - xa + 2, 2, METAL);
+  for (const x of centres) R(g, x - 1, joinY, 2, 4, METAL);
 }
 
 export function pad(g: G, x: number, y: number, lit: boolean): void {
   R(g, x - 4, y - 2, 9, 5, P.ink); R(g, x - 3, y - 1, 7, 3, lit ? P.padHi : P.pad); R(g, x - 3, y + 1, 7, 1, P.padLo);
-}
-export function copper(g: G, x: number, y0: number, y1: number, lit: boolean): void {
-  if (y1 <= y0) return;
-  R(g, x - 1, y0 + 1, 4, y1 - y0, P.copperLo); R(g, x - 2, y0, 4, y1 - y0, lit ? P.copperHi : P.copper);
 }
 export function coreBlock(g: G, r: Rect, busy: boolean, lent: boolean): Rect {
   const top = lent ? mix(P.logic, P.rnd, 0.3) : busy ? P.logicHi : P.logic;
@@ -70,10 +65,17 @@ export function coreBlock(g: G, r: Rect, busy: boolean, lent: boolean): Rect {
   if (r.w >= 16) for (let x = t.x + 3; x < t.x + t.w - 2; x += 4) R(g, x, t.y + t.h + 1, 2, 1, P.pad);
   return t;
 }
-export function coreGhost(g: G, r: Rect, locked: boolean): void {
+/** An open core site: it can take a core now. */
+export function coreGhost(g: G, r: Rect): void {
   R(g, r.x, r.y, r.w, r.h, mix(P.wafer, P.ink, 0.25));
   if (r.w >= 12) dotted(g, r.x, r.y, r.w, r.h, P.silkLo, 0, 1, 2);
-  brackets(g, r.x, r.y, r.w, r.h, locked ? P.silkLo : P.silk, 3);
+  brackets(g, r.x, r.y, r.w, r.h, P.silk, 3);
+}
+/** A locked site (A25): bare die, one dim outline and the lock glyph, no text; the callout names it. */
+export function lockedSite(g: G, r: Rect): void {
+  R(g, r.x, r.y, r.w, r.h, P.wafer);
+  frame(g, r.x, r.y, r.w, r.h, P.silkLo);
+  if (r.w >= 11 && r.h >= 12) stamp(g, SPR.lock, r.x + (r.w >> 1) - 3, r.y + (r.h >> 1) - 4);
 }
 /** A progress bar 4 art tall: ink rim, dark well, the filled fraction in `c`. */
 export function bar(g: G, x: number, y: number, w: number, f: number, c: string): void {
@@ -92,7 +94,12 @@ export function clockBlock(g: G, r: Rect, tick: boolean): void {
   if (tick) { g.globalAlpha = 0.35; R(g, lx - 2, ly - 2, 6, 6, P.amber); g.globalAlpha = 1; }
 }
 /** Shared cache: one cell per bit up to 32 bits, then a fill bar. Lit = held by running work. */
-export function cacheBlock(g: G, r: Rect, bits: number, used: number): void {
+/**
+ * `spilled` (D26 `cache.spilledOutBits`): bits of running shards that didn't fit and went on to RAM.
+ * They show as a hatched overflow block in the RAM colour at the bar's right end, up to a third of it,
+ * in proportion to the spill against the cache size.
+ */
+export function cacheBlock(g: G, r: Rect, bits: number, used: number, spilled = 0): void {
   const top = prism(g, r.x, r.y + 3, r.w, r.h - 3, 3, { top: P.sram, front: P.sramLo });
   const cy = top.y + top.h - 9, x0 = top.x + 4, w = top.w - 8;
   if (bits >= 1 && bits <= 32) {
@@ -107,6 +114,15 @@ export function cacheBlock(g: G, r: Rect, bits: number, used: number): void {
     R(g, x0 - 1, cy - 1, w + 2, 8, P.ink); R(g, x0, cy, w, 6, P.sramLo);
     if (bits > 0) R(g, x0, cy, Math.round((w * Math.min(used, bits)) / bits), 6, P.cacheOn);
   }
+  if (spilled > 0) {
+    const k = Math.max(3, Math.round((w / 3) * Math.min(1, spilled / Math.max(1, bits))));
+    R(g, x0 + w - k - 1, cy - 1, k + 2, 8, P.ink); R(g, x0 + w - k, cy, k, 6, P.ram); hatch(g, x0 + w - k, cy, k, 6);
+  }
+}
+/** Diagonal ink stripes: spilled bits (D26), the same hatch as the System board's tiers. */
+function hatch(g: G, x: number, y: number, w: number, h: number): void {
+  g.fillStyle = P.ink;
+  for (let j = 0; j < h; j++) for (let i = j % 3; i < w; i += 3) g.fillRect(x + i, y + j, 1, 1);
 }
 export function queueGhost(g: G, r: Rect): void {
   R(g, r.x, r.y, r.w, r.h, mix(P.wafer, P.ink, 0.2));

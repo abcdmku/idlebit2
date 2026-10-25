@@ -1,18 +1,22 @@
-// The upgrade callout (D15.4): tapping a part in the world opens it beside the part, never over it.
-// "x → x", price, Buy; Open drills into a unit; More opens the part's full plate.
-import { useEffect, useState } from 'react';
+// The upgrade callout (D15.4, A07): tapping a part in the world opens it. On desktop it docks in the
+// world's right gutter, level with the part; on phone it sits above or below the part. A leader joins
+// it to the part. "x → x", price, Buy; Open drills into a unit; More opens the part's full plate.
+import { useEffect, useRef, useState } from 'react';
 import type { LevelSnapshot } from '../../game';
 import type { HitTarget, Rect } from '../../render/core';
 import { useShellOffers } from '../deck/useOffers';
-import { lockWord, offerAction, PriceText } from '../deck/offerUi';
+import { offerAction, PriceText, RightText } from '../deck/offerUi';
 import type { Offer } from '../deck/offers';
 import { plateRequest } from '../plates/PlateLayer';
 import { box, T, useLayout } from '../shell/geometry';
 import { useGameSelector, useQuote, useShell, useViewState } from '../storeHooks';
-import { calloutModel, placeCallout } from './model';
+import { calloutModel, dockCallout, leaderRect, placeCallout } from './model';
 
 /** On the CPU the callout sits beside the package (L2): the cache spans the die, 16 art px in from the package, plus its 3 px frame. */
 const PACKAGE_INSET_ART = 19;
+/** A10: after a purchase the Buy key ignores taps this long, so the next level isn't bought by a double tap. */
+const REARM_MS = 250;
+const KEY_H = 48;
 
 /** The target's rect on the stage, following the camera (rack scroll, resize). Null while hidden. */
 function useAnchor(id: string, chip: boolean, n: number): Rect | null {
@@ -42,31 +46,56 @@ export function Callout() {
   return <Open key={t.id} target={t} focus={focus} />;
 }
 
+/** The target has a plate to open (the global scheduler has none until it is installed, A23). */
+function hasPlate(t: HitTarget, focus: LevelSnapshot): boolean {
+  if (t.part?.slot.kind === 'globalScheduler') return focus.level === 'global' && !!focus.scheduler;
+  return !!plateRequest(t, focus) || t.kind === 'unit';
+}
+
 function Open({ target: t, focus }: { target: HitTarget; focus: LevelSnapshot }) {
   const L = useLayout(), shell = useShell(), offers = useShellOffers();
-  const anchor = useAnchor(t.id, t.owner.level === 'chip', L.N);
+  // The part itself, not the package: the leader points at what was tapped.
+  const part = useAnchor(t.id, false, L.N), around = useAnchor(t.id, t.owner.level === 'chip', L.N);
   const request = plateRequest(t, focus);
   const quotes = useQuote(request);
   const m = calloutModel(t, focus, quotes, offers);
-  if (!anchor) return null;
-  const c = placeCallout(anchor, L.callout, L.calloutBounds, L.lat);
-  // Phone and compact desktop: keys at least 44 px tall (48 on the grid).
-  const big = L.N === 3, pad = big ? 16 : 8, bw = big ? 72 : 56, bh = big ? 24 : 48, by = big ? 64 : 48, gap = 8;
+  const [bought, setBought] = useState(0), [armed, setArmed] = useState(true), timer = useRef<ReturnType<typeof setTimeout>>(undefined);
+  useEffect(() => () => clearTimeout(timer.current), []);
+  if (!part || !around) return null;
+  const d = L.kind === 'desktop';
+  // The renderer keeps the right gutter clear on desktop; a part that reaches into it falls back to beside-it placement.
+  const dock = d ? dockCallout(part, L.callout, L.calloutBounds) : null;
+  const at = dock && dock.x >= part.x + part.w ? dock : placeCallout(around, L.callout, L.calloutBounds, L.lat);
+  const leader = leaderRect(part, at, L.N);
+  const pad = d ? 16 : 8, bw = d ? 80 : 56, gap = 8, by = at.h - pad - KEY_H;
   const o = m.offer, act = o ? offerAction(o as Offer) : null;
   const keys: { id: string; label: string; tone: string; disabled?: boolean; run: () => void }[] = [];
   if (o?.quote && !o.where && (o.price !== null || act)) {
-    keys.push({ id: 'buy', label: act && 'research' in act ? 'Research' : 'Buy', tone: o.affordable ? 'buy' : act ? 'plain' : 'off', disabled: !act,
-      run: () => { if (!act) return; if ('action' in act) shell.dispatch(act.action); else shell.view.dispatch({ type: 'openResearch', project: act.research.node }); } });
+    const research = !!act && 'research' in act;
+    keys.push({ id: 'buy', label: research ? 'Research' : 'Buy', tone: o.affordable ? 'buy' : act ? 'plain' : 'off', disabled: !act || (!research && !armed),
+      run: () => {
+        if (!act) return;
+        if ('research' in act) { shell.view.dispatch({ type: 'openResearch', project: act.research.node }); return; }
+        if (!armed) return;
+        if (shell.dispatch(act.action)?.ok) {
+          setBought(b => b + 1); setArmed(false);
+          clearTimeout(timer.current); timer.current = setTimeout(() => setArmed(true), REARM_MS);
+        }
+      } });
   }
   if (m.drill) { const ref = m.drill; keys.push({ id: 'open', label: 'Open', tone: 'plain', run: () => shell.view.dispatch({ type: 'drill', ref }) }); }
-  if (request || t.kind === 'unit') keys.push({ id: 'more', label: 'More', tone: 'plain', run: () => shell.view.dispatch({ type: 'openPlate' }) });
-  return <aside className="panel callout" style={box(c)} data-k="callout" data-testid="callout" role="dialog" aria-label={m.name}
-    onPointerDown={e => e.stopPropagation()}>
-    <T x={pad} y={pad} w={c.w - 2 * pad - 80}><b>{m.name}</b></T>
-    <T right={pad} y={pad}>{o?.price != null ? <PriceText offer={o as Offer} n={L.N} /> : o?.lock ? <span className="dim">{lockWord(o as Offer)}</span> : null}</T>
-    <T x={pad} y={pad + L.lh} w={c.w - 2 * pad} className="mute">{m.change}</T>
-    {keys.map((k, i) => <button key={k.id} type="button" className={`skey ${k.tone}`} data-testid={`callout-${k.id}`} disabled={k.disabled} data-qa-target={big ? undefined : ''}
-      style={{ right: pad + i * (bw + gap), top: by, width: bw, height: bh, lineHeight: `${bh}px` }}
-      onClick={k.run}>{k.label}</button>)}
-  </aside>;
+  if (hasPlate(t, focus)) keys.push({ id: 'more', label: 'More', tone: 'plain', run: () => shell.view.dispatch({ type: 'openPlate' }) });
+  return <>
+    {leader && <i className="leader" data-free="art" aria-hidden="true" style={box(leader)} />}
+    <aside className="panel callout" style={box(at)} data-k="callout" data-testid="callout" role="dialog" aria-label={m.name}
+      onPointerDown={e => e.stopPropagation()}>
+      <T x={pad} y={pad} w={at.w - 2 * pad - 96}><b>{m.name}</b></T>
+      <T right={pad} y={pad}>{o?.price != null ? <PriceText offer={o as Offer} n={L.N} />
+        : o && !m.research && (o as Offer).right ? <RightText offer={o as Offer} n={L.N} /> : null}</T>
+      <T x={pad} y={pad + L.lh} w={at.w - 2 * pad} className={m.research ? 'warn' : 'mute'}>
+        <span key={bought} className={bought ? 'flash' : undefined}>{m.change}</span></T>
+      {keys.map((k, i) => <button key={k.id} type="button" className={`skey ${k.tone}`} data-testid={`callout-${k.id}`} disabled={k.disabled} data-qa-target
+        style={{ right: pad + i * (bw + gap), top: by, width: bw, height: KEY_H }} onClick={k.run}>{k.label}</button>)}
+    </aside>
+  </>;
 }

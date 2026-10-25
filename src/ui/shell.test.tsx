@@ -6,7 +6,6 @@ import { TASK_TYPES, typeColor, typeOf } from '../render/core';
 import type { CanvasRenderer, HitTarget, Rect } from '../render/core';
 import { Callout } from './callout/Callout';
 import { Deck } from './deck/Deck';
-import { NowCard } from './deck/NowCard';
 import { OffersScope } from './deck/useOffers';
 import { entry, fakeStore, mount, report, type FakeStore, type Mounted } from './hooks/testShell';
 import { Hud } from './Hud';
@@ -28,6 +27,9 @@ describe('band', () => {
     mounted = mount(<Hud />, store, DESKTOP);
     expect([text('[data-testid=credits]'), text('[data-testid=data]'), text('[data-testid=sla]')]).toEqual(['1.48M', '41.2k', '100.0%']);
     expect(text('[data-testid=sla-gauge]')).toContain('0:38');
+    // the round number sits beside the clock (A16), with the 60–100% meter and its 80% tick (A12)
+    expect(text('[data-testid=round]')).toBe('R1 · 0:38');
+    expect($('.hud-meter em')).not.toBeNull();
     act(() => store.set({ hud: { credits: amount(5) } }));
     expect(text('[data-testid=credits]')).toBe('5');
   });
@@ -41,67 +43,103 @@ describe('band', () => {
   });
 });
 
-describe('queue strip (D10, D17.1)', () => {
+describe('queue strip (D10, D17.1): the head leads at the top', () => {
+  // the tasks in line, not the ones leaving
+  const head = () => $('.tag.is-head:not([class*=left-])');
+  const cards = () => [...mounted!.host.querySelectorAll<HTMLElement>('.tag:not(.is-head):not([class*=left-])')];
   it.each([{ width: 1440, height: 900, n: 3 }, { width: 390, height: 780, n: 2 }])
     ('keeps type accents and rims through family changes and blocking at $width px', size => {
       const store = fakeStore();
-      mounted = mount(<><QueueStrip /><NowCard /></>, store, size);
-      const geometry = ['.head-slot', '.card', '.now'].map(rectOf);
+      mounted = mount(<QueueStrip />, store, size);
+      const fixed = ['.head-slot', '.slots', '[data-testid=dismiss]'];
+      const geometry = fixed.map(rectOf);
       for (const type of TASK_TYPES) {
         const family = FAMILIES.find(f => typeOf(f.id) === type)!.id;
         act(() => store.set({ feed: { window: [entry(1, family), entry(2, family)] } }));
-        for (const selector of ['.head-slot', '.card', '.now']) {
-          const card = $(selector)!, stripe = card.querySelector<HTMLElement>('.task-accent')!;
-          expect(card.style.getPropertyValue('--task-color')).toBe(typeColor(type));
+        for (const tag of [head()!, cards()[0]!]) {
+          const stripe = tag.querySelector<HTMLElement>('.task-accent')!;
+          expect(tag.style.getPropertyValue('--task-color')).toBe(typeColor(type));
           expect(stripe.style.width).toBe(`${size.n}px`);
           expect([stripe.style.left, stripe.style.top, stripe.style.bottom]).toEqual(['0px', '0px', '0px']);
-          expect(card.style.color).toBe('');
+          expect(tag.style.color).toBe('');
         }
         expect($('.head-slot')!.style.getPropertyValue('--rim')).toBe(typeColor(type));
-        expect($('.now')!.style.getPropertyValue('--rim')).toBe(typeColor(type));
         act(() => store.set({ feed: { window: store.getSnapshot().feed.window.map(t => ({ ...t, blockedBy: 'cache' })) } }));
-        for (const selector of ['.head-slot', '.card', '.now']) {
-          expect($(selector)!.classList.contains('blocked')).toBe(true);
-          expect($(selector)!.style.getPropertyValue('--task-color')).toBe(typeColor(type));
-        }
-        expect($('.now')!.style.getPropertyValue('--rim')).toBe(typeColor(type));
-        expect(['.head-slot', '.card', '.now'].map(rectOf)).toEqual(geometry);
+        for (const el of [$('.head-slot')!, head()!, cards()[0]!]) expect(el.classList.contains('blocked')).toBe(true);
+        expect(fixed.map(rectOf)).toEqual(geometry);
       }
-      expect(mounted.host.querySelectorAll('.card .task-accent')).toHaveLength(1);
       act(() => store.set({ feed: { window: [] } }));
       expect(mounted.host.querySelectorAll('.task-accent')).toHaveLength(0);
       expect($('.head-slot')!.style.getPropertyValue('--rim')).toBe('');
-      expect($('.now')!.style.getPropertyValue('--rim')).toBe('');
     });
-  it('leads with the head and its real 10 s clock, then the next 4', () => {
+  it('reads the head with its values and real 10 s clock, then the next 4 (no task numbers)', () => {
     const store = fakeStore();
     mounted = mount(<QueueStrip />, store, { width: 390, height: 780 });
-    // a task reads as its icon and name: no task numbers (user)
-    expect(text('[data-testid=head-slot]')).toContain('Bit Flip');
-    expect(text('[data-testid=head-slot]')).not.toContain('#');
-    expect(text('[data-testid=head-clock]')).toBe('10 s');
+    expect(head()!.textContent).toContain('Bit Flip');
+    expect(head()!.textContent).toContain('1 op · 1 b');
+    expect(head()!.textContent).not.toContain('#');
+    expect(text('[data-testid=head-clock]')).toBe('10 s to take');
     mounted.frame(3000);
-    expect(text('[data-testid=head-clock]')).toBe('7 s');
+    expect(text('[data-testid=head-clock]')).toBe('7 s to take');
     mounted.unmount();
-    // desktop: the rim is the head's clock; the cards read name, payout and pipe time
     mounted = mount(<QueueStrip />, store, DESKTOP);
-    expect($('.head-slot .rim-fill')!.style.width).toBe(`${(240 / 3 - 2) * 3}px`);
+    expect($('.head-slot .rim-fill')!.style.width).toBe(`${(432 / 3 - 2) * 3}px`);
     mounted.frame(5000);
-    expect($('.head-slot .rim-fill')!.style.width).toBe(`${39 * 3}px`);
-    const cards = [...mounted.host.querySelectorAll<HTMLElement>('.card')];
-    expect(cards).toHaveLength(4);
-    expect(cards[0]!.dataset.task).toBe('1:1:2');
-    expect(cards[0]!.textContent).toContain('+1');
-    expect(cards[0]!.textContent).toContain('1 ms');
+    expect($('.head-slot .rim-fill')!.style.width).toBe(`${71 * 3}px`);
+    expect(cards().map(c => c.dataset.task)).toEqual(['1:1:2', '1:1:3', '1:1:4', '1:1:5']);
+    expect(cards()[0]!.textContent).toContain('+1');
+    // a 1 ms transfer is a single flash on the pipe (D12.4): the card doesn't print it (A18)
+    expect(cards()[0]!.textContent).not.toContain('ms');
+    act(() => store.set({ feed: { window: store.getSnapshot().feed.window.map(t => ({ ...t, transferS: 1.25 })) } }));
+    expect(cards()[0]!.textContent).toContain('lands 1.25 s');
   });
-  it('marks a blocked head and pauses the clock between rounds', () => {
-    const store = fakeStore(), feed = store.getSnapshot().feed;
-    store.set({ feed: { window: [{ ...entry(20), workingSetBits: 2, blockedBy: 'cache' }, ...feed.window.slice(1)], blockedBy: 'cache' } });
-    mounted = mount(<QueueStrip />, store, { width: 390, height: 780 });
-    expect($('[data-testid=head-slot]')!.classList.contains('blocked')).toBe(true);
-    expect(text('[data-testid=head-clock]')).toBe('blocked');
-    act(() => store.set({ feed: { timing: 'onReturn', headDeadlineTick: null } }));
-    expect(text('[data-testid=head-clock]')).toBe('paused');
+  it('Dismiss is free and dismisses the head; returned work cannot be dismissed', () => {
+    const store = fakeStore();
+    mounted = mount(<QueueStrip />, store, DESKTOP);
+    act(() => $('[data-testid=dismiss]')!.click());
+    expect(store.actions).toEqual([{ type: 'dismissTask', task: store.getSnapshot().feed.window[0]!.task }]);
+    const feed = store.getSnapshot().feed;
+    act(() => store.set({ feed: { window: [{ ...entry(20, 0, true), workingSetBits: 2, blockedBy: 'cache' }, ...feed.window.slice(1)] } }));
+    expect(head()!.textContent).toContain('Needs 2 b cache');
+    // taken work back at the front has no clock (D25.7)
+    expect(text('[data-testid=head-clock]')).toBe('In LB queue');
+    expect(($('[data-testid=dismiss]') as HTMLButtonElement).disabled).toBe(true);
+  });
+  it('between rounds the same key returns to market, in the same place', () => {
+    const store = fakeStore();
+    mounted = mount(<QueueStrip />, store, DESKTOP);
+    expect(rectOf('[data-testid=dismiss]')).toBe('336px 96px 96px 48px');
+    act(() => store.set({ round: { state: 'between', canReturn: true }, feed: { timing: 'onReturn', headDeadlineTick: null } }));
+    expect($('[data-testid=dismiss]')).toBeNull();
+    expect(rectOf('[data-testid=return]')).toBe('336px 96px 96px 48px');
+    expect(head()!.textContent).toContain('Starts after Return');
+    // the next round's queue is frozen and nothing reads as blocked (A03)
+    expect(mounted.host.querySelectorAll('.blocked')).toHaveLength(0);
+    act(() => $('[data-testid=return]')!.click());
+    expect(store.actions).toEqual([{ type: 'returnToMarket' }]);
+  });
+  it('slides forward: a taken head stays until its exit ends, the rest move up, the new task joins the back', () => {
+    vi.useFakeTimers();
+    try {
+      const store = fakeStore();
+      mounted = mount(<QueueStrip />, store, DESKTOP);
+      const second = cards()[0]!;
+      act(() => store.set({ feed: { window: [2, 3, 4, 5, 6].map(i => entry(i)), taken: 1 } }));
+      // the promoted task rises onto the head's own belt (it never crosses the cards or Dismiss)
+      expect(second.isConnected).toBe(false);
+      expect(head()!.dataset.task).toBe('1:1:2');
+      expect(head()!.parentElement!.dataset.belt).toBe('head');
+      expect(rectOf('.tag.is-head:not([class*=left-])')).toBe('0px 0px 304px 96px');
+      expect($('.tag.left-taken')!.dataset.task).toBe('1:1:1');
+      expect(cards().map(c => c.dataset.task)).toEqual(['1:1:3', '1:1:4', '1:1:5', '1:1:6']);
+      act(() => { vi.advanceTimersByTime(300); });
+      expect($('.tag.left-taken')).toBeNull();
+      // reduced motion: a leaving task drops at once
+      act(() => mounted!.shell.view.setReducedMotion(true));
+      act(() => store.set({ feed: { window: [3, 4, 5, 6, 7].map(i => entry(i)), dismissed: 1 } }));
+      expect($('.tag.left-dismissed')).toBeNull();
+      expect(head()!.dataset.task).toBe('1:1:3');
+    } finally { vi.useRealTimers(); }
   });
 });
 
@@ -110,58 +148,39 @@ function deck(store: FakeStore, size = DESKTOP) {
 }
 
 describe('deck', () => {
-  it('the now card repeats the head; Dismiss is free and dismisses the head', () => {
-    const store = fakeStore();
-    mounted = deck(store);
-    expect(text('[data-testid=now]')).toContain('Bit Flip');
-    expect(text('[data-testid=now]')).not.toContain('#');
-    expect(text('[data-testid=now-clock]')).toBe('10 s to take');
-    act(() => $('[data-testid=dismiss]')!.click());
-    expect(store.actions).toEqual([{ type: 'dismissTask', task: store.getSnapshot().feed.window[0]!.task }]);
-  });
-  it('a blocked head says what it needs; returned work cannot be dismissed', () => {
-    const store = fakeStore(), feed = store.getSnapshot().feed;
-    store.set({ feed: { window: [{ ...entry(20, 0, true), workingSetBits: 2, blockedBy: 'cache' }, ...feed.window.slice(1)] } });
-    mounted = deck(store);
-    expect(text('[data-testid=now]')).toContain('Needs 2 bits cache');
-    expect(text('[data-testid=now-clock]')).toBe('Blocked · 10 s');
-    expect(($('[data-testid=dismiss]') as HTMLButtonElement).disabled).toBe(true);
-  });
-  it('between rounds the same key returns to market', () => {
-    const store = fakeStore();
-    store.set({ round: { state: 'between', canReturn: true }, feed: { timing: 'onReturn', headDeadlineTick: null } });
-    mounted = deck(store);
-    expect($('[data-testid=dismiss]')).toBeNull();
-    act(() => $('[data-testid=return]')!.click());
-    expect(store.actions).toEqual([{ type: 'returnToMarket' }]);
-  });
   it('controls never move: the deck keeps its geometry across states', () => {
     const store = fakeStore();
     mounted = deck(store);
-    const keys = ['[data-testid=now]', '[data-testid=buy]', '[data-testid=build-rows]', '[data-testid=research-key]'];
-    const before = keys.map(rectOf), dismiss = rectOf('[data-testid=dismiss]');
-    expect(dismiss).toBe('576px 24px 96px 48px');
+    const keys = ['[data-testid=buy]', '[data-testid=build-rows]', '[data-testid=research-key]'];
+    const before = keys.map(rectOf);
+    expect(before).toEqual(['1104px 744px 312px 120px', '24px 744px 720px 120px', '768px 744px 312px 120px']);
     act(() => store.set({ round: { state: 'between', canReturn: true }, feed: { timing: 'onReturn', headDeadlineTick: null } }));
     expect(keys.map(rectOf)).toEqual(before);
-    expect(rectOf('[data-testid=return]')).toBe(dismiss);
-    act(() => store.set({ research: { active: 'fabKhz' as never, name: 'kHz fab', progress: 0.5 } }));
+    act(() => store.set({ research: { active: 'fabKhz' as never, name: 'kHz fab', progress: 0.5, opsPerSec: 1200, queued: 2 } }));
     expect(keys.map(rectOf)).toEqual(before);
+    mounted.unmount();
+    mounted = deck(store);
+    expect(text('[data-testid=research-key]')).toBe('Research50%kHz fab1.2k ops/s · 2 queued');
+  });
+  it('the Buy key says how far off the next buy is', () => {
+    const store = fakeStore();
+    mounted = deck(store);
+    expect(text('[data-testid=buy]')).toMatch(/Saving up · \d+ to go/);
   });
   it('builds five rows from the sim quotes: x → x, prices, and where the pipe upgrades', () => {
     const store = fakeStore();
     mounted = deck(store);
     const rows = [...mounted.host.querySelectorAll<HTMLElement>('[data-row]')];
     expect(rows.map(r => r.dataset.row)).toEqual(['core', 'cache', 'clock', 'scheduler', 'link']);
-    expect(rows[4]!.textContent).toContain('Upgrade at the Rack switch');
+    expect(rows[4]!.textContent).toContain('At the Rack switch');
     expect(rows[2]!.textContent).toMatch(/1 → 2 Hz/);
-    expect(rows[1]!.textContent).toMatch(/1 → 2 bits/);
+    expect(rows[1]!.textContent).toMatch(/1 → 2 b/);
   });
-  it('phone: Dismiss, Research and Buy sit in the bottom-right thumb zone; Build opens a sheet', () => {
+  it('phone: Research and Buy sit in the bottom-right thumb zone; Build opens a sheet', () => {
     const store = fakeStore();
     mounted = deck(store, { width: 390, height: 780 });
     expect([rectOf('[data-testid=build-key]'), rectOf('[data-testid=research-key]'), rectOf('[data-testid=buy]')])
       .toEqual(['8px 704px 80px 64px', '96px 704px 112px 64px', '216px 704px 160px 64px']);
-    expect(rectOf('[data-testid=dismiss]')).toBe('256px 16px 96px 48px');
     act(() => $('[data-testid=build-key]')!.click());
     expect($('[data-testid=build-sheet]')).not.toBeNull();
   });
@@ -184,8 +203,10 @@ describe('upgrade callout (D15.4)', () => {
     const c = $('[data-testid=callout]')!;
     expect(c.textContent).toContain('Clock');
     expect(c.textContent).toMatch(/1 → 2 Hz/);
-    // beside the package, never over it (the package edge is 19 art px out from the cache), on the lattice
-    expect([c.style.left, c.style.top, c.style.width, c.style.height]).toEqual(['792px', '312px', '288px', '96px']);
+    // docked in the right gutter, level with the part, with a leader to it (A07)
+    expect([c.style.left, c.style.top, c.style.width, c.style.height]).toEqual(['1104px', '304px', '288px', '144px']);
+    expect($('.leader')!.style.left).toBe('696px');
+    expect($('[data-testid=callout-buy]')!.style.height).toBe('48px');
     act(() => mounted!.shell.view.dispatch({ type: 'cancel' }));
     expect($('[data-testid=callout]')).toBeNull();
   });
@@ -219,7 +240,11 @@ describe('round plate', () => {
     expect(text('.p-sub')).toBe('Round 14 · 14:05');
     expect(text('.rp-v')).toBe('79.9%');
     expect(text('[data-testid=rp-failed]')).toBe('7,129');
-    expect(text('[data-testid=rp-detail]')).toBe("Can't run · RAM 387");
+    expect(text('[data-testid=rp-detail]')).toBe("Can't run · RAM ×387");
+    // no footnote, no type table, no peak intensity (A02, A26); energy and net are listed
+    expect(text('[data-testid=round-plate]')).not.toMatch(/rejoins|Peak|Met work/);
+    expect(text('[data-testid=rp-net]')).toContain('2.71M');
+    expect(text('[data-testid=rp-fix]')).toContain('Fix: —');
     act(() => ($('[data-testid=rp-return]') as HTMLButtonElement).click());
     expect(store.actions).toEqual([{ type: 'returnToMarket' }]);
   });
@@ -227,9 +252,34 @@ describe('round plate', () => {
     const store = fakeStore();
     store.set({ round: { state: 'ended', lastReport: report(), canReturn: true } });
     mounted = mount(<RoundPlate />, store);
-    act(() => ($('.rp-x') as HTMLButtonElement).click());
+    act(() => ($('.round-plate .p-x') as HTMLButtonElement).click());
     expect(store.actions).toEqual([{ type: 'dismissReport' }]);
     act(() => store.set({ round: { state: 'running' } }));
     expect($('[data-testid=round-plate]')).toBeNull();
+  });
+});
+
+describe('round plate fix line (A02)', () => {
+  it('names the build that answers the top failure, from the deck\'s own offers', () => {
+    const store = fakeStore();
+    store.set({ round: { state: 'ended', canReturn: true, lastReport: report({ details: [{ cause: 'cantRun', detail: 'cache', count: 2 }],
+      byType: [{ type: 'compute' as never, metWork: 41, failedWork: 18, dismissed: 0 }] }) } });
+    mounted = mount(<OffersScope><RoundPlate /></OffersScope>, store, DESKTOP);
+    expect(text('[data-testid=rp-detail]')).toBe("Can't run · cache ×2");
+    expect(text('[data-testid=rp-fix]')).toMatch(/Cache\s*1 → 2 b/);
+    expect(text('[data-testid=rp-types]')).toBe('Failed:Compute 18 ops');
+  });
+});
+
+describe('round plate with no detail pairs (D26)', () => {
+  it('names the top cause, the disk share, and still offers a fix', () => {
+    const store = fakeStore();
+    store.set({ round: { state: 'ended', canReturn: true, lastReport: report({ details: [], deliveredWork: 100,
+      failedByCause: { timeout: 5, cantRun: 0, misroute: 0, power: 0, heat: 0, swap: 0, late: 0 }, spill: { ramWork: 4, diskWork: 74 } }) } });
+    mounted = mount(<OffersScope><RoundPlate /></OffersScope>, store, DESKTOP);
+    expect(text('[data-testid=rp-detail]')).toBe('Timed out ×5');
+    expect(text('[data-testid=rp-spill]')).toBe('From disk: 74% of work · RAM 4%');
+    // no RAM row at the CPU level: the next answer to slowness is the clock
+    expect(text('[data-testid=rp-fix]')).toMatch(/Clock/);
   });
 });

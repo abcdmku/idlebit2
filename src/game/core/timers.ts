@@ -1,4 +1,5 @@
 import { UNIT_MODES } from '../types/views';
+import { wakeRouters } from './routerQueue';
 import { MODE } from './modes';
 import { dirtySystem, touchSummary } from './touch';
 import type { World } from './world';
@@ -16,6 +17,7 @@ export function setUnitMode(w: World, sys: number, mode: number, timerTicks = 0)
   if (w.hot.sys.mode[sys] !== mode) {
     dirtySystem(w, sys);
     touchSummary(w, w.compiled.sys.rack[sys]!);
+    wakeRouters(w, 0, w.compiled.sys.rack[sys]!);
   }
   w.hot.sys.mode[sys] = mode;
   w.hot.sys.timer[sys] = timerTicks;
@@ -51,7 +53,7 @@ export function timerPhase(w: World): void {
     if (t > 1) { timer[s] = t - 1; continue; }
     timer[s] = 0;
     const next = mode[s] === MODE.goingOffline ? MODE.offline : restingMode(w, s);
-    if (next !== mode[s]) { dirtySystem(w, s); touchSummary(w, w.compiled.sys.rack[s]!); }
+    if (next !== mode[s]) { dirtySystem(w, s); touchSummary(w, w.compiled.sys.rack[s]!); wakeRouters(w, 0, w.compiled.sys.rack[s]!); }
     mode[s] = next;
   }
 }

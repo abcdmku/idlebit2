@@ -18,16 +18,17 @@ import { installedGpuStats } from './gpu';
 import type { GpuModelId } from '../types/gpu';
 
 /*
- * The build tray: exactly 4 quotes per level (R13). chip: core, cache, clock, scheduler; system:
+ * The build tray: 4 primary quotes per level (R13), plus each installed core's upgrade at chip.
+ * chip: core, cache, clock, scheduler; system:
  * CPU, RAM, GPU, storage; rack: cooling, power, LB, switch; room: switch, row, cooling, power;
- * global: site, backbone, scheduler, zone. Nothing to buy = locked "Max". Each quote carries the
+ * global: site, backbone, scheduler, zone. Nothing to buy = locked "Max". Each primary quote carries the
  * effect of its action (R42).
  *
- * Plans read only build, research unlocks and saved configs, so the 4 picked plans are cached on
+ * Plans read only build, research unlocks and saved configs, so the picked plans are cached on
  * those; each call re-derives what moves with the wallet, the round and the load (architecture §3.3).
  */
 type Option = readonly [GameAction, Plan];
-interface Item { readonly action: GameAction; readonly plan: Plan; readonly capText?: string }
+interface Item { readonly action: GameAction; readonly plan: Plan; readonly capText?: string; readonly preview?: false }
 const MAX: Plan = { ok: false, code: 'cap', reason: 'Max', lock: { code: 'ceiling', node: null, text: 'Max' }, price: null, label: 'Max' };
 
 /** The first plan that can run; else the first that has a price; else Max. */
@@ -57,7 +58,13 @@ function chipTray(state: GameState, id: SystemId): Item[] {
   const sg = Math.max(0, newestGen(state.research.unlocks, 'scheduler', 4));
   const scheduler: Option[] = sched ? [upgrade(state, at({ kind: 'scheduler' }))] : [[{ type: 'addPart', system: id, kind: 'scheduler', generation: sg }, planAdd(state, id, 'scheduler', sg)]];
   const fallback: GameAction = { type: 'upgradePart', part: at({ kind: 'clock', socket: 0 }) };
-  return [core, best(caches, fallback), best([upgrade(state, at({ kind: 'clock', socket: 0 }))], fallback), best(scheduler, fallback)];
+  // D7.3: one quote per shared core index, not per CPU; planUpgrade charges for every CPU.
+  // World affordances only need price and locks, so avoid per-core power/payback previews.
+  const installed = (cpu?.cores ?? []).map((_, index): Item => {
+    const [action, plan] = upgrade(state, at({ kind: 'core', socket: 0, index }));
+    return { action, plan, preview: false };
+  });
+  return [core, best(caches, fallback), best([upgrade(state, at({ kind: 'clock', socket: 0 }))], fallback), best(scheduler, fallback), ...installed];
 }
 
 /**
@@ -157,8 +164,8 @@ function cachedItems(state: GameState, at: NodeRef): readonly Item[] {
 }
 
 export function trayQuotes(state: GameState, at: NodeRef): Quote[] {
-  return cachedItems(state, at).map(({ action, plan, capText }) => {
-    const q = toQuote(state, action, plan, quoteEffect(state, action, plan));
+  return cachedItems(state, at).map(({ action, plan, capText, preview }) => {
+    const q = toQuote(state, action, plan, preview === false ? null : quoteEffect(state, action, plan));
     return capText && q.locked?.code === 'cap' ? { ...q, locked: { ...q.locked, text: capText } } : q;
   });
 }

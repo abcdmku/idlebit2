@@ -6,6 +6,7 @@ import type { GlobalSnapshot } from '../types/snapshot';
 import type { GameState } from '../types/state';
 import type { LinkView, SiteView, ZoneView } from '../types/views';
 import { containerMode, lbView, ladderHz, probeTimerS, roomProbe, siteProbe, supplyView } from './common';
+import { globalFlows } from './flows';
 import { roomDark } from './room';
 
 const linkActive = (state: GameState, link: number): boolean => link >= 0 && (state.hot.link.head[link] ?? -1) >= 0;
@@ -100,10 +101,10 @@ export function globalSnapshot(state: GameState): GlobalSnapshot {
   const g = state.compiled.global;
   return {
     level: 'global', sites, backbone: { links },
-    scheduler: sched ? lbView(sched, {
-      strategy: g.lbStrategy[0] ?? 0, filters: g.lbFilters[0] ?? 0, placements: g.lbPlacements[0] ?? 0,
-      reserve: g.reserveOnRoute[0] ?? 0, routed: state.hot.g[G.globalRouted] ?? 0, last: state.hot.g[G.globalLast] ?? -1,
+    scheduler: sched ? lbView(state, sched, {
+      kind: 3, id: 0, strategy: g.lbStrategy[0] ?? 0, filters: g.lbFilters[0] ?? 0, routed: state.hot.g[G.globalRouted] ?? 0, last: state.hot.g[G.globalLast] ?? -1,
     }) : null,
     regionsOpen, gateway: REGION_IDS[0],
+    flows: globalFlows(state),
   };
 }

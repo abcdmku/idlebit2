@@ -2,7 +2,9 @@
 // contract fixture; only the fields the global renderer reads vary.
 import { LEVEL_FIXTURES } from '../../../game/fixtures';
 import { REGIONS, roomId, siteId } from '../../../game';
-import type { GlobalSnapshot, LinkView, SiteView, ZoneView } from '../../../game';
+import type { GlobalSnapshot, LbView, LinkView, SiteView, ZoneView } from '../../../game';
+import { FAM, flowAt, queueOf } from '../rack/flowFixtures';
+import type { FlowCase } from '../rack/flowFixtures';
 
 type Mut<T> = { -readonly [K in keyof T]: T[K] };
 const BASE = LEVEL_FIXTURES.global;
@@ -23,13 +25,11 @@ function site(i: number, zones: number, o: Partial<Mut<SiteView>> = {}): SiteVie
 }
 const closed = (i: number): SiteView => ({ ...BASE.sites[i]!, open: false, online: 'empty', siteId: null, zones: [], grid: null, dataPlane: null });
 const link = (i: number, active: boolean, generation = 1): LinkView => ({ siteId: siteId(i), speedHz: 1e9, latencyMs: 40, active, generation });
-function world(sites: SiteView[], links: LinkView[], regionsOpen: number, scheduler = false): GlobalSnapshot {
-  return {
-    ...BASE, sites, regionsOpen, backbone: { links },
-    scheduler: scheduler ? { generation: 1, level: 2, strategy: 'firstFit', filters: [], placements: [], reserveOnRoute: false,
-      routedPerSec: 900, misroutesThisRound: 0, lastTarget: 1 } : null,
-  };
+const SCHEDULER: LbView = { ...LEVEL_FIXTURES.rack.lb, generation: 1, level: 2, strategy: 'firstFit', filters: [], routedPerSec: 900, misroutesThisRound: 0, lastTarget: 1, queue: queueOf(4, [FAM.region]) };
+function world(sites: SiteView[], links: LinkView[], regionsOpen: number, scheduler = false, flows: readonly FlowCase[] = [], timeMs = 0): GlobalSnapshot {
+  return { ...BASE, sites, regionsOpen, backbone: { links }, scheduler: scheduler ? SCHEDULER : null, flows: flows.map(f => flowAt(f, timeMs)) };
 }
+const room = (site: number, z: number): FlowCase['to'] => ({ level: 'room', id: roomId(site * 3 + z) });
 const idx = (id: string) => REGIONS.findIndex(r => r.id === id);
 
 export const CASES: Readonly<Record<string, (timeMs: number) => GlobalSnapshot>> = {
@@ -40,6 +40,24 @@ export const CASES: Readonly<Record<string, (timeMs: number) => GlobalSnapshot>>
     const built = new Set(ACTIVE_BUILD.map(idx));
     const sites = REGIONS.map((_, i) => (built.has(i) ? site(i, i === 0 ? 3 : 2) : closed(i)));
     return world(sites, [...built].filter(i => i !== 0).map((i, k) => link(i, k !== 1, 1 + k)), 4, true);
+  },
+  /** D25: a 7-shard Regional task: two shards on backbone links in turn (one waiting at the hub),
+   * three across data planes to zone tiles, one landing; a 3-shard Multi-zone task in the gateway site. */
+  flows: t => {
+    const built = new Set(ACTIVE_BUILD.map(idx)), eu = idx('eu-west'), usw = idx('us-west'), ap = idx('ap-southeast');
+    const sites = REGIONS.map((_, i) => (built.has(i) ? site(i, i === 0 ? 3 : 2) : closed(i)));
+    const flows: FlowCase[] = [
+      { task: 61, family: FAM.region, shard: 0, shards: 7, link: 'backbone', to: room(eu, 0), phase: 0.5, seconds: 3 },
+      { task: 61, family: FAM.region, shard: 1, shards: 7, link: 'backbone', to: room(ap, 0), phase: 0.2, seconds: 3 },
+      { task: 61, family: FAM.region, shard: 2, shards: 7, link: 'backbone', to: room(ap, 1), state: 'waiting' },
+      { task: 61, family: FAM.region, shard: 3, shards: 7, link: 'zone', to: room(usw, 0), phase: 0.3 },
+      { task: 61, family: FAM.region, shard: 4, shards: 7, link: 'zone', to: room(usw, 1), phase: 0.6 },
+      { task: 61, family: FAM.region, shard: 5, shards: 7, link: 'zone', to: room(eu, 1), state: 'landing' },
+      { task: 62, family: FAM.zones, shard: 0, shards: 3, link: 'zone', to: room(0, 0), phase: 0.1 },
+      { task: 62, family: FAM.zones, shard: 1, shards: 3, link: 'zone', to: room(0, 1), phase: 0.4 },
+      { task: 62, family: FAM.zones, shard: 2, shards: 3, link: 'zone', to: room(0, 2), state: 'waiting' },
+    ];
+    return world(sites, [...built].filter(i => i !== 0).map(i => link(i, true, 2)), 4, true, flows, t);
   },
   /** The largest fleet: 8 sites × 3 zones, every link busy. */
   max: () => world(REGIONS.map((_, i) => site(i, 3, { hottestF: 76 })), REGIONS.map((_, i) => link(i, true, 3)).slice(1), 8, true),

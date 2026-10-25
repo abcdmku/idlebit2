@@ -3,6 +3,7 @@ import { advanceGameOwned } from '../core/advance';
 import { cloneCompiled, cloneHot } from '../core/buffers';
 import { TICK_MS } from '../core/constants';
 import { primeMarket } from '../market/prime';
+import { LADDERS } from '../build/catalog';
 import type { PartLevel, RackBuild, RoomBuild, SiteBuild, SystemBuild, SystemSpec } from '../types/build';
 import type { RackId, SystemId } from '../types/ids';
 import type { GameState } from '../types/state';
@@ -35,23 +36,23 @@ const TOP_SPEC: SystemSpec = {
 /** Synthetic maximum population: existing GHz CPUs, 8 ECC DDR5, 8 G9990 u5 cards, 4 drives. */
 export const topSystem = (id: SystemId, rack: RackId, slot: number): SystemBuild => ({ id, rack, slot, online: true, spec: TOP_SPEC });
 
-const topRouter = { gen: 2, level: 13, strategy: 'leastWork', filters: ['capability', 'health'], placements: ['gang'], reserveOnRoute: true } as const;
+const topRouter = { gen: 2, level: 13, strategy: 'leastWork', filters: ['capability', 'health'], queueLevel: 32 } as const;
 
 const TOP_RACK_PARTS: Pick<RackBuild, 'cooler' | 'pdu' | 'lb' | 'switch'> = {
   cooler: { gen: 3, level: 14, setpointF: 60 }, pdu: { gen: 2, level: 13, capped: false },
-  lb: { ...topRouter, filters: [...topRouter.filters], placements: [...topRouter.placements] },
+  lb: { ...topRouter, filters: [...topRouter.filters] },
   switch: { gen: 6, ports: Array(12).fill(21), uplinks: Array(4).fill(21), sameSpeed: true },
 };
 export const topRack = (rack: RackBuild): RackBuild => ({ ...rack, ...TOP_RACK_PARTS });
 export const topRoom = (room: RoomBuild): RoomBuild => ({
   ...room,
   cooler: { gen: 5, level: 16, setpointF: 60 }, ups: [{ gen: 2, level: 13, capped: false }, { gen: 2, level: 13, capped: false }],
-  lb: { ...topRouter, filters: [...topRouter.filters], placements: ['gang', 'topology'] },
+  lb: { ...topRouter, filters: [...topRouter.filters] },
   switch: { gen: 6, ports: Array(24).fill(21), uplinks: Array(4).fill(21), sameSpeed: true },
 });
 export const topSite = (site: SiteBuild): SiteBuild => ({
   ...site,
-  dataPlane: { gen: 2, k: 24, router: { ...topRouter, filters: ['capability', 'health', 'thermal'], placements: ['gang', 'zone'] } },
+  dataPlane: { gen: 2, k: 24, router: { ...topRouter, filters: ['capability', 'health', 'thermal'] } },
   grid: { gen: 2, level: 13, capped: false },
   backbone: site.id === 0 ? null : { gen: 3, k: 24 },
 });
@@ -59,8 +60,25 @@ export const topSite = (site: SiteBuild): SiteBuild => ({
 export const MAX_FLEET: FleetSpec = {
   seed: 42, sites: 8, zonesPerSite: 3, racksPerZone: 24, serversPerRack: 12, unlocks: 'max',
   system: topSystem, rack: topRack, room: topRoom, site: topSite,
-  global: { scheduler: { ...topRouter, gen: 0, level: 11, strategy: 'latency', filters: ['region', 'capability', 'health'], placements: ['gang'] } },
+  global: { scheduler: { ...topRouter, gen: 0, level: 11, strategy: 'latency', filters: ['region', 'capability', 'health'] } },
 };
+
+/**
+ * Informational stress fleet (not a budget): MAX_FLEET with every link at its newest generation's
+ * top rung, so uplinks carry what their ports can. Opened near the intensity a 6,912-server split
+ * fleet sustains (D25.10: about +1 I per doubling).
+ */
+const TOP_K = { rack: LADDERS.switch.topK[6]!, room: LADDERS.roomSwitch.topK[6]!, dataPlane: LADDERS.dataPlane.topK[2]!, backbone: LADDERS.backbone.topK[3]! } as const;
+export const MAX_LINK_FLEET: FleetSpec = {
+  ...MAX_FLEET,
+  rack: (rack) => ({ ...topRack(rack), switch: { gen: 6, ports: Array(12).fill(TOP_K.rack), uplinks: Array(4).fill(TOP_K.rack), sameSpeed: true } }),
+  room: (room) => ({ ...topRoom(room), switch: { gen: 6, ports: Array(24).fill(TOP_K.room), uplinks: Array(4).fill(TOP_K.room), sameSpeed: true } }),
+  site: (site) => {
+    const top = topSite(site);
+    return { ...top, dataPlane: { ...top.dataPlane, k: TOP_K.dataPlane }, backbone: top.backbone ? { gen: 3, k: TOP_K.backbone } : null };
+  },
+};
+export const LINK_FLEET_INTENSITY = 42;
 
 /**
  * Opening intensities sized for each fixture's top hardware, as the offset start gives a player who
@@ -84,6 +102,8 @@ export const FLEETS = {
   fleetMax: (): GameState => fresh(warmFleetMax ??= advanceGameOwned(
     primeMarket(provisionInfrastructure(buildState(MAX_FLEET)), FLEET_MARKET_INTENSITY), FLEET_WARMUP_TICKS * TICK_MS,
   ).state),
+  /** MAX_LINK_FLEET from a cold start (informational stress case; no warm-up). */
+  fleetMaxLinks: (): GameState => primeMarket(provisionInfrastructure(buildState(MAX_LINK_FLEET)), LINK_FLEET_INTENSITY),
   /** Undersized PDUs and coolers, so supplies cycle and racks crash. */
   fleetMaxHot: (): GameState => primeMarket(buildState({
     ...MAX_FLEET,

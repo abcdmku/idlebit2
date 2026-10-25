@@ -1,8 +1,10 @@
 // Room snapshots for the harness and tests, derived from the contract fixture. Port transfers
 // advance with `timeMs` so packets move in the harness; nothing here runs the sim.
 import { LEVEL_FIXTURES } from '../../../game/fixtures';
+import { FAM, flowAt, queueOf } from '../rack/flowFixtures';
+import type { FlowCase } from '../rack/flowFixtures';
 import { UNIT_MODES, rackId, roomId } from '../../../game';
-import type { CoolTech, PortView, RackSlotView, RoomSnapshot, SupplyView, UnitMode } from '../../../game';
+import type { CoolTech, LbView, PortView, RackSlotView, RoomSnapshot, SupplyView, UnitMode } from '../../../game';
 
 type Mutable<T> = { -readonly [K in keyof T]: T[K] };
 const BASE = LEVEL_FIXTURES.room;
@@ -13,6 +15,8 @@ export interface RoomCase {
   gen?: number; duty?: number; crashed?: boolean; crashS?: number; dark?: boolean; upsGen?: number; upsUsage?: number;
   overloadS?: number; active?: readonly number[]; uplink?: boolean; rackTempF?: number; strategy?: RoomSnapshot['network']['lb']['strategy'];
   routed?: number; servers?: number; id?: number;
+  /** D25: shard flows (`to` = the rack of a room slot) and the LB queue. */
+  flows?: readonly FlowCase[]; queue?: LbView['queue'];
 }
 const supply = (u: SupplyView, o: RoomCase): SupplyView => ({
   ...u, generation: o.upsGen ?? 1, level: 2, usage: o.upsUsage ?? 0.27, deliveredW: u.capacityW * (o.upsUsage ?? 0.27),
@@ -46,13 +50,27 @@ export function roomCase(o: RoomCase, timeMs: number): RoomSnapshot {
     ups: [supply(BASE.ups[0], o)],
     network: {
       switch: { ...BASE.network.switch, generation: 1, ports, uplinks: [port(null, !!o.uplink, (t * 0.4) % 1)] },
-      lb: { ...BASE.network.lb, strategy: o.strategy ?? 'leastConn', routedPerSec: o.routed ?? 4 },
+      lb: { ...BASE.network.lb, strategy: o.strategy ?? 'leastConn', routedPerSec: o.routed ?? 4, queue: o.queue ?? BASE.network.lb.queue },
     },
+    flows: (o.flows ?? []).map(f => flowAt(f, timeMs)),
     rows, maxRows: 3, racks,
   };
   return s;
 }
 
+const rack = (slot: number): FlowCase['to'] => ({ level: 'rack', id: rackId(slot) });
+/** A 6-shard Parallel task: three shards on rack uplinks in two rows, one on the zone link, two waiting;
+ * a Distributed task waiting behind it; an unsplit Compute task on its rack's uplink. */
+export const SPLIT_FLOWS: readonly FlowCase[] = [
+  { task: 51, family: FAM.parallel, shard: 0, shards: 6, link: 'rack', to: rack(0), phase: 0.7 },
+  { task: 51, family: FAM.parallel, shard: 1, shards: 6, link: 'rack', to: rack(2), phase: 0.5 },
+  { task: 51, family: FAM.parallel, shard: 2, shards: 6, link: 'rack', to: rack(9), phase: 0.3 },
+  { task: 51, family: FAM.parallel, shard: 3, shards: 6, link: 'zone', to: rack(3), phase: 0.4 },
+  { task: 51, family: FAM.parallel, shard: 4, shards: 6, link: 'zone', to: rack(8), state: 'waiting' },
+  { task: 51, family: FAM.parallel, shard: 5, shards: 6, link: 'zone', to: rack(1), state: 'waiting' },
+  { task: 52, family: FAM.cluster, shard: 0, shards: 2, link: 'zone', to: rack(1), state: 'waiting' },
+  { task: 53, family: FAM.compute, shard: 0, shards: 1, link: 'rack', to: rack(3), phase: 0.15 },
+];
 const ALL24 = Array.from({ length: 24 }, (_, i) => i);
 export const CASES: Readonly<Record<string, (timeMs: number) => RoomSnapshot>> = {
   overview: t => roomCase({}, t),
@@ -66,4 +84,6 @@ export const CASES: Readonly<Record<string, (timeMs: number) => RoomSnapshot>> =
   azB: t => roomCase({ zone: 1, zones: [0, 1, null], built: [0, 1, 2] }, t),
   empty: t => roomCase({ built: [] }, t),
   paused: t => roomCase({}, t),
+  flows: t => roomCase({ active: [0, 1, 2, 3, 4], uplink: true, flows: SPLIT_FLOWS, queue: queueOf(8, [FAM.memory, FAM.cluster, FAM.parallel]) }, t),
+  queue32: t => roomCase({ rows: 3, built: ALL24, queue: queueOf(32, Array.from({ length: 27 }, (_, i) => [FAM.cluster, FAM.parallel, FAM.accel][i % 3])) }, t),
 };

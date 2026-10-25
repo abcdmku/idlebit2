@@ -12,6 +12,8 @@ export interface AccelChoice {
   readonly domain: number;
   readonly take: number;
   readonly opsPerS: number;
+  /** VRAM each task holds on the card; below the need when it overflows (unifiedMemory, D26.4). */
+  readonly held: number;
 }
 /** One enabled physical device or the linked GPU pool. Rates remain paired with capacity. */
 export interface AccelDomain {
@@ -68,24 +70,33 @@ export function accelGate(c: CompiledBuffers, sys: number, need: AccelNeed): num
     hardware = true;
     if (d.gpuCores < need.gpuCores) continue;
     cores = true;
-    if (d.vramBits >= need.vramBits) return ACCEL_GATE.ok;
+    // D26.4: with unifiedMemory the need may overflow into the system's RAM and disk.
+    if (d.vramBits + c.sys.unifiedBits[sys]! >= need.vramBits) return ACCEL_GATE.ok;
   }
   return !hardware ? ACCEL_GATE.gpu : !cores ? ACCEL_GATE.gpuCores : ACCEL_GATE.vram;
 }
 
-/** Largest compatible uncontended rate wins; equal rates retain physical/domain order. */
-export function chooseAccel(c: CompiledBuffers, hot: HotBuffers | null, sys: number, need: AccelNeed, maxTake: number): AccelChoice | null {
+/**
+ * Largest compatible uncontended rate wins; equal rates retain physical/domain order. `spillRoom`
+ * (unifiedMemory, D26.4): bits outside VRAM one task's overflow may take; a task that overflows starts alone.
+ */
+export function chooseAccel(c: CompiledBuffers, hot: HotBuffers | null, sys: number, need: AccelNeed, maxTake: number, spillRoom = 0): AccelChoice | null {
   if (!(maxTake >= 1)) return null;
-  if (!need.required) return { domain: -1, take: Math.floor(maxTake), opsPerS: 0 };
+  if (!need.required) return { domain: -1, take: Math.floor(maxTake), opsPerS: 0, held: 0 };
   let best: AccelChoice | null = null;
   for (let domain = 0; domain < ACCEL_DOMAINS; domain += 1) {
     const d = readAccelDomain(c, sys, domain);
-    if (!d || !permitted(d, need) || d.gpuCores < need.gpuCores || d.vramBits < need.vramBits) continue;
-    const free = d.vramBits - (hot?.sys.accelUsedVram[sys * ACCEL_DOMAINS + domain] ?? 0);
-    const take = Math.min(Math.floor(maxTake), need.vramBits > 0 ? Math.floor(free / need.vramBits) : Math.floor(maxTake));
-    if (take < 1) continue;
+    if (!d || !permitted(d, need) || d.gpuCores < need.gpuCores || d.vramBits + c.sys.unifiedBits[sys]! < need.vramBits) continue;
+    const free = Math.max(0, d.vramBits - (hot?.sys.accelUsedVram[sys * ACCEL_DOMAINS + domain] ?? 0));
+    let take = Math.min(Math.floor(maxTake), need.vramBits > 0 ? Math.floor(free / need.vramBits) : Math.floor(maxTake));
+    let held = need.vramBits;
+    if (take < 1) {
+      // Without the rule spillRoom is 0: VRAM stays a hard gate.
+      if (!(spillRoom > 0) || free + spillRoom < need.vramBits) continue;
+      take = 1; held = free;
+    }
     const opsPerS = rateFor(d, need);
-    if (!best || opsPerS > best.opsPerS) best = { domain, take, opsPerS };
+    if (!best || opsPerS > best.opsPerS) best = { domain, take, opsPerS, held };
   }
   return best;
 }

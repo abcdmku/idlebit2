@@ -46,7 +46,7 @@ function emptyReport(): AdvanceReport {
 export function isQuiescent(w: World): boolean {
   if (w.round.phase === 'running') return false;
   if (w.research.active !== null && !w.research.stoppedInsolvent) return false;
-  if (w.hot.g[G.recUsed] !== 0 || w.hot.g[G.gangUsed] !== 0) return false;
+  if (w.hot.g[G.recUsed] !== 0 || w.hot.g[G.parentUsed] !== 0 || w.hot.g[G.rqTotal] !== 0) return false;
   if (timersPending(w)) return false;
   return physSettled(w);
 }
@@ -114,3 +114,6 @@ function advance(state: GameState, elapsedMs: number, owned: boolean, options: A
  * so it can go to advanceGameOwned while `state` stays live.
  */
 export const copyGameState = (state: GameState): GameState => ({ ...state, hot: cloneHot(state.hot) });
+
+/** An owned offline session never inherits the live view's completion/failure observer. */
+export const copyOfflineState = (state: GameState): GameState => ({ ...state, hot: cloneHot(state.hot, false) });

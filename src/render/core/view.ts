@@ -3,24 +3,28 @@
 // tests in CSS px and reports the zoom so the UI can drop the partner when it ends.
 // One bad frame never stops the loop: every level call is guarded and reported once.
 import { MAX_EXTRAPOLATION_MS } from './activity';
-import { camera, camFromTop, lerpCam, projectRect, restFor, toScreen, toWorld } from './camera';
+import { camera, camFromTop, gutters, lerpCam, projectRect, restFor, toScreen, toWorld } from './camera';
 import type { Camera, PixelRatio, RestFraming, WorldForm } from './camera';
 import { ZoomChain } from './chain';
 import { createEffectPool } from './fx';
 import { loadCanvasFont } from './fonts';
 import { copyRect, contains, rect } from './geom';
 import { arbitrateHit } from './hit';
-import { DESKTOP_TYPE, LabelBuffer, PHONE_TYPE, drawLabels } from './labels';
+import { DESKTOP_TYPE, LabelBuffer, PHONE_TYPE, drawLabels, typeForScale } from './labels';
 import { BG, P } from './palette';
 import { zoomPath } from './paths';
 import { drawPipe } from './pipe';
+import { Feedback } from './feedback';
+import { frameRest, homeBelow, restPan } from './restPan';
+import { drawZoomLayer } from './zoomLayer';
+import type { ZoomLayer } from './zoomLayer';
 import { brackets, setReducedMotion } from './px';
 import { depth } from './registry';
 import { clearSpriteCache, context2d } from './sprites';
 import { ZoomTransition } from './transition';
 import { copyHitTarget, createHitTarget, idOf, isRef, refKey, refOf, resetHitTarget } from './types';
 import type { CanvasRendererDebug, ChildView, FrameClock, HitTarget, LevelId, LevelRegistry, LevelSnapshot,
-  Rect, RenderSnapshot, TransitionInfo, ViewPresentation, WorldFrame } from './types';
+  Rect, RenderSnapshot, RestArea, TransitionInfo, ViewPresentation, WorldFrame } from './types';
 import { drawVeil } from './unit';
 
 export const MAX_CHILDREN = 32, MAX_TARGETS = 128, MAX_FAULTS = 16;
@@ -28,18 +32,14 @@ const CHILD_IDS = Array.from({ length: MAX_CHILDREN }, (_, i) => `child${i}`);
 interface WorldBuffer { canvas: HTMLCanvasElement; g: CanvasRenderingContext2D; size: Rect }
 type MutableFrame = { -readonly [K in keyof WorldFrame]: WorldFrame[K] };
 
-const reported = new Set<string>();
-/** Log a render failure once per place and message; the frame carries on. */
-export function reportRenderError(where: string, error: unknown): void {
-  const key = `${where}:${error instanceof Error ? error.message : String(error)}`;
-  if (reported.has(key)) return;
-  reported.add(key); console.error(`Render ${where} failed`, error);
-}
+import { reportRenderError } from './errors';
+export { reportRenderError } from './errors';
 
 export function createCanvasRenderer(canvas: HTMLCanvasElement, registry: LevelRegistry): CanvasRendererDebug {
   const g = context2d(canvas), viewport = rect(), ratio: PixelRatio = { x: 1, y: 1 };
   const cam = camera(), targetCam = camera(), oldTarget = camera(), framingFrom = camera(), localCam = camera();
-  const focusRect = rect(), visible = rect(), entry = { x: 0, y: 0 }, corner = { x: 0, y: 0 }, scratch = rect(), hitOut = createHitTarget(), zoom = new ZoomTransition(), effects = createEffectPool(1);
+  const focusRect = rect(), visible = rect(), entry = { x: 0, y: 0 }, corner = { x: 0, y: 0 }, scratch = rect(), hitOut = createHitTarget(), zoom = new ZoomTransition(), effects = createEffectPool(1), fb = new Feedback(), popClip = rect();
+  const area: { w: number; h: number; scale: number } = { w: 0, h: 0, scale: 1 };
   const chain = new ZoomChain(), labels = new LabelBuffer();
   const buffers = new Map<LevelId, WorldBuffer>();
   const children: ChildView[] = Array.from({ length: MAX_CHILDREN }, () => ({ ref: { level: 'chip', id: 0 } as ChildView['ref'], rect: rect() }));
@@ -47,7 +47,7 @@ export function createCanvasRenderer(canvas: HTMLCanvasElement, registry: LevelR
   const faults: Rect[] = Array.from({ length: MAX_FAULTS }, () => rect());
   let snapshot: RenderSnapshot | null = null, view: ViewPresentation | null = null, frame: MutableFrame | null = null;
   let parentIsFocus = false, framing: RestFraming | null = null, form: WorldForm = 'desktop';
-  let curLevel: LevelId | null = null, curId = -1, epoch = -1, lastSeq = 0, disposed = false, pausedAt: number | null = null;
+  let hint: ReturnType<typeof refOf> | null = null, curLevel: LevelId | null = null, curId = -1, epoch = -1, partsFor: LevelSnapshot | null = null, disposed = false, pausedAt: number | null = null;
   let framingStart = -Infinity, lastNow = 0, held: number | null = null, info: (TransitionInfo & { progress: number }) | null = null;
   let measured = { w: 0, h: 0, dpr: 0 };
   let fontReady = !canvas.ownerDocument.fonts, lastClock: FrameClock | null = null;
@@ -120,7 +120,7 @@ export function createCanvasRenderer(canvas: HTMLCanvasElement, registry: LevelR
     const focus = s.focus, id = idOf(focus);
     if (curLevel === focus.level && curId === id) return;
     const prev = curLevel === null ? null : { level: curLevel, id: curId } as ReturnType<typeof refOf>;
-    curLevel = focus.level; curId = id; endZoom(nowS);
+    hint = prev; curLevel = focus.level; curId = id; endZoom(nowS); fb.leaveWorld(); restPan.reset();
     if (!prev || !s.partner || !isRef(s.partner, prev)) { chain.reset(); return; }
     const path = zoomPath(registry, s.partner, focus, viewport, children, form);
     if (!path) { chain.reset(); return; }
@@ -143,16 +143,26 @@ export function createCanvasRenderer(canvas: HTMLCanvasElement, registry: LevelR
       return null;
     } catch (error) { reportRenderError(`${s.level} entry`, error); return null; }
   }
+  /** The free world at rest (A05): the view below the strip minus the gutters, at the shell's N. */
+  function restArea(): RestArea | undefined {
+    if (!framing) return undefined;
+    const gt = gutters(viewport, framing);
+    area.w = viewport.w - gt.left - gt.right; area.h = viewport.h - framing.top - gt.top - gt.bottom; area.scale = framing.scale;
+    return area;
+  }
   function drawRest(s: LevelSnapshot, nowS: number): void {
-    level(s).focus(s, viewport, focusRect, form);
+    const ra = restArea();
+    level(s).focus(s, viewport, focusRect, form, ra);
+    if (framing && ra) frameRest(level(s), s, focusRect, viewport, framing, ra, hint ?? homeBelow(snapshot!, s), reportRenderError);
     const e = entryOf(s);
     restFor(focusRect, viewport, ratio, framing, targetCam, level(s).cameraScaleStep?.(s), e ? { x: e.x, y: e.y } : null);
     if (framingStart === -Infinity) { Object.assign(cam, targetCam); Object.assign(oldTarget, targetCam); framingStart = nowS - 1; }
     else if (targetCam.cx !== oldTarget.cx || targetCam.cy !== oldTarget.cy || targetCam.s !== oldTarget.s) {
       Object.assign(framingFrom, cam); Object.assign(oldTarget, targetCam); framingStart = nowS;
     }
-    const follow = !!level(s).followFocus?.(s);
-    const u = view!.reducedMotion || follow ? 1 : Math.min(1, (nowS - framingStart) / 0.25);
+    const follow = !!level(s).followFocus?.(s) || restPan.dragging, easeS = restPan.active ? 0.15 : level(s).restEaseS?.(s) ?? 0.25;
+    const u = view!.reducedMotion || follow ? 1 : Math.min(1, (nowS - framingStart) / easeS);
+    frame!.scale = Math.max(1, Math.round(targetCam.s / ratio.x));
     if (u >= 1) Object.assign(cam, targetCam); else lerpCam(framingFrom, targetCam, u, cam);
     toWorld(cam, viewport, ratio, viewport.x, viewport.y + (framing?.top ?? 0), corner); visible.x = corner.x; visible.y = corner.y;
     toWorld(cam, viewport, ratio, viewport.x + viewport.w, viewport.y + viewport.h, corner);
@@ -160,10 +170,16 @@ export function createCanvasRenderer(canvas: HTMLCanvasElement, registry: LevelR
     fill(s.level, 1); blit(s, cam, 1, true);
     const lv = level(s), type = form === 'phone' ? PHONE_TYPE : DESKTOP_TYPE;
     if (lv.labels) {
+      const worldType = typeForScale(frame!.scale ?? framing?.scale ?? 3);
       labels.clear();
-      try { lv.labels(s, view!, frame!, labels); drawLabels(g, labels, cam, viewport, ratio, type); }
+      try { lv.labels(s, view!, frame!, labels); drawLabels(g, labels, cam, viewport, ratio, form === 'phone' ? PHONE_TYPE : worldType); }
       catch (error) { reportRenderError(`${s.level} labels`, error); }
     }
+    if (lv.partVersion && s !== partsFor) {
+      partsFor = s;
+      try { fb.parts(s, lv, targets, fillTargets(s), nowS); } catch (error) { reportRenderError(`${s.level} partVersion`, error); }
+    }
+    fb.drawFlash(g, nowS, cam, viewport, ratio);
     if (!framing?.pipe) return;
     const at = entryOf(s) ?? { x: focusRect.x + focusRect.w / 2, y: focusRect.y };
     toScreen(cam, viewport, ratio, at.x, at.y, corner);
@@ -175,8 +191,9 @@ export function createCanvasRenderer(canvas: HTMLCanvasElement, registry: LevelR
     const snaps = parentIsFocus ? [s.focus, partner] : [partner, s.focus];
     if (view!.reducedMotion) {
       const a = zoom.fromIndex, b = zoom.toIndex, u = zoom.state.progress;
-      fill(snaps[a].level, 1); blit(snaps[a], zoom.rests[a], 1, false);
-      fill(snaps[b].level, u); blit(snaps[b], zoom.rests[b], u, false);
+      frame!.scale = Math.round(zoom.rests[a].s / ratio.x); fill(snaps[a].level, 1); blit(snaps[a], zoom.rests[a], 1, false);
+      frame!.scale = Math.round(zoom.rests[b].s / ratio.x); fill(snaps[b].level, u); blit(snaps[b], zoom.rests[b], u, false);
+      drawZoomLayer(layer(), s, snaps, view!, frame!);
       return true;
     }
     const start = zoom.fills[1] >= 0.999 ? 1 : 0;
@@ -185,8 +202,10 @@ export function createCanvasRenderer(canvas: HTMLCanvasElement, registry: LevelR
       if (i > start && zoom.alphas[i] <= 0.001) break;
       if (i > start && zoom.fills[i] > 0.001) fill(snaps[i].level, zoom.fills[i]);
       camFromTop(zoom.camera, zoom.maps[i], localCam);
+      frame!.scale = Math.round(zoom.rests[i].s / ratio.x);
       blit(snaps[i], localCam, i === start ? 1 : zoom.alphas[i], false);
     }
+    drawZoomLayer(layer(), s, snaps, view!, frame!);
     return true;
   }
   function drawFaults(s: LevelSnapshot): void {
@@ -196,34 +215,41 @@ export function createCanvasRenderer(canvas: HTMLCanvasElement, registry: LevelR
       projectRect(cam, viewport, ratio, faults[i], scratch); effects.smoke(i, scratch.x + scratch.w / 2, scratch.y);
     }
   }
-  /** One coin per new 'met' event whose system is visible in the focus world. */
-  function drawPayouts(s: RenderSnapshot): void {
-    const lv = level(s.focus);
-    if (!lv.unitAnchor) return;
-    for (let i = 0; i < s.events.length; i++) {
-      const e = s.events[i];
-      if (e.seq <= lastSeq || e.kind !== 'met' || e.system === null || !lv.unitAnchor(s.focus, e.system, scratch)) continue;
-      projectRect(cam, viewport, ratio, scratch, scratch); effects.coin(e.seq, scratch.x + scratch.w / 2, scratch.y);
+  let zoomLayer: ZoomLayer | null = null;
+  function layer(): ZoomLayer {
+    if (!zoomLayer || zoomLayer.framing !== framing || zoomLayer.form !== form) {
+      zoomLayer = { g, zoom, vp: viewport, ratio, framing, form, labels, level, report: reportRenderError };
     }
+    return zoomLayer;
+  }
+  function drawPops(): void {
+    const n = frame!.scale ?? Math.max(1, Math.round(cam.s / ratio.x)), top = framing?.top ?? 0;
+    popClip.x = viewport.x; popClip.y = viewport.y + top; popClip.w = viewport.w; popClip.h = viewport.h - top;
+    fb.drawPops(g, frame!.timeMs, cam, viewport, ratio, form === 'phone' ? PHONE_TYPE : typeForScale(n), n, popClip, view!.reducedMotion);
   }
   function drawFrame(next: RenderSnapshot, nextView: ViewPresentation, clock: FrameClock): void {
-    if (epoch !== next.epoch) { epoch = next.epoch; lastSeq = next.lastSeq; effects.clear(); endZoom(clock.nowS); chain.reset(); curLevel = null; pausedAt = null; }
+    if (epoch !== next.epoch) {
+      // A load or reset: its completions and failures are history, consumed without drawing.
+      epoch = next.epoch; effects.clear(); fb.reset(next); partsFor = null;
+      endZoom(clock.nowS); chain.reset(); curLevel = null; pausedAt = null;
+    }
     const paused = next.round.state !== 'running';
     const live = next.simTimeMs + Math.max(0, Math.min(MAX_EXTRAPOLATION_MS, clock.sincePublishMs));
     if (!paused) pausedAt = null; else pausedAt ??= live;
     frame ??= { snapshot: next, timeMs: 0, paused, reducedMotion: false, zoom: null, form, visible: null };
     frame.snapshot = next; frame.timeMs = paused ? pausedAt! : live; frame.paused = paused;
-    frame.reducedMotion = nextView.reducedMotion; frame.zoom = null; frame.form = form; frame.visible = null;
+    frame.reducedMotion = nextView.reducedMotion; frame.zoom = null; frame.form = form; frame.visible = null; frame.scale = framing?.scale;
     navigate(next, clock.nowS);
     g.setTransform(1, 0, 0, 1, 0, 0); g.globalAlpha = 1;
     g.clearRect(viewport.x * ratio.x, viewport.y * ratio.y, viewport.w * ratio.x, viewport.h * ratio.y);
     if (zoom.active) {
       zoom.sample(clock.nowS, nextView.reducedMotion); frame.zoom = zoom.state; info!.progress = zoom.state.progress;
       if (!drawZoom(next) || zoom.finished) endZoom(clock.nowS);
-      else if (framing?.pipe) drawPipe(g, next, frame.timeMs, frame.paused, framing, viewport, ratio, null, PHONE_TYPE);
     }
-    if (!zoom.active) { drawRest(next.focus, clock.nowS); drawFaults(next.focus); if (!paused) drawPayouts(next); }
-    lastSeq = Math.max(lastSeq, next.lastSeq);
+    try { fb.take(next, level(next.focus), form, frame.timeMs, clock.nowS, !zoom.active && !paused); }
+    catch (error) { reportRenderError(`${next.focus.level} payoutAnchor`, error); }
+    if (!zoom.active) { drawRest(next.focus, clock.nowS); drawFaults(next.focus); if (!paused) drawPops(); }
+    if (framing) fb.drawFailure(g, clock.nowS, framing, viewport, ratio);
     if (paused) { g.save(); g.translate(viewport.x * ratio.x, viewport.y * ratio.y); drawVeil(g, viewport.w * ratio.x, viewport.h * ratio.y); g.restore(); }
     effects.update(Math.max(0, clock.nowS - lastNow)); lastNow = clock.nowS;
     g.setTransform(ratio.x, 0, 0, ratio.y, 0, 0);

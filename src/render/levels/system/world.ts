@@ -1,7 +1,6 @@
 // System world (mockup v3 levels/system.js draw + core/power.js board PSU). Prices live in the
 // callout, tray and plates; the world shows parts and state. While the round is not running there
 // is no activity: only the steady PSU meter and the online lamp remain.
-import { FAMILIES, POOL_DOMAIN } from '../../../game';
 import type { QuoteResult, SystemSnapshot, TaskView } from '../../../game';
 import { BG, P, R, darkFx, drawGhost, drawSaveIcon, drawUnitLamp, glowBit, lampState, pathAt, upArrow, upArrowFill } from '../../core';
 import type { GhostState, LevelRegistry, Point, Rect, ViewPresentation, WorldFrame } from '../../core';
@@ -10,15 +9,15 @@ import { drawLeaders, firstRow } from './labels';
 import { CABLE_X, LAMP, PORT, POWERED, PSU, SAVE, packageRect, siteCentre, siteRect, worldRect } from './layout';
 import type { SiteType } from './layout';
 import { boardModel, pickedType } from './model';
+import { drawGpuSpill, drawReadLights, drawTiers } from './memory';
 import type { BoardModel, Site } from './model';
+import { drawGpuPiece, drawInbound, inboundOf } from './shards';
 import { drawCable, drawCpuSocket, drawDrivePart, drawEmptySite, drawGpuPart, drawPackageBody, drawPackageFront, drawPort, drawPsu,
   drawRamPart, drawSiteLocked } from './sprites';
 
 type G = CanvasRenderingContext2D;
 /** The boot / cold-change drain the lamp shows, at base (Fast boot shortens the real timer). */
 export const BOOT_MS = 10_000;
-/** A transfer shorter than this shows no travelling packet (D12.4). */
-export const MIN_VISIBLE_TRANSFER_S = 0.25;
 
 /** Modes in which the board is powered and can work. */
 export function powered(s: SystemSnapshot): boolean {
@@ -26,7 +25,6 @@ export function powered(s: SystemSnapshot): boolean {
 }
 const world: Rect = { x: 0, y: 0, w: 0, h: 0 }, pkg: Rect = { x: 0, y: 0, w: 0, h: 0 }, hit: Rect = { x: 0, y: 0, w: 0, h: 0 };
 const at: Point = { x: 0, y: 0 }, c0 = { x: 0, y: 0 }, c1 = { x: 0, y: 0 };
-const link: [number, number][] = [[CABLE_X, -2], [CABLE_X, PORT.y - PORT.z], [CABLE_X, 0]];
 const stage: [number, number][] = [[0, 0], [0, 0], [0, 0]];
 
 function quoteState(quotes: QuoteResult | null, type: SiteType): GhostState {
@@ -53,7 +51,7 @@ export function drawBoard(g: G, s: SystemSnapshot, view: ViewPresentation, frame
   worldRect(frame.form, world);
   R(g, world.x, world.y, world.w, world.h, BG.system);
   g.drawImage(boardStatic(s.board), 0, 0);
-  const transfer = live ? s.chip.pipe.transfer : null;
+  const transfer = live ? inboundOf(s) : null;
   drawCable(g, CABLE_X, 0, PORT.y - PORT.z + 2, !!transfer);
   const stageOn = activeStages(s, live);
   for (const site of m.sites) {
@@ -70,13 +68,11 @@ export function drawBoard(g: G, s: SystemSnapshot, view: ViewPresentation, frame
     for (const site of m.sites) if (site.type === pick && site.state === 'open') { siteRect(b, site.type, site.index, hit); drawGhost(g, hit.x, hit.y, hit.w, hit.h, state); }
   }
   drawPort(g, PORT, !!transfer);
-  if (transfer && transfer.bits > 0 && transfer.speed > 0 && transfer.bits / transfer.speed >= MIN_VISIBLE_TRANSFER_S) {
-    const sent = transfer.bitsSent + transfer.speed * Math.max(0, frame.timeMs - frame.snapshot.simTimeMs) / 1000;
-    link[2][1] = b.sites.cpu[0]!.y + 4;
-    pathAt(link, Math.min(1, Math.max(0, sent / transfer.bits)), at);
-    glowBit(g, at.x, at.y, transfer.bits, P.bit);
-  }
-  if (live) for (const t of s.running) drawStageBit(g, m, t);
+  // D25: the port's shard rides in at its real progress, in its task type's colour.
+  if (transfer) drawInbound(g, transfer, b, frame);
+  // D26: each tier fills its parts (spill hatched), and the tier a shard reads from now shows its light.
+  drawTiers(g, s, m, live); drawGpuSpill(g, m, live); drawReadLights(g, s, m, frame.timeMs, live);
+  if (live) for (const t of s.running) { drawStageBit(g, m, t); drawGpuPiece(g, m, t); }
   if (live) {
     const credits = Number(frame.snapshot.hud?.credits ?? 0);
     for (const site of m.sites) {
@@ -103,7 +99,7 @@ export function drawBoard(g: G, s: SystemSnapshot, view: ViewPresentation, frame
 const stages = new Set<SiteType>();
 function activeStages(s: SystemSnapshot, live: boolean): Set<SiteType> {
   stages.clear();
-  if (live) for (const t of s.running) { const k = KIND_OF[t.resource]; if (k) stages.add(k); }
+  if (live) for (const t of s.running) { const k = stageKind(t); if (k) stages.add(k); }
   return stages;
 }
 function drawCpu(g: G, s: SystemSnapshot, site: Site, live: boolean, frame: WorldFrame, registry: LevelRegistry): void {
@@ -115,22 +111,21 @@ function drawCpu(g: G, s: SystemSnapshot, site: Site, live: boolean, frame: Worl
   drawPackageFront(g, pkg);
 }
 
-const KIND_OF: Readonly<Partial<Record<TaskView['resource'], 'ram' | 'gpu' | 'drive'>>> = { ram: 'ram', gpu: 'gpu', io: 'drive' };
-const COLOUR: Readonly<Record<'ram' | 'gpu' | 'drive', string>> = { ram: P.ram, gpu: P.gpu, drive: P.stor };
-/** A RAM, GPU or IO stage runs out from CPU 1 to the part serving it, at the stage's real progress. */
+/** The part a stage runs on: a D26 `mem` part on its tier (RAM sticks or drives; cache has none), or the GPU. */
+function stageKind(t: TaskView): 'ram' | 'gpu' | 'drive' | undefined {
+  if (t.resource === 'gpu') return 'gpu';
+  if (t.resource !== 'mem') return undefined;
+  return t.memTier === 'ram' ? 'ram' : t.memTier === 'disk' ? 'drive' : undefined;
+}
+const COLOUR: Readonly<Record<'ram' | 'drive', string>> = { ram: P.ram, drive: P.stor };
+/**
+ * A RAM or IO stage runs out from CPU 1 to the part serving it, at the stage's real progress. A GPU
+ * stage is drawn as the shard's piece on its card instead (shards.ts `drawGpuPiece`).
+ */
 export function drawStageBit(g: G, m: BoardModel, t: TaskView): void {
-  const type = KIND_OF[t.resource];
-  if (!type) return;
+  const type = stageKind(t);
+  if (!type || type === 'gpu') return;
   const list = m.installed[type];
-  if (type === 'gpu') {
-    // A linked stage fans out only to GPUs. NPUs never join the GPU pool.
-    if (t.accelDomain === POOL_DOMAIN) { for (const p of list) if (p.part?.kind === 'gpu') drawStagePath(g, m, p, t.progress, COLOUR.gpu); return; }
-    const site = list.find(p => p.index === t.accelDomain);
-    if (!site) return;
-    if (site.part?.kind === 'npu' && (!FAMILIES[t.family]?.tensor || t.gpuCoresMin > 0)) return;
-    drawStagePath(g, m, site, t.progress, site.part?.kind === 'npu' ? P.rnd : COLOUR.gpu);
-    return;
-  }
   let site: Site | null = null;
   for (const p of list) if (!site || p.part?.active) site = p;
   if (site) drawStagePath(g, m, site, t.progress, COLOUR[type]);

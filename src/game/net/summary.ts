@@ -96,7 +96,7 @@ function classTerms(w: World, r: number, C: number): void {
   if (gateDecision === memo.decision && gateEpoch === memo.epoch && memo.exact) return;
   gateDecision = memo.decision; gateEpoch = memo.epoch;
   if (classOk.length < C) { classOk = new Uint8Array(C * 2); classOwn = new Float64Array(C * 2); classKeff = new Float64Array(C * 2); }
-  const c = w.compiled, rec = w.hot.rec, family = rec.family[r]!, scale = rec.scale[r]!, def = FAMILIES[family]!;
+  const c = w.compiled, rec = w.hot.rec, family = rec.family[r]!, scale = rec.units[r]!, def = FAMILIES[family]!;
   const classes = classesOf(c);
   for (let i = 0; i < C; i += 1) {
     const cls = classes[i];

@@ -1,8 +1,9 @@
-import { G, GANG, LOC, RECORD, type HotBuffers } from './buffers';
+import { G, LOC, PARENT, RECORD, type HotBuffers } from './buffers';
 import { copyRow, growTable, resetRow } from './table';
+import { unlinkDeadline } from './deadlines';
 
 /**
- * Record and gang pools with free lists (architecture §1.4), and doubly linked list ops over
+ * Record and parent pools with free lists (architecture §1.4, D25), and doubly linked list ops over
  * rec.prev / rec.next. Only call on a World's cloned hot buffers.
  */
 
@@ -24,6 +25,7 @@ export function allocRecord(hot: HotBuffers): number {
 /** The record must already be unlinked from every list and have released its resource holds. */
 export function freeRecord(hot: HotBuffers, r: number): void {
   const rec = hot.rec;
+  if (rec.parent[r]! >= 0) dropSibling(hot, r);
   rec.loc[r] = LOC.free;
   rec.accelDomain[r] = -1;
   rec.count[r] = 0;
@@ -46,30 +48,55 @@ export function splitRecord(hot: HotBuffers, r: number, k: number): number {
   const rec = hot.rec;
   rec.count[r] = count - k;
   rec.count[s] = k;
+  // The extracted prefix keeps the oldest IDs; the remaining cohort starts after that prefix.
+  rec.taskId[r] = rec.taskId[r]! + k;
   rec.prev[s] = -1; rec.next[s] = -1;
   return s;
 }
 
-export function allocGang(hot: HotBuffers): number {
-  const gang = hot.gang;
-  let i = hot.g[G.gangFree]!;
+/** A parent row (D25) for a task split into several shards. Live rows have placed + pending > 0. */
+export function allocParent(hot: HotBuffers): number {
+  const p = hot.parent;
+  let i = hot.g[G.parentFree]!;
   if (i >= 0) {
-    hot.g[G.gangFree] = gang.next[i]!;
+    hot.g[G.parentFree] = p.next[i]!;
   } else {
-    if (gang.len >= gang.cap) growTable(GANG, gang, gang.len + 1);
-    i = gang.len;
-    gang.len += 1;
+    if (p.len >= p.cap) growTable(PARENT, p, p.len + 1);
+    i = p.len;
+    p.len += 1;
   }
-  resetRow(GANG, gang, i);
-  hot.g[G.gangUsed] = hot.g[G.gangUsed]! + 1;
+  resetRow(PARENT, p, i);
+  hot.g[G.parentUsed] = hot.g[G.parentUsed]! + 1;
   return i;
 }
 
-export function freeGang(hot: HotBuffers, i: number): void {
-  hot.gang.members[i] = 0;
-  hot.gang.next[i] = hot.g[G.gangFree]!;
-  hot.g[G.gangFree] = i;
-  hot.g[G.gangUsed] = hot.g[G.gangUsed]! - 1;
+/** Frees parent row i; its records must already be gone (their sib links are not followed). */
+export function freeParent(hot: HotBuffers, i: number): void {
+  const p = hot.parent;
+  unlinkDeadline(hot, i);
+  p.deadline[i] = -1; p.tier[i] = 0; p.ramBits[i] = 0; p.diskBits[i] = 0;
+  p.placed[i] = 0; p.pending[i] = 0; p.done[i] = 0; p.head[i] = -1;
+  p.next[i] = hot.g[G.parentFree]!;
+  hot.g[G.parentFree] = i;
+  hot.g[G.parentUsed] = hot.g[G.parentUsed]! - 1;
+}
+
+/** Links record r into parent p's sibling list (rec.sib), at the front. */
+export function addSibling(hot: HotBuffers, p: number, r: number): void {
+  hot.rec.parent[r] = p;
+  hot.rec.sib[r] = hot.parent.head[p]!;
+  hot.parent.head[p] = r;
+}
+
+/** Unlinks record r from its parent's sibling list (at most 256 siblings). */
+export function dropSibling(hot: HotBuffers, r: number): void {
+  const p = hot.rec.parent[r]!;
+  if (p < 0) return;
+  const rec = hot.rec;
+  if (hot.parent.head[p] === r) hot.parent.head[p] = rec.sib[r]!;
+  else for (let q = hot.parent.head[p]!; q >= 0; q = rec.sib[q]!) if (rec.sib[q] === r) { rec.sib[q] = rec.sib[r]!; break; }
+  rec.sib[r] = -1;
+  rec.parent[r] = -1;
 }
 
 /* ---------- lists ---------- */

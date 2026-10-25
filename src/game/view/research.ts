@@ -8,6 +8,7 @@ import type { ResearchBadge } from '../types/snapshot';
 import type { GameState, ResearchState } from '../types/state';
 import type { ResearchNodeState, ResearchNodeView, ResearchTreeView } from '../types/views';
 import { researchCreditsPerMinute, researchLenders } from './lenders';
+import { answerTypes } from '../market/taskTypes';
 
 /** Research ops this tick, scaled to a second (exec tallies them in G.researchOps). */
 export const researchOpsPerSec = (state: GameState): number => (state.hot.g[G.researchOps] ?? 0) * TICKS_PER_SECOND;
@@ -66,7 +67,7 @@ export function researchTree(state: GameState): ResearchTreeView {
       lockedBy: st === 'locked' ? (def.requires.find((p) => !done.has(p)) ?? null) : null,
       level: def.level, era: def.era, tier: def.tier,
       needsData: st === 'queued' && amountCompare(cost, state.wallet.data) > 0,
-      effect: effectText(def.id), summary: def.summary,
+      effect: effectText(def.id), summary: def.summary, answers: answerTypes(def.answers),
     });
   }
   const slots = r.unlocks.ceilings.researchQueue;

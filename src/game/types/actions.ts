@@ -1,5 +1,5 @@
 import type { BoardKind } from './build';
-import type { FilterId, PlacementId, QueueStrategyId, RouteStrategyId } from './catalog';
+import type { FilterId, QueueStrategyId, RouteStrategyId } from './catalog';
 import type { PartRef, RackId, ResearchId, RoomId, ScopeRef, SwitchRef, SystemId, UnitKind, UnitRef } from './ids';
 import type { ResearchMode, GameState, TaskRef } from './state';
 import type { GpuModelId } from './gpu';
@@ -43,8 +43,8 @@ export type GameAction =
   | { readonly type: 'addUplink'; readonly sw: SwitchRef }
   | { readonly type: 'setStrategy'; readonly unit: ScopeRef; readonly strategy: QueueStrategyId | RouteStrategyId }
   | { readonly type: 'setFilter'; readonly unit: ScopeRef; readonly filter: FilterId; readonly on: boolean }
-  | { readonly type: 'setPlacement'; readonly unit: ScopeRef; readonly mode: PlacementId; readonly on: boolean }
-  | { readonly type: 'setReserveOnRoute'; readonly unit: ScopeRef; readonly on: boolean }
+  /** D25.7: one more router queue slot (L → L + 1, at most 32). Hot. */
+  | { readonly type: 'upgradeRouterQueue'; readonly unit: ScopeRef }
   | { readonly type: 'setSetpoint'; readonly unit: { readonly kind: 'rack'; readonly id: RackId } | { readonly kind: 'room'; readonly id: RoomId }; readonly setpointF: number }
   | { readonly type: 'setPowerCap'; readonly part: PartRef; readonly on: boolean }
   | { readonly type: 'setSystemSetting'; readonly system: SystemId; readonly setting: 'dvfs' | 'turbo'; readonly on: boolean }

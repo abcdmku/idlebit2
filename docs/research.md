@@ -2,7 +2,7 @@
 
 Research designer, 24 October 2026. Inputs: `docs/decisions.md` (binding), IdleBit at `C:\Users\Borg\Documents\GitHub\IdleBit` (`src/game/content/research.ts`, `content/dispatcherJobs.ts`, `content/upgrades.ts`, the tier, cooling, accelerator, facility, cloud and automation definitions, `game-spec.md`, `FEATURES.md`), the v2 tree (the v2 spec §Research and Appendix A, and the v2 mockup research data, both in the BitRouge repository).
 
-The tree has 162 nodes in ten categories, including D12 Auto-skip. D15 removed Network speed: port steps open with the structure a link plugs into. The accepted GPU ruling adds nine generation nodes, separates tensor technology from generation unlocks, and adds exact Credit fees for generations 2 through 9. GPU campaign pacing remains unproved. Revision 2 applies the lead's decision log (program §15a, D1): FIFO first-fit load balancing, one shared boot time, VRAM per level, regional prices and outside air, a growing offline cap and cooling generations. Every number below is a starting value for the balance owner unless the program fixes it.
+The tree has 162 nodes in ten categories, including D12 Auto-skip. D26 (memory hierarchy) repurposed Virtual memory as Hot pages and added Unified memory. D25 (divisible tasks) turned the gang placements and queued take into split research and deleted Global gang; see §5.5. D15 removed Network speed: port steps open with the structure a link plugs into. The accepted GPU ruling adds nine generation nodes, separates tensor technology from generation unlocks, and adds exact Credit fees for generations 2 through 9. GPU campaign pacing remains unproved. Revision 2 applies the lead's decision log (program §15a, D1): FIFO first-fit load balancing, one shared boot time, VRAM per level, regional prices and outside air, a growing offline cap and cooling generations. Every number below is a starting value for the balance owner unless the program fixes it.
 
 ## 1. Rules the tree follows
 
@@ -14,8 +14,8 @@ Implementation status during the GPU wave: §5 and §9 are the accepted referenc
 4. **Strategies are chosen per unit and switching is hot.** Changing a strategy, filter or setpoint on a unit is instant and loses no work, in or between rounds.
 5. **Network nodes split into three kinds.**
    - Strategies: pick one per load balancer. First-fit is the free default; round robin, least connections, weighted, least work and bin packing are researched.
-   - Filters: toggles on a load balancer that remove candidates before the strategy picks. These are capability, health, power and thermal. A filter that would remove every candidate is skipped for that decision.
-   - Placement modes: how distributed tasks are placed. These are gang, topology-aware and zone-aware.
+   - Filters: toggles on a load balancer that remove candidates before the strategy picks. These are capability, health, power, thermal, region and local. A filter that would remove every candidate is skipped for that decision.
+   - Split rules (D25): how a router cuts a task into shards. The base is FIFO first-fit spread: equal shares to every child with room. Gather, shard stealing and cross-rack stealing are researched rules. Distributed tasks need no placement research: their `members` is a minimum split, gated by owning enough systems, zones and regions.
    A network strategy or filter, once researched, is available at every network scope the player has opened: rack load balancer, room load balancer, site data plane and backbone scheduler.
 6. **No income multipliers.** Every effect changes a rate, a capacity, a watt figure, a loss fraction, a time constant, a ceiling, a routing decision or a latency. Payouts are authored and never touched.
 7. **Every node answers something the player can see.** That is a market band entering the feed, or a failure cause in the round report.
@@ -29,10 +29,10 @@ Program D1.5 makes every network scope start as FIFO first-fit.
 | Market (D10) | An endless queue. Hardware takes the head when it has room; only the head has a 10 s clock. A head no hardware can run blocks the line. |
 | Pipe (D10, D15) | Every system receives tasks over its rack-switch port, a 1 kHz inbound pipe; transfer time = work / speed. It can't be upgraded until the Rack switch exists. |
 | System, no scheduler | One task at a time. On completion it takes the head, waits for its transfer, then runs it. |
-| Rack load balancer | FIFO first-fit. Each feed task goes to the first server, in slot order, that can admit it now. A server is full when it is busy with no scheduler or its queue is full; booting, crashed and offline servers count as full. Nothing else is checked: no gates, load or speed. A task that lands on a server it can't run fails as a misroute. If every server is full, the task waits in the feed and can expire. |
-| Room load balancer | First-fit over racks in slot order. A rack is full when its load balancer has no server that can admit. |
-| Site data plane | First-fit over zones. |
-| Global scheduler | The market enters at site 0, the gateway (D4.6). First-fit over sites; other sites are reached over their backbone link to the gateway. Region-blind. |
+| Rack load balancer | FIFO first-fit spread (D25.2). The head is split into equal whole-unit shards, one for every server, in slot order, that can admit now: at most 256 and never below the family's grain. A server is full when it is busy with no scheduler or its queue is full; booting, crashed and offline servers count as full. Nothing else is checked: no gates, load or speed. A shard that lands on a server it can't run misroutes and fails the whole task. If every server is full, the head goes into the LB queue (1 slot, upgradable to 32 with Credits); if that is full too, it waits in the market and can expire. |
+| Room load balancer | The same spread over racks in slot order; each rack splits its share over its servers. A rack has room when a server can admit or its LB queue has a free slot. |
+| Site data plane | The same spread over zones. |
+| Global scheduler | The market enters at site 0, the gateway (D4.6). The same spread over sites; other sites are reached over their backbone link to the gateway. Region-blind. |
 | Supplies | Loss fractions of generation 0 (§4.3). |
 | Coolers | Full duty, no setpoint. |
 | Boot time | 10 s, shared by every online/offline transition, post-failure reboot, mid-round add and cold change (D1.8). |
@@ -50,7 +50,7 @@ Band codes and families are `docs/tasks.md`'s (§4, §5). "I from" is the intens
 | `threads` | Multi-threaded compute | Hash Batch, LZ Compress, Monte Carlo | 10 | CPU | 0:07 |
 | `ram` | Working set beyond cache, RAM stream stages | JSON Parse, Merge Sort, SQL Join | 12.5 | System | 0:13 |
 | `gpu` | GPU core and VRAM gates | Thumbnail, Video Transcode, ML Inference | 15 | System | 1:22 |
-| `storage` | Storage capacity and IO | Log Ingest, Backup, Index Build | 16.5 | System | 1:22 |
+| `storage` | Data-heavy work: large working sets and many bits touched (D26) | Log Ingest, Backup, Index Build | 16.5 | System | 1:22 |
 | `rackDist` | Distributed, members fit in one rack | Replicated Write, MapReduce, Training Shard | 26 | Rack | 2:02 |
 | `roomDist` | Distributed across racks in one zone | TeraSort, Render Farm, Large Training | 32 | Room | 3:48 |
 | `multiAz` | Members in at least 2 zones | Active-Active DB, Quorum Write, Multi-hall Train | 41 | Data center | 6:08 |
@@ -132,7 +132,7 @@ Structure unlocks and fab generations cost 3× their tier, so each era jump is a
 | W8 | 4e6 | 1.2e7 | under an hour of Rack Data |
 | W9 | 1.5e7 | 4.5e7 | `fabMhz` at about 1 d 6 h |
 | W10 | 4e7 | 1.2e8 | `room` starts at about 2 d 8 h; **Room** opens at 3 d 2 h – 3 d 6 h (D19: 2–4 days) |
-| W11 | 6e7 | 1.8e8 | Room era: `fabGhz`, `gangRoom` |
+| W11 | 6e7 | 1.8e8 | Room era: `fabGhz`, `stealRoom` |
 | W12 | 2e8 | 6e8 | `dataCenter` (D19 zones: about 1–2 weeks) |
 | W13 | 4e8 | 1.2e9 | `regions` (D19: 2–4 weeks) |
 | W14 | 3e9 | 9e9 | `intercontinental` |
@@ -228,19 +228,19 @@ Columns: id, short name, prerequisites, the zoom level where it first matters, e
 | `fabKhz` | kHz fab | systemBoard, superscalar | System | kHz W6 | Gen 1 of core (2 base lanes), clock (1 kHz base), L1, L2, L3, scheduler and CPU package. Opens Barebones kHz. | Opens kHz chips and Barebones kHz | all bands, `energy` |
 | `fabMhz` | MHz fab | fabKhz, rack | Rack | MHz W9 | Gen 2 of every chip part. Opens Barebones MHz. | Opens MHz chips and Barebones MHz | all bands, `energy` |
 | `fabGhz` | GHz fab | fabMhz, room | Room | GHz W11 | Gen 3 of every chip part. Opens Barebones GHz. | Opens GHz chips and Barebones GHz | all bands, `energy` |
-| `l2Cache` | L2 cache | pipelining | CPU | Hz W2 | New chip part L2, shared by all cores. Capacity 8× an L1 of the same level, for 2× the watts. Adds to the cache total that gates `workingSet`. | Adds shared L2 cache, 8× L1 size | `ints`, `gate` |
+| `l2Cache` | L2 cache | pipelining | CPU | Hz W2 | New chip part L2, shared by all cores. Capacity 8× an L1 of the same level, for 2× the watts. Adds to the cache tier (D26): bits that fit cache cost no memory time, so bigger cache speeds RAM-heavy work and delays spill. | Adds shared L2 cache, 8× L1 size | `ints`, `gate` |
 | `l3Cache` | L3 cache | l2Cache, systemBoard | System | Hz W5 | New chip part L3, shared. Capacity 64× an L1 of the same level, for 6× the watts. | Adds shared L3 cache, 64× L1 size | `ints`, `ram` before RAM |
 | `smt` | SMT | timeSlice, octaCore | CPU | kHz W7 | Each core holds 2 running tasks. Scheduler K may reach 2× cores, still at most 32. Two tasks on one core each run at 0.6× the core's rate (1.2× combined). | Each core runs 2 tasks at once | `pickup` |
 | `dualSocket` | Dual socket | octaCore, rack | System | kHz W8 | CPU sockets 1→2. Every CPU in a system is identical: CPU 2 copies CPU 1's generation and levels, and an upgrade applies to all, priced × CPU count. All cores pool under one scheduler (D7.3). Socket factor 0.92 in `η_cfg` (D7.5). A task whose threads span sockets runs its RAM stream stages at 0.5× bandwidth. | Up to 2 CPUs per system | `density`, `threads` |
 | `quadSocket` | 4 sockets | dualSocket | System | kHz W9 | CPU sockets 2→4 (3 and 4). Socket factors 0.85 and 0.78. Denser per rack slot and switch port, less efficient than several small boxes. | Up to 4 CPUs per system | `density`, `rackDist` member specs |
-| `dma` | DMA engine | memController | System | Hz W5 | During a task's RAM stream and storage IO stages its core is free for another task. The task keeps its scheduler K slot. | Cores free up during RAM and IO | `ram`, `storage` |
-| `prefetch` | Prefetcher | dma, l3Cache | System | kHz W6 | A queued task's first RAM stream stage runs while it waits in the queue, using RAM bandwidth no running task is using. | Queued tasks preload from RAM | `ram` |
+| `dma` | DMA engine | memController | System | Hz W5 | While a shard is in the RAM or disk part of a memory stage (D26), its core is free for another shard. The shard keeps its scheduler K slot. | Cores free up during RAM and disk. | `ram`, `storage` |
+| `prefetch` | Prefetcher | dma, l3Cache | System | kHz W6 | The shard at the front of the system queue is placed in the memory hierarchy early, and its first RAM part runs with RAM bandwidth no running shard is using (D26). | Queued shards preload from RAM | `ram` |
 
 ### 5.2 Memory (13)
 
 | id | Name | Requires | Level | Era / tier | Effect | Short | Answers |
 |---|---|---|---|---|---|---|---|
-| `memController` | Memory ctrl | systemBoard | System | Hz W4 | RAM part gen 0 (SDRAM), 1 slot. RAM capacity gates `workingSet`; RAM bandwidth sets RAM stream rate. | Adds RAM: 1 SDRAM slot | `ram`, `gate` |
+| `memController` | Memory ctrl | systemBoard | System | Hz W4 | RAM part gen 0 (SDRAM), 1 slot: the second memory tier (D26). Working sets that overflow cache sit in RAM and their traffic runs at RAM bandwidth; RAM adds to the hierarchy that gates them. | Adds RAM: 1 SDRAM slot | `ram`, `gate` |
 | `ddr` | DDR | memController | System | Hz W5 | RAM gen 1: 2× gen-0 native bandwidth and capacity. Both generations have 36 levels; watts use the era's energy ratio, not a free bandwidth multiplier. | Opens DDR RAM: 2× speed and size | `ram` |
 | `ddr2` | DDR2 | ddr, fabKhz | System | kHz W7 | RAM gen 2. | Opens DDR2 RAM | `ram` |
 | `ddr3` | DDR3 | ddr2, fabMhz | System | MHz W10 | RAM gen 3. | Opens DDR3 RAM | `ram`, `rackDist` |
@@ -252,9 +252,9 @@ Columns: id, short name, prerequisites, the zoom level where it first matters, e
 | `ecc` | ECC memory | ddr2, rack | Rack | kHz W8 | RAM modules can be bought as ECC: 1.25× price, 1.1× watts. Tasks with gate `ecc` need ECC RAM on every system they touch. | Buy ECC RAM for ECC tasks | `storage`, `rackDist`, `gate` |
 | `rdimm` | Registered DIMM | quadChannel, ecc | Rack | MHz W9 | ECC module capacity ×2 at the same level and bandwidth. Every RAM generation still has all 36 levels. Replaces the old +4-level effect. See `hardware-progression.md`. | ECC RAM capacity ×2 | `rackDist`, `roomDist` per-member RAM |
 | `lowVoltRam` | Low-voltage RAM | ddr2 | System | kHz W7 | RAM idle and load watts ×0.7 at the same rates. | RAM watts ×0.7 | `energy`, `overload` |
-| `virtualMem` | Virtual memory | memController, storageCtl | System | Hz W5 | `workingSet` may exceed RAM by up to free storage capacity. The task gains a storage IO stage of 2× the excess bits. A hard gate failure becomes a slow task. | Big tasks spill RAM to storage | `gate`, `ram` |
+| `hotPages` | Hot pages | memController, storageCtl | System | Hz W5 | Rule (D26; was Virtual memory, now base): a spilled shard's hot data stays in fast tiers. Its disk traffic is `f_d²` of its memory traffic instead of `f_d`; the rest runs from RAM. A shard 25% on disk does 6% of its traffic there. | Spilled tasks touch disk less | `storage`, `ram` |
 
-### 5.3 Acceleration (17)
+### 5.3 Acceleration (18)
 
 GPU display generations are 1 through 9; `gen("gpu", g-1)` is their generic adapter effect. Every node opens 24 preconfigured models. Tier and hot upgrades cost Credits without extra research. GPU specs, exact prices, energy rules and fixed family core floors are in `gpu-progression.md`; execution follows the accepted `gpu-runtime.md`. GPU gates are cores and VRAM, never clock or device count.
 
@@ -274,6 +274,7 @@ Generation research charges the following Credit fee once at actual start, in ad
 | `tensorCores` | Tensor cores | gpuGen4 | System | MHz W10 | Tensor stages on GPUs of displayed gen 4+ run at 4 times ordinary rate. Opens legacy NPU g2 when `npu` is complete. No GPU generation unlock. | Tensor work 4× on 1 MHz+ GPUs | `gpu`, `rackDist` |
 | `matrixGpu` | Matrix engines | tensorCores, gpuGen6 | System | GHz W12 | Tensor stages on GPUs of displayed gen 6+ run at 8 times ordinary rate, replacing 4. Opens legacy NPU g3 when `npu` is complete. No GPU generation unlock. | Tensor work 8× on 100 MHz+ GPUs | `roomDist`, `multiAz` |
 | `gddr6` | GDDR6 | gpuGen2 | System | kHz W7 | GPU and legacy NPU VRAM total multiplier becomes 4. No separate VRAM part. | GPU VRAM ×4 | `gpu` VRAM gates |
+| `unifiedMemory` | Unified memory | hbm, gpuGen8 | System | GHz W14 | Rule (D26.4): GPU VRAM pools with system RAM. A shard's VRAM need beyond the card's free VRAM sits in free RAM, then on disk. GPU ops on those bits add RAM- and disk-rate traffic. Without it VRAM is a hard gate. | VRAM overflows to RAM and disk | `gpu`, `roomDist` |
 | `hbm` | HBM | gddr6, fabMhz | System | MHz W10 | GPU and legacy NPU VRAM total multiplier becomes 16. Halves only GPU VRAM idle watts; NPU watts retain their own rule. | GPU VRAM ×16, half idle watts | `roomDist` |
 | `dualGpu` | Dual GPU | gpuGen2, fabKhz | System | kHz W7 | Shared GPU/NPU slots 1 to 2, the general-board cap. | Up to 2 GPUs per system | `gpu` |
 | `accelSystem` | Accelerator box | dualSocket, quadChannel, dualGpu | Rack | kHz W8 | Adds an accelerator board with 2 CPU sockets, 8 RAM slots and 8 shared GPU/NPU slots, with no DIMM penalty up to 8. A density choice for specialized work; no family requires eight GPU devices. | Adds accelerator board: 8 GPU slots | `gpu`, `rackDist`, `roomDist`, `density` |
@@ -286,15 +287,15 @@ NPU base rates, VRAM, tensor factors, prices and power stay explicit in `gpu-pro
 
 | id | Name | Requires | Level | Era / tier | Effect | Short | Answers |
 |---|---|---|---|---|---|---|---|
-| `storageCtl` | Storage | systemBoard | System | Hz W5 | Storage part gen 0 (HDD): capacity and IO bits/s, 1 drive slot. | Adds storage: 1 HDD slot | `storage`, `gate` |
-| `ssd` | SSD | storageCtl, fabKhz | System | kHz W7 | Storage gen 1. | Opens SSD storage | `storage` |
-| `nvme` | NVMe | ssd, fabMhz | System | MHz W10 | Storage gen 2. | Opens NVMe storage | `storage`, `rackDist` |
-| `scm` | Storage-class mem | nvme, fabGhz | System | GHz W12 | Storage gen 3. | Opens SCM storage | `multiAz` |
-| `raid0` | Striping | storageCtl | System | Hz W6 | Drive slots 1→4. An IO stage runs at the sum of all drives' rates. Capacity sums. | Up to 4 drives, speeds add up | `storage` |
-| `ncq` | Command queuing | ssd | System | kHz W7 | A drive serves up to 4 IO stages at once, sharing its rate. Base drives serve one at a time. | Drives serve 4 IO stages at once | `storage`, `pickup` |
-| `sharedStorage` | Rack storage | raid0, rack | Rack | kHz W8 | A server slot may hold a storage node. Servers in that rack can meet storage gates and run IO stages on it; the IO bits cross both servers' switch ports. | Adds rack storage nodes | `storage`, `density` |
+| `storageCtl` | Storage | systemBoard | System | Hz W5 | Storage part gen 0 (HDD), 1 drive slot: the disk tier (D26). No task needs a drive; a drive lets a small machine take a task whose working set overflows RAM, at drive IO speed. | Adds the disk tier: 1 HDD slot | `storage`, `gate` |
+| `ssd` | SSD | storageCtl, fabKhz | System | kHz W7 | Storage gen 1: disk-tier IO 2,000 bit/s at L1 (1/16 of DDR2), 16× an HDD per level. | Opens SSD storage: faster spill | `storage` |
+| `nvme` | NVMe | ssd, fabMhz | System | MHz W10 | Storage gen 2: disk-tier IO 1.6e7 bit/s at L1, 1/4 of DDR3 bandwidth. | Opens NVMe: spill at 1/4 RAM speed | `storage`, `rackDist` |
+| `scm` | Storage-class mem | nvme, fabGhz | System | GHz W12 | Storage gen 3: disk-tier IO 6.4e10 bit/s at L1, 1/2 of DDR5 bandwidth. | Opens SCM: spill at 1/2 RAM speed | `multiAz` |
+| `raid0` | Striping | storageCtl | System | Hz W6 | Drive slots 1→4. The disk tier's rate is the sum of all drives' IO rates; capacity sums. | Up to 4 drives, speeds add up | `storage` |
+| `ncq` | Command queuing | ssd | System | kHz W7 | Drives serve up to 4 shards' disk traffic at once, sharing their rate. Base drives serve one at a time. | Drives serve 4 shards at once | `storage`, `pickup` |
+| `sharedStorage` | Rack storage | raid0, rack | Rack | kHz W8 | A server slot may hold a storage node: a disk tier shared by the rack (D26). A server's working set spills onto it after its own drives; that traffic crosses both servers' switch ports. | Adds a shared rack disk tier | `storage`, `density` |
 
-### 5.5 Scheduling (26)
+### 5.5 Scheduling (25)
 
 System scope (the scheduler chip part):
 
@@ -305,32 +306,31 @@ System scope (the scheduler chip part):
 | `timeSlice` | Time slicing | fifoSched | CPU | Hz W2 | Strategy time slicing: admits up to 2× K tasks; running tasks share cores in 100 ms slices, so n tasks on c cores each progress at c/n. Pickup stays fast; completion slows. | Scheduler: time slicing, 2× tasks | `pickup` |
 | `priorityQ` | Priority | sjf | CPU | Hz W3 | Strategy priority: highest payout per unit work first. Trades task count for Credits. | Scheduler: best pay first | `energy`, late-round earnings |
 | `mlfq` | Aging (MLFQ) | sjf, timeSlice | CPU | Hz W3 | Strategy MLFQ: SJF, but a queued task that has waited 3 s or more starts first. No queued task starves. | Scheduler: SJF that never starves | `pickup` |
-| `workStealing` | Work stealing | quadCore | CPU | Hz W3 | Rule: an idle core joins a running task that has `threads` above its assigned cores, mid-task. | Idle cores join running tasks | `threads` |
+| `workStealing` | Work stealing | quadCore | CPU | Hz W3 | Rule (D25.3): an idle thread joins a running shard that holds fewer threads than `floor(units / grain)`, mid-shard. | Idle cores join running shards | `threads` |
 | `numaAware` | NUMA-aware | dualSocket | System | kHz W8 | Rule: a task stays on one socket when its threads fit there; it spans sockets only when they don't. | Tasks stay on one socket if they fit | `ram`, `rackDist` |
 
 Network scopes (rack load balancer, then room, site and backbone):
 
 | id | Name | Requires | Level | Era / tier | Effect | Short | Answers |
 |---|---|---|---|---|---|---|---|
-| `lbCapability` | Capability-aware | rack | Rack | kHz W8 | Filter: never route a task to a system that fails its gates (working set, VRAM, storage, ECC). It never checks `threads`, which is a maximum, not a gate (D4.5). Cheap on purpose; it is the first Rack fix. | LB skips servers that can't run it | `misroute` |
+| `lbCapability` | Capability-aware | rack | Rack | kHz W8 | Filter: never route a shard to a system that fails its gates (working set, VRAM, storage, ECC). It removes children with no system that can run one grain. It never dispatches a split whose shards would not fit their targets: the task waits, in the LB queue or as the head, instead of misrouting (D25.9). The grain is not a gate. Cheap on purpose; it is the first Rack fix. | LB skips servers that can't run it | `misroute` |
 | `lbRoundRobin` | Round robin | rack | Rack | kHz W8 | Strategy: rotate through servers that can admit, starting after the last one used. Spreads load and heat off slot 1. | LB: round robin across servers | `overload`, `heat` |
 | `lbHealth` | Health checks | lbCapability | Rack | kHz W8 | Filter: skip servers whose board PSU overload timer or rack crash timer is above 0. First-fit already skips full and booting servers; this one stops feeding a server that is counting down to failure. | LB skips failing servers | `overload`, `heat` |
-| `lbLeastConn` | Least conns | lbRoundRobin | Rack | kHz W8 | Strategy: route to the server with the fewest admitted tasks. Unlike round robin it accounts for tasks of different lengths. | LB: fewest tasks first | `pickup`, `overload` |
-| `lbWeighted` | Weighted | lbLeastConn | Rack | kHz W8 | Strategy: route in proportion to each server's rated compute ops/s. For mixed-generation racks. | LB: weighted by server speed | `pickup`, mixed fleets |
-| `lbLeastWork` | Least work left | lbWeighted, telemetry | Rack | MHz W9 | Strategy: route to the smallest predicted finish time (queued work / rate + transfer time). IdleBit's least-finish-time routing. | LB: earliest finish first | `pickup`, `transfer` |
+| `lbLeastConn` | Least conns | lbRoundRobin | Rack | kHz W8 | Strategy (D25): shares in proportion to each child's free slots, so a nearly full child gets a small share. | LB: shares by free slots | `pickup`, `overload` |
+| `lbWeighted` | Weighted | lbLeastConn | Rack | kHz W8 | Strategy (D25): shares in proportion to each child's rated compute ops/s among its systems with room. For mixed-generation racks, where equal shares wait on the slowest server. | LB: shares by server speed | `pickup`, mixed fleets |
+| `lbLeastWork` | Least work left | lbWeighted, telemetry | Rack | MHz W9 | Strategy (D25): shares chosen so every child's predicted finish (queued work / rate + transfer + its share / rate) is as equal as whole units allow. IdleBit's least-finish-time routing. | LB: shares that finish together | `pickup`, `transfer` |
 | `lbPowerAware` | Power-aware | lbHealth, telemetry | Rack | MHz W9 | Filter: skip servers whose PSU usage would reach 90% with this task's load added. At room scope it does the same for racks by PDU. Predictive, where health checks are reactive. | LB skips servers near 90% power | `overload` |
-| `binPacking` | Bin packing | lbRoundRobin, s3Sleep, telemetry | Rack | MHz W9 | Strategy: fill servers in slot order up to their K running tasks, not their queues, and skip any whose supply would pass 90%. Queues fill only when every server is at K. Load stays concentrated, so the idle tail reaches S3, without first-fit's overloaded slot 1. | LB: pack servers, let idle ones sleep | `energy`, `overload` |
-| `lbAffinity` | Workload affinity | accelSystem, lbCapability | Rack | kHz W8 | Strategy (D7.7): GPU, `tensor` and big-memory families go to accelerator systems first, general families to general systems first; first-fit inside the preferred class, falling back to the other class when it is full. Unlike capability-aware it has a preference, not just a veto. | LB: GPU work goes to accelerators | `gpu`, `pickup`, `energy` |
-| `lbReserve` | Queued take | lbHealth | Rack | MHz W9 | Rule (queued take): the load balancer may take the head while the first link is still busy, up to 10 s of that link's capacity queued. Fewer heads time out on a busy uplink; throughput is unchanged. | LB queues up to 10 s on busy links | `transfer`, `pickup` |
-| `gangRack` | Gang scheduling | lbCapability | Rack | kHz W8 | Placement: distributed tasks whose members fit in one rack. All members are admitted in one 10 s window or none are. | Run distributed tasks in one rack | `rackDist` |
-| `gangRoom` | Cross-rack gang | gangRack, room | Room | MHz W11 | Placement: gang across racks in one zone, through the room load balancer. | Run distributed tasks across racks | `roomDist` |
+| `binPacking` | Bin packing | lbRoundRobin, s3Sleep, telemetry | Rack | MHz W9 | Strategy (D25): shares go only to children with a free running slot (not a queue slot) whose supply is under 90%, in slot order; queues fill only when none qualifies. Load stays concentrated, so the idle tail reaches S3. | LB: pack servers, let idle ones sleep | `energy`, `overload` |
+| `lbAffinity` | Workload affinity | accelSystem, lbCapability | Rack | kHz W8 | Strategy (D7.7, D25): GPU, `tensor` and big-memory families split only over accelerator systems, general families only over general systems; spread inside the preferred class, falling back to the other class when none has room. Unlike capability-aware it has a preference, not just a veto. | LB: GPU work goes to accelerators | `gpu`, `pickup`, `energy` |
+| `shardSteal` | Shard stealing | lbHealth | Rack | MHz W9 | Rule (D25.9; was `lbReserve`, queued take, which the LB queue retired): a server with a free running slot and an empty queue takes the newest not-started shard queued on another server in its rack. The shard crosses both server ports. Tasks stop waiting on their slowest shard. | Free servers steal queued shards | `pickup`, `transfer` |
+| `splitGather` | Gather | lbCapability | Rack | kHz W8 | Rule (D25.9; was `gangRack`; gang placement is base): a router dispatches a task only when at least half its eligible children have room, or when the entry has waited 10 s in its queue. It stops the first server to free up from taking a whole task alone. | Split wide, not to the first free server | `rackDist`, `pickup` |
+| `stealRoom` | Cross-rack stealing | shardSteal, room | Room | MHz W11 | Rule (D25.9; was `gangRoom`): shard stealing spans every rack in the zone. A stolen shard crosses both rack uplinks and both ports. | Steal shards across racks | `roomDist`, `pickup` |
 | `thermalAware` | Thermal-aware | lbPowerAware, room | Room | MHz W11 | Filter at room scope and above: weight racks by e(T) and skip racks at ≥90 °F. One rack is one lump, so this has no rack-scope effect. | Room LB avoids hot racks | `heat` |
-| `topologyAware` | Topology-aware | gangRoom | Room | GHz W11 | Placement: put gang members in the fewest racks, same rack first. Less payload crosses room uplinks. | Gang tasks use the fewest racks | `transfer`, `roomDist` |
-| `zoneAware` | Zone-aware | gangRoom, dataCenter | Global | GHz W12 | Placement at site scope: spread members over at least 2 zones (required for `multiAz`). Routes away from zones with a failed supply. | Spread tasks over 2+ zones | `multiAz` |
+| `topologyAware` | Topology-aware | stealRoom | Room | GHz W11 | Strategy `linkAware` (D25.9): shares in proportion to what each child can absorb, the lesser of its rated compute with room and its top link speed. A rack behind a slow uplink gets a small share. | Shares follow uplink speed | `transfer`, `roomDist` |
+| `zoneAware` | Zone-aware | stealRoom, dataCenter | Global | GHz W12 | Filter `local` (D25.9) at room, site and global scope: keep only the first child that can take the whole split by itself and meets the task's zones and region; if none can, keep all. A rack, zone or site failure then kills only its own tasks. Skips zones with a dark UPS. | Keep a task in one rack, zone or site | `multiAz`, `overload`, `heat` |
 | `regionAware` | Region-aware | regions | Global | GHz W14 | Filter at backbone scope: region-locked tasks go only to sites in their region. Without it they fail as misroutes. | Region-locked tasks route correctly | `region`, `misroute` |
 | `latencyAware` | Latency-aware | regionAware | Global | GHz W14 | Strategy at backbone scope: route to the site with the least backbone latency + transfer + queue time. | Route to the fastest site | `transfer` |
 | `priceAware` | Price-aware | latencyAware | Global | GHz W14 | Strategy at backbone scope: route to the site with the lowest energy price per joule that can admit, breaking ties by latency. Regions differ in price (D1.7). | Route to the cheapest-power site | `energy` |
-| `globalGang` | Global gang | zoneAware, regionAware | Global | GHz W15 | Placement: gang members across sites over the backbone. | Run distributed tasks across sites | `region` distributed |
 
 ### 5.6 Networking (18)
 
@@ -408,7 +408,7 @@ Network scopes (rack load balancer, then room, site and backbone):
 | `rack` | Rack | fabKhz | Rack | kHz W6 | Opens Rack. A free starter rack with air cooler, basic PDU, 4-port gen-0 switch (ports at 1 kHz, shared port/uplink ceiling 500 GHz) and a round-robin load balancer. Server port speeds can now be upgraded on the rack switch (D15); before this the pipe is fixed at 1 kHz. The system becomes server 1. | Opens the Rack level | `density`, `rackDist` |
 | `room` | Room | rack, fabMhz | Room | MHz W10 | Opens Room (one AZ hall): network rack with room switch and load balancer, CRAC, standby UPS, 2 rows. Rack uplinks can now be upgraded on the network rack (D15). | Opens the Room level | `density`, `roomDist` |
 | `hallExpansion` | Third row | room, spineLeaf | Room | GHz W11 | A third row of 8 rack slots: racks per room 16 → 24. `spineLeaf` supplies ports for racks 17–24. | Racks per room 16 → 24 | `density` |
-| `dataCenter` | Data center | room, gangRoom | Global | GHz W12 | Opens Global with the first site: copper data plane, utility grid feed, zones up to 2. Room uplinks can now be upgraded at the data plane; backbone links once `regions` adds them (D15). | Opens the Global level | `multiAz` |
+| `dataCenter` | Data center | room, stealRoom | Global | GHz W12 | Opens Global with the first site: copper data plane, utility grid feed, zones up to 2. Room uplinks can now be upgraded at the data plane; backbone links once `regions` adds them (D15). | Opens the Global level | `multiAz` |
 | `zoneExpansion` | Third zone | dataCenter, zoneAware | Global | GHz W13 | Zones per site 2 → 3. | Zones per site 2 → 3 | `multiAz`, `density` |
 | `regions` | Regions | dataCenter, zoneAware | Global | GHz W13 | Sites 1 → 4 (home + 3 regions), one site per region. Leased-line backbone gen 0. | Sites 1 → 4 across regions | `region` |
 | `intercontinental` | Global reach | regions, bbDarkFiber | Global | GHz W14 | Sites 4 → 8: all 8 regions. | Sites 4 → 8, all regions | `region` |
@@ -433,7 +433,7 @@ Network scopes (rack load balancer, then room, site and backbone):
 | `hotPlug` | Hot-plug drives | storageCtl, rack | Rack | kHz W8 | Adding or replacing storage is hot: no downtime. | Swap storage with no downtime | `downtime` |
 | `liveMigration` | Live migration | gracefulDrain, sw1M | Rack | MHz W10 | When a server goes offline, cold or crashes (not a supply failure), its running tasks move to another server in the rack with room. Their remaining state crosses both ports. | Tasks move off failing servers | `downtime`, `heat` |
 | `hotSwap` | Hot swap | rollingUpgrade, room | Room | GHz W11 | Server replacement at Rack and above has no downtime (program §3). | Replace servers with no downtime | `downtime` |
-| `checkpointing` | Checkpointing | gangRoom | Room | GHz W11 | A distributed task survives losing a member if a replacement is admitted within 10 s. That member restarts its share of the work. | Gang tasks survive a lost member | `roomDist`, `overload`, `heat` |
+| `checkpointing` | Checkpointing | stealRoom | Room | GHz W11 | A split task survives losing a shard if a replacement is placed within 10 s (D25.9). That shard restarts its units. | Split tasks survive a lost shard | `roomDist`, `overload`, `heat` |
 
 ### 5.11 Count
 
@@ -441,9 +441,9 @@ Network scopes (rack load balancer, then room, site and backbone):
 |---|---:|
 | Compute | 21 |
 | Memory | 13 |
-| Acceleration | 17 |
+| Acceleration | 18 |
 | Storage | 7 |
-| Scheduling | 26 |
+| Scheduling | 25 |
 | Networking | 18 |
 | Power | 21 |
 | Cooling | 14 |
@@ -472,7 +472,7 @@ The path below is the real campaign bot's (`src/game/probes/bot.ts`, seed 42, D1
 | 0:58–1:10 | `memController`, `psu80` (W4, 12,000 each) | `ram` band; the board PSU limits a fast Hz chip | `l3Cache` |
 | 1:10–3:30 | save for `fabKhz` (W6 milestone, 150,000 Data) | Hz parts are at their ceilings; Credits pile up for kHz parts | W5 nodes within the off-path budget |
 | 3:33 | `fabKhz` | kHz era: the upgrade-or-replace moment for the CPU. kHz parts speed research, not income: the pipe still caps it | |
-| 3:50–4:00 | `gpuGen1`, `storageCtl` (W5, 15,000 each) | Their bands open above the pipe wall, so the first card and drive pay only after Rack | `virtualMem`, `l3Cache` |
+| 3:50–4:00 | `gpuGen1`, `storageCtl` (W5, 15,000 each) | Their bands open above the pipe wall, so the first card and drive pay only after Rack | `hotPages`, `l3Cache` |
 | 4:00–6:20 | save for `rack` (W6 milestone, 150,000 Data) | | `offline12` (W6) for an overnight gap |
 | 6:20–6:50 | `rack` | **Rack** opens at 6:40–6:48. Ports step at once, servers are copied in, and the W5–W6 extras follow | |
 
@@ -609,15 +609,15 @@ export type Scope = "system" | "rack" | "room" | "site" | "global" | "net";
 
 export type StrategyId =
   | "fifo" | "sjf" | "timeSlice" | "priority" | "mlfq"
-  | "firstFit" | "roundRobin" | "leastConn" | "weighted" | "leastWork" | "binPack" | "affinity" | "latency" | "price";
+  | "firstFit" | "roundRobin" | "leastConn" | "weighted" | "leastWork" | "binPack" | "affinity" | "linkAware" | "latency" | "price";
 /** "firstFit" is the free default at every network scope (D1.5); no node unlocks it. */
-export type FilterId = "capability" | "health" | "power" | "thermal" | "region";
-export type PlacementId = "gang" | "topology" | "zone";
+export type FilterId = "capability" | "health" | "power" | "thermal" | "region" | "local";
+/** D25: placements are gone. Distributed tasks are minimum splits; split behaviour is strategies, filters and rules. */
 
 export type RuleId =
   | "workStealing" | "numaAware" | "smt" | "socketFactor" | "dimmFactor" | "accelBoard" | "socketSpanPenalty" | "dma" | "prefetch"
-  | "multiChannel" | "ecc" | "virtualMemory" | "tensorRate" | "gpuLink" | "npuTensorOnly"
-  | "vramPerLevel" | "vramScale" | "ramWatts" | "registeredCapacity" | "ncq" | "sharedStorage" | "reserveOnRoute"
+  | "multiChannel" | "ecc" | "tensorRate" | "gpuLink" | "npuTensorOnly"
+  | "vramPerLevel" | "vramScale" | "ramWatts" | "registeredCapacity" | "ncq" | "sharedStorage" | "hotPages" | "unifiedMemory" | "gather" | "shardSteal" | "stealRoom"
   | "cutThrough" | "qos" | "routingCapacity" | "linkScale" | "subseaLatency"
   | "coreIdle" | "packageIdle" | "s3Sleep" | "dvfs" | "turbo" | "powerCap" | "loadShed"
   | "lossFraction" | "supplyCapacity" | "dualFeed" | "upsRideThrough"
@@ -630,7 +630,6 @@ export type ResearchEffect =
   | { kind: "ceiling"; key: CeilingId; value: number }
   | { kind: "strategy"; scope: Scope; id: StrategyId }
   | { kind: "filter"; scope: Scope; id: FilterId }
-  | { kind: "placement"; scope: Scope; id: PlacementId }
   | { kind: "view"; level: ZoomLevel }
   | { kind: "rule"; id: RuleId; params?: Readonly<Record<string, number>> };
 
@@ -660,7 +659,6 @@ const gen = (part: PartId, g: number): ResearchEffect => ({ kind: "gen", part, g
 const cap = (key: CeilingId, value: number): ResearchEffect => ({ kind: "ceiling", key, value });
 const strat = (scope: Scope, id: StrategyId): ResearchEffect => ({ kind: "strategy", scope, id });
 const filt = (scope: Scope, id: FilterId): ResearchEffect => ({ kind: "filter", scope, id });
-const place = (scope: Scope, id: PlacementId): ResearchEffect => ({ kind: "placement", scope, id });
 const view = (level: ZoomLevel): ResearchEffect => ({ kind: "view", level });
 const rule = (id: RuleId, params?: Record<string, number>): ResearchEffect => ({ kind: "rule", id, params });
 const chipGen = (g: number) =>
@@ -692,7 +690,7 @@ export const RESEARCH_V3: readonly ResearchNode[] = [
   n("smt", "SMT", "compute", ["timeSlice", "octaCore"], "cpu", "khz", 7, 1_000_000, [cap("threadsPerCore", 2), rule("smt", { shareRate: 0.6 })], ["pickup"]),
   n("dualSocket", "Dual socket", "compute", ["octaCore", "rack"], "system", "khz", 8, 4_000_000, [cap("cpuSockets", 2), rule("socketFactor", { s2: 0.92 }), rule("socketSpanPenalty", { ramBandwidth: 0.5 })], ["density", "threads"]),
   n("quadSocket", "4 sockets", "compute", ["dualSocket"], "system", "khz", 9, 1.5e7, [cap("cpuSockets", 4), rule("socketFactor", { s3: 0.85, s4: 0.78 })], ["density", "rackDist"]),
-  n("dma", "DMA engine", "compute", ["memController"], "system", "hz", 5, 15_000, [rule("dma")], ["ram", "storage"]),
+  n("dma", "DMA engine", "compute", ["memController"], "system", "hz", 5, 15_000, [rule("dma")], ["ram", "storage"]), // D26: RAM and disk parts
   n("prefetch", "Prefetcher", "compute", ["dma", "l3Cache"], "system", "khz", 6, 50_000, [rule("prefetch")], ["ram"]),
 
   // Memory
@@ -708,7 +706,7 @@ export const RESEARCH_V3: readonly ResearchNode[] = [
   n("ecc", "ECC memory", "memory", ["ddr2", "rack"], "rack", "khz", 8, 4_000_000, [rule("ecc", { price: 1.25, watts: 1.1 })], ["storage", "rackDist", "gate"]),
   n("rdimm", "Registered DIMM", "memory", ["quadChannel", "ecc"], "rack", "mhz", 9, 1.5e7, [rule("registeredCapacity", { factor: 2 })], ["rackDist", "roomDist"]),
   n("lowVoltRam", "Low-voltage RAM", "memory", ["ddr2"], "system", "khz", 7, 1_000_000, [rule("ramWatts", { factor: 0.7 })], ["energy", "overload"]),
-  n("virtualMem", "Virtual memory", "memory", ["memController", "storageCtl"], "system", "hz", 5, 15_000, [rule("virtualMemory", { ioPerExcessBit: 2 })], ["gate", "ram"]),
+  n("hotPages", "Hot pages", "memory", ["memController", "storageCtl"], "system", "hz", 5, 15_000, [rule("hotPages", { diskExponent: 2 })], ["storage", "ram"]),
 
   // Acceleration
   n("gpuGen1", "GPU gen 1, 1 kHz", "accel", ["memController"], "system", "hz", 5, 15_000, [gen("gpu", 0)], ["gpu"]),
@@ -723,6 +721,7 @@ export const RESEARCH_V3: readonly ResearchNode[] = [
   n("tensorCores", "Tensor cores", "accel", ["gpuGen4"], "system", "mhz", 10, 4e7, [gen("npu", 2), rule("tensorRate", { factor: 4, minGpuGen: 4 })], ["gpu", "rackDist"]),
   n("matrixGpu", "Matrix engines", "accel", ["tensorCores", "gpuGen6"], "system", "ghz", 12, 2e8, [gen("npu", 3), rule("tensorRate", { factor: 8, minGpuGen: 6 })], ["roomDist", "multiAz"]),
   n("gddr6", "GDDR6", "accel", ["gpuGen2"], "system", "khz", 7, 1_000_000, [rule("vramPerLevel", { factor: 4 })], ["gpu"]),
+  n("unifiedMemory", "Unified memory", "accel", ["hbm", "gpuGen8"], "system", "ghz", 14, 3e9, [rule("unifiedMemory")], ["gpu", "roomDist"]),
   n("hbm", "HBM", "accel", ["gddr6", "fabMhz"], "system", "mhz", 10, 4e7, [rule("vramPerLevel", { factor: 16 }), rule("vramScale", { idle: 0.5 })], ["roomDist"]),
   n("dualGpu", "Dual GPU", "accel", ["gpuGen2", "fabKhz"], "system", "khz", 7, 1_000_000, [cap("gpuSlots", 2)], ["gpu"]),
   n("accelSystem", "Accelerator box", "accel", ["dualSocket", "quadChannel", "dualGpu"], "rack", "khz", 8, 4_000_000, [rule("accelBoard", { sockets: 2, ramSlots: 8, gpuSlots: 8 })], ["gpu", "rackDist", "roomDist", "density"]),
@@ -748,7 +747,7 @@ export const RESEARCH_V3: readonly ResearchNode[] = [
   n("numaAware", "NUMA-aware", "scheduling", ["dualSocket"], "system", "khz", 8, 4_000_000, [rule("numaAware")], ["ram", "rackDist"]),
   // Scheduling: network scopes
   n("lbCapability", "Capability-aware", "scheduling", ["rack"], "rack", "khz", 8, 4_000_000, [filt("net", "capability")], ["misroute"]),
-  n("lbHealth", "Health checks", "scheduling", ["lbCapability"], "rack", "khz", 8, 4_000_000, [filt("net", "health")], ["pickup", "misroute"]),
+  n("lbHealth", "Health checks", "scheduling", ["lbCapability"], "rack", "khz", 8, 4_000_000, [filt("net", "health")], ["overload", "heat"]),
   n("lbRoundRobin", "Round robin", "scheduling", ["rack"], "rack", "khz", 8, 4_000_000, [strat("net", "roundRobin")], ["overload", "heat"]),
   n("lbLeastConn", "Least conns", "scheduling", ["lbRoundRobin"], "rack", "khz", 8, 4_000_000, [strat("net", "leastConn")], ["pickup", "overload"]),
   n("lbWeighted", "Weighted", "scheduling", ["lbLeastConn"], "rack", "khz", 8, 4_000_000, [strat("net", "weighted")], ["pickup"]),
@@ -756,16 +755,15 @@ export const RESEARCH_V3: readonly ResearchNode[] = [
   n("lbPowerAware", "Power-aware", "scheduling", ["lbHealth", "telemetry"], "rack", "mhz", 9, 1.5e7, [filt("net", "power")], ["overload"]),
   n("binPacking", "Bin packing", "scheduling", ["lbRoundRobin", "s3Sleep", "telemetry"], "rack", "mhz", 9, 1.5e7, [strat("net", "binPack")], ["energy", "overload"]),
   n("lbAffinity", "Workload affinity", "scheduling", ["accelSystem", "lbCapability"], "rack", "khz", 8, 4_000_000, [strat("net", "affinity")], ["gpu", "pickup", "energy"]),
-  n("lbReserve", "Queued take", "scheduling", ["lbHealth"], "rack", "mhz", 9, 1.5e7, [rule("reserveOnRoute")], ["transfer", "pickup"]),
-  n("gangRack", "Gang scheduling", "scheduling", ["lbCapability"], "rack", "khz", 8, 4_000_000, [place("rack", "gang")], ["rackDist"]),
-  n("gangRoom", "Cross-rack gang", "scheduling", ["gangRack", "room"], "room", "mhz", 11, 6e7, [place("room", "gang")], ["roomDist"]),
+  n("shardSteal", "Shard stealing", "scheduling", ["lbHealth"], "rack", "mhz", 9, 1.5e7, [rule("shardSteal")], ["pickup", "transfer"]),
+  n("splitGather", "Gather", "scheduling", ["lbCapability"], "rack", "khz", 8, 4_000_000, [rule("gather", { share: 0.5, waitS: 10 })], ["rackDist", "pickup"]),
+  n("stealRoom", "Cross-rack stealing", "scheduling", ["shardSteal", "room"], "room", "mhz", 11, 6e7, [rule("stealRoom")], ["roomDist", "pickup"]),
   n("thermalAware", "Thermal-aware", "scheduling", ["lbPowerAware", "room"], "room", "mhz", 11, 6e7, [filt("room", "thermal")], ["heat"]),
-  n("topologyAware", "Topology-aware", "scheduling", ["gangRoom"], "room", "ghz", 11, 6e7, [place("room", "topology")], ["transfer", "roomDist"]),
-  n("zoneAware", "Zone-aware", "scheduling", ["gangRoom", "dataCenter"], "global", "ghz", 12, 2e8, [place("site", "zone"), place("site", "gang")], ["multiAz"]),
+  n("topologyAware", "Topology-aware", "scheduling", ["stealRoom"], "room", "ghz", 11, 6e7, [strat("net", "linkAware")], ["transfer", "roomDist"]),
+  n("zoneAware", "Zone-aware", "scheduling", ["stealRoom", "dataCenter"], "global", "ghz", 12, 2e8, [filt("net", "local")], ["multiAz", "overload", "heat"]),
   n("regionAware", "Region-aware", "scheduling", ["regions"], "global", "ghz", 14, 3e9, [filt("global", "region")], ["region", "misroute"]),
   n("latencyAware", "Latency-aware", "scheduling", ["regionAware"], "global", "ghz", 14, 3e9, [strat("global", "latency")], ["transfer"]),
   n("priceAware", "Price-aware", "scheduling", ["latencyAware"], "global", "ghz", 14, 3e9, [strat("global", "price")], ["energy"]),
-  n("globalGang", "Global gang", "scheduling", ["zoneAware", "regionAware"], "global", "ghz", 15, 1e10, [place("global", "gang")], ["region"]),
 
   // Networking
   n("sw100k", "Switch gen 1", "network", ["rack"], "rack", "khz", 8, 4_000_000, [gen("switch", 1)], ["transfer"]),
@@ -831,7 +829,7 @@ export const RESEARCH_V3: readonly ResearchNode[] = [
   n("rack", "Rack", "structure", ["fabKhz"], "rack", "khz", 6, 150_000, [view("rack"), gen("rackCooler", 0), gen("pdu", 0), gen("lb", 0), gen("switch", 0)], ["density", "rackDist"]),
   n("room", "Room", "structure", ["rack", "fabMhz"], "room", "mhz", 10, 1.2e8, [view("room"), gen("roomCooler", 0), gen("ups", 0), gen("row", 0)], ["density", "roomDist"]),
   n("hallExpansion", "Third row", "structure", ["room", "spineLeaf"], "room", "ghz", 11, 6e7, [cap("roomRows", 3)], ["density"]),
-  n("dataCenter", "Data center", "structure", ["room", "gangRoom"], "global", "ghz", 12, 6e8, [view("global"), gen("dataPlane", 0), gen("grid", 0), gen("zone", 0), cap("siteZones", 2)], ["multiAz"]),
+  n("dataCenter", "Data center", "structure", ["room", "stealRoom"], "global", "ghz", 12, 6e8, [view("global"), gen("dataPlane", 0), gen("grid", 0), gen("zone", 0), cap("siteZones", 2)], ["multiAz"]),
   n("zoneExpansion", "Third zone", "structure", ["dataCenter", "zoneAware"], "global", "ghz", 13, 4e8, [cap("siteZones", 3)], ["multiAz", "density"]),
   n("regions", "Regions", "structure", ["dataCenter", "zoneAware"], "global", "ghz", 13, 1.2e9, [gen("site", 0), gen("backbone", 0), cap("sites", 4)], ["region"]),
   n("intercontinental", "Global reach", "structure", ["regions", "bbDarkFiber"], "global", "ghz", 14, 9e9, [cap("sites", 8)], ["region"]),
@@ -853,7 +851,7 @@ export const RESEARCH_V3: readonly ResearchNode[] = [
   n("hotPlug", "Hot-plug drives", "operations", ["storageCtl", "rack"], "rack", "khz", 8, 4_000_000, [rule("hotPlug")], ["downtime"]),
   n("liveMigration", "Live migration", "operations", ["gracefulDrain", "sw1M"], "rack", "mhz", 10, 4e7, [rule("liveMigration")], ["downtime", "heat"]),
   n("hotSwap", "Hot swap", "operations", ["rollingUpgrade", "room"], "room", "ghz", 11, 6e7, [rule("hotSwap")], ["downtime"]),
-  n("checkpointing", "Checkpointing", "operations", ["gangRoom"], "room", "ghz", 11, 6e7, [rule("checkpointing", { windowS: 10 })], ["roomDist", "overload", "heat"]),
+  n("checkpointing", "Checkpointing", "operations", ["stealRoom"], "room", "ghz", 11, 6e7, [rule("checkpointing", { windowS: 10 })], ["roomDist", "overload", "heat"]),
 ];
 ```
 
@@ -871,7 +869,33 @@ Keep the existing ten-field `n(...)` tuples and numeric Data arguments. Copy `RE
 
 D10's Network speed node and queue-only SJF, aging and Queued take text are applied in §5 and §9. D12's Auto-skip is an Operations node at Rack, kHz W8, costing 400,000,000 Data. It requires both Auto-return and Capability-aware routing, making it a mid-game automation reward after the player can identify incompatible work. It dismisses only heads that no online hardware can run.
 
-The sync test (`src/game/build/research/tree.sync.test.ts`) byte-compares §5 and §9 with generated `tree.data.ts` and `tree.text.ts` and asserts 162 nodes. Regenerate both files with `WRITE_TREE=1 npx vitest run src/game/build/research/tree.sync.test.ts`. The §9 catalog checks still apply, including the three roots, acyclic prerequisites, nondecreasing tiers and exact tier Data costs.
+The sync test (`src/game/build/research/tree.sync.test.ts`) byte-compares §5 and §9 with generated `tree.data.ts` and `tree.text.ts` and asserts 162 nodes after D26 (161 after D25; the sim owner updates the assertion). Regenerate both files with `WRITE_TREE=1 npx vitest run src/game/build/research/tree.sync.test.ts`. The §9 catalog checks still apply, including the three roots, acyclic prerequisites, nondecreasing tiers and exact tier Data costs.
+
+### Applied under D25 (divisible tasks, LB queues)
+
+| Node | Before | After |
+|---|---|---|
+| `gangRack` → `splitGather` (Gather) | Placement `gang` at rack scope; required for `rackDist`. | Rule `gather`: a router dispatches only when at least half its eligible children have room, or after 10 s in its queue. Gang placement is base (minimum split). |
+| `lbReserve` → `shardSteal` (Shard stealing) | Rule `reserveOnRoute` (queued take, 10 s first-link backlog). | Rule `shardSteal`: a free server takes a not-started sibling shard in its rack. The LB queue (Credits, 1–32 slots) replaces queued take. |
+| `gangRoom` → `stealRoom` (Cross-rack stealing) | Placement `gang` at room scope; required for `roomDist`. | Rule `stealRoom`: stealing spans the zone. `topologyAware`, `zoneAware`, `dataCenter` and `checkpointing` now require it. |
+| `topologyAware` | Placement `topology`: gang members in the fewest racks. | Strategy `linkAware`: shares follow each child's link and compute capacity. |
+| `zoneAware` | Placements `zone` and `gang` at site scope; required for `minZones ≥ 2`. | Filter `local` (room, site, global): keep a task in one child when it can take the whole split. Multi-AZ placement is structural. |
+| `globalGang` | Placement `gang` at global scope. | Deleted: cross-site splits are base. 161 nodes. |
+| `checkpointing` | A lost gang member is re-placed within 10 s. | Any lost shard is re-placed within 10 s. |
+| `workStealing`, `lbCapability`, `lbLeastConn`, `lbWeighted`, `lbLeastWork`, `binPacking`, `lbAffinity` | Whole-task routing text. | Split text (§5.5). |
+
+Tiers and Data costs are unchanged. The `PlacementId` type and the `placement` effect are removed from §9.
+
+### Applied under D26 (memory hierarchy, spill, completion windows)
+
+| Node | Before | After |
+|---|---|---|
+| `virtualMem` → `hotPages` (Hot pages) | Working sets may exceed RAM into storage, with an IO stage of 2× the excess. | Spill to disk is base (D26.1). The rule cuts a spilled shard's disk traffic to `f_d²` of its memory traffic. |
+| `unifiedMemory` (new, GHz W14, requires `hbm`, `gpuGen8`) | — | VRAM pools with RAM and disk; overflow costs RAM and disk time (D26.4). |
+| `memController`, `storageCtl`, `ssd`, `nvme`, `scm`, `raid0`, `ncq`, `sharedStorage` | RAM and drives are gates; IO stages need a drive. | RAM and drives are tiers of one hierarchy. Drive generations set spill speed (IO re-based to 1/16, 1/16, 1/4, 1/2 of their era's RAM bandwidth). |
+| `dma`, `prefetch`, `l2Cache`, `l3Cache` | RAM stream and IO stages. | RAM and disk parts of memory stages; cache traffic is free. |
+
+The tree has 162 nodes. Tiers and Data costs are unchanged; `unifiedMemory` costs W14 Data and work.
 
 ### Settled by the decision log (program §15a, D1)
 

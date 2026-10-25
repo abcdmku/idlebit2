@@ -1,5 +1,9 @@
-import type { FilterId, LbView, PlacementId, Quote, RouteStrategyId, ScopeRef } from '../../game';
-import { FILTER_NAMES, PLACEMENT_NAMES, ROUTE_NAMES } from './copy';
+import type { CSSProperties } from 'react';
+import type { FilterId, LbView, Quote, RouteStrategyId, ScopeRef } from '../../game';
+import { typeColor, typeOf } from '../../render/core';
+import { useWindowLeft } from '../hooks/headClock';
+import { clockText } from '../hooks/format';
+import { FILTER_NAMES, ROUTE_NAMES } from './copy';
 import { PlateFrame } from './PlateFrame';
 import { Choices, Lines, QuoteKey, Status, type Choice, type Line } from './widgets';
 import type { PlateCommon } from './types';
@@ -10,7 +14,12 @@ export interface LbBodyProps extends Pick<PlateCommon, 'quotes' | 'onAction' | '
   view: LbView;
   /** What the balancer routes to: "server" in a rack, "rack" in a room. */
   child?: LbChild;
+  /** `quote({ kind: 'routerQueue', unit })`: the next queue slot (D25.7), or null before it loads. */
+  queueQuote?: Quote | null;
 }
+
+/** The router queue's ladder top (D25.7). */
+export const QUEUE_MAX = 32;
 
 const lockText = (q: Quote | undefined) => (q?.locked ? q.locked.text : null);
 
@@ -22,35 +31,59 @@ export function lbLines(view: LbView, child: LbChild): Line[] {
   return lines;
 }
 
-/** Strategy (pick one), filters and placements (toggles), each locked by research; capacity upgrade. */
-export function LbBody({ unit, view, quotes, onAction, onResearch, researchName }: LbBodyProps) {
+/**
+ * The router queue (D25.7): tasks taken but not yet dispatched, one well per slot, each filled in its
+ * task type's colour. A task in here is picked up: its clock has stopped.
+ */
+export function LbQueue({ view }: { view: LbView }) {
+  const q = view.queue, used = q.entries.length;
+  // D26.5: a queued task's completion window runs from take; the soonest one due is what matters.
+  const due = q.entries.reduce<number | null>((m, e) => (e.windowEndTick === null ? m : m === null ? e.windowEndTick : Math.min(m, e.windowEndTick)), null);
+  return <div className="lb-queue" data-testid="lb-queue">
+    <span className="k">Queue</span><b className="v">{used}/{q.slots}</b><span className="mute">L{q.level}/{QUEUE_MAX}</span>
+    <span className="lb-wells" aria-label={`${used} of ${q.slots} queue slots used`}>
+      {Array.from({ length: q.slots }, (_, i) => {
+        const e = q.entries[i];
+        return <i key={i} className={e ? 'on' : ''} style={e ? { '--well': typeColor(typeOf(e.family)) } as CSSProperties : undefined} />;
+      })}
+    </span>
+    {due !== null && <DueIn endTick={due} />}
+  </div>;
+}
+
+/** "Next due 1:42" for the queued task whose completion window ends first; warning under 30 s. */
+function DueIn({ endTick }: { endTick: number }) {
+  const left = useWindowLeft(endTick);
+  if (left === null) return null;
+  return <span className={left <= 30 ? 'warn' : 'mute'} data-testid="lb-due">Next due {clockText(left * 1000)}</span>;
+}
+
+/** Strategy (pick one) and filters (toggles), each locked by research; the router queue and its next slot. */
+export function LbBody({ unit, view, quotes, queueQuote, onAction, onResearch, researchName }: LbBodyProps) {
   const qs = quotes?.quotes ?? [];
   const strategies = qs.filter((q): q is Quote & { action: { type: 'setStrategy'; strategy: RouteStrategyId } } => q.action.type === 'setStrategy');
   const filters = qs.filter((q): q is Quote & { action: { type: 'setFilter'; filter: FilterId } } => q.action.type === 'setFilter');
-  const placements = qs.filter((q): q is Quote & { action: { type: 'setPlacement'; mode: PlacementId } } => q.action.type === 'setPlacement');
   const strategyIds: RouteStrategyId[] = strategies.length ? strategies.map((q) => q.action.strategy) : [view.strategy];
   const rows: Choice[] = [
     ...strategyIds.map((id) => ({ id: 's:' + id, label: ROUTE_NAMES[id].name, on: id === view.strategy,
       lock: id === view.strategy ? null : lockText(strategies.find((q) => q.action.strategy === id)) })),
     ...filters.map((q) => ({ id: 'f:' + q.action.filter, label: FILTER_NAMES[q.action.filter].name,
       on: view.filters.includes(q.action.filter), lock: lockText(q) })),
-    ...placements.map((q) => ({ id: 'p:' + q.action.mode, label: PLACEMENT_NAMES[q.action.mode],
-      on: view.placements.includes(q.action.mode), lock: lockText(q) })),
   ];
   const pick = (key: string) => {
     const [k, id] = [key.slice(0, 1), key.slice(2)];
     if (k === 's') onAction({ type: 'setStrategy', unit, strategy: id as RouteStrategyId });
     if (k === 'f') onAction({ type: 'setFilter', unit, filter: id as FilterId, on: !view.filters.includes(id as FilterId) });
-    if (k === 'p') onAction({ type: 'setPlacement', unit, mode: id as PlacementId, on: !view.placements.includes(id as PlacementId) });
   };
-  const capacity = qs.find((q) => q.action.type === 'upgradePart');
+  const level = view.queue.level, max = level >= QUEUE_MAX, capacity = qs.find((q) => q.action.type === 'upgradePart');
   return <>
-    <Choices rows={rows} label="Routing" onPick={pick} />
+    <LbQueue view={view} />
     <div className="keys">
-      {capacity && <QuoteKey quote={capacity}
-        label={`Capacity${capacity.effect ? ` · ${Math.round(capacity.effect.capacityAfter)} a second` : ''}`}
+      {queueQuote && <QuoteKey quote={queueQuote} label={max ? `Queue ${level} · max` : `Queue ${level} → ${level + 1}`}
         onAction={(q) => onAction(q.action)} onResearch={onResearch} researchName={researchName} />}
+      {capacity && <QuoteKey quote={capacity} label={`Capacity${capacity.effect ? ` · ${Math.round(capacity.effect.capacityAfter)} a second` : ''}`} onAction={(q) => onAction(q.action)} onResearch={onResearch} researchName={researchName} />}
     </div>
+    <Choices rows={rows} label="Routing" onPick={pick} />
   </>;
 }
 
@@ -59,15 +92,15 @@ export function lbStatus(view: LbView) {
   return { text: `${Math.round(view.routedPerSec)} routing decisions a second`, progress: view.routedPerSec > 0 ? 1 : 0 };
 }
 
-export interface LbPlateProps extends PlateCommon { unit: ScopeRef; view: LbView; child?: LbChild; title?: string; maxLevel?: number }
+export interface LbPlateProps extends PlateCommon { unit: ScopeRef; view: LbView; child?: LbChild; title?: string; queueQuote?: Quote | null }
 
-/** The rack load balancer plate (mockup rack/econ.js lbSpec). */
-export function LbPlate({ unit, view, child = 'server', title = 'Load balancer', maxLevel = 8, quotes, onAction, onResearch, researchName, ...frame }: LbPlateProps) {
+/** The rack load balancer plate (mockup rack/econ.js lbSpec): its strategy, filters and queue. */
+export function LbPlate({ unit, view, child = 'server', title = 'Load balancer', queueQuote, quotes, onAction, onResearch, researchName, ...frame }: LbPlateProps) {
   const st = lbStatus(view);
-  return <PlateFrame {...frame} title={title} sub={`${ROUTE_NAMES[view.strategy].name} · L${view.level}`}
-    pips={[Math.min(maxLevel, view.level), maxLevel]} className="lb">
+  return <PlateFrame {...frame} title={title} sub={`${ROUTE_NAMES[view.strategy].name} · queue ${view.queue.level}/${QUEUE_MAX}`} className="lb">
     <Status text={st.text} progress={st.progress} />
     <Lines lines={lbLines(view, child)} slots={2} />
-    <LbBody unit={unit} view={view} child={child} quotes={quotes} onAction={onAction} onResearch={onResearch} researchName={researchName} />
+    <LbBody unit={unit} view={view} child={child} quotes={quotes} queueQuote={queueQuote}
+      onAction={onAction} onResearch={onResearch} researchName={researchName} />
   </PlateFrame>;
 }

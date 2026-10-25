@@ -1,4 +1,4 @@
-import { MAX_FAMILIES, MAX_GANG_MEMBERS } from '../core/constants';
+import { MAX_FAMILIES, MAX_SHARDS } from '../core/constants';
 import { BANDS, FAMILIES, familyKey, payPerUnit, payloadAt, payoutAt } from './families';
 import { familyId } from '../types/ids';
 
@@ -20,9 +20,21 @@ describe('family catalog (tasks.md §5)', () => {
     expect(pay).toMatchObject({ bitFlip: 1, compare: 2, regex: 5, mergeSort: 5, imageBlur: 11, rayTrace: 14, trainShard: 20, llmTrain: 30, exchangeFeed: 6 });
   });
 
-  it('pays members × Σ stage work (D2)', () => {
+  it('folds RAM and storage stages into one mem stage and disk into the working set (D26.3), with band windows (D26.5)', () => {
+    const at = (key: string) => FAMILIES.find((f) => f.key === key)!;
+    expect(at('indexBuild').stages.map((s) => [s.resource, s.work.perSize])).toEqual([['compute', 2], ['mem', 5]]);
+    expect(at('indexBuild').workingSet).toEqual({ fixed: 0, perSize: 6 });
+    expect(at('backup').stages.map((s) => [s.resource, s.work.perSize])).toEqual([['mem', 6]]);
+    expect(at('backup').workingSet.perSize).toBe(16);
+    expect(at('imageBlur').stages.map((s) => s.resource)).toEqual(['mem', 'gpu']);
+    expect(['bitFlip', 'sqlScan', 'replWrite', 'teraSort', 'drBackup', 'euResidency', 'exchangeFeed'].map((k) => at(k).windowS))
+      .toEqual([null, null, 120, 180, 240, 120, 60]);
+    expect(FAMILIES.filter((f) => f.windowS !== null)).toHaveLength(18);
+  });
+
+  it('pays Σ stage work of the whole task, once (D2, D25.5)', () => {
     const replWrite = FAMILIES.find((f) => f.key === 'replWrite')!;
-    expect(payoutAt(replWrite, 10)).toBe(3 * 7 * 10);
+    expect(payoutAt(replWrite, 10)).toBe(7 * 10);
   });
 
   it('derives payload from whole-task work for every family (D10.4)', () => {
@@ -32,7 +44,7 @@ describe('family catalog (tasks.md §5)', () => {
   });
 
   it('keeps members ≤ 256, Data ratios in 10..100, tensor on 5 and ECC on 10 families', () => {
-    expect(Math.max(...FAMILIES.map((f) => f.members))).toBe(MAX_GANG_MEMBERS);
+    expect(Math.max(...FAMILIES.map((f) => f.members))).toBe(MAX_SHARDS);
     for (const f of FAMILIES) {
       expect(f.dataRatio).toBeGreaterThanOrEqual(10);
       expect(f.dataRatio).toBeLessThanOrEqual(100);
@@ -56,7 +68,9 @@ describe('catalog sync with scripts/market-model.ts', () => {
     const root = join(__dirname, '../../..');
     const model = readFileSync(join(root, 'scripts/market-model.ts'), 'utf8').split('\n')
       .filter((l) => l.trimStart().startsWith('fam("'))
-      .map((l) => l.trim().replace(/"/g, "'").replace(/\),$/, ');'));
+      .map((l) => l.trim().replace(/"/g, "'").replace(/\),$/, ');')
+        // The model's WINX tuning knob scales windows; the sim carries the base value.
+        .replace(' * Number(process.env.WINX ?? 1)', ''));
     const ours = readFileSync(join(__dirname, 'families.ts'), 'utf8').split('\n').filter((l) => l.startsWith("fam('"));
     expect(ours).toEqual(model);
   });

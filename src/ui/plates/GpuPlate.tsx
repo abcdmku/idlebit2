@@ -5,7 +5,7 @@ import { projectKey } from '../research/ResearchDrawer';
 import { familyName } from '../hooks/feedModel';
 import { TaskTypeLabel } from '../art/TaskType';
 import { useLayout } from '../shell/geometry';
-import { bits, hertz, quantity, span, watts } from './format';
+import { bits, hertz, ops, quantity, span, watts } from './format';
 import { PlateFrame } from './PlateFrame';
 import type { PlateCommon } from './types';
 import { exactAmount, GPU_CLASSES, GPU_GENERATIONS, GPU_SERIES, GPU_TIERS, gpuResearch, lacksAmount, SERIES_COPY, SERIES_NAMES, type GpuSelection } from './gpuModel';
@@ -126,7 +126,7 @@ export function GpuModelPlate({ system, index, installed, tasks = [], selection:
             {next && <span className="gpu-research-price"><span>{exactAmount(next.dataCost)} Data</span><span>{exactAmount(next.creditCost ?? '0' as Amount)} Cr</span></span>}
           </button>
           <p className="gpu-shortfall">{next && feePending && (next.needsData || lacksAmount(data, next.dataCost)) ? 'Needs Data. ' : ''}{next && feePending && (next.needsCredits || lacksAmount(credits, next.creditCost)) ? 'Needs Credits.' : ''}</p>
-          <p className="gpu-note">{next ? `${quantity(next.workOps, 'ops')} + energy. Fees charged when work starts. Cancel gives no refund.` : 'Choose a model from any generation.'}</p>
+          <p className="gpu-note">{next ? `${ops(next.workOps)} + energy. Fees charged when work starts. Cancel gives no refund.` : 'Choose a model from any generation.'}</p>
         </section>
       </div>
       <p className="gpu-status">{before ? `${bits(held)} of ${bits(before.vramBits)} VRAM held. ` : ''}Task fit uses cores and VRAM. Clock sets work speed.</p>
@@ -141,7 +141,7 @@ export function GpuModelPlate({ system, index, installed, tasks = [], selection:
 function GpuComparison({ before, after, code, installedLabel }: { before: GpuStats | null; after: GpuStats | undefined; code: string; installedLabel?: string }) {
   const rows: readonly [string, (s: GpuStats) => string][] = [
     ['Cores', s => s.cores.toLocaleString('en-US')], ['VRAM', s => bits(s.vramBits)], ['Clock', s => hertz(s.clockHz)],
-    ['Rated work', s => quantity(s.opsPerS, 'ops/s')], ['Efficiency', s => quantity(s.efficiencyOpsPerJ, 'ops/J')],
+    ['Rated work', s => `${ops(s.opsPerS)}/s`], ['Efficiency', s => quantity(s.efficiencyOpsPerJ, 'ops/J')],
     ['Card load', s => watts(s.idleW + s.loadW)],
   ];
   return <table className="gpu-comparison" aria-label="Installed and selected GPU comparison">

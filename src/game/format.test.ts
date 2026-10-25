@@ -1,6 +1,6 @@
 ﻿import { amount } from './amount';
-import { formatAmount, formatBits, formatCountdownMs, formatCredits, formatData, formatDurationMs,
-  formatMetric, formatNet, formatPrice, formatRate, formatSeconds, formatSignedAmount, formatWatts } from './format';
+import { formatAmount, formatCountdownMs, formatCredits, formatData, formatDurationMs,
+  formatMetric, formatNet, formatPrice, formatRate, formatSeconds, formatSignedAmount, formatWatts, formatSize, formatHertz, formatOps } from './format';
 
 // Approved core/format.js fmt/fmtTime and the Phase 0D wallet/part-plate examples.
 describe('shared mockup currency formatting',()=>{
@@ -64,10 +64,20 @@ describe('shared measurement and income formatting',()=>{
     expect(formatNet('4619000000000')).toBe('+4.62T net/min');
     expect(formatNet('-0')).toBe('+0.00 net/min');
   });
-  it('keeps bit dimensions separate from currency suffixes',()=>{
-    expect(formatBits(8)).toBe('8 b');
-    expect(formatBits('1000')).toBe('1 Kb');
-    expect(formatBits(2000000)).toBe('2 Mb');
+});
+
+describe('shared unit quantities (board, deck, callouts and cards)', () => {
+  it.each([
+    [formatSize, 1, '1 b'], [formatSize, 64, '64 b'], [formatSize, 21_400, '21.4 kb'], [formatSize, 197_000, '197 kb'],
+    [formatSize, 2_500_000, '2.5 Mb'], [formatSize, 1e9, '1 Gb'],
+    [formatHertz, 1, '1 Hz'], [formatHertz, 1024, '1.02 kHz'], [formatHertz, 8000, '8 kHz'], [formatHertz, 50_000, '50 kHz'],
+    [formatHertz, 1.28e9, '1.28 GHz'],
+    [formatOps, 1, '1 op'], [formatOps, 3, '3 ops'], [formatOps, 999, '999 ops'], [formatOps, 53_400, '53.4k ops'], [formatOps, 1.2e6, '1.2M ops'],
+    // Rounding carries across a prefix; past Y the UI's scientific fallback.
+    [formatSize, 999.7, '1 kb'], [formatHertz, 999_600, '1 MHz'], [formatOps, 1000, '1k ops'], [formatSize, 3e24, '3 Yb'],
+    [formatSize, 1.8e36, '1.80e36 b'], [formatOps, 0, '0 ops'], [formatSize, 0.5, '0.5 b'],
+  ] as const)('%o(%d) is %s', (fmt, n, text) => {
+    expect(fmt(n)).toBe(text);
   });
 });
 

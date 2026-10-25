@@ -2,7 +2,10 @@ import { LOC, type CompiledBuffers, type HotBuffers } from '../core/buffers';
 import { accelNeed, chooseAccel } from '../core/accelerators';
 import type { TouchLog } from '../core/touch';
 import type { World } from '../core/world';
-import { CPU, GPU, IO, RAM, shapeOf, stageWorkAt } from './shape';
+import { CPU, GPU, RAM, shapeOf, stageWorkAt, wantThreads, workingSetOf } from './shape';
+import { staticFractions } from './memory';
+
+const frac = new Float64Array(2);
 
 /*
  * Queued work per system for the site- and global-scope routing summaries (program D24, spec
@@ -30,17 +33,22 @@ export function estNominal(c: CompiledBuffers, s: number, family: number, scale:
   const clock = sys.threadRate[s]! * eta;
   const accel = chooseAccel(c, null, s, accelNeed(shape.def, scale), 1)?.opsPerS ?? 0;
   const threads = Math.max(1, sys.threads[s]!);
+  const node = sys.diskNode[s]!, io = sys.ioRate[s]! + (node >= 0 ? sys.ioRate[node]! : 0);
+  staticFractions(c, s, workingSetOf(shape, scale), frac);
   let secs = 0;
   for (let i = 0; i < shape.stages; i += 1) {
     const work = stageWorkAt(shape, i, scale);
-    let rate = 0;
+    if (!(work > 0)) continue;
     switch (shape.res[i]) {
-      case CPU: rate = Math.min(shape.threads, threads) * clock; break;
-      case RAM: rate = sys.ramBw[s]!; break;
-      case GPU: rate = accel * eta; break;
-      case IO: rate = sys.ioRate[s]!; break;
+      case CPU: { const rate = Math.min(wantThreads(shape, scale), threads) * clock; secs += rate > 0 ? work / rate : Infinity; break; }
+      case GPU: { const rate = accel * eta; secs += rate > 0 ? work / rate : Infinity; break; }
+      case RAM: {
+        // D26.2: the mem stage's RAM and disk parts, its working set placed in the empty hierarchy.
+        if (frac[0]! > 0) secs += sys.ramBw[s]! > 0 ? work * frac[0]! / sys.ramBw[s]! : Infinity;
+        if (frac[1]! > 0) secs += io > 0 ? work * frac[1]! / io : Infinity;
+        break;
+      }
     }
-    if (work > 0) secs += rate > 0 ? work / rate : Infinity;
   }
   return secs;
 }
@@ -79,7 +87,7 @@ export function recountBacklog(c: CompiledBuffers, hot: HotBuffers, units: Float
     const loc = rec.loc[r];
     const s = loc === LOC.link ? rec.target[r]! : loc === LOC.queue || loc === LOC.running ? rec.owner[r]! : -1;
     if (s < 0 || s >= c.sys.len) continue;
-    units[s] = units[s]! + rec.count[r]! * taskUnits(c, s, rec.family[r]!, rec.scale[r]!);
+    units[s] = units[s]! + rec.count[r]! * taskUnits(c, s, rec.family[r]!, rec.units[r]!);
     if (held) held[s] = held[s]! + rec.count[r]!;
   }
 }
@@ -144,7 +152,7 @@ export function noteBacklog(w: World, s: number, delta: number, r: number): void
   if (!b) return;
   if (r < 0) { current = null; return; }
   const rec = w.hot.rec;
-  b.units[s] = b.units[s]! + delta * taskUnits(w.compiled, s, rec.family[r]!, rec.scale[r]!);
+  b.units[s] = b.units[s]! + delta * taskUnits(w.compiled, s, rec.family[r]!, rec.units[r]!);
   b.held[s] = b.held[s]! + delta;
   markRack(b, w.compiled.sys.rack[s]!);
 }

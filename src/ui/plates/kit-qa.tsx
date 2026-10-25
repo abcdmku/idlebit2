@@ -30,7 +30,7 @@ const q = (action: GameAction, cost: number, extra: Partial<Quote> = {}): Quote 
   affordable: true, locked: null, cold: false, downtimeMs: 0, effect: null, workOps: null, ...extra });
 const R = (quotes: Quote[]): QuoteResult => ({ configRevision: 1, quotes });
 const lockR = (node: string, text: string): LockReason => ({ code: 'research', node: researchId(node), text });
-const eff = (before: number, after: number, unit: 'ops/s' | 'W' | 'bit/s' | 'tasks/s', paybackS: number | null, w0 = 2, w1 = 3) =>
+const eff = (before: number, after: number, unit: 'ops/s' | 'W' | 'bit/s' | 'tasks/s' | 'slots', paybackS: number | null, w0 = 2, w1 = 3) =>
   ({ capacityBefore: before, capacityAfter: after, unit, wattsBefore: w0, wattsAfter: w1, energyPerMinuteDelta: '1' as Amount, paybackS });
 const noop = () => undefined, act = (a: GameAction) => console.info('action', JSON.stringify(a));
 const common = { bounds, onAction: act, onClose: noop, onResearch: noop, researchName: (id: string) => ({ fabKhz: 'kHz fab', sw1M: 'MHz switching', rackWater: 'Rack water' } as Record<string, string>)[id] ?? id };
@@ -54,7 +54,7 @@ const lbQuotes = (unit: typeof rack | { kind: 'room'; id: typeof room }) => R([
     { locked: s === 'roundRobin' ? lockR('lbRoundRobin', 'Needs Round robin research') : null })),
   q({ type: 'setFilter', unit, filter: 'capability', on: true }, 0),
   q({ type: 'setFilter', unit, filter: 'thermal', on: true }, 0, { locked: lockR('thermalAware', 'Needs Thermal-aware research') }),
-  q({ type: 'setPlacement', unit, mode: 'gang', on: true }, 0, { locked: lockR('gangRack', 'Needs Gang scheduling research') }),
+  q({ type: 'upgradeRouterQueue', unit }, 379_843, { label: 'Queue 1 → 2', effect: eff(1, 2, 'slots', null) }),
 ]);
 
 const addQuotes = (kind: 'system' | 'rack') => {
@@ -75,7 +75,7 @@ const addQuotes = (kind: 'system' | 'rack') => {
 
 const node = (id: string, name: string, state: ResearchNodeView['state'], extra: Partial<ResearchNodeView> = {}): ResearchNodeView => ({
   id: researchId(id), name, category: 'compute', state, progress: 0, dataCost: '150000' as Amount, workOps: 3e6, requires: [], lockedBy: null,
-  level: 'system', era: 'khz', tier: 6, needsData: false, effect: '', summary: '', ...extra });
+  level: 'system', era: 'khz', tier: 6, needsData: false, effect: '', summary: '', answers: [], ...extra });
 const tree = (phase: 'running' | 'between') => ({
   nodes: [node('fabKhz', 'kHz fab', 'active', { progress: 0.4, effect: 'Gen 1 of core, clock, L1, L2, L3, scheduler and CPU package' }),
     node('l3Cache', 'L3 cache', 'available', { effect: 'New chip part L3, shared', dataCost: '5000' as Amount, workOps: 3e5 }),

@@ -34,6 +34,8 @@ export function unitRect(u: number, out: Rect = rect()): Rect { return setRect(o
 export function serverRect(slot: number, out: Rect = rect()): Rect { return unitRect(serverRow(slot), out); }
 export const SWITCH_RECT = unitRect(0);
 export const LB_RECT = unitRect(1);
+/** The LB's queue wells (D25.7): right of the twelve routing lights, left of the status LED and ear. */
+export const LB_WELLS = { x: OPEN.x + 81, dy: 2, w: 12, h: 8 } as const;
 export const ROOF_RECT = rect(CAB.x, CAB.roofY, CAB.w, CAB.roofH);
 export const STRIP_RECT = rect(STRIP.x - 1, U0, STRIP.w + 2, NU * U);
 /** Server rows are 12 art px: the hit rect spans the whole cabinet width (generous rows). */

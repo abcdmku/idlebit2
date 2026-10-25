@@ -58,3 +58,25 @@ export function RimClock({ w, n, blocked }: { w: number; n: number; blocked: boo
   return <i className="rim-track" data-free="art" style={{ left: n, top: n, width: w - 2 * n, height: 2 * n }} aria-hidden="true">
     <b ref={ref} className="rim-fill" style={{ height: 2 * n }} /></i>;
 }
+
+/** "2 min", "45 s": a completion window (D26.5), floored to whole minutes from 90 s so it never overstates. */
+export function windowText(ticks: number): string {
+  const s = ticks * TICK_MS / 1000;
+  return s < 90 ? `${Math.max(1, Math.round(s))} s` : `${Math.floor(s / 60)} min`;
+}
+
+/**
+ * Seconds left in a taken task's completion window (D26.5), from `windowEndTick` (the last tick it may
+ * be met in) at the presentation time the world draws with. Re-renders only when the number changes.
+ */
+export function useWindowLeft(endTick: number | null): number | null {
+  const { surface } = useShell();
+  const [left, setLeft] = useState<number | null>(null);
+  useEffect(() => {
+    if (endTick === null) { setLeft(null); return; }
+    const listener = (timeMs: number) => setLeft(Math.max(0, Math.ceil(((endTick + 1) * TICK_MS - timeMs) / 1000)));
+    surface.frameListeners.add(listener);
+    return () => { surface.frameListeners.delete(listener); };
+  }, [surface, endTick]);
+  return left;
+}

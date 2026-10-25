@@ -5,7 +5,7 @@ import { nextFloat, reseedForRound, roundSeed, seedRng } from '../core/rng';
 import type { World } from '../core/world';
 import { NO_DETAIL } from '../types/events';
 import type { QueuedTask } from '../types/state';
-import { baseRate, baseWeight, CURVE, memberSize, sizeJitter } from './curve';
+import { baseRate, baseWeight, CURVE, sizeJitter, taskSize } from './curve';
 import { FAMILIES, payoutAt } from './families';
 import { canRunFleet, detailIndex } from './fleet';
 import { failTasks } from './sla';
@@ -33,10 +33,13 @@ export function drawTask(hot: HotBuffers, I: number): QueuedTask {
     draw -= baseWeight(f, mixI) * hot.fam.weightJitter[f.id]!;
     if (draw < 0) { family = f; break; }
   }
-  const size = memberSize(I, sizeJitter(nextFloat(hot)), family.members);
+  const j = sizeJitter(nextFloat(hot));
+  const size = taskSize(I, j, family.members, family.grain);
   const taskId = hot.g[G.nextTaskId]!;
   hot.g[G.nextTaskId] = taskId + 1;
-  return { taskId, family: family.id, size };
+  // D26.5: the completion window scales with the same frozen jitter; no extra RNG draw.
+  const deadline = family.windowS === null ? null : Math.ceil((family.windowS * j) / DT_S);
+  return { taskId, family: family.id, size, deadline };
 }
 
 /** Round preparation, once, at initialization or the previous round's end: seed, jitters, five tasks at I. */
@@ -71,10 +74,11 @@ function materialize(w: World, r: number, t: QueuedTask): void {
   const rec = w.hot.rec, family = FAMILIES[t.family]!;
   rec.family[r] = t.family;
   rec.count[r] = 1;
-  rec.scale[r] = t.size;
+  rec.units[r] = t.size;
   rec.payout[r] = payoutAt(family, t.size);
-  rec.threads[r] = family.threads;
+  rec.threads[r] = 0;
   rec.taskId[r] = t.taskId;
+  rec.deadline[r] = t.deadline ?? -1;
 }
 
 /** Removes window entry i and draws its replacement at the back at the current I. */
@@ -138,7 +142,8 @@ export function returnToFront(w: World, r: number): void {
   rec.owner[r] = -1;
   rec.target[r] = -1;
   rec.stage[r] = 0;
-  rec.gang[r] = -1;
+  rec.shard[r] = 0;
+  rec.threads[r] = 0;
   insertBefore(w.hot, frontList(w.hot), r, before);
   if (w.hot.g[G.frontHead] === r) promote(w);
 }
@@ -152,10 +157,10 @@ export function clearFront(w: World): void {
   });
 }
 
-/** The head's family and per-member size into `out`; false when there is none. */
+/** The head's family and size into `out`; false when there is none. */
 export function peekHead(w: Pick<World, 'hot' | 'market'>, out: { family: number; size: number; front: boolean }): boolean {
   const front = w.hot.g[G.frontHead]!;
-  if (front >= 0) { out.family = w.hot.rec.family[front]!; out.size = w.hot.rec.scale[front]!; out.front = true; return true; }
+  if (front >= 0) { out.family = w.hot.rec.family[front]!; out.size = w.hot.rec.units[front]!; out.front = true; return true; }
   const t = w.market.window[0];
   if (!t) return false;
   out.family = t.family; out.size = t.size; out.front = false;
@@ -176,6 +181,8 @@ export function headGate(w: World): number {
  */
 export function dismissAt(w: World, i: number): void {
   const wasHead = i === 0 && w.hot.g[G.frontHead]! < 0;
+  const family = w.market.window[i]!.family;
+  w.hot.fam.dismissedRound[family] = w.hot.fam.dismissedRound[family]! + 1;
   leaveWindow(w, i);
   w.hot.g[G.dismissed] = w.hot.g[G.dismissed]! + 1;
   if (wasHead) promote(w);
@@ -191,11 +198,11 @@ function failHead(w: World): void {
     const rec = w.hot.rec;
     const r = rec.count[front]! > 1 ? splitRecord(w.hot, front, 1) : front;
     if (r === front) unlink(w.hot, frontList(w.hot), r);
-    failTasks(w, rec.family[r]!, cause, 1, rec.payout[r]!, detail);
+    failTasks(w, rec.family[r]!, cause, 1, rec.payout[r]!, detail, rec.taskId[r]!);
     freeRecord(w.hot, r);
   } else {
     const t = w.market.window[0]!;
-    failTasks(w, t.family, cause, 1, payoutAt(FAMILIES[t.family]!, t.size), detail);
+    failTasks(w, t.family, cause, 1, payoutAt(FAMILIES[t.family]!, t.size), detail, t.taskId);
     leaveWindow(w, 0);
   }
   promote(w);

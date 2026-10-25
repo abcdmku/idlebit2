@@ -13,7 +13,7 @@ export { DESKTOP_TYPE, PHONE_TYPE, LabelBuffer, TONE, drawLabels, MAX_LABELS } f
 export type { LabelAlign, LabelTone, LabelWriter, Typography } from './labels';
 export * from './format';
 export { BAND, BAND_ORDER, BAND_TYPE, FAMILY, FAMILY_CELL, FAMILY_ICON, PIPS, TASK_TYPES, TYPE, bandColor, drawFamilyIcon,
-  drawTypeIcon, drawPip, familyBand, familyName, hasFamilyIcon, paintFamilyIcon, paintTypeIcon, typeOf, typeColor, typeName } from './familyIcons';
+  drawTypeIcon, drawTypeMini, drawPip, familyBand, familyName, hasFamilyIcon, paintFamilyIcon, paintTypeIcon, typeOf, typeColor, typeName } from './familyIcons';
 export type { BandStyle, IconTone, TaskType, TypeStyle } from './familyIcons';
 export { drawPipe, inbound, transferProgress, MIN_VISIBLE_TRANSFER_S } from './pipe';
 export type { Inbound } from './pipe';
@@ -26,6 +26,14 @@ export * from './px';
 export * from './activity';
 export * from './decoration';
 export { createEffectPool, EFFECT_LIMITS } from './fx';
+export { PayoutPops, completionMs, POP_LIFE_MS, POP_MERGE_MS, MAX_POPS } from './pops';
+export type { Completion } from './pops';
+export { partVersionOf, sumVersions } from './versions';
+export { restPan, RestPan, frameRest } from './restPan';
+export type { RestPanControl, PanSnap } from './restPan';
+export { drawFlow, drawFork, drawWaiting, flowColor, flowPhase, flowsOf } from './flows';
+export type { FlowView, FlowPhase } from './flows';
+export { Feedback, FAIL_BEAT_S, FLASH_S } from './feedback';
 export type { EffectPool, EffectKind } from './fx';
 export * from './feed';
 export * from './unit';

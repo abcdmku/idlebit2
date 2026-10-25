@@ -6,14 +6,20 @@ import type { LevelId, NodeRef, RackId, ResearchId, RoomId, SiteId, SystemId } f
 import type { RoundReport } from './report';
 import type { ResearchMode, RoundPhase } from './state';
 import type {
-  BuildSlotView, ChipQueueEntryView, CoolerView, LbView, LinkView, OutcomeView, PartView, QueueEntryView, RackSlotView,
-  ServerSlotView, SiteView, SupplyView, SwitchView, TaskView, TransferView, UnitMode,
+  BuildSlotView, ChipQueueEntryView, CompletionView, CoolerView, FailureView, LbView, LinkView, MemTierView, OutcomeView, PartView, QueueEntryView, RackSlotView,
+  ServerSlotView, ShardDoneView, SiteView, SupplyView, SwitchView, TaskView, TransferView, UnitMode,
 } from './views';
 
 /** What is on screen: the focus level and, during a zoom transition, its partner. */
 export interface SnapshotScope { readonly focus: NodeRef; readonly partner: NodeRef | null }
 
 export interface RenderSnapshot {
+  /** Since the supplied previous snapshot; newest 2048 retained. First view starts capture; workers do not record. Not saved. */
+  readonly completions: readonly CompletionView[];
+  /** Same capture and retention policy as completions, with its own sequence numbers. */
+  readonly failures: readonly FailureView[];
+  /** D25.5: finished non-final shards, no pay. Same capture and retention as completions, own sequence numbers. */
+  readonly shardsDone: readonly ShardDoneView[];
   readonly epoch: number;
   readonly tick: number;
   readonly simTimeMs: number;
@@ -105,6 +111,8 @@ export type LevelSnapshot = ChipSnapshot | SystemSnapshot | RackSnapshot | RoomS
 export interface CoreView {
   readonly socket: number;
   readonly lanes: number;
+  /** This core's own rate in ops/s: its lanes × its socket's clock, as compile runs it (the core's upgrade quote shows it). */
+  readonly rate: number;
   readonly generation: number;
   readonly level: number;
   readonly busy: number;
@@ -113,6 +121,10 @@ export interface CoreView {
   readonly family: number | null;
   readonly progress: number;
   readonly threads: number;
+  /** D25: the shard index of that task (null when idle); cores with equal taskId and shard run one shard. */
+  readonly shard: number | null;
+  /** Threads that shard holds in total (its group size); 0 when idle. */
+  readonly shardThreads: number;
   readonly research: number;
   readonly cstate: 0 | 1 | 3 | 6;
 }
@@ -133,7 +145,8 @@ export interface ChipSnapshot {
   readonly clock: { readonly hz: number; readonly effectiveHz: number; readonly generation: number; readonly level: number };
   readonly coreSites: number;
   readonly cores: readonly CoreView[];
-  readonly cache: { readonly levels: readonly CacheLevelView[]; readonly usedBits: number; readonly capacityBits: number };
+  /** usedBits: bits of running shards placed in cache; spilledOutBits: bits of running shards that didn't fit cache (D26.7). */
+  readonly cache: { readonly levels: readonly CacheLevelView[]; readonly usedBits: number; readonly capacityBits: number; readonly spilledOutBits: number };
   readonly scheduler: SchedulerView | null;
   /** Occupied scheduler wells, oldest taken first then taskId; remaining wells are empty. */
   readonly queue: readonly ChipQueueEntryView[];
@@ -179,9 +192,13 @@ export interface SystemSnapshot {
   readonly rates: { readonly ops: number; readonly ramBits: number; readonly gpuOps: number; readonly ioBits: number };
   readonly capacities: { readonly cache: number; readonly ram: number; readonly vram: number; readonly storage: number };
   readonly used: { readonly memory: number; readonly vram: number; readonly storage: number };
+  /** D26.7: the hierarchy, cache, RAM, disk in that order (always three; capacity 0 for a tier the system lacks). */
+  readonly memory: { readonly tiers: readonly MemTierView[] };
   readonly drawW: number;
   readonly saveable: boolean;
   readonly slots: readonly BuildSlotView[];
+  /** D25: the front shard on the system's port (the pipe before Rack), or null. Same as `chip.pipe.transfer`. */
+  readonly inbound: TransferView | null;
 }
 
 export interface RackSnapshot {
@@ -206,6 +223,11 @@ export interface RackSnapshot {
   /** Always 12. */
   readonly servers: readonly ServerSlotView[];
   readonly saveable: boolean;
+  /**
+   * D25: the rack uplink ('uplink': its first 4 × uplinks FIFO shards, sending first, then waiting with
+   * bitsSent 0), then each port's front shard ('server'). At most 12 + uplinks × 4.
+   */
+  readonly flows: readonly TransferView[];
 }
 
 export interface RoomSnapshot {
@@ -230,6 +252,8 @@ export interface RoomSnapshot {
   /** rows × 8. */
   readonly racks: readonly RackSlotView[];
   readonly saveable: boolean;
+  /** D25: the zone link (first 4 × channels FIFO shards, waiting included), then each rack link's first `channels` ('rack'). At most 128. */
+  readonly flows: readonly TransferView[];
 }
 
 export interface GlobalSnapshot {
@@ -240,4 +264,9 @@ export interface GlobalSnapshot {
   readonly scheduler: LbView | null;
   readonly regionsOpen: number;
   readonly gateway: RegionId;
+  /**
+   * D25: each backbone link (first 4 shards, waiting included), then each site's data plane per zone
+   * ('zone': first 4 × channels at the gateway site, where they are first links, else `channels`). At most 128.
+   */
+  readonly flows: readonly TransferView[];
 }

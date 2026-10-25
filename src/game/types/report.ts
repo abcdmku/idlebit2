@@ -2,9 +2,19 @@ import type { Amount } from '../amount';
 import type { FailCause, FailCounts, FailDetail } from './events';
 import type { GameState } from './state';
 import type { ResearchId } from './ids';
+import type { TaskTypeId } from './views';
+
+export interface RoundTypeTally {
+  readonly type: TaskTypeId;
+  readonly metWork: number;
+  readonly failedWork: number;
+  readonly dismissed: number;
+}
 
 /** Frozen at round end (spec §4.7). Credits and Data are integer Amounts. */
 export interface RoundReport {
+  /** Only types with met/failed work or dismissals, in D23 display order. */
+  readonly byType: readonly RoundTypeTally[];
   readonly index: number;
   readonly startTick: number;
   readonly durationTicks: number;
@@ -21,6 +31,11 @@ export interface RoundReport {
   /** The SLA sums in ops (spec §4.2). */
   readonly deliveredWork: number;
   readonly failedWork: number;
+  /**
+   * D26: of deliveredWork, the work of met tasks weighted by their RAM and disk traffic share: Σ bits
+   * their shards touched in RAM and on disk. "From disk: 18% of work" is diskWork / deliveredWork.
+   */
+  readonly spill: { readonly ramWork: number; readonly diskWork: number };
   readonly gross: Amount;
   readonly data: Amount;
   readonly energy: Amount;

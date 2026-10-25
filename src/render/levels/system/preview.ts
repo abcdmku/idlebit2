@@ -1,7 +1,7 @@
 // Dev preview of the chip and system levels through R1's canvas renderer, framed like the
 // mockup's phone and landscape layouts. Open
 // /src/render/levels/system/preview.html?scene=system&shape=phone
-// Scenes: boot, chip, chip-paused, system, system-full, system-paused, zoom (chip → system, held).
+// Scenes: boot, chip, chip-paused, system, system-full, system-shard (D25), system-paused, zoom (chip → system, held).
 import type { LevelSnapshot, QuoteResult, RenderSnapshot } from '../../../game';
 import { DESKTOP_FRAMING, PHONE_FRAMING, createCanvasRenderer, createLevelRegistry, rect } from '../../core';
 import type { Rect, ViewPresentation } from '../../core';
@@ -35,6 +35,7 @@ function focusOf(): { focus: LevelSnapshot; partner: LevelSnapshot | null } {
   if (scene === 'boot') return { focus: chipScene('boot'), partner: null };
   if (scene.startsWith('chip')) return { focus: chipScene('chip'), partner: null };
   if (scene === 'system-full') return { focus: systemScene('full'), partner: null };
+  if (scene === 'system-shard') return { focus: systemScene('shard'), partner: null };
   if (scene === 'zoom') return { focus: systemScene('system'), partner: chipScene('system') };
   return { focus: systemScene('system'), partner: null };
 }

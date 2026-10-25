@@ -1,4 +1,6 @@
 import { TICK_MS } from '../core/constants';
+import { completionCursor, readCompletions, readShardsDone, shardCursor } from '../core/completions';
+import { failureCursor, readFailures } from '../core/failures';
 import { rackId, roomId, systemId, type LevelId, type NodeRef } from '../types/ids';
 import type { LevelSnapshot, RenderSnapshot, SnapshotScope } from '../types/snapshot';
 import type { GameState } from '../types/state';
@@ -22,6 +24,9 @@ export { slaPercent } from './hud';
  * state and updates its hot buffers in place, so `hot` is compared together with the tick.
  */
 interface Source {
+  readonly completionCursor: number;
+  readonly failureCursor: number;
+  readonly shardCursor: number;
   readonly build: GameState['build'];
   readonly compiled: GameState['compiled'];
   readonly unlocks: GameState['research']['unlocks'];
@@ -123,6 +128,9 @@ export function deriveRenderSnapshot(state: GameState, scope: SnapshotScope, pre
   const entries = state.events.entries;
   const sameEvents = !!prev && !!src && src.events === state.events;
   const snap: RenderSnapshot = {
+    completions: readCompletions(state.hot, prev ? src?.completionCursor : undefined),
+    failures: readFailures(state.hot, prev ? src?.failureCursor : undefined),
+    shardsDone: readShardsDone(state.hot, prev ? src?.shardCursor : undefined),
     epoch: state.epoch, tick: state.clock.tick, simTimeMs: state.clock.tick * TICK_MS + state.clock.carryMs,
     bootMs: state.research.unlocks.bootTicks * TICK_MS,
     hud: hudSnapshot(state, prev?.hud ?? null),
@@ -136,6 +144,9 @@ export function deriveRenderSnapshot(state: GameState, scope: SnapshotScope, pre
     events: entries, firstSeq: entries[0]?.seq ?? state.events.nextSeq, lastSeq: state.events.nextSeq - 1,
   };
   SOURCES.set(snap, {
+    completionCursor: completionCursor(state.hot),
+    failureCursor: failureCursor(state.hot),
+    shardCursor: shardCursor(state.hot),
     build: state.build, compiled: state.compiled, unlocks: state.research.unlocks, hot: state.hot, round: state.round,
     research: state.research, tick: state.clock.tick, events: state.events,
     focusKey: keyOf(focusRef), partnerKey: partnerRef ? keyOf(partnerRef) : null,

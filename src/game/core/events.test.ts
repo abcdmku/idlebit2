@@ -20,7 +20,7 @@ describe('events phase', () => {
     ]);
     expect(w.report.met).toBe(7);
     expect(w.report.failed[0]).toBe(7);
-    expect([w.hot.fam.metTick[2], w.hot.fam.metSys[2], w.hot.fam.failTick[2 * 6]]).toEqual([0, -1, 0]);
+    expect([w.hot.fam.metTick[2], w.hot.fam.metSys[2], w.hot.fam.failTick[2 * 7]]).toEqual([0, -1, 0]);
   });
 
   it('keeps at most 256 events with increasing seq', () => {

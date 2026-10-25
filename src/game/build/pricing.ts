@@ -4,6 +4,7 @@ import {
   PARTS, scalePrice, SHELLS, upgradePrice, upgradesBetween, type CatalogRow, type LadderDef,
 } from './catalog';
 import { gpuInstallPrice, gpuNativePrice, gpuPriceToLevel } from './catalog/gpuModels';
+import { lbQueueStepsTo } from './catalog/network';
 
 /**
  * Prices of building things from nothing (spec §12.3, §13.3), whole Credits as bigint.
@@ -67,7 +68,7 @@ export const shellPrice = (kind: keyof typeof SHELLS, paidSiblings: number): big
 export function rackConfigPrice(cfg: RackConfig): bigint {
   let total = shellPrice('rack', 0);
   total += partFromNothing(PARTS.rackCooler, cfg.cooler) + partFromNothing(PARTS.pdu, cfg.pdu) + partFromNothing(PARTS.lb, cfg.lb);
-  total += switchPrice(LADDERS.switch, cfg.switch);
+  total += lbQueueStepsTo('rack', cfg.lb.queueLevel) + switchPrice(LADDERS.switch, cfg.switch);
   for (const s of cfg.servers) if (s) total += systemSpecPrice(s.spec);
   return total;
 }
@@ -76,6 +77,7 @@ export function rackConfigPrice(cfg: RackConfig): bigint {
 export function roomConfigPrice(cfg: RoomConfig, paidZones: number): bigint {
   let total = shellPrice('zone', paidZones) + rowsPrice(cfg.rows);
   total += switchPrice(LADDERS.roomSwitch, cfg.switch) + partFromNothing(PARTS.roomLb, cfg.lb) + partFromNothing(PARTS.roomCooler, cfg.cooler);
+  total += lbQueueStepsTo('room', cfg.lb.queueLevel);
   for (const u of cfg.ups) total += partFromNothing(PARTS.ups, u);
   for (const r of cfg.racks) if (r) total += rackConfigPrice(r);
   return total;
@@ -87,7 +89,7 @@ export function siteConfigPrice(cfg: SiteConfig, paidSites: number): bigint {
   const zones = Math.max(1, cfg.zones.filter((z) => z).length);
   let total = shellPrice('site', paidSites) + ladderInstall(dp, cfg.dataPlane.gen);
   total += networkStepsBetween(dp, dp.baseK[cfg.dataPlane.gen]!, cfg.dataPlane.k, false, zones);
-  total += partFromNothing(PARTS.grid, cfg.grid);
+  total += partFromNothing(PARTS.grid, cfg.grid) + lbQueueStepsTo('site', cfg.dataPlane.router.queueLevel);
   cfg.zones.forEach((z, n) => { if (z) total += roomConfigPrice(z, n); });
   return total;
 }

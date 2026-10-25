@@ -99,7 +99,8 @@ describe('capability classes retain ordered physical inventory', () => {
     const a = native('3390'), b = native('3590');
     cards(w.compiled, 1, [{ ...a, vram: b.vram }, { ...b, vram: a.vram }]);
     expect(classesOf(w.compiled).map((cls) => cls.members)).toEqual([[0], [1]]);
-    const f = { ...family('trainShard'), members: 1 };
+    // Two shards on distinct servers (members 2): the split floor alone would keep this short task whole (D25.11).
+    const f = { ...family('trainShard'), members: 2 };
     expect(canRunFleet(w, f, 2 ** 24)).toBe(0);
   });
 

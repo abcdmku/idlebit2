@@ -42,8 +42,8 @@ export function gpuLoadedState(fullFleet = false): GameState {
   const scale = 2 ** 23;
   for (let sys = 0; sys < w.compiled.sys.len; sys++) for (let slot = 0; slot < MAX_ACCELS; slot++) {
     const r = allocRecord(w.hot), rec = w.hot.rec;
-    rec.family[r] = family.id; rec.count[r] = 1; rec.scale[r] = scale;
-    rec.stage[r] = 0; rec.threads[r] = family.threads;
+    rec.family[r] = family.id; rec.count[r] = 1; rec.units[r] = scale;
+    rec.stage[r] = 0;
     rec.taskId[r] = w.hot.g[G.nextTaskId]!; w.hot.g[G.nextTaskId] = w.hot.g[G.nextTaskId]! + 1;
     rec.payout[r] = payoutAt(family, scale);
     enqueue(w, sys, r); noteAdmitted(w, sys, 1);
