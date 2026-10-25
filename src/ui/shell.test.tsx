@@ -187,7 +187,7 @@ describe('deck', () => {
   });
   it('with a round income, the Buy key says how long the saving takes', () => {
     const store = fakeStore();
-    store.set({ hud: { income: { dataPerSec: 0, creditsPerSec: 0.001 } } });
+    store.set({ hud: { incomeRecent: { dataPerSec: 0, creditsPerSec: 0.001 } } });
     mounted = deck(store);
     expect(text('[data-testid=buy]')).toMatch(/· Saving up · ~\d+ (min|h)/);
   });
@@ -258,6 +258,12 @@ describe('upgrade callout (D15.4)', () => {
 });
 
 describe('round plate', () => {
+  it.each([['player', 'Ended by you'], ['stall', 'Stalled · nothing completed for 2 min']] as const)('says why the round ended (%s)', (endedBy, why) => {
+    const store = fakeStore();
+    store.set({ round: { state: 'ended', lastReport: { ...report(), endedBy }, canReturn: true } });
+    mounted = mount(<RoundPlate />, store);
+    expect(text('.p-sub')).toBe(`Round 14 · 14:05 · ${why}`);
+  });
   it('reports the round and offers one Return to market', () => {
     const store = fakeStore();
     store.set({ round: { state: 'ended', lastReport: report(), canReturn: true }, hud: { sla: { met: 28_400, failed: 7129, percent: 79.9, checking: true, window: 50, roundMet: 28_400, roundFailed: 7129, deliveredWork: 28_400, failedWork: 7_129, grace: 10 } } });

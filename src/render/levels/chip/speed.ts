@@ -14,6 +14,9 @@ export const coreHz = (c: CoreView): number => c.hz;
 export const coreSleep = (c: CoreView): string | null => c.sleep;
 /** The text a core tile shows: its C-state asleep, else its Hz. */
 export const coreSpeedText = (c: CoreView): string => coreSleep(c) ?? formatHertz(coreHz(c));
+/** QA-24: between rounds (not live) a core that reports 0 Hz shows the clock it is ready to run at. */
+export const readySpeedText = (c: CoreView, chip: ChipSnapshot, live: boolean): string =>
+  !live && !coreSleep(c) && coreHz(c) <= 0 ? formatHertz(chip.clock.hz) : coreSpeedText(c);
 
 /** Rough CSS width of `text` at `body` px in Chakra Petch (digits and units average about 0.58 em). */
 export const textWidth = (text: string, body: number): number => Math.ceil(text.length * body * 0.58);

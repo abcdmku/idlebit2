@@ -17,7 +17,8 @@
 
 /* head */
 .v3-plate .p-head { position: relative; display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; min-height: 24px; }
-.v3-plate.has-x .p-head { padding-right: 56px; }
+.v3-plate.has-x .p-head { padding-right: 56px; min-height: 40px; }
+/* The close key spans the header; nothing below it runs under the key (QA-19). */
 .v3-plate .p-head .p-title { font-size: var(--head); line-height: 18px; font-weight: 700; }
 .v3-plate .p-sub { color: #a99be6; }
 .v3-plate .p-head .pz { margin-left: auto; }
@@ -29,7 +30,7 @@
   color: #a99be6; cursor: pointer; }
 
 /* facts */
-.v3-plate .p-status { min-height: 18px; color: #efeaff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.v3-plate .p-status { min-height: 18px; color: #efeaff; }
 .v3-plate .p-status.warn { color: #ffab98; }
 .v3-plate .p-bar { height: 6px; margin-top: 6px; background: #2a1d4a; box-shadow: 0 0 0 1px #0e0b1c; }
 .v3-plate .p-bar b { display: block; height: 100%; background: #8ef5ff; }

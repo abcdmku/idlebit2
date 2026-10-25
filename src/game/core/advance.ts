@@ -46,6 +46,8 @@ function emptyReport(): AdvanceReport {
 export function isQuiescent(w: World): boolean {
   if (w.round.phase === 'running') return false;
   if (w.research.active !== null && !w.research.stoppedInsolvent) return false;
+  // QA-04: a stopped project with Credits back resumes at the next ledger step.
+  if (w.research.stoppedInsolvent && w.ledger.credits >= 0n) return false;
   if (w.hot.g[G.recUsed] !== 0 || w.hot.g[G.parentUsed] !== 0 || w.hot.g[G.rqTotal] !== 0) return false;
   if (timersPending(w)) return false;
   return physSettled(w);

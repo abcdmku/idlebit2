@@ -3,6 +3,7 @@ import { advanceGame, advanceGameOwned, applyAction, createInitialState, researc
 import { G } from '../core/buffers';
 import { researchDef } from '../build/research/tree';
 import { copyGameState } from '../core/advance';
+import { compileAll } from '../core/topology';
 
 /** D27: research is a task that cuts the line. The boot machine: one 1 Hz core, no scheduler. */
 function bootWithTaskRunning(): GameState {
@@ -61,6 +62,24 @@ describe('research task (D27)', () => {
     expect(later.hot.g[G.fail]).toBe(0);
     const timedOut = advanceGame(later, 1_500).state;
     expect(timedOut.hot.g[G.fail]).toBe(1);
+  });
+
+  it('QA-03: with queue room, research is taken while every thread runs a task, and starts on the next freed thread', () => {
+    // Same boot machine with a scheduler: the only thread is busy, but the system has a queue slot.
+    const base = bootWithTaskRunning();
+    const sys = base.build.systems[0]!;
+    const spec = { ...sys.spec, scheduler: { gen: 0, level: 2, strategy: 'fifo' as const } };
+    const build = { ...base.build, systems: base.build.systems.map((s, i) => (i === 0 && s ? { ...s, spec } : s)) };
+    const start: GameState = { ...base, build, compiled: compileAll(build, base.research) };
+    expect(start.hot.sys.running[0]).toBe(1);
+    const taken = advanceGame(start, 100).state;
+    expect(taken.hot.sys.researchThreads[0]).toBe(1);
+    // No progress while the task holds the thread...
+    const busy = advanceGame(taken, 300).state;
+    expect(busy.research.activeProgress).toBe(0);
+    // ...and research runs once the 1-op Bit Flip frees it at 1.0 s, ahead of anything queued.
+    const after = advanceGame(busy, 1_000).state;
+    expect(after.research.activeProgress).toBeGreaterThan(0);
   });
 
   it('is delta-invariant and owned-equivalent through take, hold, completion and the round end', () => {

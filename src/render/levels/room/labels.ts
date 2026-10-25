@@ -19,12 +19,20 @@ export function roomLabels(s: RoomSnapshot, frame: WorldFrame, out: LabelWriter)
 }
 function gutterTags(s: RoomSnapshot, out: LabelWriter): void {
   const G = hallOf(s.rows), left = G.x - GAP;
-  const net = NET_RECT, speed = s.network.switch.uplinks[0]?.speedHz ?? 0;
+  // QA-25: the room switch's port speed, the value the deck's Net rack row upgrades (the slowest port).
+  // The uplink is the pipe's own tag at this level (Fiber), as the rack's is (Uplink).
+  const net = NET_RECT, speed = portSpeed(s);
   out.label('net', left, net.y + 2, 'right', true).text('Net rack', 'name', true).text(formatHertz(speed), 'net')
     .leader(net.x, net.y + 6);
   const crac = CRAC_HITS[0]!;
   out.label('cooling', left, crac.y + 8, 'right', true).text('Cooling', 'name', true).text(`${whole(Math.round(s.tempF))}°F`, 'cyan')
     .leader(crac.x, crac.y + 12);
+}
+/** The room switch's slowest port speed (0 with no ports). */
+export function portSpeed(s: RoomSnapshot): number {
+  let hz = 0;
+  for (const p of s.network.switch.ports) if (p.speedHz > 0 && (hz === 0 || p.speedHz < hz)) hz = p.speedHz;
+  return hz;
 }
 function upsTag(s: RoomSnapshot, frame: WorldFrame, out: LabelWriter): void {
   let usage = 0;

@@ -36,3 +36,10 @@ export function slaFill(percent: number): number {
   return Math.max(0, Math.min(100, (percent - 60) / 40 * 100));
 }
 
+
+/** One ETA everywhere (QA-09): "~9 s" under a minute, "~35 min" under 90 min, then "~2 h". */
+export function etaSpan(seconds: number): string {
+  if (!Number.isFinite(seconds)) return '—';
+  const s = Math.max(1, Math.ceil(seconds));
+  return s < 60 ? `~${s} s` : s < 5400 ? `~${Math.round(s / 60)} min` : `~${Math.round(s / 3600)} h`;
+}

@@ -19,7 +19,8 @@ import { shallowEqual, useGameSelector } from './storeHooks';
 export { TaskIcon } from './queue/taskText';
 
 /** One task in its slot: the head reads its name and state, a card its name, payout and what it needs. */
-function Tag({ L, t, slot, running, risk, waiting = false }: { L: ShellLayout; t: QueueEntryView; slot: number; running: boolean; risk: boolean;
+function Tag({ L, t, slot, running, risk, waiting = false, twoLine = false }: { L: ShellLayout; t: QueueEntryView; slot: number; running: boolean; risk: boolean;
+  /** QA-22: the four cards share one form; when any name and payout can't share a line, all take two. */ twoLine?: boolean;
   /** D27: research waits at the front, so the market's head waits behind it. */ waiting?: boolean }) {
   const head = slot === 0, d = L.kind === 'desktop', n = L.N, icon = 16 * n;
   const rect: Rect = head ? L.headSlot : L.cards[slot - 1]!;
@@ -36,7 +37,7 @@ function Tag({ L, t, slot, running, risk, waiting = false }: { L: ShellLayout; t
     // A card whose name and payout won't share a line takes two (cards have no clock bar to clear).
     // The head's name never gets cut: with its longest state word it either fits one line or takes two.
     const name = familyName(t.family), full = payoutText(t);
-    const oneLine = head ? fits(`${name} ${!running ? 'next' : t.committed ? 'restarting 10 s' : 'blocked'}`, w, L.body) : fits(`${name} ${full}`, w, L.body);
+    const oneLine = head ? fits(`${name} ${!running ? 'next' : t.committed ? 'restarting 10 s' : 'blocked'}`, w, L.body) : !twoLine;
     const pay = full;
     const lands = running && t.transferS !== null && t.transferS >= MIN_VISIBLE_TRANSFER_S;
     const extra = !running ? '' : waiting ? '· waiting' : blocked ? `needs ${needShort(t)}`
@@ -106,6 +107,9 @@ export function QueueStrip() {
   const blocked = running && !!head && head.blockedBy !== null;
   const risk = running && !!head && !head.committed && headRisk(q.met, q.failed, q.checking, q.slaWindow);
   const first = L.cards[0], last = L.cards[3];
+  // QA-22: one form for the four cards, decided by the longest (cards are as wide as each other).
+  const cardW = first.w - (L.lat + 16 * L.N + 8) - 8;
+  const twoLine = L.kind === 'desktop' && L.cards.some((_, i) => { const t = q.window[i + behind]; return !!t && !fits(`${familyName(t.family)} ${payoutText(t)}`, cardW, L.body); });
   return <section className="queue" aria-label="Task queue" data-testid="queue">
     <div className={`panel head-slot${blocked ? ' blocked' : ''}${risk ? ' risk' : ''}${rq ? ' research-head' : ''}`}
       style={{ ...box(L.headSlot), ...taskTypeStyle(head?.family), ...(risk ? { '--rim': 'var(--fault)' } as CSSProperties : {}) }}
@@ -118,7 +122,7 @@ export function QueueStrip() {
       {L.cards.map((c, i) => {
         const t = q.window[i + behind];
         return <li key={i} className="slot" style={box(c, first)} data-k={`slot${i}`}>
-          {t && <Tag L={L} t={t} slot={i + 1} running={running} risk={false} waiting={!!rq && i === 0} />}
+          {t && <Tag L={L} t={t} slot={i + 1} running={running} risk={false} waiting={!!rq && i === 0} twoLine={twoLine} />}
         </li>;
       })}
     </ol>

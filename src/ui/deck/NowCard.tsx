@@ -58,8 +58,10 @@ export function NowCard() {
       ? <button type="button" className={`skey${blocked ? ' warn' : ''}`} style={key} data-testid="dismiss" data-qa-target
         disabled={!head || !head.dismissible} title={head ? `Dismiss ${familyName(head.family)}: free, no SLA change` : undefined}
         onClick={() => { if (head?.dismissible) shell.dispatch({ type: 'dismissTask', task: head.task }); }}>Dismiss</button>
+      // While the round report is up it carries the one Return key (QA-17).
+      : r.phase === 'ended' ? null
       : <button type="button" className={`skey primary${L.kind === 'phone' ? ' two' : ''}`} style={key} data-testid="return" data-qa-target
-        disabled={!r.can || r.phase === 'ended'} title="Return to market: the next round starts" onClick={() => returnToMarket(shell)}>
+        disabled={!r.can} title="Return to market: the next round starts" onClick={() => returnToMarket(shell)}>
         {/* Desktop fits one line; the phone key is 96 px, so the label is two deliberate lines. */}
         {L.kind === 'desktop' ? 'Return to market' : <><span>Return to</span><span>market</span></>}</button>}
   </section>;

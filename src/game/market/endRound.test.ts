@@ -2,6 +2,9 @@ import { describe, expect, it } from 'vitest';
 import { advanceGame } from '../core/advance';
 import { applyAction } from '../core/actions';
 import { G } from '../core/buffers';
+import { STALL_END_TICKS } from '../core/constants';
+import { openWorld } from '../core/world';
+import { roundPhase } from './rounds';
 import { MODE } from '../core/timers';
 import { createInitialState } from '../core/state';
 import type { GameState } from '../types/state';
@@ -99,5 +102,23 @@ describe('research between rounds', () => {
     expect(later.hot.sys.researchThreads[1]).toBe(0);
     expect(later.hot.sys.drawW[1]).toBe(0);
     expect(later.hot.sys.drawW[0]).toBeGreaterThan(0);
+  });
+});
+
+/** D33 (user, 25 Oct): a running round also ends when no task has been met for 120 s. */
+describe('stall end', () => {
+  it('ends the round as stalled after 120 s without a met task, not one tick sooner', () => {
+    const base = advanceGame(createInitialState(42), 1_000).state;
+    const at = (tick: number) => {
+      const w = openWorld(base);
+      w.hot.g[G.lastMetTick] = 100;
+      w.tick = tick;
+      roundPhase(w);
+      return w;
+    };
+    expect(at(100 + STALL_END_TICKS - 1).round.phase).toBe('running');
+    const ended = at(100 + STALL_END_TICKS);
+    expect(ended.round.phase).toBe('ended');
+    expect(ended.round.reports.at(-1)!.endedBy).toBe('stall');
   });
 });

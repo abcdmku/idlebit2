@@ -79,7 +79,9 @@ export function CanvasWorld() {
     let x0 = 0, y0 = 0, quiet: ReturnType<typeof setTimeout> | undefined, held: PanTarget | null = null, wheeling: PanTarget | null = null;
     const target = (): PanTarget | null => {
       if (view.getState().partner) return null;
-      if (store.getSnapshot().focus.level === 'rack') return rackPan;
+      // The rack row pans only when it has a neighbour to pan to; otherwise the wheel zooms (QA-12).
+      const f = store.getSnapshot().focus;
+      if (f.level === 'rack') return f.row.filter(r => r.rackId !== null).length > 1 ? rackPan : null;
       return restPan.active ? restPan : null;
     };
     const pan: PanHandler = {
@@ -92,10 +94,12 @@ export function CanvasWorld() {
       },
       wheel(dx, dy) {
         const t = target();
-        if (!t) return;
+        // The rack row scrolls sideways only: a vertical wheel there zooms (QA-12).
+        if (!t || (t === rackPan && !dx)) return false;
         wheeling = t; t.setDragging(true);
-        if (t === rackPan) t.scrollBy((dx || dy) / t.scale, 0); else t.scrollBy(dx / t.scale, dy / t.scale);
+        if (t === rackPan) t.scrollBy(dx / t.scale, 0); else t.scrollBy(dx / t.scale, dy / t.scale);
         clearTimeout(quiet); quiet = setTimeout(() => { wheeling?.release(0, 0); wheeling = null; }, 150);
+        return true;
       },
     };
     const stopInput = bindGestures(canvas, {

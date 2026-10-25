@@ -7,6 +7,8 @@ import { recordingContext } from '../../core/testCanvas';
 import { createChipRenderer } from '.';
 import { arrangementOf, coreSites, coreText, floorOf, queueWells } from './layout';
 import { chipScene } from './scenes';
+import { readySpeedText } from './speed';
+import { formatHertz } from '../../../game';
 import { chipAfford, createChipAfford, drawWorld, emptyBlocks, firstLockedSite, siteCount } from './world';
 import { lockSpot } from './block';
 import { coreTag, overlaps } from './tag';
@@ -308,5 +310,14 @@ describe('CPU grid lock mark and busy tag', () => {
       expect(tag!.speed).toBe(true);
       for (let i = 0; i < chip.cores.length; i++) expect(overlaps(sites[i]!, tag!.area)).toBe(false);
     }
+  });
+});
+
+describe('QA-24: a core between rounds', () => {
+  it('shows the clock it is ready to run at when it reports 0 Hz, and its own speed while live', () => {
+    const chip = chipScene('mid'), c = { ...chip.cores[0]!, hz: 0, sleep: null };
+    expect(readySpeedText(c, chip, false)).toBe(formatHertz(chip.clock.hz));
+    expect(readySpeedText(c, chip, true)).toBe(formatHertz(0));
+    expect(readySpeedText({ ...c, sleep: 'C3' }, chip, false)).toBe('C3');
   });
 });

@@ -26,17 +26,20 @@ export const FIXTURE_ROUNDS: readonly RoundPhase[] = ['running', 'ended', 'betwe
 
 /**
  * D31 Power control at work: eight kHz servers, Power control (lead-acid, L1) set to "Start with 2 of
- * 8", returned to market (which refills the battery and wakes 2), then 10 s of real play. Kept live.
+ * 8", returned to market (which refills the battery and wakes 2), then 2 s of real play. Kept live.
  * The one dressed value: the battery charge is set to 10 minutes of the rack's draw, so its
  * "BAT m:ss left" reads in minutes (a full L1 battery lasts days at kHz draw); it drains live from there.
  */
 function powerRack(): GameState {
   const built = buildState({
-    seed: 42, sites: 1, zonesPerSite: 1, racksPerZone: 1, serversPerRack: 8, unlocks: 'max', round: 'between', credits: '1000000000',
+    // Two zones: the Room and World levels everything-researched opens are owned too (their tabs open).
+    seed: 42, sites: 1, zonesPerSite: 2, racksPerZone: 1, serversPerRack: 8, unlocks: 'max', round: 'between', credits: '1000000000',
     system: (id, rack, slot) => ({ id, rack, slot, online: true, spec: barebonesSpec(1) }),
-    rack: (rack) => ({ ...rack, powerCtl: { ...defaultStartCtl(0, 1), startWith: 2 } }),
+    // QA-13: a port for every server (the 4-port starter switch left four servers unlinked, idle but unreachable).
+    rack: (rack) => ({ ...rack, switch: { ...rack.switch, ports: Array(8).fill(rack.switch.ports[0]!) }, powerCtl: { ...defaultStartCtl(0, 1), startWith: 2 } }),
   });
-  const s = advanceGameOwned(applyAction(built, { type: 'returnToMarket' }).state, 10_000).state;
+  // 2 s in: the start controller still holds most servers asleep (every port is linked, so wakes follow quickly).
+  const s = advanceGameOwned(applyAction(built, { type: 'returnToMarket' }).state, 2_000).state;
   const hot = cloneHot(s.hot);
   hot.rack.batteryJ[0] = Math.max(1, hot.rack.drawW[0] ?? 0) * 600;
   return { ...s, hot };

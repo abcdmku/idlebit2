@@ -19,15 +19,17 @@ export interface PartPlateProps extends PlateCommon {
   className?: string;
   /** Widgets between the facts and the keys (setpoint, online row). */
   children?: ReactNode;
+  /** Tasks in the line blocked on what this part supplies (QA-21). */
+  unblocks?: number;
 }
 
 /** Any part with an upgrade-versus-replace choice: board parts, supplies, coolers, links. */
 export function PartPlate({ title, sub, level, pips, status, statusTone = '', progress, lines = [], lineSlots = 2,
-  className = '', children, quotes, onAction, onResearch, researchName, ...frame }: PartPlateProps) {
+  className = '', children, quotes, onAction, onResearch, researchName, unblocks, ...frame }: PartPlateProps) {
   return <PlateFrame {...frame} title={title} sub={sub} pips={pips} className={`part ${className}`}>
     <Status text={status} tone={statusTone} progress={progress} />
     <Lines lines={lines} slots={lineSlots} />
     {children}
-    <PartKeys quotes={quotes} level={level} onAction={onAction} onResearch={onResearch} researchName={researchName} />
+    <PartKeys quotes={quotes} level={level} onAction={onAction} onResearch={onResearch} researchName={researchName} unblocks={unblocks} />
   </PlateFrame>;
 }

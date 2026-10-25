@@ -67,6 +67,12 @@ export interface HudSnapshot {
    * elapsed. Always set by the view; optional only until hand-built fixtures add it.
    */
   readonly income?: { readonly dataPerSec: number; readonly creditsPerSec: number };
+  /**
+   * Recent net income per second, for ETAs: the last 30 s of round time, energy included, so it goes
+   * negative when the bill outruns pay (ResearchTreeView.income uses it). Between rounds, the last
+   * report's average; 0 until 10 s have elapsed. Optional only until hand-built fixtures add it.
+   */
+  readonly incomeRecent?: { readonly dataPerSec: number; readonly creditsPerSec: number };
 }
 
 /** The market: the endless queue's visible window, the head clock and the work in transfer (spec §16.2). */
@@ -134,7 +140,8 @@ export interface CoreView {
   readonly rate: number;
   /**
    * The core's live clock in Hz: the socket clock × its active modifiers (spec §9.3: DVFS or turbo,
-   * thermal throttle, power caps). 0 while it sleeps, and while its system is unpowered.
+   * thermal throttle, power caps). Paused between rounds: the nominal (ready) clock. 0 while it sleeps,
+   * and while its system is asleep or powered off.
    */
   readonly hz: number;
   /** The sleep state while the core sleeps: an idle core's C-state, or 'S3' with its whole system asleep; else null. */

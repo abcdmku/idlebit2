@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { createInitialState, quote, rackId, roomId, systemId, type EffectPreview, type NodeRef, type Quote } from '../../game';
-import { buildOffers, changeText, EXTRA_ROWS, extraOffer, extraRequest, linkRequest } from './offers';
+import { actionable, buildOffers, changeText, EXTRA_ROWS, extraOffer, extraRequest, linkRequest } from './offers';
 
 const nodes: readonly NodeRef[] = [
   { level: 'chip', id: systemId(0) }, { level: 'system', id: systemId(0) },
@@ -77,14 +77,17 @@ describe('one grammar and one list (A08, A14)', () => {
     const rows = buildOffers('system', tray, null).rows;
     expect(rows.map(r => r.key)).toEqual(['cpu', 'ram', 'storage', 'link', 'psu']);
     expect(rows.map(r => [r.name, r.change, r.right.kind])).toEqual([
-      ['CPU', '1 → 2 slots', 'research'], ['Add RAM', '0 → 1 slots', 'price'], ['Storage', '1 → 2 slots', 'max'], ['Pipe', '—', 'none'], ['PSU', '—', 'none']]);
+      // QA-08, QA-23: a maxed row says only where it stands; one slot is singular
+      ['CPU', '1 → 2 slots', 'research'], ['Add RAM', '0 → 1 slot', 'price'], ['Storage', '1 slot', 'max'], ['Pipe', '—', 'none'], ['PSU', '—', 'none']]);
     expect(rows[0]!.right).toEqual({ kind: 'research', node: 'Dual socket' });
   });
   it('the System lists its PSU from the part quote, and the tile names the next unlock when nothing is priced', () => {
     const psu = offer(effect('W', 32_800, 65_500));
     const o = buildOffers('system', null, null, [psu]);
     expect(o.rows.at(-1)).toMatchObject({ key: 'psu', slot: 'psu', name: 'PSU', price: 12 });
-    expect(o.next?.key).toBe('psu');
+    // QA-05: a supply is featured only near its limit
+    expect(o.next).toBeNull();
+    expect(buildOffers('system', null, null, [psu], { cacheLevels: 1, supplyNear: new Set(['psu']) }).next?.key).toBe('psu');
     const locked = { ...offer(slots(1, 2)), locked: { code: 'research' as const, node: 'dualSocket' as never, text: 'Needs Dual socket' } };
     const none = buildOffers('system', [locked, locked, locked, locked], null);
     expect([none.next, none.unlock?.key]).toEqual([null, 'cpu']);
@@ -128,5 +131,20 @@ describe('start controller rows (D31.2)', () => {
   it('an upgrade with no capacity effect reads its level step', () => {
     const up = { ...offer(effect('slots', 0, 1)), effect: null, label: 'Room start control · L3', action: { type: 'upgradePart', part: { unit: { kind: 'room', id: roomId(0) }, slot: { kind: 'roomStart' } } } } as unknown as Quote;
     expect(buildOffers('room', null, null, [null, up]).rows.find(r => r.key === 'roomStart')?.change).toBe('L2 → L3');
+  });
+});
+
+describe('the featured buy answers the wall (QA-05)', () => {
+  const at = (price: number, e = effect('slots', 1, 2)) => ({ ...offer(e), cost: String(price) as never });
+  it('prefers what the head is blocked on, saving up for it, over a cheaper affordable buy', () => {
+    const tray = [at(5), { ...at(500, effect('bits', 1, 2)), affordable: false }, at(8, effect('Hz', 1, 2)), at(9)];
+    expect(buildOffers('chip', tray, null).next?.key).toBe('core');
+    expect(buildOffers('chip', tray, null, [], { cacheLevels: 1, wall: ['cache'] }).next?.key).toBe('cache');
+  });
+  it('never points at Max: a maxed wall row falls back to the cheapest buy', () => {
+    const maxed = { ...at(500, effect('bits', 2, 2)), locked: { code: 'ceiling' as const, node: null, text: 'Max' } };
+    const tray = [at(5), maxed, at(8, effect('Hz', 1, 2)), at(9)];
+    expect(buildOffers('chip', tray, null, [], { cacheLevels: 1, wall: ['cache'] }).next?.key).toBe('core');
+    expect(actionable(buildOffers('chip', tray, null).rows[1]!)).toBe(false);
   });
 });

@@ -5,12 +5,12 @@
 // Return to market key. Closing it dismisses the report; the head's key then returns.
 import { useContext, useEffect, useRef, type CSSProperties } from 'react';
 import { FAIL_CAUSES, formatOps } from '../game';
-import type { EnergyBreakdown, FailCause, FailDetail, RoundReport, RoundTypeTally } from '../game';
+import type { EnergyBreakdown, FailCause, FailDetail, RoundEndedBy, RoundReport, RoundTypeTally } from '../game';
 import { P, drawCause, typeColor, typeName } from '../render/core';
 import { ArtCanvas } from './art/ArtCanvas';
 import { drawMiniIcon } from './art/deckArt';
 import { OffersContext } from './deck/useOffers';
-import type { Offer, Offers } from './deck/offers';
+import { actionable, WALL_ROWS, type Offer, type Offers } from './deck/offers';
 import { offerAction, PriceText, RightText } from './deck/offerUi';
 import { CurrencyIcon } from './Hud';
 import { useDialogFocus } from './hooks/useDialogFocus';
@@ -49,10 +49,6 @@ export function detailLine(report: RoundReport): string {
  * The build rows that answer a failure detail, best first, on the level the player is looking at.
  * Spill (D26): more RAM keeps work off the disk; a faster drive makes what still spills quicker.
  */
-const FIX_ROWS: Readonly<Partial<Record<FailDetail, readonly string[]>>> = {
-  cache: ['cache'], ram: ['ram', 'storage'], disk: ['ram', 'storage'], gpu: ['gpu'], gpuCores: ['gpu'], vram: ['gpu'], link: ['link'],
-  psu: ['psu'], pdu: ['pdu'], ups: ['ups'], rack: ['rackCooler'], room: ['roomCooler'],
-};
 /** A timeout is too little speed: the clock on a CPU, the CPU on a system. */
 const SLOW_ROWS = ['clock', 'cpu', 'core'];
 
@@ -63,9 +59,10 @@ export function fixOffer(report: RoundReport, offers: Offers | null): Offer | nu
   // Work that ran mostly from disk was slow because RAM was short (D26.2): a timeout or a late task is fixed by RAM first.
   const spilled = report.spill && report.deliveredWork > 0 && report.spill.diskWork / report.deliveredWork >= 0.25;
   const slow = top.cause === 'timeout' || top.cause === 'late';
-  const keys = top.detail && FIX_ROWS[top.detail] ? FIX_ROWS[top.detail]!
+  const keys = top.detail && WALL_ROWS[top.detail] ? WALL_ROWS[top.detail]!
     : slow ? (spilled || top.cause === 'late' ? ['ram', 'storage', ...SLOW_ROWS] : SLOW_ROWS) : [];
-  for (const k of keys) { const o = offers.rows.find(r => r.key === k && r.quote); if (o) return o; }
+  // Never a dead end (QA-05): a maxed part or a lock with no research behind it is no fix.
+  for (const k of keys) { const o = offers.rows.find(r => r.key === k && actionable(r)); if (o) return o; }
   return null;
 }
 
@@ -117,7 +114,7 @@ function plateStyle(L: ShellLayout): CSSProperties {
 export function RoundReportPlate({ report, percent, onReturn, onClose }: {
   report: RoundReport; percent: number; onReturn: () => void; onClose: () => void;
 }) {
-  const ref = useRef<HTMLElement>(null), L = useLayout(), n = L.N, offers = useContext(OffersContext), wide = L.kind === 'desktop';
+  const ref = useRef<HTMLElement>(null), L = useLayout(), n = L.N, offers = useContext(OffersContext);
   useDialogFocus(ref, onClose);
   const failed = FAIL_CAUSES.reduce((sum, c) => sum + report.failedByCause[c], 0);
   const chips = failedByType(report.byType ?? []);
@@ -126,7 +123,7 @@ export function RoundReportPlate({ report, percent, onReturn, onClose }: {
     data-testid="round-plate" style={{ ...plateStyle(L), overflowY: 'auto' }} onPointerDown={e => e.stopPropagation()} onWheel={e => e.stopPropagation()}>
     <header className="p-head">
       <b className="p-title">Round over</b>
-      <span className="p-sub">Round {report.index} · {clockText(report.durationMs)} · {report.endedBy === 'player' ? 'Ended by you' : 'SLA under 80%'}</span>
+      <span className="p-sub">Round {report.index} · {clockText(report.durationMs)} · {ENDED_BY[report.endedBy]}</span>
       <button type="button" className="p-x" aria-label="Close report" onClick={onClose}>
         <i className="x-glyph" aria-hidden="true" style={{ width: 12, height: 12, '--x-w': '1px' } as CSSProperties} /></button>
     </header>
@@ -153,8 +150,8 @@ export function RoundReportPlate({ report, percent, onReturn, onClose }: {
         <b style={{ color: typeColor(c.type) }}>{typeName(c.type)}</b> {c.text}</span>) : <span className="dim"> none</span>}</p>
     {/* Earned, energy and net as a 2 × 2 grid, so the plate fits the view with its Return key in sight. */}
     <ul className="p-list rp-bottom">
-      <li><span>Credits{wide ? '' : ' earned'}</span><span className="v gold"><CurrencyIcon kind="credits" n={n} />{amountText(report.gross)}</span></li>
-      <li><span>Data{wide ? '' : ' earned'}</span><span className="v data"><CurrencyIcon kind="data" n={n} />{amountText(report.data)}</span></li>
+      <li><span>Credits earned</span><span className="v gold"><CurrencyIcon kind="credits" n={n} />{amountText(report.gross)}</span></li>
+      <li><span>Data earned</span><span className="v data"><CurrencyIcon kind="data" n={n} />{amountText(report.data)}</span></li>
       {energy !== null && <li><span>Energy</span><span className="v mute" data-testid="rp-energy">−<CurrencyIcon kind="credits" n={n} />{amountText(energy)}</span></li>}
       {net !== null && <li><span>Net</span><span className="v gold" data-testid="rp-net"><CurrencyIcon kind="credits" n={n} />{amountText(net)}</span></li>}
     </ul>
@@ -168,6 +165,11 @@ export function RoundReportPlate({ report, percent, onReturn, onClose }: {
     </div>
   </section>;
 }
+
+/** Why the round ended, in the report's subtitle (spec §4.1, D33). */
+export const ENDED_BY: Readonly<Record<RoundEndedBy, string>> = {
+  sla: 'SLA under 80%', player: 'Ended by you', stall: 'Stalled · nothing completed for 2 min',
+};
 
 /** D31 energy lines: billed and paid (−), unbilled (saved by batteries and generation). */
 const ENERGY_LINES: readonly { key: keyof EnergyBreakdown; label: string; paid: boolean }[] = [

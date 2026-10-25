@@ -136,7 +136,8 @@ export function calloutModel(t: HitTarget, focus: LevelSnapshot, quotes: QuoteRe
   const research = lock?.code === 'research' && !offer!.where && !/^Upgrade at /.test(lock.text) ? lock.text.replace(/^Needs /, '') : null;
   if (research) {
     // Locked grammar (A07): the title is what you get, line 2 what it needs, the key opens it.
-    change = `Needs research: ${research}`;
+    // An installed core upgrades its own lanes; the Cores row adds cores. Say which, so the two never read as a contradiction (QA-23).
+    change = own ? `More lanes: needs ${research}` : `Needs research: ${research}`;
   }
   return { name, change, offer, research, drill };
 }

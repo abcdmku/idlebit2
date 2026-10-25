@@ -31,4 +31,11 @@ describe('core live clock (spec §9.3)', () => {
     expect(running.rate).toBe(asleep.rate);
     expect(running.rate).toBeGreaterThan(running.hz);
   });
+
+  it('between rounds, a paused core shows its ready (nominal) clock and no sleep state', () => {
+    const s = buildState({ seed: 42, sites: 1, zonesPerSite: 1, racksPerZone: 1, serversPerRack: 1, unlocks: 'max', round: 'between' });
+    const chip = chipOf(s);
+    expect(chip.online).toBe('paused');
+    expect(chip.cores.map((c) => [c.hz, c.sleep])).toEqual(chip.cores.map(() => [chip.clock.hz, null]));
+  });
 });

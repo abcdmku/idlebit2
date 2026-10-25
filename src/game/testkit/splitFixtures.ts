@@ -53,17 +53,21 @@ const midRoom = (racks: number, port: number, uplink: number, queue: number) => 
   switch: { gen: 0, ports: Array(racks).fill(port), uplinks: [uplink], sameSpeed: true },
 });
 
-/** Market intensity where Parallel and Accelerated families are drawn and sized to split 4+ ways. */
-export const SPLIT_INTENSITY = 16;
+/**
+ * D29: links run at the 100 kHz default rung (6) or faster, so shards stay visible by being big: the
+ * market opens where a Parallel or Accelerated task is 1e5–3e5 bits, and a 6-way shard spends about
+ * 0.3 s on a 100 kHz port. Each fleet's intensity is the one its split width needs.
+ */
 const WARM_TICKS = 120;
+const D29_PORT = 6;
 
 interface SplitShape {
   readonly zones: number; readonly racks: number; readonly servers: number; readonly gpuEvery: number;
   /** Ladder rungs: rack ports, rack uplink, room ports, room uplink. */
   readonly port: number; readonly uplink: number; readonly roomPort: number; readonly roomUplink: number;
-  readonly rackQueue: number; readonly roomQueue: number;
+  readonly rackQueue: number; readonly roomQueue: number; readonly intensity: number;
 }
-function splitFleet(o: SplitShape): GameState {
+export function splitFleet(o: SplitShape): GameState {
   const built = buildState({
     seed: 42, sites: 1, zonesPerSite: o.zones, racksPerZone: o.racks, serversPerRack: o.servers, unlocks: 'max',
     credits: '2500000', data: '40000', system: midSystem(o.gpuEvery), rack: midRack(o.servers, o.port, o.uplink, o.rackQueue),
@@ -71,24 +75,24 @@ function splitFleet(o: SplitShape): GameState {
     // The gen 0 data plane opens at rung 50 and draws megawatts; kHz zones run it at the room uplink's rung.
     site: (site) => ({ ...site, dataPlane: { ...site.dataPlane, k: o.roomUplink } }),
   });
-  return advanceGameOwned(primeMarket(built, SPLIT_INTENSITY), WARM_TICKS * TICK_MS).state;
+  return advanceGameOwned(primeMarket(built, o.intensity), WARM_TICKS * TICK_MS).state;
 }
 
 export const SPLIT_FLEETS = {
-  /** One rack of 8 GPU servers: 5 kHz ports, one 50 kHz uplink, LB queue L3. Splits 8 ways. */
+  /** One rack of 6 GPU servers: 100 kHz ports, one 200 kHz uplink (shards cross it in turn), LB queue L3. Splits 6 ways. */
   rackSplit: (): GameState => splitFleet({
-    zones: 1, racks: 1, servers: 8, gpuEvery: 1, port: 2, uplink: 5, roomPort: 5, roomUplink: 5, rackQueue: 3, roomQueue: 3,
+    zones: 1, racks: 1, servers: 6, gpuEvery: 1, port: D29_PORT, uplink: 7, roomPort: 7, roomUplink: 7, rackQueue: 3, roomQueue: 3, intensity: 17.5,
   }),
   /**
-   * One room of 4 racks × 4 servers (GPUs on odd slots): 5 kHz ports, 10 kHz rack links, and a
-   * 50 kHz room uplink that carries every shard in turn (they wait at its mouth). LB queues L3, room L4.
+   * One room of 3 racks × 2 GPU servers: 100 kHz ports and rack links, and a 200 kHz
+   * room uplink that carries every shard in turn (they wait at its mouth). LB queues L3, room L4.
    */
   roomSplit: (): GameState => splitFleet({
-    zones: 1, racks: 4, servers: 4, gpuEvery: 2, port: 2, uplink: 3, roomPort: 3, roomUplink: 5, rackQueue: 3, roomQueue: 4,
+    zones: 1, racks: 3, servers: 2, gpuEvery: 1, port: D29_PORT, uplink: D29_PORT, roomPort: D29_PORT, roomUplink: 7, rackQueue: 3, roomQueue: 4, intensity: 18.5,
   }),
-  /** One site of 2 zones, each 2 racks × 4 servers: the roomSplit links, split across zones over the data plane. */
+  /** One site of 2 zones, each 2 racks × 2 servers: the roomSplit links, split across zones over the data plane. */
   globalSplit: (): GameState => splitFleet({
-    zones: 2, racks: 2, servers: 4, gpuEvery: 2, port: 2, uplink: 3, roomPort: 3, roomUplink: 5, rackQueue: 3, roomQueue: 4,
+    zones: 2, racks: 2, servers: 2, gpuEvery: 1, port: D29_PORT, uplink: D29_PORT, roomPort: D29_PORT, roomUplink: 7, rackQueue: 3, roomQueue: 4, intensity: 18,
   }),
 } as const;
 export type SplitFleetName = keyof typeof SPLIT_FLEETS;

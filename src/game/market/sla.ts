@@ -48,7 +48,7 @@ export function countOutcomes(w: World): void {
   }
   ring.met[row] = met;
   ring.failed[row] = failed;
-  if (met !== 0) g[G.met] = g[G.met]! + met;
+  if (met !== 0) { g[G.met] = g[G.met]! + met; g[G.lastMetTick] = w.tick; }
   if (failed !== 0) g[G.failed] = g[G.failed]! + failed;
   pushOutcomes(g, met, failed);
   g[G.deliveredWork] = g[G.deliveredWork]! + g[G.metWorkTick]!;

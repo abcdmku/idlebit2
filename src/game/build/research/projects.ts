@@ -4,7 +4,7 @@ import { compileAll, syncHotSizes } from '../../core/topology';
 import type { World } from '../../core/world';
 import type { ResearchId } from '../../types/ids';
 import type { ResearchState } from '../../types/state';
-import { deriveUnlocks, openContainers } from './effects';
+import { deriveUnlocks, openContainers, sizePsusForSystem } from './effects';
 import { researchDef } from './tree';
 import { reconcileAccelerators } from '../../exec';
 
@@ -49,8 +49,11 @@ function complete(w: World, id: ResearchId): void {
   r.completed = [...r.completed, id];
   r.active = null;
   r.activeProgress = 0;
+  const hadSystem = r.unlocks.levels.system;
   r.unlocks = deriveUnlocks(r.completed);
-  const opened = openContainers(w.build, r.unlocks);
+  let opened = openContainers(w.build, r.unlocks);
+  // QA-02: the board PSU's limit starts with System; every PSU is raised, free, to cover its system.
+  if (!hadSystem && r.unlocks.levels.system) opened = sizePsusForSystem(opened, r.unlocks);
   w.build = { ...opened, revision: w.build.revision + 1 };
   w.compiled = compileAll(w.build, r);
   syncHotSizes(w.hot, w.compiled);

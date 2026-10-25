@@ -6,6 +6,7 @@ import type { Fill } from '../../core/testCanvas';
 import type { RoomSnapshot } from '../../../game';
 import { createRoomRenderer } from '.';
 import { CASES, roomCase } from './fixtures';
+import { portSpeed } from './labels';
 import { LB_RECT, NET_FOOT, SPINE, THERMO } from './layout';
 
 // jsdom has no Canvas2D: static layers fall back to direct drawing (quietly).
@@ -131,5 +132,14 @@ describe('room performance', () => {
       ms = Math.min(ms, (performance.now() - t0) / 10);
     }
     expect(ms).toBeLessThan(2);
+  });
+});
+
+describe('QA-25: the Net rack tag', () => {
+  it('reads the room switch port speed (what the deck upgrades), not the uplink', () => {
+    const s = CASES.overview!(0);
+    expect(portSpeed(s)).toBe(s.network.switch.ports[0]!.speedHz);
+    const mixed = { ...s, network: { ...s.network, switch: { ...s.network.switch, ports: [{ ...s.network.switch.ports[0]!, speedHz: 2e5 }, { ...s.network.switch.ports[0]!, speedHz: 1e5 }] } } };
+    expect(portSpeed(mixed)).toBe(1e5);
   });
 });

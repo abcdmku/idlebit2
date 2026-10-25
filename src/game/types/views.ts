@@ -509,8 +509,9 @@ export interface ResearchTreeView {
   /** Each root's current spec at the focused system (and its rack, room, site); "none" for parts not owned yet. */
   readonly parts: Readonly<Record<ResearchPartId, ResearchPartView>>;
   /**
-   * Round-time income for ETAs, per second: this round's Data and net Credits (gross − energy) over
-   * its elapsed time while it runs; else the last report's over its duration. 0 until 10 s have elapsed.
+   * Recent round-time income for ETAs, per second (same as HudSnapshot.incomeRecent): net Credits
+   * (gross − energy) over the last 30 s of the running round, negative when energy outruns pay; else
+   * the last report's average. 0 until 10 s have elapsed.
    */
   readonly income: { readonly dataPerSec: number; readonly creditsPerSec: number };
   readonly active: ResearchId | null;

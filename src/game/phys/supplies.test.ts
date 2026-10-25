@@ -49,7 +49,7 @@ describe('board PSU on the lone system', () => {
     physTicks(w, 1);
     expect(w.hot.sys.mode[0]).toBe(MODE.dark);
     expect(w.hot.sys.psuOverTicks[0]).toBe(0);
-    expect(killSubtree).toHaveBeenCalledWith(w, { kind: 'system', id: 0 }, 'power');
+    expect(killSubtree).toHaveBeenCalledWith(w, { kind: 'system', id: 0 }, 'power', 'psu');
     expect(w.events.entries.at(-1)).toMatchObject({ kind: 'supplyFailed', supply: { kind: 'psu', id: 0 } });
     // Dark for the full boot time, drawing nothing.
     physTicks(w, 99);
@@ -85,7 +85,7 @@ describe('rack PDU', () => {
     physTicks(w, 100);
     expect(w.hot.rack.pduFailed[0]).toBe(1);
     expect([w.hot.sys.mode[0], w.hot.sys.mode[1]]).toEqual([MODE.dark, MODE.dark]);
-    expect(killSubtree).toHaveBeenCalledWith(w, { kind: 'rack', id: 0 }, 'power');
+    expect(killSubtree).toHaveBeenCalledWith(w, { kind: 'rack', id: 0 }, 'power', 'pdu');
     physTicks(w, 100);
     expect(w.hot.rack.pduFailed[0]).toBe(0);
     expect(w.hot.sys.mode[1]).toBe(MODE.onMarket);

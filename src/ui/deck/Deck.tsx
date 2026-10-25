@@ -13,6 +13,7 @@ import { box, T, useLayout } from '../shell/geometry';
 import { shallowEqual, useGameSelector, useShell, useViewState } from '../storeHooks';
 import { BuildSheet } from './BuildSheet';
 import { etaText, useCreditsPerSec } from './eta';
+import { fits } from '../queue/taskText';
 import { NowCard } from './NowCard';
 import type { Offers } from './offers';
 import { offerAction, PriceText, RightText, useTapOffer } from './offerUi';
@@ -48,7 +49,8 @@ function BuyButton({ offers }: { offers: Offers }) {
         <T right={L.lat} y={0} h={b.h}><PriceText offer={nx} n={n} /></T>
       </> : <>
         {/* The name has its own line (it never shares one with the price); the price sits by the call to buy. */}
-        <T x={tx} y={8} w={b.w - tx - 8}><b>{nx.name}</b></T>
+        {/* A long first add drops its "Add" rather than its name; line 2 shows it starts from nothing. */}
+        <T x={tx} y={8} w={b.w - tx - 8}><b>{fits(nx.name, b.w - tx - 8, L.body) ? nx.name : nx.name.replace(/^Add /, '')}</b></T>
         <T x={tx} y={24} w={b.w - tx - 8} className={`${can ? '' : 'mute'}`}>{nx.change}</T>
         {/* Saving up: how long at this round's income, when there is one. */}
         <T x={8} y={40} className={can ? 'gold' : 'dim'}>{can ? 'Tap to buy' : eta ?? 'Saving up'}</T>

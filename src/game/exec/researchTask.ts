@@ -94,11 +94,16 @@ export function recountResearchThreads(w: World): void {
   w.hot.g[G.busyThreads] = w.hot.g[G.busyThreads]! + total;
 }
 
-/** Room to take the research task now: a slot like any task, and at least one free thread. */
+/**
+ * Room to take the research task now. In a round: a slot like any task (QA-03: no free thread needed; it
+ * cut the line, so it also cuts the system's queue and runs on the next thread a task frees). Between
+ * rounds: a free thread.
+ */
 function canTake(w: World, s: number): boolean {
   const c = w.compiled.sys, h = w.hot.sys;
-  if (h.researchThreads[s]! > 0 || h.busyThreads[s]! >= hwThreads(w, s)) return false;
+  if (h.researchThreads[s]! > 0) return false;
   if (w.round.phase === 'running') return canAdmit(w, s);
+  if (h.busyThreads[s]! >= hwThreads(w, s)) return false;
   // Between rounds the market is paused and nothing else runs: a powered, linked server the player
   // keeps online takes it. One switched offline holds nothing and draws nothing (spec §11.3).
   return c.alive[s] === 1 && c.intent[s] === 1 && c.kind[s] !== STORAGE_NODE && h.mode[s] === MODE.paused && hasLink(w, s);
@@ -137,7 +142,9 @@ export function researchTakePhase(w: World): boolean {
   for (let s = 0; s < w.compiled.sys.len; s += 1) {
     if (!canTake(w, s)) continue;
     const free = hwThreads(w, s) - h.busyThreads[s]!;
-    hold(w, s, w.round.phase === 'running' ? Math.min(ROUND_THREADS, free) : free);
+    // In a round the holder claims its thread even while every thread runs a task: queued tasks wait
+    // behind it, and it starts researching when the next running task frees a thread (research.ts).
+    hold(w, s, w.round.phase === 'running' ? ROUND_THREADS : free);
     if (w.round.phase === 'running') noteTake(w, s);
   }
   if (g[G.researchHolders]! === 0) return false;

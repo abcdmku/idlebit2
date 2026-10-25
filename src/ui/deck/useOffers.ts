@@ -1,6 +1,28 @@
 import { createContext, createElement, useContext, useEffect, useMemo, type ReactNode } from 'react';
 import { useGameSelector, useQuote, useShell, useViewState } from '../storeHooks';
-import { buildOffers, EXTRA_ROWS, extraOffer, extraRequest, linkRequest, type Offers } from './offers';
+import type { RenderSnapshot } from '../../game';
+import { buildOffers, EXTRA_ROWS, extraOffer, extraRequest, linkRequest, WALL_ROWS, type Offers } from './offers';
+
+/** A timeout is too little speed: the clock on a CPU, the CPU on a system. */
+const SLOW_ROWS = ['clock', 'cpu', 'core'];
+/** Draw at or above this share of a supply's capacity (or a lump this hot) makes it worth featuring. */
+const NEAR = 0.8, HOT_F = 85;
+
+/**
+ * QA-05: what the wall is now, as row keys (the head's block, else last round's top failure), and which
+ * supplies run near their limit. A string, so the selector only changes when the answer does.
+ */
+export function wallKey(s: RenderSnapshot): string {
+  const report = s.round.lastReport, top = report?.details[0];
+  const wall = s.feed.blockedBy ? WALL_ROWS[s.feed.blockedBy] ?? []
+    : top ? WALL_ROWS[top.detail] ?? (top.cause === 'timeout' || top.cause === 'late' ? SLOW_ROWS : [])
+    : report && (report.failedByCause.timeout > 0 || report.failedByCause.late > 0) ? SLOW_ROWS : [];
+  const f = s.focus, near: string[] = [];
+  if ((f.level === 'system' || f.level === 'chip') && f.psu.usage >= NEAR) near.push('psu');
+  if (f.level === 'rack') { if (f.pdu.usage >= NEAR) near.push('pdu'); if (f.tempF >= HOT_F || f.throttled) near.push('rackCooler'); }
+  if (f.level === 'room') { if (f.ups.some(u => u.usage >= NEAR)) near.push('ups'); if (f.tempF >= HOT_F) near.push('roomCooler'); }
+  return `${wall.join(',')}|${near.join(',')}`;
+}
 
 /**
  * The visible level's offers: tray quotes (R13 order), the inbound link and the level's other parts
@@ -17,10 +39,16 @@ export function useOffers(): Offers {
   const defs = EXTRA_ROWS[at.level] ?? [];
   const extra0 = useQuote(defs[0] ? extraRequest(at, defs[0]) : null), extra1 = useQuote(defs[1] ? extraRequest(at, defs[1]) : null);
   const cacheLevels = useGameSelector(s => (s.focus.level === 'chip' ? s.focus.cache.levels.length : 1));
+  const wk = useGameSelector(wallKey, Object.is, 500);
   useEffect(() => { surface.buildQuotes = tray; }, [surface, tray]);
   useEffect(() => () => { surface.buildQuotes = null; }, [surface]);
   return useMemo(() => buildOffers(at.level, quotes, link?.quotes[0] ?? null,
-    [extraOffer(extra0?.quotes), extraOffer(extra1?.quotes)], { cacheLevels }), [at.level, quotes, link, extra0, extra1, cacheLevels]);
+    [extraOffer(extra0?.quotes), extraOffer(extra1?.quotes)], wallContext(cacheLevels, wk)), [at.level, quotes, link, extra0, extra1, cacheLevels, wk]);
+}
+
+function wallContext(cacheLevels: number, key: string) {
+  const [wall = '', near = ''] = key.split('|');
+  return { cacheLevels, wall: wall ? wall.split(',') : [], supplyNear: new Set(near ? near.split(',') : []) };
 }
 
 /** One set of offers for the deck and the callout; the shell provides it. */

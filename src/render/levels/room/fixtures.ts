@@ -95,6 +95,8 @@ export const CASES: Readonly<Record<string, (timeMs: number) => RoomSnapshot>> =
   azB: t => roomCase({ zone: 1, zones: [0, 1, null], built: [0, 1, 2] }, t),
   empty: t => roomCase({ built: [] }, t),
   paused: t => roomCase({}, t),
+  /** QA-20: the network rack's LCD with a four-letter strategy (FIFO). */
+  fifo: t => roomCase({ strategy: 'firstFit' }, t),
   /** D31: the room start controller: racks 3 and 9 in standby, rack 8 powering on, racks 1 and 2 mostly asleep. */
   power: t => roomCase({ start: { standby: [3, 9], waking: 8, sleepy: [1, 2] } }, t),
   /** Between rounds: rack 2 is off market; rack 1 has three sleds sitting out. Use with ?paused. */

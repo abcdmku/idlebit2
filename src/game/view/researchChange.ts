@@ -28,7 +28,9 @@ const percent = (f: number): string => `${Math.round(f * 100)}%`;
 const change = (label: string, before: string, after: string): ResearchChangeView => ({ label, before, after });
 
 /** The scheduler's queue at level 1 of generation g, as the board prints it. */
-const queueText = (g: number): string => (g < 0 ? 'none' : `${capacity2(PARTS.scheduler, g, 1)} tasks`);
+const queueText = (g: number): string => (g < 0 ? 'No queue' : `${capacity2(PARTS.scheduler, g, 1)} tasks`);
+/** Before for a part with no generation researched yet: a dash, never "none → Hz L2". */
+const NOT_YET = '—';
 
 function genChange(state: GameState, e: Extract<ResearchEffect, { kind: 'gen' }>): ResearchChangeView | null {
   const u = state.research.unlocks;
@@ -37,7 +39,7 @@ function genChange(state: GameState, e: Extract<ResearchEffect, { kind: 'gen' }>
   if (e.part === 'scheduler') return change('Queue', queueText(have), queueText(e.gen));
   const label = GEN_LABEL[e.part];
   if (!label) return null;
-  return change(label, have < 0 ? 'none' : partName(e.part, have), partName(e.part, e.gen));
+  return change(label, have < 0 ? NOT_YET : partName(e.part, have), partName(e.part, e.gen));
 }
 
 /** Idle power of a sleeping core: the deepest researched C-state's factor, or full power. */

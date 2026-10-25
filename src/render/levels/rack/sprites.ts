@@ -44,12 +44,12 @@ function lcdLine(v: ServerSlotView, look: ServerLook, max: number): string {
   switch (look) {
     case 'crash': return 'HALTED';
     case 'noport': return max >= 7 ? 'NO PORT' : 'NO NET';
-    case 'offline': return 'OFFLINE';
+    case 'offline': return max >= 7 ? 'OFFLINE' : 'OFF';
     case 'paused': return 'READY';
     case 'out': return 'OFF';
     case 'asleep': return 'SLEEP';
     case 'waking': return label('WAKE ', Math.max(1, Math.ceil((v.wakeMs ?? 0) / 1000)));
-    case 'boot': return label('BOOT ', Math.max(0, Math.ceil(v.timerS ?? 0)));
+    case 'boot': { const n = Math.max(0, Math.ceil(v.timerS ?? 0)); return n >= 10 && max < 7 ? label('BT ', n) : label('BOOT ', n); }
     default: break;
   }
   if (v.running > 0) return label('RUN ', v.running);

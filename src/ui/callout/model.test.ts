@@ -58,7 +58,7 @@ describe('callout quote effects', () => {
     const offers = buildOffers('chip', tray, null);
     const own = calloutModel(target, focus, null, offers);
     expect([own.name, own.offer]).toEqual(['Core 1', offers.cores[0]]);
-    expect(own.change).toBe(`Needs research: ${tray[4]!.locked!.text.replace(/^Needs /, '')}`);
+    expect(own.change).toBe(`More lanes: needs ${tray[4]!.locked!.text.replace(/^Needs /, '')}`);
     // Core 2 needs research: the callout names what you get, and its key opens the research (A07)
     const site = calloutModel({ ...target, part: { ...target.part!, slot: { kind: 'core', socket: 0, index: 1 } } }, focus, null, offers);
     expect([site.name, site.change, site.offer]).toEqual(['Add Core 2', `Needs research: ${tray[0]!.locked!.text.replace(/^Needs /, '')}`, offers.rows[0]]);

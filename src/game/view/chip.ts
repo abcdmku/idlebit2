@@ -108,10 +108,12 @@ export function chipSnapshot(state: GameState, id: SystemId, parent: NodeRef | n
   // Live clock (spec §9.3): the socket clock × clockFactor (P-state, thermal throttle, power caps).
   // Unpowered modes run no clock; an S3-asleep system's cores all sleep; an idle core sinks to the C-state.
   const draw = drawKind(h.mode[id] ?? MODE.empty, (state.hot.g[G.researchHolders] ?? 0) > 0);
-  const liveHz = draw === DRAW_NONE || draw === DRAW_SLEEP ? 0 : hz * (h.clockFactor[id] ?? 1);
+  // Paused between rounds: the ready clock (nominal); its real speed returns when the round starts.
+  const paused = h.mode[id] === MODE.paused;
+  const liveHz = paused ? hz : draw === DRAW_NONE || draw === DRAW_SLEEP ? 0 : hz * (h.clockFactor[id] ?? 1);
   const cores: CoreView[] = parts.map((part, i) => {
     const busy = Math.max(0, Math.min(tpc, busyThreads - i * tpc)) / tpc;
-    const sleep: CoreSleep | null = draw === DRAW_SLEEP ? 'S3' : draw !== DRAW_NONE && busy === 0 && cstate > 0 ? `C${cstate as 1 | 3 | 6}` : null;
+    const sleep: CoreSleep | null = paused ? null : draw === DRAW_SLEEP ? 'S3' : draw !== DRAW_NONE && busy === 0 && cstate > 0 ? `C${cstate as 1 | 3 | 6}` : null;
     return {
       socket: 0, lanes: coreLanes(state, part), rate: capacity(PARTS.core, part.gen, part.level) * hz, generation: part.gen, level: part.level, busy,
       hz: sleep === null ? liveHz : 0, sleep,

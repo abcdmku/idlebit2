@@ -11,6 +11,7 @@ import { loadCanvasFont } from './fonts';
 import { copyRect, contains, rect } from './geom';
 import { arbitrateHit } from './hit';
 import { DESKTOP_TYPE, LabelBuffer, PHONE_TYPE, drawLabels, typeForScale } from './labels';
+import type { Typography } from './labels';
 import { BG, P } from './palette';
 import { zoomPath } from './paths';
 import { drawPipe } from './pipe';
@@ -38,6 +39,7 @@ export { reportRenderError } from './errors';
 export function createCanvasRenderer(canvas: HTMLCanvasElement, registry: LevelRegistry): CanvasRendererDebug {
   const g = context2d(canvas), viewport = rect(), ratio: PixelRatio = { x: 1, y: 1 };
   const cam = camera(), targetCam = camera(), oldTarget = camera(), framingFrom = camera(), localCam = camera();
+  let labelType: Typography | null = null;
   const artRect = rect(), artSrc = rect(), artTl = { x: 0, y: 0 }, artBr = { x: 0, y: 0 };
   const focusRect = rect(), visible = rect(), entry = { x: 0, y: 0 }, corner = { x: 0, y: 0 }, scratch = rect(), hitOut = createHitTarget(), zoom = new ZoomTransition(), effects = createEffectPool(1), fb = new Feedback(), popClip = rect();
   const area: { w: number; h: number; scale: number } = { w: 0, h: 0, scale: 1 };
@@ -170,10 +172,11 @@ export function createCanvasRenderer(canvas: HTMLCanvasElement, registry: LevelR
     visible.w = corner.x - visible.x; visible.h = corner.y - visible.y; frame!.visible = visible;
     fill(s.level, 1); blit(s, cam, 1, true);
     const lv = level(s), type = form === 'phone' ? PHONE_TYPE : DESKTOP_TYPE;
+    // The level's labels are written here and drawn after the payout pops (drawWorldLabels, QA-18).
+    labels.clear(); labelType = null;
     if (lv.labels) {
       const worldType = typeForScale(frame!.scale ?? framing?.scale ?? 3);
-      labels.clear();
-      try { lv.labels(s, view!, frame!, labels); drawLabels(g, labels, cam, viewport, ratio, form === 'phone' ? PHONE_TYPE : worldType); }
+      try { lv.labels(s, view!, frame!, labels); labelType = form === 'phone' ? PHONE_TYPE : worldType; }
       catch (error) { reportRenderError(`${s.level} labels`, error); }
     }
     if (lv.partVersion && s !== partsFor) {
@@ -227,6 +230,10 @@ export function createCanvasRenderer(canvas: HTMLCanvasElement, registry: LevelR
     }
     return zoomLayer;
   }
+  /** The rest world's labels, over the payout pops so a rising pop never hides one (QA-18). */
+  function drawWorldLabels(): void {
+    if (labelType) drawLabels(g, labels, cam, viewport, ratio, labelType);
+  }
   function drawPops(): void {
     const n = frame!.scale ?? Math.max(1, Math.round(cam.s / ratio.x)), top = framing?.top ?? 0;
     popClip.x = viewport.x; popClip.y = viewport.y + top; popClip.w = viewport.w; popClip.h = viewport.h - top;
@@ -253,7 +260,7 @@ export function createCanvasRenderer(canvas: HTMLCanvasElement, registry: LevelR
     }
     try { fb.take(next, level(next.focus), form, frame.timeMs, clock.nowS, !zoom.active && !paused); }
     catch (error) { reportRenderError(`${next.focus.level} payoutAnchor`, error); }
-    if (!zoom.active) { drawRest(next.focus, clock.nowS); drawFaults(next.focus); if (!paused) drawPops(); }
+    if (!zoom.active) { drawRest(next.focus, clock.nowS); drawFaults(next.focus); if (!paused) drawPops(); drawWorldLabels(); }
     if (framing) fb.drawFailure(g, clock.nowS, framing, viewport, ratio);
     if (paused) { g.save(); g.translate(viewport.x * ratio.x, viewport.y * ratio.y); drawVeil(g, viewport.w * ratio.x, viewport.h * ratio.y); g.restore(); }
     effects.update(Math.max(0, clock.nowS - lastNow)); lastNow = clock.nowS;

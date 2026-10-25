@@ -11,8 +11,8 @@ export interface PanHandler {
   active(): boolean;
   /** CSS px since the drag began. At 'end', the finger's last velocity in CSS px/s. */
   drag(dxCss: number, dyCss: number, phase: 'start' | 'move' | 'end', vxCss?: number, vyCss?: number): void;
-  /** One wheel step's delta, CSS px. */
-  wheel(dxCss: number, dyCss: number): void;
+  /** One wheel step's delta, CSS px. False when this wheel isn't a pan, so it zooms (QA-12). */
+  wheel(dxCss: number, dyCss: number): boolean;
 }
 /** A drag longer than this many CSS px is a pan, not a tap (L2). */
 export const PAN_SLOP = 6;
@@ -78,7 +78,7 @@ export function bindGestures(canvas: HTMLCanvasElement, handlers: GestureHandler
   };
   const onWheel = (event: WheelEvent) => {
     event.preventDefault();
-    if (handlers.pan?.active() && !handlers.renderer()?.transition) { handlers.pan.wheel(event.deltaX, wheelUnits(event, canvas.clientHeight)); return; }
+    if (handlers.pan?.active() && !handlers.renderer()?.transition && handlers.pan.wheel(event.deltaX, wheelUnits(event, canvas.clientHeight))) return;
     wheel += wheelUnits(event, canvas.clientHeight);
     // One step per threshold; a large wheel gesture can cross the entire reachable hierarchy.
     let steps = Math.min(4, Math.floor(Math.abs(wheel) / 120));

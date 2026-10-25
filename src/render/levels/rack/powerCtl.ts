@@ -5,8 +5,9 @@
 // researched (`powerCtlLocked`), then an open bay with the add mark.
 import { P, R, drawGhost, mix, px } from '../../core';
 import type { GhostState } from '../../core';
+import { formatClock } from '../../../game';
 import type { RackSnapshot } from '../../../game';
-import { OFF, ears, label, lcdText } from './art';
+import { OFF, ears, lcdText } from './art';
 import { POWER_CTL_RECT } from './layout';
 
 type G = CanvasRenderingContext2D;
@@ -16,16 +17,28 @@ const LCD_BG = mix(P.ledOff, P.ink, 0.4), LCD_ON = P.led, LCD_QUIET = mix(P.led,
 export const PWR_FACE = { bat: { dx: 7, w: 16 }, lcd: { dx: 25, w: 34 }, awake: { dx: 61, w: 32 } } as const;
 
 const timeText = new Map<number, string>();
-/** "BAT 4:12" under 10 min, "BAT 42M" under 100 min, then hours; "GRID" once the battery is empty. */
-export function batteryText(secondsLeft: number | null, chargeJ: number): string {
+/**
+ * QA-14: the shared `formatClock` ("4:12", "10:00", then "1.5 h", "12 h"), the plate's format, with
+ * "BAT " in front where the LCD holds it (`maxChars`). "GRID" once the battery is empty.
+ */
+export function batteryText(secondsLeft: number | null, chargeJ: number, maxChars = 8): string {
   if (chargeJ <= 0) return 'GRID';
   if (secondsLeft === null) return 'BAT';
-  const s = Math.max(0, Math.ceil(secondsLeft));
-  if (s >= 6000) return label('BAT ', Math.min(99, Math.floor(s / 3600)), 'H');
-  if (s >= 600) return label('BAT ', Math.floor(s / 60), 'M');
-  let t = timeText.get(s);
-  if (t === undefined) { t = `BAT ${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`; timeText.set(s, t); }
+  const s = Math.max(0, secondsLeft);
+  // formatClock's resolution: whole seconds under an hour, tenths of an hour after (cached, no per-frame strings)
+  const key = (s < 3600 ? Math.floor(s) : 1e6 + Math.floor(s / 360)) * 16 + Math.min(15, maxChars);
+  let t = timeText.get(key);
+  if (t === undefined) {
+    const c = formatClock(s);
+    t = c.length + 4 <= maxChars ? `BAT ${c}` : c;
+    if (timeText.size < 4096) timeText.set(key, t);
+  }
   return t;
+}
+/** Fill columns of a battery bar `w` px wide: the real charge share (full battery, full bar), at least one while any charge is left. */
+export function batteryFill(chargeJ: number, capacityJ: number, w: number): number {
+  if (chargeJ <= 0 || capacityJ <= 0) return 0;
+  return Math.max(1, Math.round(w * Math.min(1, chargeJ / capacityJ)));
 }
 const awakeText = new Map<number, string>();
 /** "4/12 ON": units awake under the controller now, of its total; "12/12" when "ON" doesn't fit `maxChars`. */
@@ -62,8 +75,7 @@ export function drawPowerCtl(g: G, s: RackSnapshot, dark: boolean, quiet: boolea
   // battery: body with its real charge as the fill, terminal on the right
   const bx = r.x + PWR_FACE.bat.dx, bw = PWR_FACE.bat.w, by = r.y + 3;
   R(g, bx, by, bw, 6, P.ink); R(g, bx + bw, by + 2, 1, 2, P.ink);
-  // any charge left shows at least one column: the bar never reads empty while the rack is still unbilled
-  const fill = b.chargeJ > 0 ? Math.max(1, Math.round((bw - 2) * share)) : 0, low = share < 0.25;
+  const fill = batteryFill(b.chargeJ, b.capacityJ, bw - 2), low = share < 0.25;
   R(g, bx + 1, by + 1, bw - 2, 4, mix(face, P.ink, 0.6));
   if (!dark && fill > 0) R(g, bx + 1, by + 1, fill, 4, low ? P.amber : P.led);
 
@@ -71,7 +83,7 @@ export function drawPowerCtl(g: G, s: RackSnapshot, dark: boolean, quiet: boolea
   const lx = r.x + PWR_FACE.lcd.dx, lw = PWR_FACE.lcd.w;
   R(g, lx, r.y + 2, lw, 8, P.ink); R(g, lx + 1, r.y + 3, lw - 2, 6, dark ? P.ink : LCD_BG);
   if (!dark) {
-    const empty = b.chargeJ <= 0, text = batteryText(b.secondsLeft, b.chargeJ);
+    const empty = b.chargeJ <= 0, text = batteryText(b.secondsLeft, b.chargeJ, Math.floor((lw - 3) / 4) + 1);
     lcdText(g, lx + 2, r.y + 3, text, empty ? P.amber : b.discharging && !quiet ? LCD_ON : LCD_QUIET, lx + 1, lx + lw - 1);
   }
   // the awake count under the start controller

@@ -1,6 +1,6 @@
 ﻿import { amount } from './amount';
 import { formatAmount, formatCountdownMs, formatCredits, formatData, formatDurationMs,
-  formatMetric, formatNet, formatPrice, formatRate, formatSeconds, formatSignedAmount, formatWatts, formatSize, formatHertz, formatOps, formatEnergy } from './format';
+  formatMetric, formatNet, formatPrice, formatRate, formatSeconds, formatSignedAmount, formatWatts, formatSize, formatHertz, formatOps, formatEnergy, formatClock } from './format';
 
 // Approved core/format.js fmt/fmtTime and the Phase 0D wallet/part-plate examples.
 describe('shared mockup currency formatting',()=>{
@@ -104,5 +104,14 @@ describe('shared duration and countdown formatting',()=>{
     expect(formatSeconds(42)).toBe('42s');
     expect(formatSeconds('9.95')).toBe('10.0s');
     expect(formatSeconds(-1)).toBe('0.0s');
+  });
+});
+
+describe('display countdown (battery time left)', () => {
+  it.each([
+    [0, '0:00'], [-5, '0:00'], [Infinity, '0:00'], [59.9, '0:59'], [252, '4:12'], [600, '10:00'], [3599, '59:59'],
+    [3600, '1 h'], [5400, '1.5 h'], [7200, '2 h'], [35_999, '9.9 h'], [43_200, '12 h'],
+  ])('%d s reads %s', (seconds, text) => {
+    expect(formatClock(seconds)).toBe(text);
   });
 });

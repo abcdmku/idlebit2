@@ -6,11 +6,12 @@ import type { CSSProperties } from 'react';
 import type { GameAction, ResearchId, ResearchNodeView, ResearchTreeView } from '../../game';
 import { formatOps } from '../../game';
 import { wholeText } from '../plates/format';
-import { durationText, holdSeconds } from './estimate';
+import { etaSpan } from '../hooks/format';
+import { holdSeconds } from './estimate';
 import { leadsTo, PART_NAMES, TAB_NAMES, type Board } from './model';
 import { CURRENCY_NAME, priceOf } from './money';
 import { PriceTag } from './ResearchTree';
-import { keyFor, nodeStatus, secondsLeft, statusText, type KeyContext, type NodeStatus } from './status';
+import { keyFor, NO_INCOME, nodeStatus, secondsLeft, statusText, type KeyContext, type NodeStatus } from './status';
 
 export interface DetailProps {
   readonly node: ResearchNodeView | null;
@@ -42,9 +43,9 @@ function Change({ n }: { n: ResearchNodeView }) {
 function timeText(n: ResearchNodeView, s: NodeStatus, p: DetailProps): string {
   const ops = formatOps(n.workOps);
   if (s.kind === 'done') return ops;
-  if (s.kind === 'running') { const left = secondsLeft(n, p.ctx.line); return left === null ? ops : `${ops} · ${durationText(left)} left`; }
+  if (s.kind === 'running') { const left = secondsLeft(n, p.ctx.line); return left === null ? ops : `${ops} · ${etaSpan(left)} left`; }
   const hold = holdSeconds(n.workOps * (1 - n.progress), p.tree.takenOpsPerSec);
-  if (hold !== null) return `${ops} · holds your hardware ${durationText(hold)}`;
+  if (hold !== null) return `${ops} · holds your hardware ${etaSpan(hold)}`;
   return ops;
 }
 
@@ -73,7 +74,7 @@ function DetailBody({ n, s, p }: { n: ResearchNodeView; s: NodeStatus; p: Detail
       <dd className="col"><PriceTag price={priceOf(n)} short={s.kind === 'short' ? s.short.map(x => x.currency) : []} />
         {isPaid(s) && <span className="mute">Paid</span>}
         {s.kind === 'short' && s.short.map((x, i) => <span key={x.currency} className={i ? 'mute' : 'need'}>
-          {i ? 'Also ' : 'Need '}{wholeText(x.need)} more {CURRENCY_NAME[x.currency]}{x.etaS === null ? '' : `, in ${durationText(x.etaS)}`}</span>)}</dd>
+          {i ? 'Also ' : 'Need '}{wholeText(x.need)} more {CURRENCY_NAME[x.currency]}{x.etaS === null ? `, ${NO_INCOME}` : `, in ${etaSpan(x.etaS)}`}</span>)}</dd>
       <dt>Work</dt>
       <dd>{timeText(n, s, p)}</dd>
       <dt>Needs</dt>
@@ -134,7 +135,7 @@ export function DetailSheet(p: DetailProps & { open: boolean; onToggle: () => vo
         : <div className="ld-fold">
           {n.change ? <Change n={n} /> : <p className="ld-sum">{n.summary || n.effect}</p>}
           <p className="ld-line"><PriceTag price={priceOf(n)} short={s.kind === 'short' ? s.short.map(x => x.currency) : []} />
-            <span className="mute">{isPaid(s) ? 'Paid' : hold !== null ? `holds ${durationText(hold)}` : ''}</span></p>
+            <span className="mute">{isPaid(s) ? 'Paid' : hold !== null ? `holds ${etaSpan(hold)}` : ''}</span></p>
         </div>}
       <DetailKey n={n} s={s} p={p} />
     </>}

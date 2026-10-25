@@ -55,7 +55,7 @@ export function failPsu(w: World, sys: number): void {
   h.psuRebootTicks[sys] = w.research.unlocks.bootTicks;
   h.failedTick[sys] = w.tick;
   touchSystem(w, sys);
-  killSubtree(w, { kind: 'system', id: systemId(sys) }, 'power');
+  killSubtree(w, { kind: 'system', id: systemId(sys) }, 'power', 'psu');
   setUnitMode(w, sys, MODE.dark);
   pushEvent(w, { kind: 'supplyFailed', supply: { kind: 'psu', id: systemId(sys) } });
 }
@@ -66,7 +66,7 @@ export function failPdu(w: World, rack: number): void {
   h.pduFailed[rack] = 1;
   h.pduRebootTicks[rack] = w.research.unlocks.bootTicks;
   h.failedTick[rack] = w.tick;
-  killSubtree(w, { kind: 'rack', id: rackId(rack) }, 'power');
+  killSubtree(w, { kind: 'rack', id: rackId(rack) }, 'power', 'pdu');
   syncRack(w, rack);
   pushEvent(w, { kind: 'supplyFailed', supply: { kind: 'pdu', id: rackId(rack) } });
 }
@@ -80,7 +80,7 @@ export function failUps(w: World, room: number, index: number): void {
   h.upsRebootTicks[i] = w.research.unlocks.bootTicks;
   h.failedTick[room] = w.tick;
   if (zoneDark(w, room)) {
-    killSubtree(w, { kind: 'room', id: roomId(room) }, 'power');
+    killSubtree(w, { kind: 'room', id: roomId(room) }, 'power', 'ups');
     syncRoom(w, room);
   }
   pushEvent(w, { kind: 'supplyFailed', supply: { kind: 'ups', id: roomId(room), index } });
@@ -101,7 +101,7 @@ export function failGrid(w: World, site: number): void {
   h.failedTick[site] = w.tick;
   forSiteRooms(w, site, (m) => {
     if (w.hot.room.rideTicks[m]! > 0) return;
-    killSubtree(w, { kind: 'room', id: roomId(m) }, 'power');
+    killSubtree(w, { kind: 'room', id: roomId(m) }, 'power', 'grid');
     syncRoom(w, m);
   });
   pushEvent(w, { kind: 'supplyFailed', supply: { kind: 'grid', id: siteId(site) } });
@@ -150,7 +150,7 @@ export function tickReboots(w: World): void {
     if (ride > 0 && w.hot.site.gridFailed[w.compiled.room.site[m]!] === 1) {
       room.rideTicks[m] = ride - 1;
       if (ride === 1) {
-        killSubtree(w, { kind: 'room', id: roomId(m) }, 'power');
+        killSubtree(w, { kind: 'room', id: roomId(m) }, 'power', 'grid');
         syncRoom(w, m);
       }
     }

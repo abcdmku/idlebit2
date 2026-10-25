@@ -5,6 +5,7 @@ import { REGIONS, TICKS_PER_SECOND } from '../core/constants';
 import { MODE, restingMode, setUnitMode } from '../core/timers';
 import type { World } from '../core/world';
 import { researchQueued } from '../exec/researchTask';
+import { hasLink } from '../exec/slots';
 import type { StartCtl } from '../types/build';
 import { S3_WAKE_TICKS } from './constants';
 import { forRackSystems, forRoomRacks, forSiteRooms } from './modes';
@@ -64,11 +65,15 @@ function ordered(units: number[], ctl: StartCtl, key: (u: number) => number): nu
   return [...units].sort((a, b) => key(a) - key(b) || a - b);
 }
 
+/**
+ * The rack's systems in its controller's order. QA-13: a system without a switch port can't take work, so
+ * linked systems come first and an unlinked one is never the one kept awake or woken.
+ */
 function rackOrder(w: World, r: number, ctl: StartCtl): number[] {
-  const list: number[] = [];
-  forRackSystems(w, r, (s) => { if (w.compiled.sys.alive[s] === 1) list.push(s); });
+  const linked: number[] = [], unlinked: number[] = [];
+  forRackSystems(w, r, (s) => { if (w.compiled.sys.alive[s] === 1) (hasLink(w, s) ? linked : unlinked).push(s); });
   const c = w.compiled.sys;
-  return ordered(list, ctl, (s) => -(c.threadRate[s]! * c.cores[s]! * (c.etaCfg[s] ?? 1)));
+  return [...ordered(linked, ctl, (s) => -(c.threadRate[s]! * c.cores[s]! * (c.etaCfg[s] ?? 1))), ...unlinked];
 }
 
 function roomOrder(w: World, m: number, ctl: StartCtl): number[] {
@@ -254,10 +259,12 @@ export function startPhase(w: World): void {
       n -= 1;
     }
   }
-  // Rack controllers: systems. Every powered rack keeps its busy EMA for its room and site.
+  // Rack controllers: systems. A powered rack keeps its busy EMA only when a controller reads it
+  // (its own, its room's or the global one), so a fleet without controllers pays nothing here.
   const site = new Float64Array(c.site.len), siteN = new Float64Array(c.site.len);
   for (let r = 0; r < c.rack.len; r += 1) {
     if (c.rack.alive[r] !== 1 || h.rack.powered[r] !== 1) continue;
+    if (!w.build.racks[r]?.powerCtl && !w.build.rooms[c.rack.room[r]!]?.start && !gctl) continue;
     const { busy, awake } = rackBusy(w, r);
     h.rack.ctlBusy[r] = h.rack.ctlBusy[r]! + BUSY_ALPHA * (busy - h.rack.ctlBusy[r]!);
     const st = c.room.site[c.rack.room[r]!]!;
@@ -267,7 +274,7 @@ export function startPhase(w: World): void {
     let n = wakeCount(w, ctl, triggered(ctl, waited, h.rack.ctlBusy[r]!), h.rack.ctlTriggerTick, r, awake);
     for (const s of rackOrder(w, r, ctl)) {
       if (n <= 0) break;
-      if (h.sys.mode[s] !== MODE.asleep || h.sys.wakeTicks[s]! > 0 || c.sys.intent[s] !== 1) continue;
+      if (h.sys.mode[s] !== MODE.asleep || h.sys.wakeTicks[s]! > 0 || c.sys.intent[s] !== 1 || !hasLink(w, s)) continue;
       wakeSystem(w, s, latencyTicks(ctl.level));
       n -= 1;
     }
@@ -284,18 +291,29 @@ export function startPhase(w: World): void {
 function demandWake(w: World, waited: number): void {
   if (waited < 1 || !physSettings(w).s3Sleep) return;
   const c = w.compiled, h = w.hot;
+  // QA-13: a router holding work it can't place (a minimum split short of awake members) is a shortage too,
+  // even while single slots are free.
+  const blocked = routerBlocked(w);
   let candidate = -1;
   for (let r = 0; r < c.rack.len; r += 1) {
     if (c.rack.alive[r] !== 1 || h.rack.powered[r] !== 1) continue;
-    if (h.rack.freeSlots[r]! > 0) return;
+    if (!blocked && h.rack.freeSlots[r]! > 0) return;
     if (candidate >= 0) continue;
     forRackSystems(w, r, (s) => {
-      if (candidate < 0 && h.sys.mode[s] === MODE.asleep && h.sys.wakeTicks[s] === 0 && c.sys.intent[s] === 1) candidate = s;
+      if (candidate < 0 && h.sys.mode[s] === MODE.asleep && h.sys.wakeTicks[s] === 0 && c.sys.intent[s] === 1 && hasLink(w, s)) candidate = s;
     });
   }
-  // A system already waking covers the shortage.
+  if (candidate < 0) return;
+  // One system waking at a time covers a shortage; the next wakes when it is up and the shortage remains.
   for (let s = 0; s < h.sys.len; s += 1) if (h.sys.mode[s] === MODE.asleep && h.sys.wakeTicks[s]! > 0) return;
-  if (candidate >= 0) wakeSystem(w, candidate, S3_WAKE_TICKS);
+  wakeSystem(w, candidate, S3_WAKE_TICKS);
+}
+
+/** A router queue holds an entry its last dispatch could not place (net/hops.ts sets rqWait). */
+function routerBlocked(w: World): boolean {
+  const q = w.hot.rq;
+  for (let row = 0; row < q.len; row += 1) if (q.rqLen[row]! > 0 && q.rqWait[row] === 1) return true;
+  return false;
 }
 
 /** Room controllers stand down racks asleep 30 s, global sites off 60 s, never below "Start with". */

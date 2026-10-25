@@ -16,7 +16,7 @@ export { netPerMinute } from './core/ledger';
 export { slaPercent } from './core/sla';
 export { partName } from './build/catalog/names';
 export { FAMILIES, familyKey } from './market/families';
-export { formatEnergy, formatHertz, formatOps, formatSize } from './format';
+export { formatClock, formatEnergy, formatHertz, formatOps, formatSize } from './format';
 
 export { TICK_MS, HEAD_TICKS, QUEUE_VISIBLE, RECENT_OUTCOMES, REGIONS, LEVEL_NAMES, MAX_CORES_PER_CPU, MAX_CPUS, SERVERS_PER_RACK, RACK_SLOTS_PER_ROW, MAX_ROWS, MAX_ZONES_PER_SITE, MAX_SITES } from './core/constants';
 export { FAIL_CAUSES, FAIL_DETAILS } from './types/events';

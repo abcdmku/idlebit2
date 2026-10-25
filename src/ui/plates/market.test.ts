@@ -34,3 +34,11 @@ describe('On market toggle', () => {
     expect(targetUnit({ kind: 'part', unit: { kind: 'rack', id: rackId(1) }, drill: null })).toBeNull();
   });
 });
+
+describe('a part plate names the tasks it unblocks (QA-21)', () => {
+  it('counts the line waiting on what the part supplies', async () => {
+    const { blockedOn } = await import('./PlateLayer');
+    const line = [{ blockedBy: 'cache' }, { blockedBy: null }, { blockedBy: 'cache' }, { blockedBy: 'ram' }];
+    expect([blockedOn(line, 'l1'), blockedOn(line, 'ram'), blockedOn(line, 'clock'), blockedOn(line, undefined)]).toEqual([2, 1, 0, 0]);
+  });
+});

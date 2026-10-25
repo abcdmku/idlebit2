@@ -283,8 +283,10 @@ export const G = {
   startBusy: 48, startTriggerTick: 49,
   /** D31: this round's energy lines in Credits (float sums, exact below 2^53): from batteries, refills, from generation, fuel. */
   roundFromBattery: 50, roundBatteryRefill: 51, roundFromGeneration: 52, roundFuel: 53,
+  /** D33: the last tick a task was met this round (-1 none; the round start counts as one). */
+  lastMetTick: 54,
 } as const;
-export const G_SIZE = 54;
+export const G_SIZE = 55;
 
 export interface CompiledBuffers {
   readonly sys: Table<typeof SYS_COMPILED>;
@@ -339,7 +341,7 @@ export function allocHot(size: FleetSize, records = 8): HotBuffers {
   const g = new Float64Array(G_SIZE);
   g[G.nextTaskId] = 1;
   g[G.frontHead] = -1; g[G.frontTail] = -1; g[G.recFree] = -1; g[G.parentFree] = -1;
-  g[G.rqSites] = size.sites; g[G.rqRooms] = size.rooms; g[G.researchProject] = -1; g[G.startTriggerTick] = -1;
+  g[G.rqSites] = size.sites; g[G.rqRooms] = size.rooms; g[G.researchProject] = -1; g[G.startTriggerTick] = -1; g[G.lastMetTick] = -1;
   return {
     g, rng: new Uint32Array(4),
     sys: allocTable(SYS_HOT, size.systems, size.systems),

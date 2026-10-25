@@ -16,7 +16,8 @@ export const SAVE_SCHEMA = 'bitrouge-v3' as const;
 // Pre-live reset: v11 is D28 (SLA is a count ratio over the last 50 resolved tasks): the window in hot.g.
 // Pre-live reset: v12 is D31 (start controllers, rack batteries, site generation): build parts, start hot state, the standby mode.
 // Pre-live reset: v13 adds the D31 runtime's back-to-standby clock (offSinceTick).
-export const SAVE_VERSION = 13;
+// Pre-live reset: v14 is D33 (stall end): the last met tick in hot.g.
+export const SAVE_VERSION = 14;
 
 export interface SaveEnvelope {
   readonly schema: typeof SAVE_SCHEMA;

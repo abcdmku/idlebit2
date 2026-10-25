@@ -5,7 +5,7 @@ import { RACK, RACK_RECTS } from '../room/layout';
 import { createRackRenderer } from '.';
 import { OFF, typeText } from './art';
 import { LCD_IDLE, drawServer, serverLook } from './sprites';
-import { awakeCount, batteryText } from './powerCtl';
+import { awakeCount, batteryFill, batteryText } from './powerCtl';
 import { CASES, rackCase } from './fixtures';
 import { CAB_RECT, FOCUS, POWER_CTL_RECT, ROW_PITCH, ROW_W, SWITCH_RECT, UPLINK_JACK, WORLD, colX, portX } from './layout';
 import { NEIGHBOUR_ALPHA } from './neighbour';
@@ -229,8 +229,17 @@ describe('between rounds: ready vs sitting out', () => {
 describe('D31 power control and sleep', () => {
   it('reads the battery as time until billed, then GRID, and the awake count', () => {
     expect(batteryText(252, 1000)).toBe('BAT 4:12');
-    expect(batteryText(1500, 1000)).toBe('BAT 25M');
-    expect(batteryText(7200, 1000)).toBe('BAT 2H');
+    expect(batteryText(1500, 1000)).toBe('25:00');
+    expect(batteryText(1500, 1000, 9)).toBe('BAT 25:00');
+    expect(batteryText(3599, 1000)).toBe('59:59');
+    expect(batteryText(5400, 1000)).toBe('1.5 h');
+    expect(batteryText(5400, 1000, 9)).toBe('BAT 1.5 h');
+    expect(batteryText(43200, 1000)).toBe('BAT 12 h');
+    expect(batteryText(7200, 1000)).toBe('BAT 2 h');
+    expect(batteryFill(10e9, 10e9, 14)).toBe(14);
+    expect(batteryFill(5e9, 10e9, 14)).toBe(7);
+    expect(batteryFill(1, 10e9, 14)).toBe(1);
+    expect(batteryFill(0, 10e9, 14)).toBe(0);
     expect(batteryText(0, 0)).toBe('GRID');
     expect(awakeCount(4, 12)).toBe('4/12 ON');
     expect(awakeCount(12, 12)).toBe('12/12');

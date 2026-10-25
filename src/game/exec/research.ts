@@ -32,7 +32,9 @@ export function researchRateOf(w: World, s: number, _share: number): number {
   h.busy[s] = threads > 0 ? (Math.min(threads, h.busyThreads[s]!) / threads) * c.cores[s]! : 0;
   const held = h.researchThreads[s]!;
   if (held === 0 || RESEARCH_MODE[h.mode[s]!] !== 1) return 0;
-  return c.threadRate[s]! * h.clockFactor[s]! * c.etaCfg[s]! * Math.min(held, threads);
+  // QA-03: a holder that took research while every thread ran a task researches only on threads tasks have freed.
+  const ready = Math.min(held, Math.max(0, threads - (h.busyThreads[s]! - held)));
+  return c.threadRate[s]! * h.clockFactor[s]! * c.etaCfg[s]! * ready;
 }
 
 /** Accelerators never research under D27: the work is compute. */

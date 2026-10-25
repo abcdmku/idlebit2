@@ -77,18 +77,18 @@ function chipTray(state: GameState, id: SystemId): Item[] {
 }
 
 /**
- * The GPU item: with a free slot, the newest generation's entry card. On a full board, the cheapest
- * card upgrade, or that entry card in place of the weakest card only when it is faster (R44: never
- * a downgrade); else Max.
+ * The GPU item. With no card, the newest generation's entry card. With cards (QA-15), the installed
+ * card's next step first: the cheapest card upgrade, or that entry card in place of the weakest card
+ * only when it is faster (R44: never a downgrade); then, with a free bay, adding the entry card; else Max.
  */
 function gpuItem(state: GameState, id: SystemId): Item {
   const spec = state.build.systems[id]!.spec, u = state.research.unlocks;
   const generation = Math.max(0, newestGen(u, 'gpu', 9)) + 1;
   const model = `${generation}330` as GpuModelId;
   const install = (index: number | null): Option => [{ type: 'installGpu', system: id, model, index }, planInstallGpu(state, id, model, index)];
-  if (spec.accels.length < boardLimit(spec, u, 'gpu')) { const [action, plan] = install(null); return { action, plan }; }
+  const freeBay = spec.accels.length < boardLimit(spec, u, 'gpu');
   const cards = spec.accels.flatMap((card, index) => (card.kind === 'gpu' ? [{ card, index }] : []));
-  if (cards.length === 0) { const [action, plan] = install(0); return { action, plan }; }
+  if (cards.length === 0) { const [action, plan] = install(freeBay ? null : 0); return { action, plan }; }
   const options = cheapest(state, cards.map(({ index }) => ({ unit: { kind: 'system' as const, id }, slot: { kind: 'gpu' as const, index } })));
   let weakest = cards[0]!, weakRate = installedGpuStats(weakest.card, u).opsPerS;
   for (const c of cards.slice(1)) {
@@ -96,6 +96,7 @@ function gpuItem(state: GameState, id: SystemId): Item {
     if (rate < weakRate) { weakest = c; weakRate = rate; }
   }
   if (installedGpuStats({ kind: 'gpu', model, upgrades: 0 }, u).opsPerS > weakRate) options.push(install(weakest.index));
+  if (freeBay) options.push(install(null));
   return best(options, { type: 'installGpu', system: id, model, index: weakest.index });
 }
 

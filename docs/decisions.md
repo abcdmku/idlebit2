@@ -1293,6 +1293,13 @@ The user's words:
 3. **Fix (constant):** cooler load watts ∝ `x^1.25` (`COOLER_LOAD_EXP`, `build/catalog/curves.ts`; spec §9.1). Levelled coolers still lose efficiency, as `x^0.25` per watt removed. Net per hour now rises with every size: 1.67e9, 3.05e9, 5.00e9, 6.62e9, 7.11e9 (energy share 43% → 70%). The D20 opening and the 3-seed pacing are unchanged.
 4. **Still open:** gross per server falls about 10–20% per doubling. The bigger fleet meets harder tasks (+1 `I`) on the same servers, so spill and the wall take a growing share; a player upgrades memory to answer it.
 
+**D33, 25 Oct: a round that completes nothing ends (user, via QA-26).** Binding. Dismissals don't count for SLA, and `autoSkip` dismisses on its own, so a round could sit at exactly 80% with no income for as long as the player kept dismissing.
+
+1. **Rule.** A running round also ends when **no task has been met for 120 s** (`STALL_END_TICKS`, a named deadline). Research completing is not a met task; neither are dismissals.
+2. **Clock.** `G.lastMetTick` is the last tick a task was met this round; the round start counts as one. The SLA step checks it after the 80% check, so the round ends the same way as an SLA end (the same tick, everything paused, the next round prepared from `I = 0`).
+3. **Report.** `RoundReport.endedBy` is `'stall'`; the report reads "Stalled · nothing completed for 2 min".
+4. **Tests.** `market/endRound.test.ts`: the round ends at exactly 120 s without a met task, not a tick sooner. `SAVE_VERSION` 14.
+
 ## 16. Shared rules for agents
 
 - **Shared checkout.** Other agents work in the same checkout at the same time. Edit only the files your brief gives you. Never revert someone else's edits. Run no git command that changes state.

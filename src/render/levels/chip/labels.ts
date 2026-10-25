@@ -8,7 +8,7 @@ import type { ChipSnapshot } from '../../../game';
 import { familyName, whole } from '../../core';
 import type { LabelWriter, WorldFrame, WorldForm } from '../../core';
 import { arrangementOf, coreSites, coreText, floorOf } from './layout';
-import { coreSleep, coreSpeedText, speedRange, tileLabelFits } from './speed';
+import { coreSleep, readySpeedText, speedRange, tileLabelFits } from './speed';
 import { coreTag } from './tag';
 import { firstLockedSite, isLive, lentCore, queueOpen, siteCount, siteLocked, spilledOut } from './world';
 
@@ -49,7 +49,7 @@ export function chipLabels(chip: ChipSnapshot, frame: WorldFrame, out: LabelWrit
     for (let i = 0; i < Math.min(sites.length, chip.cores.length); i++) {
       const r = sites[i]!, core = chip.cores[i]!;
       if (!tileLabelFits(core, r, frame)) continue;
-      out.label(LABEL_IDS[i]!, r.x + r.w / 2, r.y + 2, 'center').text(coreSpeedText(core), coreSleep(core) || !live ? 'dim' : 'value');
+      out.label(LABEL_IDS[i]!, r.x + r.w / 2, r.y + 2, 'center').text(readySpeedText(core, chip, live), coreSleep(core) || !live ? 'dim' : 'value');
     }
     // The busy tag (tag.ts): in the widest empty row run, never over an installed core, the Clock or
     // the lock mark; it carries the cores' speed only when their tiles cannot and it fits.
@@ -71,7 +71,7 @@ export function chipLabels(chip: ChipSnapshot, frame: WorldFrame, out: LabelWrit
     // A18: "Core 1 · 1 Hz" on one line, or name then Hz on their own lines, never "Core 11 Hz".
     out.label(LABEL_IDS[i]!, x, r.y + c.pad, 'left').text(CORE_NAMES[i]!, 'name', true);
     // A core shows its own live speed (user), or its C-state asleep.
-    const sp = coreSpeedText(core), spTone = coreSleep(core) ? 'dim' : 'mute';
+    const sp = readySpeedText(core, chip, live), spTone = coreSleep(core) || !live ? 'dim' : 'mute';
     if (wide) out.text(`· ${sp}`, spTone); else out.br().text(sp, spTone);
     const busy = live && core.busy > 0, lent = live && lentCore(core), idle = !busy && !lent;
     // The running task: its family icon and name, and its progress (task numbers are never shown).

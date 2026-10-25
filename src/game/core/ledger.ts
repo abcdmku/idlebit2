@@ -54,6 +54,9 @@ export function ledgerPhase(w: World): void {
   if (l.credits < 0n && research.active !== null && !research.stoppedInsolvent) {
     research.stoppedInsolvent = true;
     pushEvent(w, { kind: 'researchStopped', project: research.active });
+  } else if (l.credits >= 0n && research.stoppedInsolvent) {
+    // QA-04: a project stopped for insolvency resumes by itself once Credits are back at 0 or above.
+    research.stoppedInsolvent = false;
   }
 
   if (gross !== 0n || energy !== 0n) recordNet(w);

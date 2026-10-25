@@ -1,3 +1,4 @@
+import { FAIL_DETAILS, NO_DETAIL, type FailDetail } from '../types/events';
 import { G, LOC } from '../core/buffers';
 import { ACCEL_CLOCKS, MAX_ZONES_PER_SITE, RACKS_PER_ROOM, SERVERS_PER_RACK } from '../core/constants';
 import { allocRecord, freeRecord } from '../core/pool';
@@ -89,19 +90,21 @@ function returnQueuesUnder(w: World, unit: UnitRef, cause: number): void {
   }
 }
 
-export function killSubtree(w: World, unit: UnitRef, cause: FailCause): void {
+/** `detail` names what failed (QA-02: a power failure says which supply), shown as "Power · PSU". */
+export function killSubtree(w: World, unit: UnitRef, cause: FailCause, detail: FailDetail | null = null): void {
   markSystems(w, unit);
   const rec = w.hot.rec, h = w.hot.sys, c = w.compiled;
   const causeIndex = CAUSE[cause];
+  const d = detail === null ? NO_DETAIL : FAIL_DETAILS.indexOf(detail);
   for (let s = 0; s < c.sys.len; s += 1) {
     if (mark[s] !== 1) continue;
     for (let res = 0; res < NRES; res += 1) {
-      for (let r = h.head[s * NRES + res]!; r >= 0; r = h.head[s * NRES + res]!) failRecord(w, r, causeIndex);
+      for (let r = h.head[s * NRES + res]!; r >= 0; r = h.head[s * NRES + res]!) failRecord(w, r, causeIndex, d);
     }
     for (let a = 0; a < ACCEL_CLOCKS; a += 1) {
-      for (let r = h.accelHead[s * ACCEL_CLOCKS + a]!; r >= 0; r = h.accelHead[s * ACCEL_CLOCKS + a]!) failRecord(w, r, causeIndex);
+      for (let r = h.accelHead[s * ACCEL_CLOCKS + a]!; r >= 0; r = h.accelHead[s * ACCEL_CLOCKS + a]!) failRecord(w, r, causeIndex, d);
     }
-    for (let r = h.queueHead[s]!; r >= 0; r = h.queueHead[s]!) failRecord(w, r, causeIndex);
+    for (let r = h.queueHead[s]!; r >= 0; r = h.queueHead[s]!) failRecord(w, r, causeIndex, d);
     resetClocks(w, s);
     dirtySystem(w, s);
   }

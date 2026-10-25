@@ -1,7 +1,7 @@
 // What the deck can buy: the build rows, the one Buy key and the callouts all read one offer list
 // built from quotes (A08). Prices, locks and effects come from the sim; this file only words them,
 // in one grammar (A14): name · change · a right column (price, "Research: <node>", "Max" or "At <place>").
-import type { EffectPreview, LevelId, NodeRef, PartSlotKind, Quote, QuoteRequest, RackId, RoomId } from '../../game';
+import type { EffectPreview, FailDetail, LevelId, NodeRef, PartSlotKind, Quote, QuoteRequest, RackId, RoomId } from '../../game';
 import type { PartIconKind } from '../art/deckArt';
 import { measureUnit } from '../plates/format';
 
@@ -100,7 +100,7 @@ export function changeText(e: EffectPreview): string {
   const a = measure(e.capacityBefore, e.unit), b = measure(e.capacityAfter, e.unit);
   const ia = a.indexOf(' '), ib = b.indexOf(' ');
   const ua = a.slice(ia + 1), ub = b.slice(ib + 1);
-  return ia > 0 && (ua === ub || ub === `${ua}s`) ? `${a.slice(0, ia)} → ${b}` : `${a} → ${b}`;
+  return ia > 0 && ua.replace(/s$/, "") === ub.replace(/s$/, "") ? `${a.slice(0, ia)} → ${b}` : `${a} → ${b}`;
 }
 
 /** The inbound link's next step and structure lock, at every level (R43). */
@@ -132,13 +132,17 @@ export function offerOf(def: RowDef, q: Quote | undefined, link = def.key === 'l
     return { ...def, change: e ? (where ? measure(e.capacityBefore, e.unit) : changeText(e)) : q.label,
       quote: q, price, affordable: !q.locked && q.affordable, lock: q.locked?.text ?? null, where, right: rightOf(q, price, where) };
   }
-  const e = q.effect, first = !!e && COUNTS.has(e.unit) && e.capacityBefore === 0;
+  // A first add reads "Add …": a count from 0, or a card into a free bay (QA-15: never "GPU 0 → …" beside an installed card).
+  const e = q.effect, first = (!!e && e.capacityBefore === 0 && (COUNTS.has(e.unit) || q.action.type === 'replacePart')) || (q.action.type === 'installGpu' && q.action.index === null);
   const credits = q.currency === 'credits', price = q.locked || !credits ? null : whole(q.cost);
   // At the top of a ladder the step is a no-op: show where it stands ("32 slots"), not "32 → 32".
   // A first add keeps its "Add RAM" name and shows what it gives ("0 → 2 slots"), as the board does (user).
   // A start controller's upgrade has no capacity effect (D31): its level step, from the quote's "… · L3".
   const step = !e && q.action.type === 'upgradePart' ? /· L([0-9]+)$/.exec(q.label) : null;
-  const change = step ? `L${Number(step[1]) - 1} → L${step[1]}` : !e ? q.label : e.capacityBefore === e.capacityAfter ? measure(e.capacityBefore, e.unit) : changeText(e);
+  const maxed = q.locked?.code === 'ceiling' || q.locked?.code === 'cap';
+  // At Max a row says only where it stands (QA-08): never a next level beside "Max".
+  const change = maxed ? (e ? measure(e.capacityBefore, e.unit) : '')
+    : step ? `L${Number(step[1]) - 1} → L${step[1]}` : !e ? q.label : e.capacityBefore === e.capacityAfter ? measure(e.capacityBefore, e.unit) : changeText(e);
   return { ...def, name: first ? `Add ${def.name}` : def.name, change,
     quote: q, price, affordable: !q.locked && credits && q.affordable, lock: q.locked?.text ?? null, where: false, right: rightOf(q, price, false) };
 }
@@ -157,7 +161,23 @@ export interface Offers {
 }
 
 /** What the deck needs from the level beyond quotes: the chip's cache level count (to name the level). */
-export interface OfferContext { readonly cacheLevels: number }
+export interface OfferContext {
+  readonly cacheLevels: number;
+  /** Row keys that answer the current wall (the head's block, else last round's top failure), best first (QA-05). */
+  readonly wall?: readonly string[];
+  /** Supply rows drawing near their limit; other supply upgrades are never featured (QA-05). */
+  readonly supplyNear?: ReadonlySet<string>;
+}
+
+/** What answers a failure or a block: the rows that would let the work run (A02, QA-05). */
+export const WALL_ROWS: Readonly<Partial<Record<FailDetail, readonly string[]>>> = {
+  cache: ['cache'], ram: ['ram', 'storage'], disk: ['ram', 'storage'], gpu: ['gpu'], gpuCores: ['gpu'], vram: ['gpu'], link: ['link'],
+  psu: ['psu'], pdu: ['pdu'], ups: ['ups'], rack: ['rackCooler'], room: ['roomCooler'],
+};
+/** Supplies and coolers: worth buying only near their limit. */
+export const SUPPLY_ROWS: ReadonlySet<string> = new Set(['psu', 'pdu', 'ups', 'rackCooler', 'roomCooler']);
+/** A row a suggestion may point at: something to buy, or research that opens it; never Max or a dead lock. */
+export const actionable = (o: Offer) => !!o.quote && (o.right.kind === 'price' || o.right.kind === 'research') && !(o.price !== null && o.price <= 0);
 
 /** The quote's part slot, when it upgrades a part. */
 const slotOf = (q: Quote | undefined): PartSlotKind | null => (q?.action.type === 'upgradePart' ? q.action.part.slot.kind : null);
@@ -177,14 +197,21 @@ export function buildOffers(level: LevelId, tray: readonly Quote[] | null, link:
   const def = (d: RowDef, i: number) => (d.key === 'cache' ? cacheRow(d, tray?.[i], ctx.cacheLevels) : d);
   const rows = [...defs.map((d, i) => offerOf(def(d, i), i < 4 ? tray?.[i] : link ?? undefined)), ...more.map((d, i) => offerOf(d, extras[i] ?? undefined))]
     .filter((o): o is Offer => o !== null);
-  let best = -1, cheapest = -1;
+  // The featured buy (QA-05): what answers the wall first (saving up for it if need be), then the cheapest
+  // affordable, then the cheapest. Supplies only when they run near their limit.
+  const wall = ctx.wall ?? [];
+  const usable = (o: Offer) => o.price !== null && o.price > 0 && (!SUPPLY_ROWS.has(o.key) || !!ctx.supplyNear?.has(o.key) || wall.includes(o.key));
+  let best = -1, cheapest = -1, walled = -1;
   rows.forEach((o, i) => {
-    if (o.price === null || o.price <= 0) return;
-    if (cheapest < 0 || o.price < rows[cheapest]!.price!) cheapest = i;
-    if (o.affordable && (best < 0 || o.price < rows[best]!.price!)) best = i;
+    if (!usable(o)) return;
+    const w = wall.indexOf(o.key);
+    if (w >= 0 && (walled < 0 || w < wall.indexOf(rows[walled]!.key))) walled = i;
+    if (cheapest < 0 || o.price! < rows[cheapest]!.price!) cheapest = i;
+    if (o.affordable && (best < 0 || o.price! < rows[best]!.price!)) best = i;
   });
-  const pick = best >= 0 ? best : cheapest;
-  const unlock = pick >= 0 ? null : rows.find(o => o.right.kind === 'research' && o.quote?.locked?.node) ?? null;
+  const pick = walled >= 0 ? walled : best >= 0 ? best : cheapest;
+  const research = rows.filter(o => o.right.kind === 'research' && o.quote?.locked?.node);
+  const unlock = pick >= 0 ? null : research.find(o => wall.includes(o.key)) ?? research[0] ?? null;
   const cores = level === 'chip' ? (tray ?? []).slice(4).map((q, i) => offerOf(row(`core${i}`, 'core', `Core ${i + 1}`, 'core'), q)) : [];
   return { rows, next: pick >= 0 ? rows[pick]! : null, best, unlock, cores };
 }

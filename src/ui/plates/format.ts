@@ -98,7 +98,7 @@ export function measureUnit(n: number, unit: EffectPreview['unit']): string {
     case 'J': return formatEnergy(n);
     case 'ops': return formatOps(n);
     case 'ops/s': return `${formatOps(n)}/s`;
-    default: return COUNTS.has(unit) ? `${Math.round(n)} ${unit}` : quantity(n, unit);
+    default: return COUNTS.has(unit) ? `${Math.round(n)} ${Math.round(n) === 1 ? unit.replace(/s$/, "") : unit}` : quantity(n, unit);
   }
 }
 export const fahrenheit = (f: number) => `${Math.round(f)}°F`;

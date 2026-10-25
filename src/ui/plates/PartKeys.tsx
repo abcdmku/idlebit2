@@ -42,8 +42,8 @@ const levelOf = (a: GameAction) => (a.type === 'replacePart' ? a.generation : nu
  * Upgrade (hot, level + 1) against replace (cold, next generation), each with its effect and
  * whether it costs downtime, then the payback line. The rows hold their space when a quote is missing.
  */
-export function PartKeys({ quotes, level, onAction, onResearch, researchName }:
-  Pick<PlateCommon, 'quotes' | 'onAction' | 'onResearch' | 'researchName'> & { level: number }) {
+export function PartKeys({ quotes, level, onAction, onResearch, researchName, unblocks = 0 }:
+  Pick<PlateCommon, 'quotes' | 'onAction' | 'onResearch' | 'researchName'> & { level: number; unblocks?: number }) {
   const { upgrade, replace } = partQuotes(quotes?.quotes ?? []);
   const fire = (q: Quote) => onAction(q.action);
   return <>
@@ -57,6 +57,7 @@ export function PartKeys({ quotes, level, onAction, onResearch, researchName }:
         onAction={fire} onResearch={onResearch} researchName={researchName} />
         : <p className="key-slot">{quotes ? 'Newest generation' : ''}</p>}
     </div>
-    <p className="p-hint payback" aria-live="polite">{paybackText(upgrade, replace)}</p>
+    {/* A part the waiting tasks need says so, instead of a payback that can't see the wall (QA-21). */}
+    <p className="p-hint payback" aria-live="polite">{unblocks > 0 ? `Unblocks: ${unblocks} ${unblocks === 1 ? 'task needs' : 'tasks need'} it` : paybackText(upgrade, replace)}</p>
   </>;
 }

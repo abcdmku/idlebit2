@@ -14,6 +14,37 @@ import { researchPartSpecs } from './researchSpecs';
 import { researchCreditsPerMinute, researchLenders } from './lenders';
 import { answerTypes } from '../market/taskTypes';
 
+/** The trailing window of the recent income rate (round time). */
+const RECENT_MS = 30_000;
+
+/** Ledger totals (gross, energy) at `tick`, from the net ring (60 s of change points). */
+function ledgerAt(ring: GameState['ledger']['netRing'], tick: number): { gross: number; energy: number } {
+  let gross = 0, energy = 0;
+  for (const sample of ring) {
+    if (sample.tick > tick) break;
+    gross = Number(sample.gross); energy = Number(sample.energy);
+  }
+  return { gross, energy };
+}
+
+/**
+ * Recent round-time income per second (HudSnapshot.incomeRecent, ResearchTreeView.income): net
+ * Credits (gross − energy) over the last 30 s of the running round, or since its start; negative
+ * when energy outruns pay. Data is the recent gross at this round's Data-per-Credit (the ledger
+ * keeps no Data history). Between rounds, the last report's average. 0 until 10 s have elapsed.
+ */
+export function recentIncome(state: GameState): ResearchTreeView['income'] {
+  const round = state.round;
+  if (round.phase !== 'running') return roundIncome(state);
+  const now = state.clock.tick;
+  if ((now - round.startTick) * TICK_MS < INCOME_MIN_MS) return { dataPerSec: 0, creditsPerSec: 0 };
+  const from = Math.max(round.startTick, now - RECENT_MS / TICK_MS);
+  const base = ledgerAt(state.ledger.netRing, from), seconds = ((now - from) * TICK_MS) / 1000;
+  const gross = Number(state.ledger.gross) - base.gross, energy = Number(state.ledger.energy) - base.energy;
+  const roundGross = Number(round.gross), dataPerCredit = roundGross > 0 ? Number(round.data) / roundGross : 0;
+  return { dataPerSec: (gross * dataPerCredit) / seconds, creditsPerSec: (gross - energy) / seconds };
+}
+
 /** Income needs this much elapsed round time before it means anything. */
 const INCOME_MIN_MS = 10_000;
 /**
@@ -153,7 +184,7 @@ export function researchTree(state: GameState, at: NodeRef | null = null): Resea
   }
   const slots = r.unlocks.ceilings.researchQueue;
   return {
-    nodes, parts: researchPartSpecs(state, at), income: roundIncome(state), active: r.active, opsPerSec: researchOpsPerSec(state), holdOpsPerSec: holdOpsPerSec(state), takenOpsPerSec: takenOpsPerSec(state), queue: r.queue,
+    nodes, parts: researchPartSpecs(state, at), income: recentIncome(state), active: r.active, opsPerSec: researchOpsPerSec(state), holdOpsPerSec: holdOpsPerSec(state), takenOpsPerSec: takenOpsPerSec(state), queue: r.queue,
     queueSlots: slots > 1 ? slots : 0, horizon: researchHorizon(state),
     lenders: researchLenders(state), creditsPerMinute: researchCreditsPerMinute(state),
   };

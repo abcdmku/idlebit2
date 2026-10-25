@@ -1,5 +1,5 @@
 import { useCallback, useMemo, useState } from 'react';
-import { researchId, selectSavedConfigs, type GameAction, type SupplyView, type LevelSnapshot, type QuoteRequest, type QuoteResult, type ResearchId, type ScopeRef, type UnitRef } from '../../game';
+import { researchId, selectResearchTree, selectSavedConfigs, type GameAction, type SupplyView, type LevelSnapshot, type QuoteRequest, type QuoteResult, type ResearchId, type ScopeRef, type UnitRef } from '../../game';
 import type { HitTarget, Rect } from '../../render/core';
 import { useGameSelector, useQuote, useShell, useViewState } from '../storeHooks';
 import { ConfigPlate } from './ConfigPlate';
@@ -69,6 +69,16 @@ export function plateRequest(t: HitTarget, focus: LevelSnapshot): QuoteRequest |
   return null;
 }
 
+/** What each board part supplies, as the blocks it clears (QA-21). */
+const PART_BLOCKS: Readonly<Partial<Record<string, readonly string[]>>> = {
+  l1: ['cache'], l2: ['cache'], l3: ['cache'], ram: ['ram'], drive: ['disk'], gpu: ['gpu', 'vram', 'gpuCores'],
+};
+/** Tasks in the visible line waiting on what `part` supplies. */
+export function blockedOn(window: readonly { readonly blockedBy: string | null }[], part: string | undefined): number {
+  const clears = part ? PART_BLOCKS[part] : undefined;
+  return clears ? window.filter(t => t.blockedBy !== null && clears.includes(t.blockedBy)).length : 0;
+}
+
 /** D31: the optional power part a plate also sells: the room start controller on the UPS, the global one on the scheduler, a site's generation. */
 export function powerScope(t: HitTarget, focus: LevelSnapshot): ScopeRef | null {
   const s = t.part?.slot.kind;
@@ -115,6 +125,7 @@ function TargetPlate({ target: t, focus }: { target: HitTarget; focus: LevelSnap
   const credits = useGameSelector((s) => s.hud.credits, Object.is, 500);
   const quotes = useQuote(plateRequest(t, focus));
   const scope = powerScope(t, focus), power = useQuote(scope ? { kind: 'power', unit: scope } : null);
+  const unblocks = useGameSelector(s => blockedOn(s.feed.window, t.part?.slot.kind), Object.is, 500);
   const netRack = focus.level === 'room' && (t.part?.slot.kind === 'roomSwitch' || (t.kind === 'port' && t.sw?.kind === 'room'));
   const roomLb = useQuote(netRack && focus.level === 'room' ? { kind: 'infra', unit: { kind: 'room', id: focus.roomId }, slot: 'lb' } : null);
   // The router queue's next slot (D25.7) for whichever load balancer this plate shows.
@@ -124,7 +135,8 @@ function TargetPlate({ target: t, focus }: { target: HitTarget; focus: LevelSnap
   const subscribeFrame = useCallback((update: () => void) => {
     const l = () => update(); surface.frameListeners.add(l); return () => { surface.frameListeners.delete(l); };
   }, [surface]);
-  const researchNames = useMemo(() => new Map<ResearchId, string>(), []);
+  // Display names, never IDs (QA-07); the catalog doesn't change while a plate is open.
+  const researchNames = useMemo(() => new Map<ResearchId, string>(selectResearchTree(shell.store.getState()).nodes.map(n => [n.id, n.name])), [shell.store]);
   const common: Omit<PlateCommon, 'quotes'> = {
     readAnchor, subscribeFrame, bounds: surface.plateBounds, bootS: bootMs / 1000,
     onAction: (a: GameAction) => { shell.dispatch(a); },
@@ -207,7 +219,7 @@ function TargetPlate({ target: t, focus }: { target: HitTarget; focus: LevelSnap
       <Status text={facts.status} />
       <Lines lines={facts.lines} slots={2} />
     </PlateFrame>;
-    if (facts) return <PartPlate {...common} quotes={quotes} {...facts}>
+    if (facts) return <PartPlate {...common} quotes={quotes} {...facts} unblocks={unblocks}>
       {s.kind === 'gpu' && focus.level === 'system' && focus.gpu.find(p => p.slot === s.index)?.kind === 'npu'
         && <button type="button" className="key ghost" onClick={() => setReplaceNpu(true)}>Replace with GPU model</button>}
     </PartPlate>;

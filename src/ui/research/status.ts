@@ -2,7 +2,8 @@
 // D27: Start pays the price and puts the project at the front of the market line; one project is in
 // line or running at a time; Pause keeps its progress, and Resume is free.
 import type { GameAction, ResearchId, ResearchNodeView, ResearchTreeView } from '../../game';
-import { durationText, holdSeconds } from './estimate';
+import { etaSpan } from '../hooks/format';
+import { holdSeconds } from './estimate';
 import { CURRENCY_NAME, priceOf, shortfalls, type Income, type Shortfall, type Wallet } from './money';
 import { wholeText } from '../plates/format';
 
@@ -96,10 +97,13 @@ export function secondsLeft(n: ResearchNodeView, line: LineState): number | null
   return line.id === n.id && line.running ? holdSeconds(n.workOps * (1 - n.progress), line.opsPerSec ?? null) : null;
 }
 
+/** Said in place of an ETA while the income rate is zero or negative (the 30 s recent net rate). */
+export const NO_INCOME = 'no income right now';
+
 /** The row's second word: the ETA of a shortfall, or the time left while it runs. */
 export function statusAside(n: ResearchNodeView, s: NodeStatus, line: LineState): string {
-  if (s.kind === 'short') { const eta = s.short[0]!.etaS; return eta === null ? '' : `in ${durationText(eta)}`; }
-  if (s.kind === 'running') { const left = secondsLeft(n, line); return left === null ? '' : `${durationText(left)} left`; }
+  if (s.kind === 'short') { const eta = s.short[0]!.etaS; return eta === null ? NO_INCOME : `in ${etaSpan(eta)}`; }
+  if (s.kind === 'running') { const left = secondsLeft(n, line); return left === null ? '' : `${etaSpan(left)} left`; }
   return '';
 }
 
@@ -132,7 +136,7 @@ export function keyFor(n: ResearchNodeView, s: NodeStatus, c: KeyContext): KeyMo
     case 'done': return key('Done', 'off');
     case 'running': {
       const left = secondsLeft(n, c.line);
-      return key(`Running ${pct(s.progress)}${left === null ? '' : ` · ${durationText(left)} left`}`, 'run', { progress: s.progress, aside: pause });
+      return key(`Running ${pct(s.progress)}${left === null ? '' : ` · ${etaSpan(left)} left`}`, 'run', { progress: s.progress, aside: pause });
     }
     case 'next': return key('Next in line', 'wait', { progress: s.progress, aside: pause });
     case 'stopped': return key('Resume', 'go', { action: { type: 'resumeResearch' }, progress: s.progress, aside: pause });
@@ -145,7 +149,7 @@ export function keyFor(n: ResearchNodeView, s: NodeStatus, c: KeyContext): KeyMo
     }
     case 'short': {
       const top = s.short[0]!;
-      return key(`Need ${wholeText(top.need)} more ${CURRENCY_NAME[top.currency]}${top.etaS === null ? '' : ` · ${durationText(top.etaS)}`}`, 'off');
+      return key(`Need ${wholeText(top.need)} more ${CURRENCY_NAME[top.currency]}${top.etaS === null ? '' : ` · ${etaSpan(top.etaS)}`}`, 'off');
     }
     case 'after':
       return c.tree.queueSlots > 0 && c.tree.queue.length + 1 < c.tree.queueSlots

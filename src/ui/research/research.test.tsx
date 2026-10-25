@@ -71,6 +71,13 @@ describe('truthful states', () => {
     expect(tabNames()).toEqual(['CPU, 2 ready', 'System, locked']);
   });
 
+  it('with no income (the recent rate at or below 0) a shortfall says so instead of an ETA', () => {
+    view(tree([...early().nodes], { income: { dataPerSec: -3, creditsPerSec: 0 } }), { focusProject: r('dualCore'), wallet: { data: '267' as Amount, credits: '1000000' as Amount } });
+    expect(rowText('dualCore')).toBe('Need 2,233 Data / no income right now');
+    expect(key().textContent).toBe('Need 2,233 more Data');
+    expect(detail().querySelector('.ld-facts')!.textContent).toContain('Need 2,233 more Data, no income right now');
+  });
+
   it('no answers chips: rows and the detail show no task types', () => {
     view(early());
     expect(m.host.querySelector('.lr-pips, .ld-chip, [data-task-type]')).toBeNull();

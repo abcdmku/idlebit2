@@ -61,6 +61,6 @@ export function shortfalls(price: Price, w: Wallet, income: Income): Shortfall[]
   return out.sort((a, b) => rank(b) - rank(a));
 }
 
-/** The sim's round-time income (ResearchTreeView.income, 0 until 10 s of round time) as ETA rates. */
+/** The sim's income (ResearchTreeView.income, the 30 s recent net rate) as ETA rates: none while it is 0 or negative. */
 export const incomeOf = (i: ResearchTreeView['income']): Income =>
   ({ data: i.dataPerSec > 0 ? i.dataPerSec : null, credits: i.creditsPerSec > 0 ? i.creditsPerSec : null });

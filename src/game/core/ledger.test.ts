@@ -58,6 +58,17 @@ describe('ledger phase', () => {
     expect(w.events.entries.at(-1)).toMatchObject({ kind: 'researchStopped', project: 'pipelining' });
   });
 
+  it('resumes research stopped for insolvency as soon as Credits are back at 0 or above (QA-04)', () => {
+    const base = createInitialState(42);
+    const state: GameState = { ...base, research: { ...base.research, active: researchId('pipelining') } };
+    const w = openWorld(state);
+    tick(w, () => { w.hot.bill[0] = 1000; });
+    expect(w.research.stoppedInsolvent).toBe(true);
+    tick(w, () => { pay(w, 5, 1); });
+    expect(w.ledger.credits).toBeGreaterThanOrEqual(0n);
+    expect(w.research.stoppedInsolvent).toBe(false);
+  });
+
   it('reports whole net Credits per minute from change points', () => {
     const state = createInitialState(42);
     const w = openWorld(state);

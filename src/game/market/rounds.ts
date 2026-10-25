@@ -1,6 +1,6 @@
 import { applyStart, refillBatteries, resetPower } from '../phys/start';
 import { G } from '../core/buffers';
-import { ROUND_REPORTS_KEPT, TICK_MS } from '../core/constants';
+import { ROUND_REPORTS_KEPT, STALL_END_TICKS, TICK_MS } from '../core/constants';
 import { pushEvent, roundDetails } from '../core/events';
 import { energyBreakdown, resetRoundTotals, roundTotals } from '../core/ledger';
 import { MODE, restingMode, setUnitMode } from '../core/timers';
@@ -110,9 +110,13 @@ export function endRound(w: World, endedBy: RoundEndedBy = 'sla'): void {
   pushEvent(w, { kind: 'roundEnded', round: r.index });
 }
 
-/** SLA step (tick step 11): count this tick's outcomes; below 80% the round ends now. */
+/**
+ * SLA step (tick step 11): count this tick's outcomes; below 80% the round ends now. D33: so does a round
+ * in which no task has been met for 120 s (dismissals and research don't count), so it can't stall forever.
+ */
 export function roundPhase(w: World): void {
   if (w.round.phase !== 'running') return;
   countOutcomes(w);
-  if (slaBelowThreshold(w)) endRound(w);
+  if (slaBelowThreshold(w)) { endRound(w); return; }
+  if (w.tick - Math.max(w.hot.g[G.lastMetTick]!, w.round.startTick) >= STALL_END_TICKS) endRound(w, 'stall');
 }

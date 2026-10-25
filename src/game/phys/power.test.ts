@@ -35,7 +35,7 @@ describe('zone UPS and dual feed (spec §9.2)', () => {
     const w = physWorld(room(1));
     vi.mocked(killSubtree).mockClear();
     physTicks(w, 100);
-    expect(killSubtree).toHaveBeenCalledWith(w, { kind: 'room', id: 0 }, 'power');
+    expect(killSubtree).toHaveBeenCalledWith(w, { kind: 'room', id: 0 }, 'power', 'ups');
     expect([w.hot.sys.mode[0], w.hot.sys.mode[1]]).toEqual([MODE.dark, MODE.dark]);
   });
 

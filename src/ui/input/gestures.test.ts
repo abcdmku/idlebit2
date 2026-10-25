@@ -27,7 +27,7 @@ describe('world viewport and gestures', () => {
     send('pointerdown', 3, 40); send('pointerup', 3, 40); expect(tap).toHaveBeenCalledOnce(); dispose();
   });
   it('pans the rack row: a drag past 6 px scrolls instead of tapping; the wheel scrolls instead of zooming', () => {
-    const canvas = document.createElement('canvas'), tap = vi.fn(), zoom = vi.fn(), drag = vi.fn(), wheel = vi.fn();
+    const canvas = document.createElement('canvas'), tap = vi.fn(), zoom = vi.fn(), drag = vi.fn(), wheel = vi.fn(() => true);
     const dispose = bindGestures(canvas, { renderer: () => null, tap, zoom, pan: { active: () => true, drag, wheel } });
     const send = (type: string, x: number) => {
       const event = new Event(type, { cancelable: true });
@@ -40,6 +40,13 @@ describe('world viewport and gestures', () => {
     expect(tap).toHaveBeenCalledOnce();
     canvas.dispatchEvent(new WheelEvent('wheel', { deltaY: 120, cancelable: true }));
     expect(wheel).toHaveBeenCalledWith(0, 120); expect(zoom).not.toHaveBeenCalled();
+    dispose();
+  });
+  it('a wheel the pan declines zooms instead (QA-12: nothing to pan, or a vertical wheel on the rack row)', () => {
+    const canvas = document.createElement('canvas'), zoom = vi.fn();
+    const dispose = bindGestures(canvas, { renderer: () => null, tap: vi.fn(), zoom, pan: { active: () => true, drag: vi.fn(), wheel: () => false } });
+    canvas.dispatchEvent(new WheelEvent('wheel', { deltaY: -120, cancelable: true }));
+    expect(zoom).toHaveBeenCalledWith('in', null);
     dispose();
   });
 });

@@ -1142,7 +1142,7 @@ Each rack and zone has a crash timer `tHot`, in seconds:
 Starting a project, or the next queued project starting, puts the **research task** at the front of the market queue.
 
 - **In line.** It is the head. It has no clock, and it can't time out, be dismissed or fail on the queue. Nothing behind it is taken while it waits, and the first task behind it has no clock either. Auto-skip leaves the line alone.
-- **Taken.** At the route step (§14, step 4), before routing, every system with room takes it: a free slot by the usual rule (§6.4, one take per slot per tick) and at least one free hardware thread. Each holder keeps **one slot and one thread** during a round (a fine-grain divisible task, D25: one shard per system with room) until the project completes. It has no payload and no transfer, and it pays no Credits or Data. When it is taken, the next task becomes the head with a fresh 10 s.
+- **Taken.** At the route step (§14, step 4), before routing, every system with room takes it: a free slot by the usual rule (§6.4, one take per slot per tick). During a round no free thread is needed (QA-03): it cut the line, so it also cuts the system's queue, and it researches on the next thread a running task frees, before any queued task starts. Between rounds a holder needs a free thread. Each holder keeps **one slot and one thread** during a round (a fine-grain divisible task, D25: one shard per system with room) until the project completes. It has no payload and no transfer, and it pays no Credits or Data. When it is taken, the next task becomes the head with a fresh 10 s.
 - **Running.** A holder researches at `threadRate × clockFactor × η_cfg × threads held`, times its rack's e(T). Its threads count as busy for tasks and for power (§9.1), and a holder never sleeps.
 - **Lost.** A holder that leaves `onMarket` or `paused` (dark, crashed, cold, offline, draining) lets go. When no holder is left, the task is back at the queue front with its progress kept.
 - **Done.** When the project completes, every holder lets go, and the next queued project, if any and paid, enters the line.
@@ -1156,7 +1156,7 @@ The market is paused, but research still runs. If a project is active and not st
 
 ### 11.4 Insolvency
 
-At the ledger step, if the wallet is negative after the energy debit, research **stops**: the project is kept but marked `stoppedInsolvent`, and from the next tick no system runs research. The wallet can go negative by at most one tick's bill this way. A stopped project resumes when the player resumes it with a non-negative wallet, or automatically at the next Return to market.
+At the ledger step, if the wallet is negative after the energy debit, research **stops**: the project is kept but marked `stoppedInsolvent`, and from the next tick no system runs research. The wallet can go negative by at most one tick's bill this way. A stopped project resumes by itself at the first ledger step with Credits at 0 or above (QA-04), or when the player resumes it.
 
 ## 12. Parts and prices
 

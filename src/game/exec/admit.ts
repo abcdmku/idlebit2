@@ -1,3 +1,4 @@
+import { FAIL_DETAILS } from '../types/events';
 import { canRunOn, detailIndex } from '../market/fleet';
 import { dirtySystem } from '../core/touch';
 import type { World } from '../core/world';
@@ -5,7 +6,7 @@ import { addTransit } from '../net/fifo';
 import { arrived } from '../net/links';
 import { enqueue } from './alloc';
 import { CAUSE, failRecord, releaseReservation } from './outcome';
-import { canAdmit, noteAdmit, noteAdmitted } from './slots';
+import { admitsInMode, canAdmit, noteAdmit, noteAdmitted, runsTasks } from './slots';
 
 /**
  * Admit phase (tick step 5, spec §7.5). Transfers that arrived this tick are delivered in order of
@@ -30,6 +31,9 @@ function deliver(w: World, r: number): void {
   dirtySystem(w, s);
   const gate = canRunOn(w, s, r);
   if (gate !== 0) { failRecord(w, r, CAUSE.misroute, detailIndex(gate)); return; }
+  // QA-13: a system switched off (or that went dark) while the shard was in transit can't take it; it fails
+  // like the work the switch killed, instead of sitting in the queue of a system that never runs it.
+  if (!runsTasks(w.hot.sys.mode[s]!) && !admitsInMode(w.hot.sys.mode[s]!)) { failRecord(w, r, CAUSE.swap, FAIL_DETAILS.indexOf('offline')); return; }
   addTransit(w.hot, -k);
   releaseReservation(w, s, k, r);
   const before = canAdmit(w, s);

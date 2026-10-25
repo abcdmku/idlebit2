@@ -4,7 +4,7 @@ import { netPerMinute } from '../core/ledger';
 import { slaChecking, slaPercent, slaWindow } from '../core/sla';
 import { SLA_WINDOW } from '../core/constants';
 import type { HudSnapshot, RoundSnapshot } from '../types/snapshot';
-import { roundIncome } from './research';
+import { recentIncome, roundIncome } from './research';
 import type { GameState } from '../types/state';
 
 export { slaPercent };
@@ -25,14 +25,16 @@ export function hudSnapshot(state: GameState, prev: HudSnapshot | null): HudSnap
   const elapsed = Math.max(0, end - round.startTick) * TICK_MS;
   const credits = state.wallet.credits, data = state.wallet.data, net = netPerMinute(state);
   const auto = autoReturnInMs(state);
-  const income = roundIncome(state);
-  const sameIncome = prev?.income !== undefined && prev.income.dataPerSec === income.dataPerSec && prev.income.creditsPerSec === income.creditsPerSec;
+  const income = roundIncome(state), recent = recentIncome(state);
+  const same = (a: { dataPerSec: number; creditsPerSec: number } | undefined, b: { dataPerSec: number; creditsPerSec: number }) =>
+    a !== undefined && a.dataPerSec === b.dataPerSec && a.creditsPerSec === b.creditsPerSec;
+  const sameIncome = same(prev?.income, income), sameRecent = same(prev?.incomeRecent, recent);
   const sameSla = prev !== null && prev.sla.met === met && prev.sla.failed === failed && prev.sla.roundMet === roundMet
     && prev.sla.roundFailed === roundFailed && prev.sla.deliveredWork === delivered
     && prev.sla.failedWork === failedWork && prev.sla.grace === grace;
   if (prev && sameSla && prev.credits === credits && prev.data === data && prev.netPerMinute === net
     && prev.roundState === round.phase && prev.roundIndex === round.index
-    && prev.roundElapsedMs === elapsed && prev.autoReturnInMs === auto && sameIncome) return prev;
+    && prev.roundElapsedMs === elapsed && prev.autoReturnInMs === auto && sameIncome && sameRecent) return prev;
   return {
     credits, data, netPerMinute: net,
     sla: prev && sameSla ? prev.sla
@@ -40,6 +42,7 @@ export function hudSnapshot(state: GameState, prev: HudSnapshot | null): HudSnap
         roundMet, roundFailed, deliveredWork: delivered, failedWork, grace },
     roundState: round.phase, roundIndex: round.index, roundElapsedMs: elapsed, autoReturnInMs: auto,
     income: sameIncome ? prev!.income! : income,
+    incomeRecent: sameRecent ? prev!.incomeRecent! : recent,
   };
 }
 

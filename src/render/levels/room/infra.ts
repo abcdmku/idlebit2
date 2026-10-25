@@ -39,10 +39,11 @@ export function drawNetRack(g: G, s: RoomSnapshot, live: boolean, powered: boole
   const t = prism(g, f.x, f.y, f.w, f.h, z, NET_STYLE, top);
   R(g, t.x + 1, t.y + 1, t.w - 2, 1, powered ? P.net : mix(P.net, P.ink, 0.6));
   const fy = t.y + t.h;
-  R(g, t.x + 1, fy + 1, 14, 6, P.ink);
-  if (powered) lcdText(g, t.x + 2, fy + 1, LB_SHORT[lb.strategy] ?? 'LB', P.cacheOn, t.x + 1, t.x + 15);
+  // the LCD spans the face so a four-letter strategy (FIFO, PACK) fits whole (QA-20); the decision light sits by the port lights
+  R(g, t.x + 1, fy + 1, t.w - 1, 6, P.ink);
+  if (powered) lcdText(g, t.x + 1, fy + 1, LB_SHORT[lb.strategy] ?? 'LB', P.cacheOn, t.x + 1, t.x + t.w);
   rateAnimation(lb.routedPerSec, timeMs, 2, live, decision);
-  px(g, t.x + t.w - 2, fy + 2, decision.active && (decision.saturated || decision.phase < 0.5) ? P.bit : P.ledOff);
+  px(g, t.x + t.w - 2, fy + 8, decision.active && (decision.saturated || decision.phase < 0.5) ? P.bit : P.ledOff);
   const n = Math.min(sw.ports.length, 28);
   for (let i = 0; i < n; i++) {
     const p = sw.ports[i], x = t.x + 1 + (i % 7) * 2, y = fy + 8 + Math.floor(i / 7) * 2;

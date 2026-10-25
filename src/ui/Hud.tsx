@@ -81,7 +81,8 @@ function Sla() {
   const g = useGameSelector(s => ({ phase: s.round.state, percent: s.hud.sla.percent, met: s.hud.sla.met, failed: s.hud.sla.failed,
     checking: s.hud.sla.checking, round: s.hud.roundIndex, seconds: Math.floor(s.hud.roundElapsedMs / 1000) }), shallowEqual, 250);
   const tone = !g.checking ? 'mute' : g.percent >= 90 ? 'ok' : g.percent >= 80 ? 'warn' : 'bad';
-  const when = g.phase === 'running' ? clockText(g.seconds * 1000) : g.phase === 'ended' ? 'round over' : 'between rounds';
+  // Short words, so the label keeps its reserved width beside End round (QA-16).
+  const when = g.phase === 'running' ? clockText(g.seconds * 1000) : g.phase === 'ended' ? 'over' : 'break';
   const counts = `${g.met} / ${g.met + g.failed}`, meterW = 32 * n;
   // Where the band is narrow (End round beside it), the meter gives way first; the percent carries the same reading.
   const roomy = 2.2 * L.body + 3.4 * L.big + 3.6 * L.body + meterW + (d ? 7 : 2) * L.body + 4 * 8 <= L.sla.w;
@@ -116,7 +117,7 @@ function EndRound() {
     shell.dispatch({ type: 'endRound' });
   };
   return <button type="button" className={`skey end-round ${armed ? 'warn two' : ''}`} style={box(k)} disabled={!running} data-testid="end-round"
-    data-qa-target={k.h >= 44 ? '' : undefined} aria-label={armed ? 'End round? Tap again' : 'End round'} onClick={press}>
+    data-qa-target={k.h >= 44 ? "" : undefined} aria-label={armed ? "End round? Tap again" : "End round"} onPointerDown={e => e.stopPropagation()} onClick={press}>
     {armed ? <><span>End round?</span><span>Tap again</span></> : 'End round'}</button>;
 }
 

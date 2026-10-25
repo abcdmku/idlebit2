@@ -122,6 +122,19 @@ export function formatHertz(hz: number): string {
   const [num, prefix] = siParts(hz);
   return `${num} ${prefix}Hz`;
 }
+/**
+ * A countdown on a display (the battery's time left): m:ss under an hour ("4:12", "10:00"), then hours,
+ * one decimal under 10 h ("1.5 h", "2 h", "12 h"). Floored; negative or not finite reads "0:00".
+ */
+export function formatClock(seconds: number): string {
+  if (!Number.isFinite(seconds) || seconds <= 0) return '0:00';
+  if (seconds < 3600) {
+    const t = Math.floor(seconds);
+    return `${Math.floor(t / 60)}:${String(t % 60).padStart(2, '0')}`;
+  }
+  const h = seconds / 3600;
+  return `${h < 10 ? String(Math.floor(h * 10) / 10) : String(Math.floor(h))} h`;
+}
 /** Energy: "600 MJ", "120 GJ" (a battery's capacity). */
 export function formatEnergy(joules: number): string {
   const [num, prefix] = siParts(joules);

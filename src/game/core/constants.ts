@@ -34,6 +34,8 @@ export const SLA_THRESHOLD = 0.8;
 export const SLA_MIN_RESOLVED = 10;
 /** D28: the SLA counts the last this many resolved tasks of the round. */
 export const SLA_WINDOW = 50;
+/** D33: a running round also ends when no task has been met for this long (a named deadline). */
+export const STALL_END_TICKS = 1200;
 /** G = SLA_GRACE_TASKS × the largest of the five opening tasks' work. */
 export const SLA_GRACE_TASKS = 10;
 

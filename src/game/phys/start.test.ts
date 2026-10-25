@@ -4,7 +4,7 @@ import { POWER_CTL } from '../build/catalog/infra';
 import { defaultStartCtl } from '../build/startCtl';
 import { applyAction } from '../core/actions';
 import { advanceGame, advanceGameOwned, copyGameState } from '../core/advance';
-import { baseRouter } from '../core/defaults';
+import { barebonesSpec, baseRouter } from '../core/defaults';
 import { MODE } from '../core/timers';
 import { buildState } from '../testkit/builders';
 import type { StartCtl } from '../types/build';
@@ -140,5 +140,35 @@ describe('D31 configurations', () => {
     const applied = act(saved, { type: 'applyConfig', unit: { kind: 'rack', id: 1 as never }, name: 'battery' });
     expect(applied.build.racks[1]!.powerCtl).toEqual(ctl);
     expect(BigInt(applied.wallet.credits)).toBeLessThan(BigInt(saved.wallet.credits));
+  });
+});
+
+describe('QA-13 regressions', () => {
+  it('a shard landing on a server switched off in transit fails as swap, never stranded in its queue', () => {
+    // QA's case: the original powerRack fixture (eight kHz servers on a 4-port switch, start with 2), 10 s in, server 0 toggled off.
+    const built = buildState({
+      seed: 42, sites: 1, zonesPerSite: 2, racksPerZone: 1, serversPerRack: 8, unlocks: 'max', round: 'between', credits: '1000000000',
+      system: (id, rack, slot) => ({ id, rack, slot, online: true, spec: barebonesSpec(1) }),
+      rack: (r) => ({ ...r, powerCtl: { ...defaultStartCtl(0, 1), startWith: 2 } }),
+    });
+    let s = advanceGame(act(built, { type: 'returnToMarket' }), 10_000).state;
+    s = act(s, { type: 'setOnline', unit: { kind: 'system', id: 0 as never }, online: false });
+    s = advanceGame(s, 12_000).state;
+    expect(s.hot.sys.mode[0]).toBe(MODE.offline);
+    expect(s.hot.sys.queueLen[0]! + s.hot.sys.running[0]! + s.hot.sys.reserved[0]!).toBe(0);
+  });
+
+  it('a start controller keeps and wakes only servers with a switch port', () => {
+    // Eight servers on the starter 4-port switch: four have no link and can never take work.
+    let s = fromReturn(fleet({ racks: 1, servers: 8, rack: { ...defaultStartCtl(0), startWith: 2, order: 'fastest', trigger: { headWaitS: 1, busyPct: null } } }));
+    const port = s.compiled.sys.port;
+    for (let i = 0; i < 300; i += 1) {
+      s = advanceGame(s, 100).state;
+      for (let k = 0; k < 8; k += 1) {
+        if (port[k]! >= 0) continue;
+        expect(s.hot.sys.mode[k] === MODE.onMarket && s.hot.sys.running[k]! > 0).toBe(false);
+        expect(s.hot.sys.wakeTicks[k]).toBe(0);
+      }
+    }
   });
 });
