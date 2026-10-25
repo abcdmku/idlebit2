@@ -1,0 +1,32 @@
+// Render core barrel. Level code imports from here (never from ../index.ts, which imports the levels).
+export * from './types';
+export * from './geom';
+export * from './camera';
+export { arbitrateHit } from './hit';
+export { ORDER, depth, parentId, childId, createLevelRegistry } from './registry';
+export { ZoomTransition, transitionAlpha, zoomSeconds, MAX_PATH, REDUCED_ZOOM_S } from './transition';
+export type { PathNode, ZoomOptions, ZoomSegment, ZoomState } from './transition';
+export { ZoomChain, CHAIN_GAP_S } from './chain';
+export { createZoomLink, hallDim, keyOf, siteSink, sledOut, zoomLink } from './choreo';
+export type { ZoomLink } from './choreo';
+export { DESKTOP_TYPE, PHONE_TYPE, LabelBuffer, TONE, drawLabels, MAX_LABELS } from './labels';
+export type { LabelAlign, LabelTone, LabelWriter, Typography } from './labels';
+export * from './format';
+export { BAND, BAND_ORDER, BAND_TYPE, FAMILY, FAMILY_CELL, FAMILY_ICON, PIPS, TASK_TYPES, TYPE, bandColor, drawFamilyIcon,
+  drawTypeIcon, drawPip, familyBand, familyName, hasFamilyIcon, paintFamilyIcon, paintTypeIcon, typeOf, typeColor, typeName } from './familyIcons';
+export type { BandStyle, IconTone, TaskType, TypeStyle } from './familyIcons';
+export { drawPipe, inbound, transferProgress, MIN_VISIBLE_TRANSFER_S } from './pipe';
+export type { Inbound } from './pipe';
+export { zoomPath, adjacent } from './paths';
+export { createCanvasRenderer, reportRenderError, MAX_CHILDREN, MAX_TARGETS, MAX_FAULTS } from './view';
+export { P, BG, KIND, mix } from './palette';
+export { GLYPH_WIDTH, GLYPH_HEIGHT, GLYPH_ADVANCE, silk, silkWidth } from './glyphs';
+export { cached, pix, stamp, dataURL, context2d, createSpriteCache, clearSpriteCache, SPR } from './sprites';
+export * from './px';
+export * from './activity';
+export * from './decoration';
+export { createEffectPool, EFFECT_LIMITS } from './fx';
+export type { EffectPool, EffectKind } from './fx';
+export * from './feed';
+export * from './unit';
+export { drawContained, mapPoint } from './mini';

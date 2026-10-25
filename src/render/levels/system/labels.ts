@@ -1,0 +1,132 @@
+// System value labels (L2 main.js systemLabels): every installed part carries its size and speed.
+// Desktop: two-line labels in the board's side margins, with silkscreen leaders that end on the
+// part. Phone: one-line tags on the board beside each part. Values are snapshot fields, formatted.
+import type { SystemSnapshot } from '../../../game';
+import { P, R, bitRate, bitsText, hertz, wattsText, whole } from '../../core';
+import type { LabelWriter, Rect, WorldForm, WorldFrame } from '../../core';
+import { BOARD, PORT, PSU, siteRect } from './layout';
+import { boardModel } from './model';
+import type { Site } from './model';
+
+export type LabelKey = 'port' | 'cpu' | 'psu' | 'ram' | 'drive' | 'gpu';
+export interface PartLabel {
+  readonly key: LabelKey;
+  readonly name: string;
+  readonly value: string;
+  readonly side: 'L' | 'R';
+  /** The part's rect (hit rect union) in board art px. */
+  readonly r: Rect;
+  /** Desktop: label top and middle line, the label's inner edge and where the leader meets the part. */
+  top: number; mid: number; lx: number; end: number;
+  /** Phone: tag anchor (left edge, or right edge when `right`). */
+  tagX: number; tagY: number; right: boolean;
+}
+
+const LAT = 8, ROW = 16, GAP = 2 * LAT, FIRST = 24;
+const q4 = (v: number) => Math.round(v / 4) * 4;
+function union(sites: readonly Site[], b: Parameters<typeof siteRect>[0]): Rect {
+  let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
+  for (const s of sites) {
+    const r = siteRect(b, s.type, s.index);
+    x0 = Math.min(x0, r.x); y0 = Math.min(y0, r.y); x1 = Math.max(x1, r.x + r.w); y1 = Math.max(y1, r.y + r.h);
+  }
+  return { x: x0, y: y0, w: x1 - x0, h: y1 - y0 };
+}
+const times = (n: number) => (n > 1 ? ` ×${n}` : '');
+/** "2 + 1 KiB" when the sizes share a unit, else "512 bits + 1 KiB". */
+export function sizes(bits: readonly number[]): string {
+  const parts = bits.map(bitsText), unit = parts[0]!.slice(parts[0]!.indexOf(' ') + 1);
+  if (parts.every(p => p.endsWith(` ${unit}`))) return `${parts.map(p => p.slice(0, p.indexOf(' '))).join(' + ')} ${unit}`;
+  return parts.join(' + ');
+}
+
+/** The label values, all read from the snapshot. */
+function values(s: SystemSnapshot): Omit<PartLabel, 'top' | 'mid' | 'lx' | 'end' | 'tagX' | 'tagY' | 'right'>[] {
+  const m = boardModel(s), b = m.b, out: Omit<PartLabel, 'top' | 'mid' | 'lx' | 'end' | 'tagX' | 'tagY' | 'right'>[] = [];
+  const cores = s.chip.cores.length;
+  out.push({ key: 'port', name: 'Port', value: hertz(s.chip.pipe.speed), side: 'L', r: { x: PORT.x, y: PORT.y - PORT.z, w: PORT.w, h: PORT.h + PORT.z } });
+  out.push({ key: 'cpu', name: 'CPU', value: `${hertz(s.chip.clock.hz)} · ${whole(cores)} ${cores === 1 ? 'core' : 'cores'}${times(s.cpuCount)}`,
+    side: 'L', r: siteRect(b, 'cpu', 0) });
+  out.push({ key: 'psu', name: 'PSU', value: wattsText(s.psu.capacityW), side: 'R', r: { ...PSU } });
+  const ram = m.installed.ram, drive = m.installed.drive, gpu = m.installed.gpu;
+  // R40: per-stick capacity and the slowest channel (L2 "2 + 1 KiB · 1 kHz"); per-drive size and IO.
+  if (ram.length) {
+    let rate = Infinity;
+    for (const q of ram) rate = Math.min(rate, q.part!.rateBits ?? 0);
+    out.push({ key: 'ram', name: 'RAM', value: `${sizes(ram.map(q => q.part!.capacityBits ?? 0))} · ${hertz(rate)}`, side: 'R', r: union(ram, b) });
+  }
+  if (drive.length) {
+    const d = drive[0]!.part!;
+    out.push({ key: 'drive', name: 'Drive', value: `${bitsText(d.capacityBits ?? 0)} · ${bitRate(d.rateBits ?? 0)}${times(drive.length)}`, side: 'R', r: union(drive, b) });
+  }
+  if (gpu.length) {
+    const p = gpu[0]!.part!, stats = p.gpu;
+    const value = stats ? `G${stats.model} · ${whole(stats.cores)} cores · ${bitsText(stats.vramBits)}${times(gpu.length)}`
+      : `NPU · level ${whole(p.level)}${times(gpu.length)}`;
+    out.push({ key: 'gpu', name: 'GPU', value, side: 'L', r: union(gpu, b) });
+  }
+  return out;
+}
+
+/** The first label top on desktop: below the band and strip at rest (frame.visible), on the lattice. */
+export function firstRow(frame: WorldFrame): number {
+  const v = frame.visible;
+  return v ? Math.max(FIRST, Math.ceil(v.y / LAT) * LAT) : FIRST;
+}
+
+function place(list: PartLabel[], form: WorldForm | undefined, first: number): void {
+  if (form === 'phone') {
+    const top = BOARD.y - 16;
+    for (const it of list) {
+      const r = it.r;
+      it.right = it.key === 'ram' || it.key === 'drive';
+      it.tagX = q4(it.right ? r.x + r.w : r.x);
+      it.tagY = q4(it.key === 'port' || it.key === 'psu' ? top : it.key === 'ram' ? r.y + r.h : it.key === 'gpu' ? r.y - 10 : r.y + r.h + 2);
+    }
+    return;
+  }
+  const boardL = BOARD.x, boardR = BOARD.x + BOARD.w;
+  for (const side of ['L', 'R'] as const) {
+    let next = first;
+    const mine = list.filter(q => q.side === side).sort((a, c) => a.r.y - c.r.y);
+    for (const it of mine) {
+      let mid = Math.round((it.r.y + it.r.h / 2) / LAT) * LAT;
+      mid = Math.min(Math.max(mid, Math.ceil(it.r.y / LAT) * LAT), Math.floor((it.r.y + it.r.h) / LAT) * LAT);
+      if (mid - ROW / 2 < next) mid = next + ROW / 2;
+      it.top = mid - ROW / 2; it.mid = mid; next = it.top + ROW;
+      it.lx = side === 'L' ? boardL - GAP : boardR + GAP;
+      it.end = side === 'L' ? it.r.x : it.r.x + it.r.w;
+    }
+  }
+}
+
+interface Placed { first: number; list: PartLabel[] }
+const cache = { desktop: new WeakMap<SystemSnapshot, Placed>(), phone: new WeakMap<SystemSnapshot, Placed>() };
+/** Labels for a snapshot and form, placed from row `first` down. Cached per published snapshot. */
+export function partLabels(s: SystemSnapshot, form: WorldForm | undefined, first = FIRST): readonly PartLabel[] {
+  const map = cache[form === 'phone' ? 'phone' : 'desktop'];
+  let entry = map.get(s);
+  if (!entry || entry.first !== first) {
+    const list = values(s).map(v => ({ ...v, top: 0, mid: 0, lx: 0, end: 0, tagX: 0, tagY: 0, right: false }));
+    place(list, form, first); entry = { first, list }; map.set(s, entry);
+  }
+  return entry.list;
+}
+
+/** Desktop leaders: a silk line from the label's inner edge to the part, with a dot on the part. Art. */
+export function drawLeaders(g: CanvasRenderingContext2D, s: SystemSnapshot, first = FIRST): void {
+  for (const it of partLabels(s, 'desktop', first)) {
+    const a = Math.min(it.lx, it.end), b = Math.max(it.lx, it.end);
+    R(g, a, it.mid, b - a, 1, P.silk); R(g, it.end - 1, it.mid - 1, 3, 3, P.silk);
+  }
+}
+
+/** Write the labels: two lines in the margins (desktop) or one-line tags on the board (phone). */
+export function writeLabels(s: SystemSnapshot, frame: WorldFrame, out: LabelWriter): void {
+  const form = frame.form;
+  for (const it of partLabels(s, form, firstRow(frame))) {
+    if (form === 'phone') { out.label(it.key, it.tagX, it.tagY, it.right ? 'right' : 'left', true).text(it.name, 'silk', true).text(it.value, 'value'); continue; }
+    const left = it.side === 'L';
+    out.label(it.key, left ? it.lx - 3 : it.lx + 3, it.top, left ? 'right' : 'left').text(it.name, 'silk', true).br().text(it.value, 'value');
+  }
+}

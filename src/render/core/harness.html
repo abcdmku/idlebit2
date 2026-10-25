@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+  <title>idlebit2 renderer harness</title>
+  <link rel="icon" href="data:," />
+  <link rel="stylesheet" href="/src/ui/styles/tokens.css" />
+<style>
+    * { box-sizing: border-box; } body { margin: 0; background: #0e0b1c; color: #efeaff; font: 13px "Chakra Petch", sans-serif; }
+    #vPhone { position: relative; width: 390px; height: 780px; margin: auto; overflow: hidden; }
+    canvas { display: block; position: absolute; inset: 0; image-rendering: pixelated; }
+    .top { position: absolute; inset: 0 0 auto; height: 134px; background: #15122a; padding: 12px; pointer-events: none; }
+    .tray { position: absolute; inset: auto 0 0; height: 150px; padding: 12px; background: #15122a; }
+    button { min-width: 64px; min-height: 44px; color: #efeaff; background: #29234b; border: 2px solid #5d5296; font: inherit; cursor: pointer; }
+    button:disabled { opacity: .4; cursor: default; }
+    .controls { max-width: 390px; margin: 12px auto; } label { display: block; padding: 12px 0; } input { width: 100%; }
+  </style>
+</head>
+<body>
+  <main id="vPhone">
+    <canvas aria-label="Renderer harness world"></canvas>
+    <div class="top">Renderer harness · LEVEL_FIXTURES</div>
+    <div class="tray"><div id="levels"></div><output id="status">Tap the world</output></div>
+  </main>
+  <div class="controls">
+    <button id="round">Toggle round</button> <button id="motion">Reduce motion</button>
+    <label>Hold zoom <input id="hold" type="range" min="0" max="1" step="0.01" value="0.5" /></label><button id="release">Release</button>
+  </div>
+  <script type="module" src="./harness.ts"></script>
+</body>
+</html>

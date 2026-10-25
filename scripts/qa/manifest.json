@@ -1,0 +1,4 @@
+[
+  { "id": "boot-phone", "width": 390, "height": 780, "dpr": 2, "seed": 42 },
+  { "id": "boot-desktop", "width": 1280, "height": 800, "dpr": 1, "seed": 42 }
+]

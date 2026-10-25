@@ -1,0 +1,243 @@
+import type { Amount } from '../amount';
+import type { BoardKind } from './build';
+import type { QueueStrategyId, RegionId } from './catalog';
+import type { FailCause, FailCounts, FailDetail, GameEvent } from './events';
+import type { LevelId, NodeRef, RackId, ResearchId, RoomId, SiteId, SystemId } from './ids';
+import type { RoundReport } from './report';
+import type { ResearchMode, RoundPhase } from './state';
+import type {
+  BuildSlotView, ChipQueueEntryView, CoolerView, LbView, LinkView, OutcomeView, PartView, QueueEntryView, RackSlotView,
+  ServerSlotView, SiteView, SupplyView, SwitchView, TaskView, TransferView, UnitMode,
+} from './views';
+
+/** What is on screen: the focus level and, during a zoom transition, its partner. */
+export interface SnapshotScope { readonly focus: NodeRef; readonly partner: NodeRef | null }
+
+export interface RenderSnapshot {
+  readonly epoch: number;
+  readonly tick: number;
+  readonly simTimeMs: number;
+  /** The current one boot time, unlocks.bootTicks × TICK_MS; pips drain timerS / bootMs. */
+  readonly bootMs: number;
+  readonly hud: HudSnapshot;
+  readonly feed: FeedSnapshot;
+  readonly round: RoundSnapshot;
+  readonly research: ResearchBadge;
+  readonly unlocked: Readonly<Record<LevelId, boolean>>;
+  /** Default node per opened level (the player's first system, rack, room). */
+  readonly home: Readonly<Partial<Record<LevelId, NodeRef>>>;
+  readonly focus: LevelSnapshot;
+  readonly partner: LevelSnapshot | null;
+  readonly events: readonly GameEvent[];
+  readonly firstSeq: number;
+  readonly lastSeq: number;
+}
+
+export interface HudSnapshot {
+  readonly credits: Amount;
+  readonly data: Amount;
+  /** Whole Credits per minute over the trailing 60 s. */
+  readonly netPerMinute: Amount;
+  /** Work-weighted (spec §4.2): percent = floor(SLA × 1000) / 10. met/failed are task counts; the work sums are ops. */
+  readonly sla: {
+    readonly met: number; readonly failed: number; readonly percent: number;
+    readonly deliveredWork: number; readonly failedWork: number; readonly grace: number;
+  };
+  readonly roundState: RoundPhase;
+  readonly roundIndex: number;
+  readonly roundElapsedMs: number;
+  readonly autoReturnInMs: number | null;
+}
+
+/** The market: the endless queue's visible window, the head clock and the work in transfer (spec §16.2). */
+export interface FeedSnapshot {
+  /** The round the window belongs to. Between rounds it is the next round, shown "after Return". */
+  readonly roundIndex: number;
+  readonly timing: 'running' | 'onReturn';
+  /** The queue's first QUEUE_VISIBLE entries, head first: returned work at the front, then the window tasks. */
+  readonly window: readonly QueueEntryView[];
+  /** The head may be taken through the end of this tick (headTick + 99); null between rounds. */
+  readonly headDeadlineTick: number | null;
+  /** The head's first missing requirement on the static capability set; null when it can run. */
+  readonly blockedBy: FailDetail | null;
+  /** Tasks moving over links: the lone system's pipe and each link's sending transfer, at most 16. */
+  readonly transfers: readonly TransferView[];
+  readonly inTransfer: number;
+  readonly queued: number;
+  readonly running: number;
+  /** This round. */
+  readonly taken: number;
+  readonly dismissed: number;
+  readonly intensity: number;
+  /** Measured takes per second over the trailing 10 s. */
+  readonly takesPerSec: number;
+  /** At most RECENT_OUTCOMES, newest last. */
+  readonly recentOutcomes: readonly OutcomeView[];
+  /** Failures this round by cause; null until `telemetry`. */
+  readonly liveFailures: FailCounts | null;
+  /** Tasks per second, met and failed over the last 2 s. */
+  readonly rates: { readonly met: number; readonly fail: number };
+  /** The dominant cause over the last 2 s, or null when nothing failed. */
+  readonly failBin: { readonly cause: FailCause; readonly perSec: number } | null;
+}
+
+export interface RoundSnapshot {
+  readonly index: number;
+  readonly state: RoundPhase;
+  readonly lastReport: RoundReport | null;
+  readonly canReturn: boolean;
+  readonly autoReturn: { readonly available: boolean; readonly on: boolean; readonly inMs: number | null };
+}
+
+export interface ResearchBadge {
+  readonly active: ResearchId | null;
+  readonly name: string | null;
+  readonly progress: number;
+  readonly mode: ResearchMode;
+  readonly stoppedInsolvent: boolean;
+  readonly needsData: boolean;
+  readonly queued: number;
+  readonly opsPerSec: number;
+}
+
+export type LevelSnapshot = ChipSnapshot | SystemSnapshot | RackSnapshot | RoomSnapshot | GlobalSnapshot;
+
+export interface CoreView {
+  readonly socket: number;
+  readonly lanes: number;
+  readonly generation: number;
+  readonly level: number;
+  readonly busy: number;
+  /** CPU-stage task assigned here, oldest taken first then taskId; null when idle. */
+  readonly taskId: number | null;
+  readonly family: number | null;
+  readonly progress: number;
+  readonly threads: number;
+  readonly research: number;
+  readonly cstate: 0 | 1 | 3 | 6;
+}
+export interface CacheLevelView { readonly kind: 'l1' | 'l2' | 'l3'; readonly bits: number; readonly generation: number; readonly level: number }
+export interface SchedulerView {
+  readonly generation: number; readonly level: number; readonly strategy: QueueStrategyId;
+  readonly q: number; readonly queued: number; readonly k: number; readonly running: number; readonly reserved: number;
+}
+export interface ChipSnapshot {
+  readonly level: 'chip';
+  /** The node one level up (its system), or null when that level is not opened. Same on every level below global. */
+  readonly parent: NodeRef | null;
+  readonly systemId: SystemId;
+  readonly online: UnitMode;
+  readonly tier: number;
+  /** Identical CPUs in the system; the view shows one, cores pool under one scheduler. */
+  readonly cpuCount: number;
+  readonly clock: { readonly hz: number; readonly effectiveHz: number; readonly generation: number; readonly level: number };
+  readonly coreSites: number;
+  readonly cores: readonly CoreView[];
+  readonly cache: { readonly levels: readonly CacheLevelView[]; readonly usedBits: number; readonly capacityBits: number };
+  readonly scheduler: SchedulerView | null;
+  /** Occupied scheduler wells, oldest taken first then taskId; remaining wells are empty. */
+  readonly queue: readonly ChipQueueEntryView[];
+  readonly researchShare: number;
+  /**
+   * The inbound pipe (D10.4, D13): the system's rack-switch port. Before Rack it carries every task;
+   * `waiting` is true while the cores sit idle on its transfer.
+   */
+  readonly pipe: { readonly speed: number; readonly transfer: TransferView | null; readonly waiting: boolean };
+  /** The system's board PSU (the CPU has no supply of its own). */
+  readonly psu: SupplyView;
+  readonly slots: readonly BuildSlotView[];
+}
+
+export interface SystemSnapshot {
+  readonly level: 'system';
+  readonly parent: NodeRef | null;
+  readonly systemId: SystemId;
+  readonly kind: 'server' | 'storageNode';
+  readonly board: BoardKind;
+  /** Identical CPUs, 1 to 4 (accelerator: up to 2). */
+  readonly cpuCount: number;
+  /** DIMM slots this board offers now: the ramSlots ceiling (≤ 4) on general, 8 on accelerator. */
+  readonly ramSlots: number;
+  /** Configuration efficiency η_cfg (compiled.sys.etaCfg), shown on the system plate. */
+  readonly etaCfg: number;
+  /** The CPU level's snapshot of CPU 1 (every CPU is an identical copy), for the package minis. */
+  readonly chip: ChipSnapshot;
+  /** Busy fraction per CPU, length cpuCount (hot sys.sockBusy). */
+  readonly cpuBusy: readonly number[];
+  readonly online: UnitMode;
+  readonly timerS: number | null;
+  /** Full length of the running boot / goingOffline / cold timer; null when timerS is null. */
+  readonly timerTotalS: number | null;
+  readonly cpu: PartView;
+  readonly ram: readonly PartView[];
+  readonly gpu: readonly PartView[];
+  readonly storage: readonly PartView[];
+  readonly psu: SupplyView;
+  readonly running: readonly TaskView[];
+  readonly queue: { readonly cap: number; readonly count: number; readonly sample: readonly TaskView[] };
+  readonly reserved: number;
+  readonly rates: { readonly ops: number; readonly ramBits: number; readonly gpuOps: number; readonly ioBits: number };
+  readonly capacities: { readonly cache: number; readonly ram: number; readonly vram: number; readonly storage: number };
+  readonly used: { readonly memory: number; readonly vram: number; readonly storage: number };
+  readonly drawW: number;
+  readonly saveable: boolean;
+  readonly slots: readonly BuildSlotView[];
+}
+
+export interface RackSnapshot {
+  readonly level: 'rack';
+  readonly parent: NodeRef | null;
+  readonly rackId: RackId;
+  /** Room slot, row-major; the starter rack reports its hidden room's slot (0). */
+  readonly slot: number;
+  /** RACK_SLOTS_PER_ROW views in column order, including this rack and empty neighbours. */
+  readonly row: readonly RackSlotView[];
+  readonly online: UnitMode;
+  readonly timerS: number | null;
+  readonly tempF: number;
+  readonly eff: number;
+  readonly crashS: number;
+  readonly crashed: boolean;
+  readonly throttled: boolean;
+  readonly cooler: CoolerView;
+  readonly pdu: SupplyView;
+  readonly lb: LbView;
+  readonly switch: SwitchView;
+  /** Always 12. */
+  readonly servers: readonly ServerSlotView[];
+  readonly saveable: boolean;
+}
+
+export interface RoomSnapshot {
+  readonly level: 'room';
+  readonly parent: NodeRef | null;
+  readonly roomId: RoomId;
+  readonly siteId: SiteId;
+  readonly zone: number;
+  /** Zone indices of the site, for the in-world zone switcher. */
+  readonly zones: readonly (RoomId | null)[];
+  readonly online: UnitMode;
+  readonly timerS: number | null;
+  readonly tempF: number;
+  readonly outsideF: number;
+  readonly crashS: number;
+  readonly crashed: boolean;
+  readonly cooler: CoolerView;
+  readonly ups: readonly SupplyView[];
+  readonly network: { readonly switch: SwitchView; readonly lb: LbView };
+  readonly rows: number;
+  readonly maxRows: number;
+  /** rows × 8. */
+  readonly racks: readonly RackSlotView[];
+  readonly saveable: boolean;
+}
+
+export interface GlobalSnapshot {
+  readonly level: 'global';
+  /** Always 8, one per region, REGION_IDS order. */
+  readonly sites: readonly SiteView[];
+  readonly backbone: { readonly links: readonly LinkView[] };
+  readonly scheduler: LbView | null;
+  readonly regionsOpen: number;
+  readonly gateway: RegionId;
+}

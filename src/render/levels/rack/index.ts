@@ -1,0 +1,60 @@
+// Rack level (v3, D17.2): the whole room row of racks, each at its true column. The active
+// rack (the focus) is drawn in full; its neighbours are darkened and a tap makes one active.
+// The view scrolls along the row (row.ts, rackRowScroll); the camera rests on the active rack.
+// Inside the active rack: four infrastructure slots (cooling roof, switch, load balancer, PDU)
+// and up to twelve servers; tap a server and its sled slides out into the System board.
+import { P, R, copyRect, px, setRect } from '../../core';
+import type { LevelRegistry, LevelRenderer, Rect } from '../../core';
+import { createFanBank } from './art';
+import { CAB_RECT, FOCUS, PLINTH, ROW_W, U0, UP_X, WORLD, colX, serverRect } from './layout';
+import { drawRackMini } from './mini';
+import { rackCol, rackRowScroll } from './row';
+import { rackChildren, rackTargets, rackUnitAnchor } from './targets';
+import { drawRow } from './world';
+import { rackDark } from './sprites';
+
+export { rackRowScroll, clampScroll, createRowScroll } from './row';
+export type { RackRowScroll } from './row';
+
+function icon(g: CanvasRenderingContext2D): void {
+  g.clearRect(0, 0, 16, 16);
+  R(g, 3, 0, 11, 16, P.ink);
+  R(g, 4, 1, 9, 2, '#4c4a6a'); R(g, 4, 1, 9, 1, P.steelLo);
+  R(g, 4, 3, 9, 12, '#18142f');
+  R(g, 4, 4, 9, 2, P.logicLo); px(g, 5, 4, P.net); px(g, 7, 4, P.net); px(g, 9, 4, P.ledOff); px(g, 11, 4, P.net);
+  for (let i = 0; i < 3; i++) { const y = 7 + i * 3; R(g, 4, y, 9, 2, i ? P.waferHi : P.steelLo); px(g, 5, y, P.led); R(g, 8, y, 3, 1, i ? P.led : P.cacheOn); }
+}
+
+export function createRackRenderer(registry: LevelRegistry): LevelRenderer<'rack'> {
+  const ctx = { registry, fans: createFanBank(8) };
+  return {
+    id: 'rack', name: 'Rack',
+    size: (_s, out) => setRect(out, 0, 0, ROW_W, WORLD.h),
+    /** The active rack, shifted by the row scroll (clamped to the row's built racks). */
+    focus(s, _vp, out) {
+      copyRect(FOCUS, out); out.x += colX(rackCol(s)) + rackRowScroll.apply(s);
+      return out;
+    },
+    /** The pipe enters at the active rack's ceiling uplink (L2 D17: x 120, y 0). */
+    entry(s, out) { out.x = colX(rackCol(s)) + UP_X; out.y = 0; return out; },
+    /** The camera tracks a drag or wheel along the row live. */
+    followFocus: () => rackRowScroll.dragging,
+    draw: (g, s, view, frame) => drawRow(g, s, view, frame, ctx),
+    drawMini: (g, v, rect, frame) => drawRackMini(g, v, rect, frame.paused),
+    children: rackChildren,
+    targets: (s, _view, out, from) => rackTargets(s, out, from),
+    unitAnchor: rackUnitAnchor,
+    faults(s, out: Rect[]) {
+      const ax = colX(rackCol(s));
+      let n = 0;
+      if (s.crashed && n < out.length) { setRect(out[n++], ax + CAB_RECT.x + 8, U0, CAB_RECT.w - 16, 4); }
+      if (rackDark(s) && n < out.length) { copyRect(PLINTH, out[n]); out[n++].x += ax; }
+      for (let i = 0; i < s.servers.length && n < out.length; i++) {
+        if (s.servers[i].state !== 'crashed' || s.crashed) continue;
+        serverRect(i, out[n]); out[n++].x += ax;
+      }
+      return n;
+    },
+    icon,
+  };
+}

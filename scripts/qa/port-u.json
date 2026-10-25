@@ -1,0 +1,124 @@
+[
+  {
+    "id": "d1-cpu-fresh",
+    "width": 1440,
+    "height": 900,
+    "dpr": 1,
+    "seed": 42
+  },
+  {
+    "id": "d2-cpu-running",
+    "width": 1440,
+    "height": 900,
+    "dpr": 1,
+    "seed": 42,
+    "steps": [
+      "__br.pause()",
+      "__br.advance(45000)",
+      "__qaTick(400)"
+    ]
+  },
+  {
+    "id": "d3-callout",
+    "width": 1440,
+    "height": 900,
+    "dpr": 1,
+    "seed": 42,
+    "steps": [
+      "__br.pause()",
+      "__br.advance(20000)",
+      "__qaTick(400)",
+      "(() => { const s = window.__brShell, r = s.surface.renderer, V = s.surface.layout.view; for (let y = V.y + 4; y < V.y + V.h; y += 8) for (let x = V.x + 4; x < V.x + V.w; x += 8) { const h = r.hit(x, y); if (h && h.part && h.part.slot.kind === 'l1') { s.view.dispatch({ type: 'select', target: { ...h, rect: { ...h.rect } } }); return h.id; } } throw new Error('no target'); })()",
+      "__qaTick(200)"
+    ]
+  },
+  {
+    "id": "d4-research-open",
+    "width": 1440,
+    "height": 900,
+    "dpr": 1,
+    "seed": 42,
+    "steps": [
+      "__br.pause()",
+      "__br.advance(20000)",
+      "window.__brShell.view.dispatch({ type: 'toggleSheet', sheet: 'research' })",
+      "__qaTick(200)"
+    ]
+  },
+  {
+    "id": "d5-system",
+    "width": 1440,
+    "height": 900,
+    "dpr": 1,
+    "seed": 42,
+    "steps": [
+      "__br.pause()",
+      "import('/src/game/fixtures.ts').then(f => { window.__brShell.store.replaceState(f.fixtureState('systemTop')); window.__brShell.view.dispatch({ type: 'zoomTo', level: 'system' }); })",
+      "__br.advance(1000)",
+      "__qaTick(1500)",
+      "__qaTick(1500)",
+      "__qaTick(500)"
+    ]
+  },
+  {
+    "id": "m1-cpu-fresh",
+    "width": 390,
+    "height": 780,
+    "dpr": 1,
+    "seed": 42
+  },
+  {
+    "id": "m2-cpu-running",
+    "width": 390,
+    "height": 780,
+    "dpr": 1,
+    "seed": 42,
+    "steps": [
+      "__br.pause()",
+      "__br.advance(45000)",
+      "__qaTick(400)"
+    ]
+  },
+  {
+    "id": "m3-callout",
+    "width": 390,
+    "height": 780,
+    "dpr": 1,
+    "seed": 42,
+    "steps": [
+      "__br.pause()",
+      "__br.advance(20000)",
+      "__qaTick(400)",
+      "(() => { const s = window.__brShell, r = s.surface.renderer, V = s.surface.layout.view; for (let y = V.y + 4; y < V.y + V.h; y += 8) for (let x = V.x + 4; x < V.x + V.w; x += 8) { const h = r.hit(x, y); if (h && h.part && h.part.slot.kind === 'l1') { s.view.dispatch({ type: 'select', target: { ...h, rect: { ...h.rect } } }); return h.id; } } throw new Error('no target'); })()",
+      "__qaTick(200)"
+    ]
+  },
+  {
+    "id": "m4-research-open",
+    "width": 390,
+    "height": 780,
+    "dpr": 1,
+    "seed": 42,
+    "steps": [
+      "__br.pause()",
+      "__br.advance(20000)",
+      "window.__brShell.view.dispatch({ type: 'toggleSheet', sheet: 'research' })",
+      "__qaTick(200)"
+    ]
+  },
+  {
+    "id": "m5-system",
+    "width": 390,
+    "height": 780,
+    "dpr": 1,
+    "seed": 42,
+    "steps": [
+      "__br.pause()",
+      "import('/src/game/fixtures.ts').then(f => { window.__brShell.store.replaceState(f.fixtureState('systemTop')); window.__brShell.view.dispatch({ type: 'zoomTo', level: 'system' }); })",
+      "__br.advance(1000)",
+      "__qaTick(1500)",
+      "__qaTick(1500)",
+      "__qaTick(500)"
+    ]
+  }
+]

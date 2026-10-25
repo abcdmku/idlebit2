@@ -1,0 +1,20 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+  <title>idlebit2 chip and system preview</title>
+  <link rel="icon" href="data:," />
+  <link rel="stylesheet" href="/src/ui/styles/tokens.css" />
+  <style>
+    html, body { margin: 0; height: 100%; background: #0e0b1c; overflow: hidden; }
+    #root { position: fixed; inset: 0; }
+    canvas { position: absolute; inset: 0; image-rendering: pixelated; }
+    .panel { position: absolute; background: #15122a; border: 2px solid #29234b; box-sizing: border-box; pointer-events: none; }
+  </style>
+</head>
+<body>
+  <div id="root"><canvas aria-label="World"></canvas></div>
+  <script type="module" src="./preview.ts"></script>
+</body>
+</html>

@@ -1,0 +1,34 @@
+{
+  "name": "idlebit2",
+  "version": "0.1.0",
+  "description": "An idle compute game: grow one CPU core into racks, rooms and data centers, and keep an accelerating task market inside its SLA.",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite --host 127.0.0.1",
+    "build": "tsc -p tsconfig.app.json && vite build",
+    "preview": "vite preview --host 127.0.0.1",
+    "test": "vitest run",
+    "typecheck": "tsc -p tsconfig.app.json --noEmit",
+    "verify": "npm test && npm run typecheck && npm run build",
+    "bench": "tsx scripts/bench/run.ts",
+    "balance": "tsx scripts/balance/chain.ts",
+    "qa": "node scripts/qa/capture.mjs"
+  },
+  "dependencies": {
+    "decimal.js": "^10.6.0",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^24.0.0",
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0",
+    "@vitejs/plugin-react": "^5.2.0",
+    "jsdom": "^26.0.0",
+    "tsx": "^4.23.0",
+    "typescript": "^5.7.0",
+    "vite": "^6.0.0",
+    "vitest": "^4.1.0"
+  }
+}

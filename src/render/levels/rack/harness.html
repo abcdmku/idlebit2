@@ -1,0 +1,20 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" href="data:," />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>idlebit2 level harness (R3)</title>
+    <link rel="stylesheet" href="/src/ui/styles/tokens.css" />
+<style>
+      html, body { margin: 0; height: 100%; background: #0e0b1c; overflow: hidden; }
+      canvas { display: block; width: 100vw; height: 100vh; image-rendering: pixelated; }
+      #hud { position: fixed; left: 0; right: 0; top: 0; color: #a99be6; font: 12px "Chakra Petch", sans-serif; padding: 4px 8px; pointer-events: none; }
+    </style>
+  </head>
+  <body>
+    <canvas id="world"></canvas>
+    <div id="hud"></div>
+    <script type="module" src="./harness.ts"></script>
+  </body>
+</html>
