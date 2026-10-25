@@ -11,7 +11,7 @@ describe('L2 shell geometry', () => {
     expect([L.N, L.w, L.h, L.x, L.y]).toEqual([3, 1440, 888, 0, 6]);
     expect(L.world).toEqual({ x: 24, y: 24, w: 1392, h: 648 });
     expect(L.band).toEqual({ x: 24, y: 24, w: 1392, h: 48 });
-    expect([L.sla, L.wallet]).toEqual([{ x: 536, y: 24, w: 480, h: 48 }, { x: 1128, y: 24, w: 264, h: 48 }]);
+    expect([L.sla, L.endKey, L.wallet]).toEqual([{ x: 512, y: 24, w: 480, h: 48 }, { x: 1000, y: 24, w: 112, h: 48 }, { x: 1192, y: 24, w: 200, h: 48 }]);
     expect(L.strip).toEqual({ x: 24, y: 72, w: 1392, h: 48 });
     expect(L.headSlot).toEqual({ x: 24, y: 72, w: 240, h: 48 });
     expect(L.cards.map(c => [c.x, c.w])).toEqual([[264, 288], [552, 288], [840, 288], [1128, 288]]);
@@ -29,18 +29,18 @@ describe('L2 shell geometry', () => {
     expect(L.kind).toBe('phone');
     expect([L.N, L.w, L.h, L.x]).toEqual([2, 384, 776, 3]);
     expect(L.world).toEqual({ x: 8, y: 8, w: 368, h: 600 });
-    expect(L.band).toEqual({ x: 8, y: 8, w: 368, h: 80 });
+    expect(L.band).toEqual({ x: 8, y: 8, w: 368, h: 96 });
     expect(L.rungs.map(r => [r.x, r.w, r.h])).toEqual([[8, 48, 48], [56, 48, 48], [104, 48, 48], [152, 48, 48], [200, 48, 48]]);
-    expect([L.wallet, L.sla]).toEqual([{ x: 256, y: 8, w: 112, h: 48 }, { x: 8, y: 56, w: 368, h: 32 }]);
-    expect(L.strip).toEqual({ x: 8, y: 88, w: 368, h: 64 });
-    expect(L.headSlot).toEqual({ x: 8, y: 88, w: 112, h: 64 });
+    expect([L.wallet, L.sla, L.endKey]).toEqual([{ x: 256, y: 8, w: 112, h: 48 }, { x: 8, y: 56, w: 280, h: 48 }, { x: 296, y: 56, w: 80, h: 48 }]);
+    expect(L.strip).toEqual({ x: 8, y: 104, w: 368, h: 64 });
+    expect(L.headSlot).toEqual({ x: 8, y: 104, w: 112, h: 64 });
     expect(L.cards.map(c => [c.x, c.w])).toEqual([[120, 64], [184, 64], [248, 64], [312, 64]]);
     expect(L.now).toEqual({ x: 8, y: 616, w: 368, h: 80 });
     expect(L.dismiss).toEqual({ x: 264, y: 632, w: 96, h: 48 });
     expect(L.kind === 'phone' && L.build).toEqual({ x: 8, y: 704, w: 80, h: 64 });
     expect(L.research).toEqual({ x: 96, y: 704, w: 112, h: 64 });
     expect(L.buy).toEqual({ x: 216, y: 704, w: 160, h: 64 });
-    expect(L.pipeSrc).toEqual({ x: 32, y: 152 });
+    expect(L.pipeSrc).toEqual({ x: 32, y: 168 });
   });
   it('N = 3 from 1200 × 760 (A01); smaller desktops drop to N = 2; narrow screens use the phone deck', () => {
     expect([shellLayout(1280, 800).kind, shellLayout(1280, 800).N, shellLayout(1200, 760).N, shellLayout(1440, 800).N]).toEqual(['desktop', 3, 3, 3]);
@@ -52,7 +52,7 @@ describe('L2 shell geometry', () => {
   it('every box sits on the 8 px grid and the strip and ladder on the lattice, at every size', () => {
     for (const [w, h] of [[1440, 900], [1920, 1080], [1280, 800], [1200, 760], [1100, 700], [1366, 768], [390, 780], [375, 667], [430, 932]] as const) {
       const L = shellLayout(w, h);
-      const boxes = [L.world, L.band, L.strip, L.headSlot, ...L.cards, L.now, L.dismiss, L.buy, L.research, L.drawer, L.lab, L.sla, L.wallet, ...L.rungs,
+      const boxes = [L.world, L.band, L.strip, L.headSlot, ...L.cards, L.now, L.dismiss, L.buy, L.research, L.drawer, L.lab, L.sla, L.endKey, L.wallet, ...L.rungs,
         ...(L.kind === 'desktop' ? L.rows : [L.build])];
       for (const b of boxes) for (const e of edges(b)) expect(on(e, 8), `${w}x${h} edge ${e}`).toBe(true);
       for (const b of [L.headSlot, ...L.cards, ...L.rungs]) for (const e of edges(b)) expect(on(e, L.lat), `${w}x${h} lattice ${e}`).toBe(true);

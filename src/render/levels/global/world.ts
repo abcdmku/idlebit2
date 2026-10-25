@@ -55,11 +55,13 @@ function drawLink(g: G, s: GlobalSnapshot, L: LinkView, live: boolean): void {
   // the landing station, lit while this link carries a real transfer
   R(g, route[4] - 2, route[5] - 2, 5, 5, P.ink); R(g, route[4] - 1, route[5] - 1, 3, 3, live && L.active ? P.led : P.ledOff);
 }
+const PIP_READY = mix(P.led, P.ink, 0.5);
 function pip(site: SiteView, paused: boolean): string {
   if (!site.open) return P.ink;
   if (site.siteId === null) return P.ledOff;
   switch (lampState(site.online)) {
-    case 'online': return paused ? P.ledOff : P.led;
+    // between rounds: dim green when the site runs next round; an off-market site reads 'offline' (lampOff)
+    case 'online': return paused ? PIP_READY : P.led;
     case 'switching': return P.amber;
     case 'fault': return P.fault;
     default: return P.lampOff;

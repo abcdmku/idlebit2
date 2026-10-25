@@ -8,7 +8,7 @@ export const DATA_BY_TIER: Readonly<Record<WorkTier, number>> = {
   9: 1.5e7, 10: 4e7, 11: 6e7, 12: 2e8, 13: 4e8, 14: 3e9, 15: 1e10,
 };
 export const WORK_TIER_OPS: Readonly<Record<WorkTier, number>> = {
-  1: 20, 2: 600, 3: 5_000, 4: 1.5e5, 5: 3e5, 6: 1e6, 7: 3e7, 8: 2e8,
+  1: 20, 2: 600, 3: 5_000, 4: 1.5e5, 5: 3e5, 6: 1e6, 7: 2.5e7, 8: 2e8,
   9: 5e9, 10: 2e10, 11: 2.5e10, 12: 3e10, 13: 4e10, 14: 6e10, 15: 1e11,
 };
 export const RESEARCH_CREDITS: Readonly<Record<string, string>> = {
@@ -182,7 +182,7 @@ export const TREE_ROWS: readonly TreeRow[] = [
   n("closedLoop", "Closed loop", "cooling", ["chilledWater", "dataCenter"], "global", "ghz", 13, 4e8, [gen("roomCooler", 4)], ["heat", "energy"]),
   n("closedLoop2", "Two-phase loop", "cooling", ["closedLoop", "regions"], "global", "ghz", 14, 3e9, [gen("roomCooler", 5)], ["heat", "energy"]),
   n("systemBoard", "System", "structure", ["dualCore", "l2Cache"], "system", "hz", 3, 7_500, [view("system"), gen("psu", 0)], ["ram", "gpu", "storage"]),
-  n("rack", "Rack", "structure", ["fabKhz"], "rack", "khz", 8, 8.1e6, [view("rack"), gen("rackCooler", 0), gen("pdu", 0), gen("lb", 0), gen("switch", 0)], ["density", "rackDist"]),
+  n("rack", "Rack", "structure", ["fabKhz"], "rack", "khz", 7, 2.7e7, [view("rack"), gen("rackCooler", 0), gen("pdu", 0), gen("lb", 0), gen("switch", 0)], ["density", "rackDist"]),
   n("room", "Room", "structure", ["rack", "fabMhz"], "room", "mhz", 10, 1.2e8, [view("room"), gen("roomCooler", 0), gen("ups", 0), gen("row", 0)], ["density", "roomDist"]),
   n("hallExpansion", "Third row", "structure", ["room", "spineLeaf"], "room", "ghz", 11, 6e7, [cap("roomRows", 3)], ["density"]),
   n("dataCenter", "Data center", "structure", ["room", "stealRoom"], "global", "ghz", 12, 6e8, [view("global"), gen("dataPlane", 0), gen("grid", 0), gen("zone", 0), cap("siteZones", 2)], ["multiAz"]),

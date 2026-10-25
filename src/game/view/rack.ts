@@ -47,7 +47,7 @@ export function rackSwitch(state: GameState, rack: number): SwitchView {
 function serverSlot(state: GameState, rack: number, slot: number, sw: SwitchView): ServerSlotView {
   const s = state.compiled.rack.servers[rack * SERVERS_PER_RACK + slot] ?? -1;
   if (s < 0 || state.compiled.sys.alive[s] !== 1) {
-    return { systemId: null, kind: null, state: 'empty', load: 0, running: 0, family: null, admitted: 0, reserved: 0, timerS: null, timerTotalS: null, cores: 0, busyCores: 0, port: null };
+    return { systemId: null, kind: null, state: 'empty', onMarket: false, load: 0, running: 0, family: null, admitted: 0, reserved: 0, timerS: null, timerTotalS: null, cores: 0, busyCores: 0, port: null };
   }
   const h = state.hot.sys;
   const running = h.running[s] ?? 0;
@@ -55,7 +55,7 @@ function serverSlot(state: GameState, rack: number, slot: number, sw: SwitchView
   const port = sw.ports[p >= 0 ? p : slot] ?? null;
   const timerS = systemTimerS(state.hot, s);
   return {
-    systemId: systemId(s), kind: (state.compiled.sys.kind[s] ?? 0) === 1 ? 'storageNode' : 'server',
+    systemId: systemId(s), kind: (state.compiled.sys.kind[s] ?? 0) === 1 ? 'storageNode' : 'server', onMarket: state.compiled.sys.intent[s] === 1,
     state: modeName(h.mode[s]), load: systemLoad(state, s), running, admitted: running + (h.queueLen[s] ?? 0),
     family: runningFamily(state, s),
     ...systemCoreActivity(state, s),

@@ -4,6 +4,7 @@ import { advanceGame } from '../core/advance';
 import { ACCEL_DOMAINS, DT_S, MAX_ACCELS } from '../core/constants';
 import { barebonesSystem } from '../core/defaults';
 import { allocRecord } from '../core/pool';
+import { G } from '../core/buffers';
 import { MODE } from '../core/timers';
 import { compileAll } from '../core/topology';
 import { commitWorld, openWorld } from '../core/world';
@@ -117,16 +118,26 @@ describe('accelerator inventory edits after billing', () => {
 
   }
 
+  // Spec §4.5: a card into an empty slot is hot. Work already running keeps going; only duty is re-metered.
   for (const kind of ['gpu', 'npu'] as const) {
-    it(`clears billed duty and old assignments when adding a ${kind} with hot-swap`, () => {
-      const before = billed();
-      const after = act(before, kind === 'gpu'
-        ? { type: 'installGpu', system: systemId(0), index: null, model: '1530' }
-        : { type: 'addPart', system: systemId(0), kind, generation: 0 });
-      expect(after.build.systems[0]!.spec.accels).toHaveLength(2);
-      cleared(after);
-      accountsAndContinuation(before, after);
-    });
+    for (const hotSwap of [false, true]) {
+      it(`keeps running work when adding a ${kind} mid-round, hot-swap ${hotSwap}`, () => {
+        const before = billed([gpu()], hotSwap);
+        expect(before.hot.sys.running[0]).toBe(1);
+        const after = act(before, kind === 'gpu'
+          ? { type: 'installGpu', system: systemId(0), index: null, model: '1530' }
+          : { type: 'addPart', system: systemId(0), kind, generation: 0 });
+        expect(after.build.systems[0]!.spec.accels).toHaveLength(2);
+        expect(after.hot.sys.mode[0]).toBe(MODE.onMarket);
+        expect(after.hot.sys.running[0]).toBe(1);
+        expect(after.hot.sys.accelHolders).toEqual(before.hot.sys.accelHolders);
+        expect(after.hot.sys.accelUsedVram).toEqual(before.hot.sys.accelUsedVram);
+        expect(acceleratorView(after, 0, 1, after.build.systems[0]!.spec.accels[1]!)).toMatchObject({ active: false, resourceBusy: 0 });
+        // Nothing is swapped out: the next tick fails no more than the same tick without the add.
+        expect(advanceGame(after, 100).state.hot.g[G.failed]).toBe(advanceGame(before, 100).state.hot.g[G.failed]);
+        accountsAndContinuation(before, after);
+      });
+    }
   }
 
 });

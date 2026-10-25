@@ -22,12 +22,12 @@ export const SERVER_ONLINE: readonly boolean[] = UNIT_MODES.map(mode => lampStat
 const port: PortView = { speedHz: 1e3, rung: 0, peer: null, active: false, family: null, progress: 0, queued: 0 };
 type Mut<T> = { -readonly [K in keyof T]: T[K] };
 const server: Mut<ServerSlotView> = {
-  systemId: null, kind: 'server', state: 'onMarket', load: 0, running: 0, admitted: 0, reserved: 0,
+  systemId: null, kind: 'server', state: 'onMarket', onMarket: true, load: 0, running: 0, admitted: 0, reserved: 0,
   timerS: null, timerTotalS: null, cores: 4, busyCores: 0, port, family: null,
 };
 const route = createRoute();
-const lookOf = (mode: UnitMode, rack: RackSlotView, paused: boolean): ServerLook =>
-  rack.state === 'dark' || mode === 'dark' ? 'dark' : rack.state === 'crashed' || mode === 'crashed' ? 'crash' : paused ? 'paused'
+const lookOf = (mode: UnitMode, rack: RackSlotView, paused: boolean, market: boolean): ServerLook =>
+  rack.state === 'dark' || mode === 'dark' ? 'dark' : rack.state === 'crashed' || mode === 'crashed' ? 'crash' : paused ? (market ? 'paused' : 'out')
     : mode === 'offline' || mode === 'goingOffline' ? 'offline' : mode === 'boot' || mode === 'cold' ? 'boot' : 'live';
 
 /** Plates with no lights: a neighbour's switch and LB faces at their real positions. */
@@ -72,8 +72,8 @@ function drawBody(g: G, v: RackSlotView, paused: boolean): void {
   for (let i = 0; i < SERVER_SLOTS; i++) {
     const mode = v.servers[i] ?? 0;
     if (!mode) continue;
-    server.state = UNIT_MODES[mode];
-    drawServer(g, OPEN.x, slotY(serverRow(i)), OPEN.w, U, server, lookOf(server.state, v, paused), 0, paused);
+    server.state = UNIT_MODES[mode]; server.onMarket = (v.serversOnMarket?.[i] ?? 1) === 1;
+    drawServer(g, OPEN.x, slotY(serverRow(i)), OPEN.w, U, server, lookOf(server.state, v, paused, server.onMarket), 0, paused);
     drawPatch(g, patchRoute(i, i, route), 1e3, false);
   }
   drawClips(g);

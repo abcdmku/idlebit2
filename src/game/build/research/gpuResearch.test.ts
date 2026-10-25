@@ -35,7 +35,7 @@ describe('GPU generation research fees', () => {
       expect(node.effects).toContainEqual({ kind: 'gen', part: 'gpu', gen: generation - 1 });
       expect(node.work).toBeGreaterThan(0);
     }
-    expect([researchDef(gen2)!.data, researchDef(gen2)!.work]).toEqual([1_000_000, 30_000_000]);
+    expect([researchDef(gen2)!.data, researchDef(gen2)!.work]).toEqual([1_000_000, 25_000_000]);
   });
 
   it('quotes and debits both wallets atomically at first actual start', () => {

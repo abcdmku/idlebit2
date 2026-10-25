@@ -13,6 +13,7 @@ import { coreColor, drawGridPiece, drawShardGroups, remaining } from './shards';
 import { CLOCK_TRACE, bar, cacheBlock, clockBlock, coreBlock, coreGhost, drawMetal, lockedSite, pad, queueBlock, queueGhost, staticCpu } from './sprites';
 import type { Incoming } from './sprites';
 import { blockOf, createBlock, drawBlock } from './block';
+import { coreTag } from './tag';
 import { dimIfAsleep } from './speed';
 import type { Block } from './block';
 
@@ -116,7 +117,8 @@ export function drawWorld(g: G, chip: ChipSnapshot, frame: WorldFrame, form: Wor
   }
   let landing = live && chip.pipe.waiting && chip.pipe.transfer !== null;
   const grid = sites.length > 2, empty = emptyBlocks(chip, sites);
-  if (grid) { drawBlock(g, empty.open, false); drawBlock(g, empty.locked, true); }
+  // The lock mark keeps clear of the busy tag's text (no label covers a meaningful mark).
+  if (grid) { drawBlock(g, empty.open, false); drawBlock(g, empty.locked, true, coreTag(chip, sites, firstLockedSite(chip, sites.length), f, frame)?.area ?? null); }
   for (let i = 0; i < sites.length; i++) {
     if (grid && i >= chip.cores.length) break;
     const core = chip.cores[i], idle = !!core && core.busy <= 0 && !lentCore(core);

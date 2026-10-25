@@ -8,8 +8,9 @@ import type { ChipSnapshot } from '../../../game';
 import { familyName, whole } from '../../core';
 import type { LabelWriter, WorldFrame, WorldForm } from '../../core';
 import { arrangementOf, coreSites, coreText, floorOf } from './layout';
-import { coreSleep, coreSpeedText, speedRange, tileLabelFits, tileShowsSpeed } from './speed';
-import { emptyBlocks, isLive, lentCore, queueOpen, siteCount, siteLocked, spilledOut } from './world';
+import { coreSleep, coreSpeedText, speedRange, tileLabelFits } from './speed';
+import { coreTag } from './tag';
+import { firstLockedSite, isLive, lentCore, queueOpen, siteCount, siteLocked, spilledOut } from './world';
 
 const LEVEL_NAMES: Readonly<Record<'l1' | 'l2' | 'l3', string>> = { l1: 'L1', l2: 'L2', l3: 'L3' };
 const CORE_NAMES = Array.from({ length: 32 }, (_, i) => `Core ${i + 1}`);
@@ -50,18 +51,13 @@ export function chipLabels(chip: ChipSnapshot, frame: WorldFrame, out: LabelWrit
       if (!tileLabelFits(core, r, frame)) continue;
       out.label(LABEL_IDS[i]!, r.x + r.w / 2, r.y + 2, 'center').text(coreSpeedText(core), coreSleep(core) || !live ? 'dim' : 'value');
     }
-    // The busy tag (no speed: the tiles carry it) sits in the empty block, inside the cores block,
-    // never over the Clock; a full grid has no free spot, and the lit tiles already show it.
-    // Tiles too small to show their speed at the body size (32 sites): the tag carries it instead.
-    let hidden = false;
-    for (let i = 0; i < Math.min(sites.length, chip.cores.length); i++) if (!tileShowsSpeed(chip.cores[i]!, sites[i]!, frame)) hidden = true;
-    const b = emptyBlocks(chip, sites), free = b.open.n ? b.open.rows[b.open.n > 1 ? 1 : 0]! : b.locked.n ? b.locked.rows[b.locked.n > 1 ? 1 : 0]! : null;
-    // A full grid has no free spot: the tag sits over its first row only when it must carry the speed.
-    const box = free ?? (hidden ? f.cores : null);
-    if (box) {
-      const x = box.w >= f.cores.w / 2 ? box.x : f.cores.x;
-      out.label('cores', x + 2, box.y + 2, 'left', true).text('Cores', 'name', true).text(`${busy} / ${whole(chip.cores.length)} busy`, 'value');
-      if (hidden && chip.cores.length) out.text(`· ${speedRange(chip)}`, 'mute');
+    // The busy tag (tag.ts): in the widest empty row run, never over an installed core, the Clock or
+    // the lock mark; it carries the cores' speed only when their tiles cannot and it fits.
+    const tag = coreTag(chip, sites, firstLockedSite(chip, sites.length), f, frame);
+    if (tag) {
+      out.label('cores', tag.box.x + 2, tag.box.y + 2, 'left', true).text('Cores', 'name', true).text(`${busy} / ${whole(chip.cores.length)} busy`, 'value');
+      if (tag.speedY !== null) out.label('coresHz', tag.box.x + 2, tag.speedY, 'left', true).text(speedRange(chip), 'mute');
+      else if (tag.speed) out.text(`· ${speedRange(chip)}`, 'mute');
     }
     return;
   }

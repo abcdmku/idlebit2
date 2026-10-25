@@ -22,6 +22,11 @@ export function tileLabelFits(c: CoreView, tile: Rect, frame: WorldFrame): boole
   const scale = frame.scale ?? (frame.form === 'phone' ? 2 : 3), t = frame.form === 'phone' ? PHONE_TYPE : typeForScale(scale);
   return labelFits(coreSpeedText(c), tile, scale, t.body, t.line);
 }
+/** True when a body-size label of `text` fits inside `span` at the world's rest scale. */
+export function spanFits(text: string, span: Rect, frame: WorldFrame): boolean {
+  const scale = frame.scale ?? (frame.form === 'phone' ? 2 : 3), t = frame.form === 'phone' ? PHONE_TYPE : typeForScale(scale);
+  return labelFits(text, span, scale, t.body, t.line);
+}
 /** True when a body-size label of `text` fits inside the tile with a 2 art px margin each side. */
 export function labelFits(text: string, tile: Rect, scale: number, body: number, line: number): boolean {
   return textWidth(text, body) <= (tile.w - 4) * scale && line <= (tile.h - 2) * scale;

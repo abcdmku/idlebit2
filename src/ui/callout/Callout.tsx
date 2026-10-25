@@ -1,6 +1,7 @@
 // The upgrade callout (D15.4, A07): tapping a part in the world opens it. On desktop it docks in the
 // world's right gutter, level with the part; on phone it sits above or below the part. A leader joins
-// it to the part. "x → x", price, Buy; Open drills into a unit; More opens the part's full plate.
+// it to the part. "x → x", price, Buy; Open drills into a unit; More opens the part's full plate. From the
+// Rack up a unit (sled, rack, room, site) also gets the On market toggle, in and between rounds.
 import { useEffect, useRef, useState } from 'react';
 import type { LevelSnapshot } from '../../game';
 import type { HitTarget, Rect } from '../../render/core';
@@ -8,6 +9,7 @@ import { useShellOffers } from '../deck/useOffers';
 import { offerAction, PriceText, RightText } from '../deck/offerUi';
 import type { Offer } from '../deck/offers';
 import { plateRequest } from '../plates/PlateLayer';
+import { marketKey, marketLine, marketOf, targetUnit } from '../plates/market';
 import { box, T, useLayout } from '../shell/geometry';
 import { useGameSelector, useQuote, useShell, useViewState } from '../storeHooks';
 import { calloutModel, dockCallout, leaderRect, placeCallout, placePhone } from './model';
@@ -59,6 +61,7 @@ function Open({ target: t, focus }: { target: HitTarget; focus: LevelSnapshot })
   const request = plateRequest(t, focus);
   const quotes = useQuote(request);
   const m = calloutModel(t, focus, quotes, offers);
+  const unit = targetUnit(t), market = unit ? marketOf(shell.store.getState(), unit) : null;
   const [bought, setBought] = useState(0), [armed, setArmed] = useState(true), timer = useRef<ReturnType<typeof setTimeout>>(undefined);
   useEffect(() => () => clearTimeout(timer.current), []);
   if (!part || !around) return null;
@@ -69,9 +72,11 @@ function Open({ target: t, focus }: { target: HitTarget; focus: LevelSnapshot })
   const at = !d ? placePhone(part, L.callout, L.calloutBounds)
     : dock && dock.x >= part.x + part.w ? dock : placeCallout(around, L.callout, L.calloutBounds, L.lat);
   const leader = leaderRect(part, at, L.N);
-  const pad = d ? 16 : 8, bw = 80, gap = 8, by = at.h - pad - KEY_H;
+  const pad = d ? 16 : 8, gap = 8, by = at.h - pad - KEY_H;
   const o = m.offer, act = o ? offerAction(o as Offer) : null;
-  const keys: { id: string; label: string; tone: string; disabled?: boolean; run: () => void }[] = [];
+  const keys: { id: string; label: string; tone: string; disabled?: boolean; pressed?: boolean; run: () => void }[] = [];
+  if (market) keys.push({ id: 'market', label: marketKey(market), tone: market.on ? 'go' : 'plain', pressed: market.on,
+    run: () => { shell.dispatch({ type: 'setOnline', unit: market.unit, online: !market.on }); } });
   if (o?.quote && !o.where && (o.price !== null || act)) {
     const research = !!act && 'research' in act;
     keys.push({ id: 'buy', label: research ? 'Research' : 'Buy', tone: o.affordable ? 'buy' : act ? 'plain' : 'off', disabled: !act || (!research && !armed),
@@ -87,6 +92,9 @@ function Open({ target: t, focus }: { target: HitTarget; focus: LevelSnapshot })
   }
   if (m.drill) { const ref = m.drill; keys.push({ id: 'open', label: 'Open', tone: 'plain', run: () => shell.view.dispatch({ type: 'drill', ref }) }); }
   if (hasPlate(t, focus)) keys.push({ id: 'more', label: 'More', tone: 'plain', run: () => shell.view.dispatch({ type: 'openPlate' }) });
+  // The market key is wider ("Off market"); the keys beside it narrow so three still fit.
+  const keyW = (i: number) => market ? (i === 0 ? 96 : 72) : 80;
+  const keyRight = (i: number) => pad + Array.from({ length: i }, (_, j) => keyW(j) + gap).reduce((a, b) => a + b, 0);
   return <>
     {leader && <i className="leader" data-free="art" aria-hidden="true" style={box(leader)} />}
     <aside className="panel callout" style={box(at)} data-k="callout" data-testid="callout" role="dialog" aria-label={m.name}
@@ -95,9 +103,9 @@ function Open({ target: t, focus }: { target: HitTarget; focus: LevelSnapshot })
       <T right={pad} y={pad}>{o?.price != null ? <PriceText offer={o as Offer} n={L.N} />
         : o && !m.research && (o as Offer).right ? <RightText offer={o as Offer} n={L.N} /> : null}</T>
       <T x={pad} y={pad + L.lh} w={at.w - 2 * pad} className={m.research ? 'warn' : 'mute'}>
-        <span key={bought} className={bought ? 'flash' : undefined}>{m.change}</span></T>
+        <span key={bought} className={bought ? 'flash' : undefined}>{m.change || (market ? marketLine(market) : '')}</span></T>
       {keys.map((k, i) => <button key={k.id} type="button" className={`skey ${k.tone}`} data-testid={`callout-${k.id}`} disabled={k.disabled} data-qa-target
-        style={{ right: pad + i * (bw + gap), top: by, width: bw, height: KEY_H }} onClick={k.run}>{k.label}</button>)}
+        aria-pressed={k.pressed} style={{ right: keyRight(i), top: by, width: keyW(i), height: KEY_H }} onClick={k.run}>{k.label}</button>)}
     </aside>
   </>;
 }

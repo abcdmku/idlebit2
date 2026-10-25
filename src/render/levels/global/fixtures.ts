@@ -65,6 +65,16 @@ export const CASES: Readonly<Record<string, (timeMs: number) => GlobalSnapshot>>
   dark: () => world(REGIONS.map((_, i) => (i === 0
     ? site(0, 3, { online: 'dark', grid: { ...BASE.sites[0]!.grid!, failed: true, usage: 0, rebootMs: 6000 } })
     : closed(i))), [], 1),
+  /** Between rounds: us-west is off market (sits out); the other sites are ready. Use with ?paused. */
+  sitout: () => {
+    const built = new Set(ACTIVE_BUILD.map(idx)), usw = idx('us-west');
+    const sites = REGIONS.map((_, i) => {
+      if (!built.has(i)) return closed(i);
+      const s = site(i, i === 0 ? 3 : 2, { online: i === usw ? 'offline' : 'paused' });
+      return { ...s, zones: s.zones.map(z => ({ ...z, state: i === usw ? 'offline' as const : 'paused' as const, load: 0 })) };
+    });
+    return world(sites, [...built].filter(i => i !== 0).map(i => link(i, false, 2)), 4, true);
+  },
   /** Zone B crashed on heat; zone A runs hot. */
   crash: () => {
     const s = site(0, 3, { hottestF: 101 });

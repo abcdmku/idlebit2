@@ -20,6 +20,7 @@ import { SupplyPlate } from './SupplyPlate';
 import { SwitchPlate } from './SwitchPlate';
 import type { PlateCommon } from './types';
 import { ServerPlate, UnitPlate } from './UnitPlate';
+import { marketOf, type MarketState } from './market';
 
 /** The unit a level snapshot shows, for configuration-plate parents and online rows. */
 function focusUnit(f: LevelSnapshot): ScopeRef {
@@ -143,7 +144,7 @@ function TargetPlate({ target: t, focus }: { target: HitTarget; focus: LevelSnap
     return null;
   }
   const save = (unit: UnitRef) => view.dispatch({ type: 'select', target: { ...t, id: `${t.id}:save`, kind: 'save', unit, rect: { ...t.rect } } });
-  if (t.kind === 'unit' && t.unit) return unitPlate(t.unit, focus, { ...common, onSave: save }, (slot) => {
+  if (t.kind === 'unit' && t.unit) return unitPlate(t.unit, focus, { ...common, onSave: save, market: marketOf(shell.store.getState(), t.unit) }, (slot) => {
     const next = { ...t, id: `${t.id.replace(/\d+$/, '')}${slot}`, slot, unit: focus.level === 'rack' && focus.servers[slot].systemId !== null
       ? { kind: 'system', id: focus.servers[slot].systemId! } as UnitRef : t.unit };
     view.dispatch({ type: 'select', target: next });
@@ -206,7 +207,7 @@ function defaultBase(unit: UnitRef, focus: LevelSnapshot): string {
   return 'Server';
 }
 
-function unitPlate(unit: UnitRef, focus: LevelSnapshot, all: Omit<PlateCommon, 'quotes'> & { onSave: (u: UnitRef) => void },
+function unitPlate(unit: UnitRef, focus: LevelSnapshot, all: Omit<PlateCommon, 'quotes'> & { onSave: (u: UnitRef) => void; market: MarketState | null },
   step: (slot: number) => void, goInside: () => void) {
   const { onSave, ...common } = all;
   const saveKey = (saveable: boolean) => (saveable ? () => onSave(unit) : null);

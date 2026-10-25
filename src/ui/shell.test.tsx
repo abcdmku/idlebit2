@@ -43,6 +43,26 @@ describe('band', () => {
     expect($('[data-testid=sla-warming]')).toBeNull();
     expect($('.hud-meter em')).not.toBeNull();
   });
+  it.each([DESKTOP, { width: 390, height: 780 }])('End round asks once, then ends the round; it waits out a round break ($width px)', size => {
+    vi.useFakeTimers();
+    const store = fakeStore();
+    mounted = mount(<Hud />, store, size);
+    const key = () => $('[data-testid=end-round]') as HTMLButtonElement;
+    const at = rectOf('[data-testid=end-round]');
+    expect(key().textContent).toBe('End round');
+    act(() => key().click());
+    expect(key().textContent).toBe('End round?Tap again');
+    expect(rectOf('[data-testid=end-round]')).toBe(at);
+    act(() => { vi.advanceTimersByTime(3000); });
+    expect(key().textContent).toBe('End round');
+    expect(store.actions).toEqual([]);
+    act(() => key().click());
+    act(() => key().click());
+    expect(store.actions).toEqual([{ type: 'endRound' }]);
+    act(() => store.set({ round: { state: 'between' } }));
+    expect(key().disabled).toBe(true);
+    vi.useRealTimers();
+  });
   it('keeps all five rungs in place; a locked rung opens research', () => {
     mounted = mount(<Hud />, fakeStore(), DESKTOP);
     const rungs = [...mounted.host.querySelectorAll<HTMLButtonElement>('.rung')];
@@ -236,7 +256,7 @@ describe('round plate', () => {
     const store = fakeStore();
     store.set({ round: { state: 'ended', lastReport: report(), canReturn: true }, hud: { sla: { met: 28_400, failed: 7129, percent: 79.9, checking: true, window: 50, roundMet: 28_400, roundFailed: 7129, deliveredWork: 28_400, failedWork: 7_129, grace: 10 } } });
     mounted = mount(<RoundPlate />, store);
-    expect(text('.p-sub')).toBe('Round 14 · 14:05');
+    expect(text('.p-sub')).toBe('Round 14 · 14:05 · SLA under 80%');
     expect(text('.rp-v')).toBe('79.9%');
     expect(text('[data-testid=rp-failed]')).toBe('7,129');
     // D28: the round's own counts; dismissed shows here and nowhere else

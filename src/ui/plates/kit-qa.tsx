@@ -114,8 +114,10 @@ const scenes: Record<string, { level: LevelId; plate: ReactNode }> = {
     network={{ switch: { ...rackSwitch(true), ports: Array.from({ length: 7 }, (_, i) => port(1e6, i < 6 ? i : null, i % 3 === 1)) }, lb: { ...lbView, strategy: 'leastConn' } }}
     quotes={R([q({ type: 'upgradePort', sw: { kind: 'room', id: room }, port: 'all' }, 108_000_000, { effect: eff(1e6, 2e6, 'bit/s', null) }), q({ type: 'addPorts', sw: { kind: 'room', id: room } }, 56_500)])}
     lbQuotes={lbQuotes({ kind: 'room', id: room })} /> },
-  server: { level: 'rack', plate: <ServerPlate {...common} slot={3} servers={servers} onStep={noop} onGoInside={noop} /> },
+  server: { level: 'rack', plate: <ServerPlate {...common} slot={3} servers={servers} onStep={noop} onGoInside={noop}
+    market={{ unit: { kind: 'system', id: systemId(3) }, on: true, live: 1, total: 1, drains: true, running: true, parentOff: null }} /> },
   rackunit: { level: 'rack', plate: <UnitPlate {...common} unit={rack} title="Rack A" sub="6 servers" status="72°F · PDU 40%" mode="onMarket" timerS={null}
+    market={{ unit: rack, on: true, live: 5, total: 6, drains: false, running: true, parentOff: null }}
     lines={[{ text: '5 of 6 servers have a switch port', tone: 'muted' }]} onSave={noop} saveLabel="Save this rack" /> },
   'config-system': { level: 'rack', plate: <ConfigPlate {...common} kind="system" sub="Rack A · slot 8" credits={'1500' as Amount} landscape={land} quotes={addQuotes('system')} /> },
   'config-rack': { level: 'room', plate: <ConfigPlate {...common} kind="rack" sub="AZ a · slot 7" landscape={land} quotes={addQuotes('rack')} /> },

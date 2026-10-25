@@ -126,7 +126,7 @@ export function RoundReportPlate({ report, percent, onReturn, onClose }: {
     data-testid="round-plate" style={{ ...plateStyle(L), overflowY: 'auto' }} onPointerDown={e => e.stopPropagation()} onWheel={e => e.stopPropagation()}>
     <header className="p-head">
       <b className="p-title">Round over</b>
-      <span className="p-sub">Round {report.index} · {clockText(report.durationMs)}</span>
+      <span className="p-sub">Round {report.index} · {clockText(report.durationMs)} · {report.endedBy === 'player' ? 'Ended by you' : 'SLA under 80%'}</span>
       <button type="button" className="p-x" aria-label="Close report" onClick={onClose}>
         <i className="x-glyph" aria-hidden="true" style={{ width: 12, height: 12, '--x-w': '1px' } as CSSProperties} /></button>
     </header>

@@ -215,3 +215,12 @@ describe('rack LCDs (A19, A28)', () => {
     expect(lines.some(t => /^E\d+%$/.test(t))).toBe(false);
   });
 });
+
+describe('between rounds: ready vs sitting out', () => {
+  it('a paused sled on market looks ready; one whose switch is off sits out', () => {
+    const s = CASES.sitout!(0);
+    expect(s.servers.map(v => serverLook(s, v, true))).toEqual(['paused', 'paused', 'out', 'paused', 'paused', 'out', 'paused', 'paused', 'paused', 'out', 'paused', 'paused']);
+    // during a round the same sleds keep the live looks
+    expect(serverLook(s, { ...s.servers[2]!, state: 'onMarket' }, false)).toBe(s.servers[2]!.port ? 'live' : 'noport');
+  });
+});

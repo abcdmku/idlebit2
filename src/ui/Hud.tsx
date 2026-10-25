@@ -6,7 +6,7 @@
 import { ORDER, SPR } from '../render/core';
 import type { LevelId } from '../game';
 import { ArtCanvas } from './art/ArtCanvas';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { amountText, clockText, slaFill, slaText, wholeText } from './hooks/format';
 import { box, useLayout } from './shell/geometry';
 import { shallowEqual, useGameSelector, useShell, useViewState } from './storeHooks';
@@ -82,19 +82,42 @@ function Sla() {
     checking: s.hud.sla.checking, round: s.hud.roundIndex, seconds: Math.floor(s.hud.roundElapsedMs / 1000) }), shallowEqual, 250);
   const tone = !g.checking ? 'mute' : g.percent >= 90 ? 'ok' : g.percent >= 80 ? 'warn' : 'bad';
   const when = g.phase === 'running' ? clockText(g.seconds * 1000) : g.phase === 'ended' ? 'round over' : 'between rounds';
-  const counts = `${g.met} / ${g.met + g.failed}`, meterW = (d ? 32 : 36) * n;
+  const counts = `${g.met} / ${g.met + g.failed}`, meterW = 32 * n;
+  // Where the band is narrow (End round beside it), the meter gives way first; the percent carries the same reading.
+  const roomy = 2.2 * L.body + 3.4 * L.big + 3.6 * L.body + meterW + (d ? 7 : 2) * L.body + 4 * 8 <= L.sla.w;
   // Reserved widths ("100.0%", "50 / 50", the meter, "R99 · 1:59:59"), so nothing moves while the numbers change.
   return <span className="figrow sla" role="status" aria-label={`SLA ${slaText(g.percent)}, ${counts} completed, round ${g.round}, ${when}`} data-testid="sla-gauge"
     style={{ left: L.sla.x, top: L.sla.y, width: L.sla.w, height: L.sla.h, justifyContent: 'center' }}>
     <span className="mute">SLA</span>
     <b className={`fig big ${tone}`} data-testid="sla" style={{ minWidth: 3.4 * L.big, textAlign: 'right' }}>{slaText(g.percent)}</b>
     <span className="mute" data-testid="sla-counts" style={{ minWidth: 3.6 * L.body, textAlign: 'center' }}>{counts}</span>
-    {g.checking
+    {!roomy ? null : g.checking
       ? <i className="g-meter hud-meter" data-free="art" aria-hidden="true" title="80% ends the round" style={{ flex: 'none', width: meterW, height: 2 * n }}>
         <b style={{ width: `${slaFill(g.percent).toFixed(1)}%` }} /><em style={{ top: -n, height: 4 * n, width: n }} /></i>
       : <span className="dim" data-testid="sla-warming" style={{ width: meterW, textAlign: 'center' }} title="The 80% floor applies after 10 tasks">warming up</span>}
     <span className="dim" data-testid="round" style={{ width: d ? 7 * L.body : 2 * L.body }}>{d ? `R${g.round} · ${when}` : `R${g.round}`}</span>
   </span>;
+}
+
+/** How long the armed End round key waits for the second tap. */
+export const END_CONFIRM_MS = 3000;
+
+/** End round (spec §4.1): two taps within 3 s. Reserved in every phase; it only works while a round runs. */
+function EndRound() {
+  const L = useLayout(), shell = useShell(), k = L.endKey;
+  const running = useGameSelector(s => s.round.state === 'running');
+  const [armed, setArmed] = useState(false), timer = useRef<ReturnType<typeof setTimeout>>(undefined);
+  useEffect(() => () => clearTimeout(timer.current), []);
+  useEffect(() => { if (!running) { clearTimeout(timer.current); setArmed(false); } }, [running]);
+  const press = () => {
+    clearTimeout(timer.current);
+    if (!armed) { setArmed(true); timer.current = setTimeout(() => setArmed(false), END_CONFIRM_MS); return; }
+    setArmed(false);
+    shell.dispatch({ type: 'endRound' });
+  };
+  return <button type="button" className={`skey end-round ${armed ? 'warn two' : ''}`} style={box(k)} disabled={!running} data-testid="end-round"
+    data-qa-target={k.h >= 44 ? '' : undefined} aria-label={armed ? 'End round? Tap again' : 'End round'} onClick={press}>
+    {armed ? <><span>End round?</span><span>Tap again</span></> : 'End round'}</button>;
 }
 
 export function Hud() {
@@ -103,6 +126,7 @@ export function Hud() {
     <div className="band-bg" style={box(L.band)} />
     <Ladder />
     <Sla />
+    <EndRound />
     <Wallet />
   </header>;
 }

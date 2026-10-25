@@ -17,6 +17,8 @@ export interface RoomCase {
   routed?: number; servers?: number; id?: number;
   /** D25: shard flows (`to` = the rack of a room slot) and the LB queue. */
   flows?: readonly FlowCase[]; queue?: LbView['queue'];
+  /** Between rounds: racks rest 'paused'; racks in `off` are off market ('offline'); `out` maps a rack slot to its sleds that sit out. */
+  between?: boolean; off?: readonly number[]; out?: Readonly<Record<number, readonly number[]>>;
 }
 const supply = (u: SupplyView, o: RoomCase): SupplyView => ({
   ...u, generation: o.upsGen ?? 1, level: 2, usage: o.upsUsage ?? 0.27, deliveredW: u.capacityW * (o.upsUsage ?? 0.27),
@@ -30,11 +32,15 @@ const port = (peer: number | null, active: boolean, progress: number): PortView 
 export function roomCase(o: RoomCase, timeMs: number): RoomSnapshot {
   const rows = o.rows ?? 2, built = new Set(o.built ?? [0, 1, 2, 3, 8, 9]), crashed = !!o.crashed;
   const racks: RackSlotView[] = Array.from({ length: rows * 8 }, (_, i) => {
-    const on = built.has(i), n = on ? Math.max(1, (o.servers ?? 12) - (i % 5)) : 0, servers = new Uint8Array(12);
-    for (let k = 0; k < n; k++) servers[k] = mode(o.dark ? 'dark' : crashed ? 'crashed' : 'onMarket');
+    const on = built.has(i), n = on ? Math.max(1, (o.servers ?? 12) - (i % 5)) : 0, servers = new Uint8Array(12), serversOnMarket = new Uint8Array(12);
+    const off = !!o.off?.includes(i), out = o.out?.[i] ?? [];
+    for (let k = 0; k < n; k++) {
+      servers[k] = mode(o.dark ? 'dark' : crashed ? 'crashed' : o.between ? 'paused' : 'onMarket');
+      serversOnMarket[k] = off || out.includes(k) ? 0 : 1;
+    }
     return {
-      rackId: on ? rackId(i) : null, state: !on ? 'empty' : o.dark ? 'dark' : crashed ? 'crashed' : 'onMarket',
-      load: on ? Math.max(0.1, 0.9 - (i % 8) * 0.12) : 0, tempF: on ? (o.rackTempF ?? (o.tempF ?? 75) + 4) : 70, pduUsage: on ? 0.5 : 0, servers,
+      rackId: on ? rackId(i) : null, state: !on ? 'empty' : o.dark ? 'dark' : crashed ? 'crashed' : off ? 'offline' : o.between ? 'paused' : 'onMarket',
+      load: on && !o.between ? Math.max(0.1, 0.9 - (i % 8) * 0.12) : 0, tempF: on ? (o.rackTempF ?? (o.tempF ?? 75) + 4) : 70, pduUsage: on ? 0.5 : 0, servers, serversOnMarket,
     };
   });
   const active = new Set(o.active ?? [0, 2]), t = timeMs / 1000;
@@ -84,6 +90,8 @@ export const CASES: Readonly<Record<string, (timeMs: number) => RoomSnapshot>> =
   azB: t => roomCase({ zone: 1, zones: [0, 1, null], built: [0, 1, 2] }, t),
   empty: t => roomCase({ built: [] }, t),
   paused: t => roomCase({}, t),
+  /** Between rounds: rack 2 is off market; rack 1 has three sleds sitting out. Use with ?paused. */
+  sitout: t => roomCase({ between: true, off: [2], out: { 1: [0, 4, 7] } }, t),
   flows: t => roomCase({ active: [0, 1, 2, 3, 4], uplink: true, flows: SPLIT_FLOWS, queue: queueOf(8, [FAM.memory, FAM.cluster, FAM.parallel]) }, t),
   queue32: t => roomCase({ rows: 3, built: ALL24, queue: queueOf(32, Array.from({ length: 27 }, (_, i) => [FAM.cluster, FAM.parallel, FAM.accel][i % 3])) }, t),
 };

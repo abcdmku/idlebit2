@@ -175,7 +175,7 @@ The `regions` ceiling (Appendix C) counts open regions, home included: 1, then 4
 
 | State | Meaning | Ends when |
 |---|---|---|
-| `running` | Hardware pulls tasks from the queue and runs them. SLA is live. | SLA < 0.80 at the SLA step (§14). |
+| `running` | Hardware pulls tasks from the queue and runs them. SLA is live. | SLA < 0.80 at the SLA step (§14), or the player ends it (End round). |
 | `ended` | The round just ended and the report is shown. Mechanically identical to `between`. | The player dismisses the report, takes any action, or returns to market. |
 | `between` | Nothing is pulled. Hardware is paused unless research runs (§11.3). | Return to market, by the player or by auto-return. |
 
@@ -194,6 +194,8 @@ A new game starts in `running`, round 1, with the queue's first five tasks alrea
 3. the round state becomes `ended` and the report is frozen (§4.7);
 4. prepares round `index + 1` once: its seed and its first five tasks, drawn from `I = 0` (D30). Retire the ended round's unused IDs and never reuse them;
 5. from the next tick, hardware is paused unless research runs. The next round's five tasks stay frozen while stopped and show as "after Return".
+
+**End round** (action `endRound`, legal only in `running`; user, 25 Oct): the player ends the round on purpose. It runs the same round end between ticks, after the last tick run, with no extra cost, and the report records `endedBy: 'player'` ("Ended by you"; an SLA end records `'sla'`).
 
 Power-failure reboots and crash recoveries keep running between rounds. With no load they finish on their own.
 

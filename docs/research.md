@@ -106,7 +106,7 @@ D27 makes research a task that cuts the line: it holds a slot and its threads on
 | W4 | 1.5e5 | System opens | 4 cores, 0.3–1 kHz, 4 lanes | about 20 s |
 | W5 | 3e5 | System, kHz | 2–4 cores, 0.5–2 kHz, 2–4 lanes | about 30 s |
 | W6 | 1e6 | Late System, `rack` | the first kHz package, about 3e4–1e5 ops/s | 10–30 s |
-| W7 | 3e7 | kHz, Rack | one kHz system to a starter rack, 2e5–1e6 ops/s | 30 s – 2 min |
+| W7 | 2.5e7 | kHz, `rack`, Rack | one kHz thread (about 15k ops/s) in a round: about 28 min per node before Rack, so each kHz node is one step of the pre-Rack stretch; 30 s – 2 min on a starter rack | about 28 min pre-Rack |
 | W8 | 2e8 | Rack, early | a starter rack, 1e6–1e7 ops/s; one thread per system in a round | 20–200 s between rounds |
 | W9 | 5e9 | Rack, late, `fabMhz` | — | 3–4 h |
 | W10 | 2e10 | MHz, `room` | — | about 12 h: the Room save-up is research time as much as Data |
@@ -584,7 +584,7 @@ export const MILESTONE_IDS = ["systemBoard", "fabKhz", "rack", "fabMhz", "room",
 
 /** D27: about N seconds of the era's typical hardware at unlock; see §3.2. */
 export const WORK_TIER_OPS: Record<WorkTier, number> = {
-  1: 20, 2: 600, 3: 5_000, 4: 1.5e5, 5: 3e5, 6: 1e6, 7: 3e7, 8: 2e8,
+  1: 20, 2: 600, 3: 5_000, 4: 1.5e5, 5: 3e5, 6: 1e6, 7: 2.5e7, 8: 2e8,
   9: 5e9, 10: 2e10, 11: 2.5e10, 12: 3e10, 13: 4e10, 14: 6e10, 15: 1e11,
 };
 
@@ -843,7 +843,7 @@ export const RESEARCH_V3: readonly ResearchNode[] = [
 
   // Structure
   n("systemBoard", "System", "structure", ["dualCore", "l2Cache"], "system", "hz", 3, 7_500, [view("system"), gen("psu", 0)], ["ram", "gpu", "storage"]),
-  n("rack", "Rack", "structure", ["fabKhz"], "rack", "khz", 8, 8.1e6, [view("rack"), gen("rackCooler", 0), gen("pdu", 0), gen("lb", 0), gen("switch", 0)], ["density", "rackDist"]),
+  n("rack", "Rack", "structure", ["fabKhz"], "rack", "khz", 7, 2.7e7, [view("rack"), gen("rackCooler", 0), gen("pdu", 0), gen("lb", 0), gen("switch", 0)], ["density", "rackDist"]),
   n("room", "Room", "structure", ["rack", "fabMhz"], "room", "mhz", 10, 1.2e8, [view("room"), gen("roomCooler", 0), gen("ups", 0), gen("row", 0)], ["density", "roomDist"]),
   n("hallExpansion", "Third row", "structure", ["room", "spineLeaf"], "room", "ghz", 11, 6e7, [cap("roomRows", 3)], ["density"]),
   n("dataCenter", "Data center", "structure", ["room", "stealRoom"], "global", "ghz", 12, 6e8, [view("global"), gen("dataPlane", 0), gen("grid", 0), gen("zone", 0), cap("siteZones", 2)], ["multiAz"]),

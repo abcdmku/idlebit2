@@ -6,7 +6,7 @@ import { MODE } from '../core/timers';
 import { createInitialState } from '../core/state';
 import type { GameState } from '../types/state';
 import type { GameAction } from '../types/actions';
-import { systemId } from '../types/ids';
+import { researchId, systemId } from '../types/ids';
 import { buildState } from '../testkit/builders';
 
 const act = (s: GameState, type: 'endRound' | 'returnToMarket') => applyAction(s, { type });
@@ -75,5 +75,29 @@ describe('choosing the on-market units between rounds', () => {
     const s = ok(rack3(), off(1));
     expect(modes(s)).toEqual([MODE.onMarket, MODE.goingOffline, MODE.onMarket]);
     expect(s.hot.sys.timer[1]).toBe(s.research.unlocks.bootTicks);
+  });
+});
+
+describe('research between rounds', () => {
+  it('runs only on systems the player keeps online', () => {
+    const base = buildState({ seed: 42, sites: 1, zonesPerSite: 1, racksPerZone: 1, serversPerRack: 3, credits: '1000000' });
+    const funded = { ...base, wallet: { ...base.wallet, data: '100000' as never } };
+    const between = applyAction(advanceGame(funded, 5_000).state, { type: 'endRound' });
+    if (!between.ok) throw new Error('endRound');
+    let s = between.state;
+    for (const a of [
+      { type: 'setOnline', unit: { kind: 'system', id: systemId(1) }, online: false },
+      { type: 'startResearch', project: researchId('fifoSched') },
+    ] as const satisfies readonly GameAction[]) {
+      const out = applyAction(s, a);
+      if (!out.ok) throw new Error(out.rejection.reason);
+      s = out.state;
+    }
+    const later = advanceGame(s, 200).state;
+    expect(later.hot.sys.researchThreads[0]).toBeGreaterThan(0);
+    expect(later.hot.sys.researchThreads[2]).toBeGreaterThan(0);
+    expect(later.hot.sys.researchThreads[1]).toBe(0);
+    expect(later.hot.sys.drawW[1]).toBe(0);
+    expect(later.hot.sys.drawW[0]).toBeGreaterThan(0);
   });
 });

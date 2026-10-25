@@ -20,6 +20,8 @@ function roofTint(T: number): string {
   if (T > 80) return HOT[Math.min(4, Math.ceil((T - 80) / 5))];
   return T < 68 ? COLD : ROOF;
 }
+/** Between rounds: a sled row that runs next round (ready, dim green) or sits out (unlit). */
+const READY = mix(P.led, P.ink, 0.55), OUT = mix(FRONT, P.ink, 0.45);
 const powered = (v: RackSlotView): boolean => v.state !== 'dark' && v.state !== 'offline' && v.state !== 'empty';
 const m = { k: 1, ox: 0, oy: 0 };
 const X = (v: number): number => Math.round(m.ox + v * m.k), Y = (v: number): number => Math.round(m.oy + v * m.k);
@@ -37,7 +39,7 @@ export function drawRackMini(g: G, v: RackSlotView, rect: Rect, paused: boolean)
   m.k = Math.min(rect.w / WORLD.w, rect.h / WORLD.h);
   m.ox = rect.x + (rect.w - WORLD.w * m.k) / 2; m.oy = rect.y + (rect.h - WORLD.h * m.k) / 2;
   const x0 = X(CAB.x), x1 = X(CAB.x + CAB.w), y0 = Y(CAB.roofY), y1 = Y(CAB.ground), yf = Math.max(y0 + 2, Y(CAB.frontY));
-  const w = x1 - x0, h = y1 - y0, on = powered(v) && !paused, crashed = v.state === 'crashed';
+  const w = x1 - x0, h = y1 - y0, on = powered(v) && !paused, crashed = v.state === 'crashed', ready = paused && powered(v) && !crashed;
   if (w < 4 || h < 6) { R(g, x0, y0, Math.max(1, w), Math.max(2, h), P.ink); return; }
   const alpha = g.globalAlpha;
   g.globalAlpha = alpha * 0.34; R(g, x0 + 1, y0 + 1, w, h, P.ink); g.globalAlpha = alpha;
@@ -47,15 +49,17 @@ export function drawRackMini(g: G, v: RackSlotView, rect: Rect, paused: boolean)
   R(g, x0 + 1, yf, w - 2, y1 - yf - 1, FRONT);
   const side = w >= 14 ? 2 : 1, ix0 = x0 + side, ix1 = x1 - side - (w >= 14 ? 1 : 0);
   if (w >= 14) { R(g, x0 + 1, yf, 1, y1 - yf - 1, POST); R(g, x1 - 3, yf, 2, y1 - yf - 1, POST); }
-  if (!on) return;
-  markBusy(v);
+  // Between rounds an off-market rack (its switch or an ancestor's is off) is clearly darker.
+  if (paused && v.state === 'offline') { g.globalAlpha = alpha * 0.45; R(g, x0 + 1, y0 + 1, w - 2, h - 2, P.ink); g.globalAlpha = alpha; }
+  if (!on && !ready) return;
+  if (on) markBusy(v);
   for (let y = yf + 1; y < y1 - 1; y += 2) {
     const wy = (y + 0.5 - m.oy) / m.k;
     if (wy < U0) continue;
     const u = Math.floor((wy - U0) / U), slot = u - 2;
     if (u < 2) { for (let x = ix0; x < ix1; x += 2) px(g, x, y, mix(P.net, P.ink, 0.6)); continue; }
     if (slot >= SERVER_SLOTS || !v.servers[slot]) continue;
-    const c = crashed ? mix(P.fault, P.ink, 0.3) : busy[slot] ? P.led : P.ledOff;
+    const c = ready ? ((v.serversOnMarket?.[slot] ?? 1) ? READY : OUT) : crashed ? mix(P.fault, P.ink, 0.3) : busy[slot] ? P.led : P.ledOff;
     for (let x = ix0; x < ix1; x += 2) px(g, x, y, c);
   }
 }

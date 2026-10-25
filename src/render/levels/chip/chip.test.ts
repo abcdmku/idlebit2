@@ -7,7 +7,9 @@ import { recordingContext } from '../../core/testCanvas';
 import { createChipRenderer } from '.';
 import { arrangementOf, coreSites, coreText, floorOf, queueWells } from './layout';
 import { chipScene } from './scenes';
-import { chipAfford, createChipAfford, drawWorld } from './world';
+import { chipAfford, createChipAfford, drawWorld, emptyBlocks, firstLockedSite, siteCount } from './world';
+import { lockSpot } from './block';
+import { coreTag, overlaps } from './tag';
 
 const VIEW = { selectedId: null, picked: null, quotes: null, reducedMotion: false };
 beforeEach(() => {
@@ -290,5 +292,21 @@ describe('CPU research core grids', () => {
       for (const r of s) { expect(Number.isInteger(r.x) && Number.isInteger(r.w)).toBe(true); expect(r.x + r.w).toBeLessThanOrEqual(f.cores.x + f.cores.w); expect(r.y + r.h).toBeLessThanOrEqual(f.cores.y + f.cores.h); }
     }
     expect(coreSites(f, 10)).toHaveLength(12); expect(coreSites(f, 20)).toHaveLength(24); expect(coreSites(f, 3)).toHaveLength(4);
+  });
+});
+
+describe('CPU grid lock mark and busy tag', () => {
+  it.each([['desktop', 3], ['phone', 2]] as const)('the lock mark stays clear of the tag text (%s)', (form, scale) => {
+    for (const scene of ['ring', 'mesh'] as const) {
+      const chip = chipScene(scene), f = floorOf(form), sites = coreSites(f, siteCount(chip));
+      const tag = coreTag(chip, sites, firstLockedSite(chip, sites.length), f, frameAt(chip, 2000, { form, scale }));
+      expect(tag).not.toBeNull();
+      const lock = lockSpot(emptyBlocks(chip, sites).locked, tag!.area);
+      expect(lock).not.toBeNull();
+      expect(overlaps(lock!, tag!.area)).toBe(false);
+      // Cores always show their Hz: these tiles are too small, so the tag carries it (a second line if need be).
+      expect(tag!.speed).toBe(true);
+      for (let i = 0; i < chip.cores.length; i++) expect(overlaps(sites[i]!, tag!.area)).toBe(false);
+    }
   });
 });

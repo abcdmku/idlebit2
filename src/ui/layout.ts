@@ -53,6 +53,8 @@ interface Common {
   readonly rungLabel: Rect;
   /** SLA, its 80% meter and the round clock: the HUD's centre. */
   readonly sla: Rect;
+  /** End round, right of the round clock: reserved in every phase, so nothing moves. */
+  readonly endKey: Rect;
   /** Data over Credits, right-aligned. */
   readonly wallet: Rect;
   /** The pipe leaves the strip under the head's icon, drops to `pipeRunY`, then runs to the level's entry. */
@@ -124,9 +126,11 @@ function desktop(N: 2 | 3, aw: number, ah: number, safe: SafeInsets): DesktopLay
   const view = r(world.x, top, world.w, world.y + world.h - top);
   // The band: the ladder at the left, the currencies stacked at the right, SLA centred between them.
   const band0 = rungs(band, 16 * N, U), rungLabel = r(band0[4].x + band0[4].w + 16, band.y, N === 3 ? 128 : 96, band.h);
-  const walletW = N === 3 ? 264 : 200, wallet = r(band.x + band.w - U - walletW, band.y, walletW, band.h);
-  const free0 = rungLabel.x + rungLabel.w + 8, free1 = wallet.x - 8, slaW = snap8(Math.min(N === 3 ? 480 : 368, free1 - free0));
-  const sla = r(snap8(free0 + (free1 - free0 - slaW) / 2), band.y, slaW, band.h);
+  const walletW = 200, wallet = r(band.x + band.w - U - walletW, band.y, walletW, band.h);
+  // SLA and End round as one block, centred between the level name and the wallet.
+  const keyW = N === 3 ? 112 : 96, free0 = rungLabel.x + rungLabel.w + 8, free1 = wallet.x - 8;
+  const slaW = snap8(Math.min(N === 3 ? 480 : 368, free1 - free0 - keyW - 8));
+  const sla = r(snap8(free0 + (free1 - free0 - slaW - 8 - keyW) / 2), band.y, slaW, band.h), endKey = r(sla.x + slaW + 8, band.y, keyW, band.h);
   return {
     kind: 'desktop', N, lat, gutter: U, x, y, w: W, h: H, body, lh, big: N === 3 ? 32 : 24, mid: N === 3 ? 20 : 16,
     world, view, band, strip, headSlot, cards: [card(0), card(1), card(2), card(3)],
@@ -135,7 +139,7 @@ function desktop(N: 2 | 3, aw: number, ah: number, safe: SafeInsets): DesktopLay
     buy: r(world.x, deckY + rowsH, b1w, KEY_H), research: r(b2x, deckY + rowsH, b2w, KEY_H),
     rows: [row(0), row(1), row(2), row(3), row(4)],
     drawer: r(b2x, top, b2w, view.h), lab: r(world.x, top, world.w, H - U - top),
-    rungs: band0, rungRow: band.h, rungLabel, sla, wallet,
+    rungs: band0, rungRow: band.h, rungLabel, sla, endKey, wallet,
     pipeSrc: { x: headSlot.x + lat + 8 * N, y: top }, pipeRunY: top + U,
     calloutBounds: inset(view, lat), callout: { w: 288, h: N === 3 ? 144 : 112 },
   };
@@ -147,8 +151,8 @@ function phone(aw: number, ah: number, safe: SafeInsets): PhoneLayout {
   const x = safe.left + Math.floor((aw - W) / 2), y = safe.top;
   const ctrlH = 64, nowH = 80, ctrlY = H - U - ctrlH, nowY = ctrlY - U - nowH;
   const world = r(U, U, W - 2 * U, nowY - 2 * U);
-  // The band: the ladder row (48 px rungs, a primary tap) with Data over Credits at its right, then SLA.
-  const rungRow = 48, band = r(U, U, world.w, rungRow + 32);
+  // The band: the ladder row (48 px rungs, a primary tap) with Data over Credits at its right, then SLA and End round.
+  const rungRow = 48, band = r(U, U, world.w, rungRow + 48);
   const band0 = rungs(band, rungRow, 0), walletX = band0[4].x + band0[4].w + 8;
   // The strip: the head first, then the next 4.
   const strip = r(U, band.y + band.h, world.w, 64);
@@ -168,7 +172,7 @@ function phone(aw: number, ah: number, safe: SafeInsets): PhoneLayout {
     build, research, buy: r(buyX, ctrlY, W - U - buyX, ctrlH),
     drawer: r(U, sheetY, world.w, world.y + world.h - sheetY), lab: r(U, top, world.w, H - U - top),
     rungs: band0, rungRow, rungLabel: r(walletX, band.y, 0, rungRow),
-    sla: r(band.x, band.y + rungRow, band.w, 32), wallet: r(walletX, band.y, band.x + band.w - U - walletX, rungRow),
+    sla: r(band.x, band.y + rungRow, band.w - 88, 48), endKey: r(band.x + band.w - 80, band.y + rungRow, 80, 48), wallet: r(walletX, band.y, band.x + band.w - U - walletX, rungRow),
     pipeSrc: { x: headSlot.x + 8 + 16, y: top }, pipeRunY: top + U,
     calloutBounds: inset(view, lat), callout: { w: 288, h: 104 },
   };

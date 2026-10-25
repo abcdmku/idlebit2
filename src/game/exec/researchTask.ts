@@ -99,8 +99,9 @@ function canTake(w: World, s: number): boolean {
   const c = w.compiled.sys, h = w.hot.sys;
   if (h.researchThreads[s]! > 0 || h.busyThreads[s]! >= hwThreads(w, s)) return false;
   if (w.round.phase === 'running') return canAdmit(w, s);
-  // Between rounds the market is paused and nothing else runs: a powered, linked server takes it.
-  return c.alive[s] === 1 && c.kind[s] !== STORAGE_NODE && h.mode[s] === MODE.paused && hasLink(w, s);
+  // Between rounds the market is paused and nothing else runs: a powered, linked server the player
+  // keeps online takes it. One switched offline holds nothing and draws nothing (spec §11.3).
+  return c.alive[s] === 1 && c.intent[s] === 1 && c.kind[s] !== STORAGE_NODE && h.mode[s] === MODE.paused && hasLink(w, s);
 }
 
 /**
@@ -118,7 +119,7 @@ export function researchTakePhase(w: World): boolean {
       for (let s = 0; s < w.compiled.sys.len; s += 1) {
         const t = h.researchThreads[s]!;
         if (t === 0) continue;
-        if (!researchesInMode(h.mode[s]!)) release(w, s);
+        if (!researchesInMode(h.mode[s]!) || w.compiled.sys.intent[s] !== 1) release(w, s);
         // In a round a holder keeps one thread: the market resumes on the rest (round start after a spread).
         else if (running && t > ROUND_THREADS) grow(w, s, ROUND_THREADS - t);
       }

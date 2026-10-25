@@ -105,27 +105,23 @@
   box-shadow: inset 0 -3px 0 #15122a, inset 0 2px 0 #5d5296, 0 0 0 2px #0e0b1c; }
 .v3-plate .setpoint .step:disabled { color: var(--dim); cursor: default; }
 
-/* online switch row */
-.v3-plate .p-online { display: flex; align-items: center; gap: 10px; height: 44px; margin-top: 8px; }
-.v3-plate .p-online .sw { position: relative; flex: none; width: 56px; height: 44px; border: 0; padding: 0; background: none; cursor: pointer; }
-.v3-plate .p-online .sw::before { content: ""; position: absolute; left: 4px; right: 4px; top: 12px; height: 20px; background: #2a2440; box-shadow: 0 0 0 2px #0e0b1c, inset 0 2px 0 #120d26; }
-.v3-plate .p-online .sw .knob { position: absolute; top: 10px; left: 4px; width: 22px; height: 24px; background: #8c90ad; box-shadow: 0 0 0 2px #0e0b1c, inset 0 2px 0 #c9cce0, inset 0 -3px 0 #5b5f7c; }
-.v3-plate .p-online:is([data-state="online"], [data-state="paused"]) .sw::before { background: #2f6b40; }
-.v3-plate .p-online:is([data-state="online"], [data-state="paused"]) .sw .knob { left: 30px; }
-.v3-plate .p-online:is([data-state^="going"], [data-state="booting"], [data-state="cold"]) .sw::before { background: #5a4210; }
-.v3-plate .p-online:is([data-state^="going"], [data-state="booting"], [data-state="cold"]) .sw .knob { left: 17px; }
-.v3-plate .p-online[data-state="crashed"] .sw::before { background: #3a1420; }
-.v3-plate .p-online .sw:disabled { cursor: default; }
-.v3-plate .sw-t { display: flex; flex-direction: column; gap: 2px; min-width: 96px; }
+/* market row: what the unit is doing, the switch pips, and the "On market" toggle key (fixed place) */
+.v3-plate .p-online { display: grid; gap: 4px 8px; margin-top: 8px; }
+.v3-plate .sw-t { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-width: 0; }
 .v3-plate .sw-t b { font-weight: 700; }
-.v3-plate .sw-t span { color: #a99be6; }
+.v3-plate .sw-s { color: #a99be6; }
 .v3-plate .p-online:is([data-state="online"], [data-state="paused"]) .sw-t b { color: #7dff9a; }
 .v3-plate .p-online:is([data-state^="going"], [data-state="booting"], [data-state="cold"]) .sw-t b { color: #ffb03b; }
 .v3-plate .p-online[data-state="crashed"] .sw-t b { color: #ff6a5a; }
-.v3-plate .sw-pips { display: flex; gap: 2px; margin-left: auto; visibility: hidden; }
+.v3-plate .p-online[data-state="offline"] .sw-t b { color: var(--dim); }
+.v3-plate .sw-pips { display: flex; gap: 2px; flex: none; visibility: hidden; }
 .v3-plate .p-online:is([data-state^="going"], [data-state="booting"], [data-state="cold"]) .sw-pips { visibility: visible; }
 .v3-plate .sw-pips i { width: 4px; height: 10px; background: #2a2440; box-shadow: 0 0 0 1px #0e0b1c; }
 .v3-plate .sw-pips i.on { background: #ffb03b; }
+.v3-plate .mk { width: 100%; height: 48px; margin-top: 4px; border: 0; padding: 0; font: inherit; font-weight: 700; cursor: pointer; text-align: center;
+  background: #1f7a52; color: #fff; box-shadow: inset 0 -4px 0 #0f4a31, inset 0 2px 0 #57f0b4, 0 0 0 2px #0e0b1c; }
+.v3-plate .mk[aria-pressed="false"] { background: #29234b; color: #c9c2ee; box-shadow: inset 0 -4px 0 #1b1437, inset 0 2px 0 #5d5296, 0 0 0 2px #0e0b1c; }
+.v3-plate .mk:disabled { background: #342c55; color: #9a92bf; box-shadow: inset 0 -4px 0 #231d40, 0 0 0 2px #0e0b1c; cursor: not-allowed; }
 
 /* configuration plate */
 .v3-plate.cfg { width: 362px; }

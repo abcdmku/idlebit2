@@ -17,29 +17,35 @@ export interface RackCase {
   modes?: Readonly<Record<number, UnitMode>>; cores?: number; usage?: number; overloadS?: number; lbTarget?: number | null;
   /** D25: shard flows (server slot → system in `to`) and the LB queue. */
   flows?: readonly FlowCase[]; queue?: LbView['queue'];
+  /** Between rounds: every sled rests 'paused'; the slots in `out` sit out the next round (off market). */
+  between?: boolean; out?: readonly number[];
 }
 const port = (peer: number | null, active: boolean, progress: number, rung: number): PortView => ({
   speedHz: [1e3, 2e3, 5e3, 1e4, 2e4, 5e4, 1e5, 2e5, 5e5, 1e6][Math.min(9, rung)], rung, peer, active, family: null, progress: active ? progress : 0, queued: 0,
 });
-function neighbour(id: number, servers: number, load: number, tempF: number): RackSlotView {
-  const modes = new Uint8Array(12);
-  for (let k = 0; k < servers; k++) modes[k] = UNIT_MODES.indexOf(k === 5 ? 'offline' : 'onMarket');
-  return { rackId: rackId(id), state: 'onMarket', load, tempF, pduUsage: 0.2 + load * 0.5, servers: modes };
+function neighbour(id: number, servers: number, load: number, tempF: number, between = false, out: ReadonlySet<number> = new Set()): RackSlotView {
+  const modes = new Uint8Array(12), market = new Uint8Array(12);
+  for (let k = 0; k < servers; k++) {
+    modes[k] = UNIT_MODES.indexOf(between ? 'paused' : k === 5 ? 'offline' : 'onMarket');
+    market[k] = out.has(k) || (!between && k === 5) ? 0 : 1;
+  }
+  return { rackId: rackId(id), state: between ? 'paused' : 'onMarket', load: between ? 0 : load, tempF, pduUsage: 0.2 + load * 0.5, servers: modes, serversOnMarket: market };
 }
-const EMPTY_SLOT: RackSlotView = { rackId: null, state: 'empty', load: 0, tempF: 0, pduUsage: 0, servers: new Uint8Array(12) };
+const EMPTY_SLOT: RackSlotView = { rackId: null, state: 'empty', load: 0, tempF: 0, pduUsage: 0, servers: new Uint8Array(12), serversOnMarket: new Uint8Array(12) };
 
 /** A rack at room slot `slot` (row-major), with racks in `built` columns of its row. */
 export function rackCase(o: RackCase, timeMs: number): RackRowSnapshot {
   const id = o.id ?? 0, slot = o.slot ?? 2, col = slot % 8, rowBase = slot - col, n = o.servers ?? 9, t = timeMs / 1000;
-  const nPorts = o.ports ?? 12, active = new Set(o.active ?? [0, 3, 6]), crashed = !!o.crashed, dark = !!o.dark;
+  const nPorts = o.ports ?? 12, active = new Set(o.between ? [] : o.active ?? [0, 3, 6]), crashed = !!o.crashed, dark = !!o.dark;
+  const between = !!o.between, out = new Set(o.out ?? []);
   const ports = Array.from({ length: nPorts }, (_, i) =>
     port(i < n ? i : null, i < n && active.has(i) && !dark && !crashed, (t * 0.6 + i * 0.29) % 1, Math.min(9, Math.floor(i / 2))));
   const servers: ServerSlotView[] = Array.from({ length: 12 }, (_, i) => {
-    if (i >= n) return { ...BASE.servers[11], systemId: null, kind: null, state: 'empty', port: ports[i] ?? null, load: 0, running: 0, cores: 0, busyCores: 0 };
-    const mode: UnitMode = o.modes?.[i] ?? (dark ? 'dark' : crashed ? 'crashed' : 'onMarket'), cores = o.cores ?? [1, 4, 8, 16, 32, 64][i % 6];
+    if (i >= n) return { ...BASE.servers[11], systemId: null, kind: null, state: 'empty', onMarket: false, port: ports[i] ?? null, load: 0, running: 0, cores: 0, busyCores: 0 };
+    const mode: UnitMode = o.modes?.[i] ?? (dark ? 'dark' : crashed ? 'crashed' : between ? 'paused' : 'onMarket'), cores = o.cores ?? [1, 4, 8, 16, 32, 64][i % 6];
     const busy = mode === 'onMarket' ? Math.round(cores * ((i * 37) % 10) / 10) : 0;
     return {
-      systemId: systemId(id * 12 + i), kind: i === 8 ? 'storageNode' : 'server', state: mode, load: cores ? busy / cores : 0,
+      systemId: systemId(id * 12 + i), kind: i === 8 ? 'storageNode' : 'server', state: mode, onMarket: !out.has(i) && mode !== 'offline' && mode !== 'goingOffline', load: cores ? busy / cores : 0,
       running: busy > 0 ? 1 + (i % 3) : 0, admitted: busy > 0 ? 2 : 0, reserved: 0,
       timerS: mode === 'boot' ? 6 : null, timerTotalS: mode === 'boot' ? 10 : null, cores, busyCores: busy, port: ports[i] ?? null,
       family: busy > 0 && i % 4 !== 3 ? familyId((i * 3) % 12) : null,
@@ -47,9 +53,10 @@ export function rackCase(o: RackCase, timeMs: number): RackRowSnapshot {
   });
   const built = new Set(o.built ?? [0, 1, col, 3, 4, 6].map(c => c)); built.add(col);
   const row = Array.from({ length: 8 }, (_, c) =>
-    c === col ? neighbour(id, n, 0.6, o.tempF ?? 72) : built.has(c) ? neighbour(100 + rowBase + c, 4 + ((c * 5) % 9), (c % 3) * 0.4, 68 + c * 3) : EMPTY_SLOT);
+    c === col ? neighbour(id, n, 0.6, o.tempF ?? 72, between, out)
+      : built.has(c) ? neighbour(100 + rowBase + c, 4 + ((c * 5) % 9), (c % 3) * 0.4, 68 + c * 3, between, between && c % 2 ? new Set([1, 2]) : new Set()) : EMPTY_SLOT);
   const s: Mutable<RackRowSnapshot> = {
-    ...BASE, rackId: rackId(id), online: dark ? 'dark' : crashed ? 'crashed' : 'onMarket',
+    ...BASE, rackId: rackId(id), online: dark ? 'dark' : crashed ? 'crashed' : between ? 'paused' : 'onMarket',
     tempF: o.tempF ?? 72, eff: (o.tempF ?? 72) > 80 ? 0.86 : 1, crashed, crashS: o.crashS ?? 0,
     cooler: { ...BASE.cooler, tech: o.tech ?? 'air', generation: o.gen ?? 1, duty: o.tempF && o.tempF > 80 ? 1 : 0.55 },
     pdu: { ...BASE.pdu, usage: o.usage ?? 0.39, failed: dark, rebootMs: dark ? 6000 : null, overloadS: o.overloadS ?? 0 },
@@ -87,6 +94,8 @@ export const CASES: Readonly<Record<string, (timeMs: number) => RackRowSnapshot>
   water: t => rackCase({ tech: 'water', gen: 2, tempF: 66 }, t),
   noport: t => rackCase({ servers: 10, ports: 8, modes: { 2: 'boot', 4: 'offline' } }, t),
   paused: t => rackCase({}, t),
+  /** Between rounds: slots 2, 5 and 9 sit out the next round (On market off); the rest are ready. Use with ?paused. */
+  sitout: t => rackCase({ servers: 12, between: true, out: [2, 5, 9] }, t),
   flows: t => rackCase({ servers: 12, active: [0, 2, 3, 9, 10], uplink: true, flows: SPLIT_FLOWS, queue: queueOf(8, [FAM.storage, FAM.parallel, FAM.cluster]) }, t),
   queue1: t => rackCase({ queue: queueOf(1, [FAM.memory]) }, t),
   queue32: t => rackCase({ servers: 12, queue: queueOf(32, Array.from({ length: 21 }, (_, i) => [FAM.compute, FAM.parallel, FAM.memory, FAM.accel][i % 4])) }, t),

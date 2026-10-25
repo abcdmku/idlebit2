@@ -36,21 +36,29 @@ export function systemsUnder(build: BuildState, unit: UnitRef): number[] {
   }
 }
 
-/** Generic part plans also edit NPUs and compact accelerator slots. Levels keep the same card. */
-function inventoryChanges(before: BuildState, change: BuildChange): number[] {
+/**
+ * Generic part plans also edit NPUs and compact accelerator slots. Levels keep the same card.
+ * `changed` resets accelerator duty; `kill` also discards the system's work. A card appended into an
+ * empty slot (every existing card keeps its slot) is hot (spec §4.5): it changes the inventory but
+ * kills nothing.
+ */
+function inventoryChanges(before: BuildState, change: BuildChange): { changed: number[]; kill: number[] } {
   const changed = new Set([
     ...(change.inventoryChangedSystems ?? []), ...(change.added ?? []), ...(change.removed ?? []),
   ]);
+  const kill = new Set(changed);
   for (let s = 0; s < Math.max(before.systems.length, change.build.systems.length); s += 1) {
     const have = before.systems[s]?.spec.accels ?? [], want = change.build.systems[s]?.spec.accels ?? [];
     if (have === want) continue;
-    if (have.length !== want.length || have.some((card, slot) => {
+    const moved = have.some((card, slot) => {
       const next = want[slot];
       return card.kind === 'gpu' ? next?.kind !== 'gpu' || card.model !== next.model
         : next?.kind !== 'npu' || card.gen !== next.gen;
-    })) changed.add(s);
+    });
+    if (moved || have.length > want.length) { changed.add(s); kill.add(s); }
+    else if (have.length < want.length) changed.add(s);
   }
-  return [...changed];
+  return { changed: [...changed], kill: [...kill] };
 }
 
 /**
@@ -72,7 +80,7 @@ export function commitBuild(state: GameState, change: BuildChange): ActionOutcom
   syncHotSizes(w.hot, compiled);
   const running = state.round.phase === 'running';
   const old: World = { ...w, build: state.build, compiled: state.compiled };
-  const inventoryChangedSystems = inventoryChanges(state.build, change);
+  const { changed: inventoryChangedSystems, kill: inventoryKills } = inventoryChanges(state.build, change);
   const killedSystems = new Set<number>();
 
   for (const s of change.removed ?? []) {
@@ -93,7 +101,7 @@ export function commitBuild(state: GameState, change: BuildChange): ActionOutcom
     if (!systems.every((s) => killedSystems.has(s))) killSubtree(old, unit, 'swap');
     for (const s of systems) killedSystems.add(s);
   }
-  for (const s of inventoryChangedSystems) {
+  for (const s of inventoryKills) {
     if (state.build.systems[s] && !killedSystems.has(s)) killSubtree(old, { kind: 'system', id: systemId(s) }, 'swap');
   }
   for (const s of change.added ?? []) {

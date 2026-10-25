@@ -226,25 +226,42 @@ describe('network rack: uplinks per rack and the room load balancer behind one k
   });
 });
 
-describe('online switch row with boot pips', () => {
-  const unitAct = (online: boolean) => onAction({ type: 'setOnline', unit: { kind: 'system', id: systemId(0) }, online });
-  it('toggles when settled; drains ten pips over the boot time while switching', () => {
-    m.render(<OnlineRow mode="onMarket" timerS={null} onToggle={unitAct} />);
+describe('market row with boot pips', () => {
+  const unit = { kind: 'system', id: systemId(0) } as const;
+  const market = { unit, on: true, live: 1, total: 1, drains: false, running: true, parentOff: null } as const;
+  const unitAct = (online: boolean) => onAction({ type: 'setOnline', unit, online });
+  const key = () => m.host.querySelector<HTMLButtonElement>('.mk')!;
+  it('one key reads the switch, On market or Off market, and toggles it; ten pips drain while switching', () => {
+    m.render(<OnlineRow mode="onMarket" timerS={null} market={market} onToggle={unitAct} />);
     expect(m.host.querySelector('.p-online')?.getAttribute('data-state')).toBe('online');
-    expect(m.host.textContent).toContain('On the market');
-    click(m.host.querySelector('.sw'));
-    expect(acts).toEqual([{ type: 'setOnline', unit: { kind: 'system', id: systemId(0) }, online: false }]);
+    expect(key().textContent).toBe('On market');
+    expect(m.host.textContent).toContain('Taking tasks');
+    click(key());
+    expect(acts).toEqual([{ type: 'setOnline', unit, online: false }]);
 
-    m.render(<OnlineRow mode="goingOffline" timerS={6.3} onToggle={unitAct} />);
-    expect(m.host.textContent).toContain('Going offline7 s');
+    m.render(<OnlineRow mode="goingOffline" timerS={6.3} market={{ ...market, on: false }} onToggle={unitAct} />);
+    expect(m.host.textContent).toContain('Going offline · 7 s');
     expect(m.host.querySelectorAll('.sw-pips i.on')).toHaveLength(7);
-    expect((m.host.querySelector('.sw') as HTMLButtonElement).disabled).toBe(true);
+    expect(key().textContent).toBe('Off market');
+    expect(key().disabled).toBe(false);
 
-    m.render(<OnlineRow mode="boot" timerS={2.5} bootS={5} onToggle={unitAct} />);
+    m.render(<OnlineRow mode="boot" timerS={2.5} bootS={5} market={market} onToggle={unitAct} />);
     expect(m.host.querySelectorAll('.sw-pips i.on')).toHaveLength(5);
-    m.render(<OnlineRow mode="cold" timerS={10} onToggle={unitAct} />);
+    m.render(<OnlineRow mode="cold" timerS={10} market={market} onToggle={unitAct} />);
     expect(m.host.textContent).toContain('Swapping');
     expect(m.host.querySelectorAll('.sw-pips i.on')).toHaveLength(10);
+    expect(key().disabled).toBe(true);
+  });
+  it('says Drains first with Graceful drain, counts a rack, and plans the next round between rounds', () => {
+    m.render(<OnlineRow mode="onMarket" timerS={null} market={{ ...market, drains: true }} onToggle={unitAct} />);
+    expect(m.host.textContent).toContain('Drains first');
+    m.render(<OnlineRow mode="onMarket" timerS={null} market={{ ...market, unit: { kind: 'rack', id: rackId(0) }, live: 6, total: 12 }} onToggle={unitAct} />);
+    expect(m.host.textContent).toContain('6 / 12 on market');
+    m.render(<OnlineRow mode="offline" timerS={null} market={{ ...market, on: false, running: false }} onToggle={unitAct} />);
+    expect(m.host.textContent).toContain('Sits out next round');
+    m.render(<OnlineRow mode="offline" timerS={null} market={{ ...market, parentOff: 'rack' }} onToggle={unitAct} />);
+    expect(m.host.textContent).toContain('Off with its rack');
+    expect(key().textContent).toBe('On market');
   });
 });
 
@@ -259,7 +276,7 @@ describe('server plate: previous and next', () => {
   });
   it('steps with ‹ › keys and says when a server has no port', () => {
     const onStep = vi.fn(), onGoInside = vi.fn();
-    m.render(<ServerPlate slot={2} servers={servers} onStep={onStep} onGoInside={onGoInside} onAction={onAction} onClose={onClose} />);
+    m.render(<ServerPlate slot={2} servers={servers} market={{ unit: { kind: 'system', id: systemId(2) }, on: true, live: 1, total: 1, drains: false, running: true, parentOff: null }} onStep={onStep} onGoInside={onGoInside} onAction={onAction} onClose={onClose} />);
     expect(m.host.querySelector('.p-title')?.textContent).toBe('Server 3');
     expect(m.host.querySelector('.p-status')?.textContent).toBe('No switch port, so no tasks');
     click(button(m.host, '‹ Server 1'));

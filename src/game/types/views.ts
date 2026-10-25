@@ -217,6 +217,12 @@ export interface ServerSlotView {
   readonly systemId: SystemId | null;
   readonly kind: 'server' | 'storageNode' | null;
   readonly state: UnitMode;
+  /**
+   * Switched onto the market (its own, rack, room and site switches all on); false while it sits out.
+   * Tells sitting-out sleds apart between rounds, when every system is paused. The view always sets
+   * it; optional only until hand-built fixtures add it.
+   */
+  readonly onMarket?: boolean;
   readonly load: number;
   readonly running: number;
   /** Family of the oldest running task, or null when none. */
@@ -241,6 +247,12 @@ export interface RackSlotView {
   readonly pduUsage: number;
   /** 12 UnitMode codes (UNIT_MODES index). */
   readonly servers: Uint8Array;
+  /**
+   * 12 flags beside `servers`: 1 when that slot's system is switched onto the market
+   * (ServerSlotView.onMarket), 0 when it sits out or the slot is empty. Always set by the view;
+   * optional only until hand-built fixtures add it.
+   */
+  readonly serversOnMarket?: Uint8Array;
 }
 export interface ZoneView {
   readonly roomId: RoomId | null;

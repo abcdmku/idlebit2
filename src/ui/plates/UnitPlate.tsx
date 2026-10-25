@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react';
 import type { ServerSlotView, UnitMode, UnitRef } from '../../game';
 import { hertz } from './format';
+import type { MarketState } from './market';
 import { OnlineRow } from './OnlineRow';
 import { PlateFrame } from './PlateFrame';
 import { Key, Lines, Status, type Line, type Tone } from './widgets';
@@ -15,6 +16,8 @@ export interface UnitPlateProps extends Omit<PlateCommon, 'quotes'> {
   lines?: readonly Line[];
   mode: UnitMode;
   timerS: number | null;
+  /** The On market toggle; null before Rack (the lone system has none). */
+  market: MarketState | null;
   /** Shows "Save this …" (the floppy icon in the world does the same). */
   onSave?: (() => void) | null;
   saveLabel?: string;
@@ -22,13 +25,13 @@ export interface UnitPlateProps extends Omit<PlateCommon, 'quotes'> {
   children?: ReactNode;
 }
 
-/** A unit's plate: what it is doing, its online switch row, and its keys. */
-export function UnitPlate({ unit, title, sub, status, statusTone = '', lines = [], mode, timerS, onSave, saveLabel = 'Save configuration',
+/** A unit's plate: what it is doing, its market row, and its keys. */
+export function UnitPlate({ unit, title, sub, status, statusTone = '', lines = [], mode, timerS, market, onSave, saveLabel = 'Save configuration',
   className = '', children, onAction, bootS, onResearch: _r, researchName: _n, ...frame }: UnitPlateProps) {
   return <PlateFrame {...frame} title={title} sub={sub} className={`unit ${className}`}>
     <Status text={status} tone={statusTone} />
     <Lines lines={lines} slots={Math.max(1, lines.length)} />
-    <OnlineRow mode={mode} timerS={timerS} bootS={bootS} onToggle={(online) => onAction({ type: 'setOnline', unit, online })} />
+    {market && <OnlineRow mode={mode} timerS={timerS} bootS={bootS} market={market} onToggle={(online) => onAction({ type: 'setOnline', unit, online })} />}
     <div className="keys">
       {children}
       {onSave && <Key tone="go" label={saveLabel} onPress={onSave} />}
@@ -42,6 +45,7 @@ export interface ServerPlateProps extends Omit<PlateCommon, 'quotes'> {
   onGoInside: () => void;
   /** Select another server of the rack by slot. */
   onStep: (slot: number) => void;
+  market: MarketState | null;
 }
 
 /** Previous and next occupied slots, wrapping (mockup srv-prev / srv-next). */

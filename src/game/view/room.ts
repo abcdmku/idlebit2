@@ -10,20 +10,21 @@ import { containerMode, coolerView, lbView, outsideF, probeTimerS, rackProbe, ro
 /** One rack in a room grid slot: mode, load, °F, PDU usage and its 12 server mode codes. */
 export function rackSlot(state: GameState, rack: number): RackSlotView {
   const c = state.compiled.rack, h = state.hot.rack;
-  const servers = new Uint8Array(SERVERS_PER_RACK);
-  if (rack < 0 || c.alive[rack] !== 1) return { rackId: null, state: 'empty', load: 0, tempF: 0, pduUsage: 0, servers };
+  const servers = new Uint8Array(SERVERS_PER_RACK), serversOnMarket = new Uint8Array(SERVERS_PER_RACK);
+  if (rack < 0 || c.alive[rack] !== 1) return { rackId: null, state: 'empty', load: 0, tempF: 0, pduUsage: 0, servers, serversOnMarket };
   let load = 0, n = 0;
   for (let slot = 0; slot < SERVERS_PER_RACK; slot += 1) {
     const s = c.servers[rack * SERVERS_PER_RACK + slot] ?? -1;
     if (s < 0 || state.compiled.sys.alive[s] !== 1) continue;
     servers[slot] = state.hot.sys.mode[s] ?? MODE.empty;
+    serversOnMarket[slot] = state.compiled.sys.intent[s] === 1 ? 1 : 0;
     load += systemLoad(state, s);
     n += 1;
   }
   const failed = (h.pduFailed[rack] ?? 0) === 1;
   return {
     rackId: rackId(rack), state: containerMode(state, c.alive[rack], c.intent[rack], failed, (h.crashed[rack] ?? 0) === 1, rackProbe(state, rack)),
-    load: n > 0 ? load / n : 0, tempF: h.tempF[rack] ?? 70, pduUsage: failed ? 0 : (h.pduUsage[rack] ?? 0), servers,
+    load: n > 0 ? load / n : 0, tempF: h.tempF[rack] ?? 70, pduUsage: failed ? 0 : (h.pduUsage[rack] ?? 0), servers, serversOnMarket,
   };
 }
 
