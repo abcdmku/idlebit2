@@ -60,6 +60,12 @@ export interface HudSnapshot {
   readonly roundIndex: number;
   readonly roundElapsedMs: number;
   readonly autoReturnInMs: number | null;
+  /**
+   * Round-time income per second, for ETAs (same as ResearchTreeView.income): this round's Data and
+   * net Credits over its elapsed time while it runs, else the last report's; 0 until 10 s have
+   * elapsed. Always set by the view; optional only until hand-built fixtures add it.
+   */
+  readonly income?: { readonly dataPerSec: number; readonly creditsPerSec: number };
 }
 
 /** The market: the endless queue's visible window, the head clock and the work in transfer (spec §16.2). */

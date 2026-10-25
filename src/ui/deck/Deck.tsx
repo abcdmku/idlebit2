@@ -12,6 +12,7 @@ import type { DesktopLayout, PhoneLayout } from '../layout';
 import { box, T, useLayout } from '../shell/geometry';
 import { shallowEqual, useGameSelector, useShell, useViewState } from '../storeHooks';
 import { BuildSheet } from './BuildSheet';
+import { etaText, useCreditsPerSec } from './eta';
 import { NowCard } from './NowCard';
 import type { Offers } from './offers';
 import { offerAction, PriceText, RightText, useTapOffer } from './offerUi';
@@ -24,7 +25,7 @@ function BuyButton({ offers }: { offers: Offers }) {
   const L = useLayout(), tap = useTapOffer(), nx = offers.next, unlock = offers.unlock, n = L.N, d = L.kind === 'desktop';
   const credits = useGameSelector(s => Math.floor(Number(s.hud.credits)), Object.is, 250);
   const can = !!nx && nx.affordable, tx = L.lat + 16 * n + 8, b = L.buy, pad = d ? L.lat : 8;
-  const short = nx?.price ? Math.max(0, nx.price - credits) : 0;
+  const short = nx?.price ? Math.max(0, nx.price - credits) : 0, eta = etaText(short, useCreditsPerSec());
   const shown = nx ?? unlock;
   return <button type="button" className={`skey buy${can ? '' : ' off'}`} style={box(b)} data-k="buy" data-testid="buy" data-qa-target
     disabled={!nx && !unlock} title={nx ? `${nx.name}: ${nx.change} for ${wholeText(nx.price ?? 0)} Credits` : unlock ? `Research ${unlock.right.kind === 'research' ? unlock.right.node : ''}` : 'Nothing to buy here'}
@@ -43,13 +44,14 @@ function BuyButton({ offers }: { offers: Offers }) {
       </>) : nx && (d ? <>
         {/* One 48 px line: the buy, what it changes, how far off it is, and its price. */}
         <T x={tx} y={0} h={b.h} w={b.w - tx - PRICE_W}><b>{nx.name}</b> <span className={can ? '' : 'mute'}>{nx.change}</span>
-          {!can && short > 0 && <span className="dim"> · {wholeText(short)} to go</span>}</T>
+          {!can && short > 0 && <span className="dim"> · Saving up · {eta ?? '—'}</span>}</T>
         <T right={L.lat} y={0} h={b.h}><PriceText offer={nx} n={n} /></T>
       </> : <>
         {/* The name has its own line (it never shares one with the price); the price sits by the call to buy. */}
         <T x={tx} y={8} w={b.w - tx - 8}><b>{nx.name}</b></T>
         <T x={tx} y={24} w={b.w - tx - 8} className={`${can ? '' : 'mute'}`}>{nx.change}</T>
-        <T x={8} y={40} className={can ? 'gold' : 'dim'}>{can ? 'Tap to buy' : 'Saving up'}</T>
+        {/* Saving up: how long at this round's income, when there is one. */}
+        <T x={8} y={40} className={can ? 'gold' : 'dim'}>{can ? 'Tap to buy' : eta ?? 'Saving up'}</T>
         <T right={8} y={40}><PriceText offer={nx} n={n} /></T>
       </>)}
     </>}

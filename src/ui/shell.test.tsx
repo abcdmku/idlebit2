@@ -180,10 +180,16 @@ describe('deck', () => {
     mounted = deck(store);
     expect(text('[data-testid=research-key]')).toBe('Research · kHz fab running · 1.2k ops/s · 2 queued50%');
   });
-  it('the Buy key says how far off the next buy is', () => {
+  it('the Buy key says it is saving up, with no ETA before the round has an income', () => {
     const store = fakeStore();
     mounted = deck(store);
-    expect(text('[data-testid=buy]')).toMatch(/· \d+ to go/);
+    expect(text('[data-testid=buy]')).toMatch(/· Saving up · —/);
+  });
+  it('with a round income, the Buy key says how long the saving takes', () => {
+    const store = fakeStore();
+    store.set({ hud: { income: { dataPerSec: 0, creditsPerSec: 0.001 } } });
+    mounted = deck(store);
+    expect(text('[data-testid=buy]')).toMatch(/· Saving up · ~\d+ (min|h)/);
   });
   it('builds five rows from the sim quotes: x → x, prices, and where the pipe upgrades', () => {
     const store = fakeStore();

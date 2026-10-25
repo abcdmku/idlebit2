@@ -23,7 +23,7 @@ export function baseSnapshot(): RenderSnapshot {
   return {
     epoch: 1, tick: 0, simTimeMs: 0, bootMs: 10_000,
     hud: { credits: amount(0), data: amount(0), netPerMinute: amount(0), sla: { met: 0, failed: 0, percent: 100, checking: false, window: 50, roundMet: 0, roundFailed: 0, deliveredWork: 0, failedWork: 0, grace: 10 },
-      roundState: 'running', roundIndex: 1, roundElapsedMs: 0, autoReturnInMs: null },
+      roundState: 'running', roundIndex: 1, roundElapsedMs: 0, autoReturnInMs: null, income: { dataPerSec: 0, creditsPerSec: 0 } },
     feed: { roundIndex: 1, timing: 'running', window: Array.from({ length: 5 }, (_, i) => entry(i + 1)), research: null,
       headDeadlineTick: 99, blockedBy: null, transfers: [], inTransfer: 0, queued: 0, running: 0, taken: 0, dismissed: 0,
       intensity: 1, takesPerSec: 0, recentOutcomes: [], liveFailures: null, rates: { met: 0, fail: 0 }, failBin: null },

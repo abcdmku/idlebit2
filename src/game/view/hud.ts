@@ -4,6 +4,7 @@ import { netPerMinute } from '../core/ledger';
 import { slaChecking, slaPercent, slaWindow } from '../core/sla';
 import { SLA_WINDOW } from '../core/constants';
 import type { HudSnapshot, RoundSnapshot } from '../types/snapshot';
+import { roundIncome } from './research';
 import type { GameState } from '../types/state';
 
 export { slaPercent };
@@ -24,18 +25,21 @@ export function hudSnapshot(state: GameState, prev: HudSnapshot | null): HudSnap
   const elapsed = Math.max(0, end - round.startTick) * TICK_MS;
   const credits = state.wallet.credits, data = state.wallet.data, net = netPerMinute(state);
   const auto = autoReturnInMs(state);
+  const income = roundIncome(state);
+  const sameIncome = prev?.income !== undefined && prev.income.dataPerSec === income.dataPerSec && prev.income.creditsPerSec === income.creditsPerSec;
   const sameSla = prev !== null && prev.sla.met === met && prev.sla.failed === failed && prev.sla.roundMet === roundMet
     && prev.sla.roundFailed === roundFailed && prev.sla.deliveredWork === delivered
     && prev.sla.failedWork === failedWork && prev.sla.grace === grace;
   if (prev && sameSla && prev.credits === credits && prev.data === data && prev.netPerMinute === net
     && prev.roundState === round.phase && prev.roundIndex === round.index
-    && prev.roundElapsedMs === elapsed && prev.autoReturnInMs === auto) return prev;
+    && prev.roundElapsedMs === elapsed && prev.autoReturnInMs === auto && sameIncome) return prev;
   return {
     credits, data, netPerMinute: net,
     sla: prev && sameSla ? prev.sla
       : { met, failed, percent: slaPercent(met, failed), checking: slaChecking(roundMet + roundFailed), window: SLA_WINDOW,
         roundMet, roundFailed, deliveredWork: delivered, failedWork, grace },
     roundState: round.phase, roundIndex: round.index, roundElapsedMs: elapsed, autoReturnInMs: auto,
+    income: sameIncome ? prev!.income! : income,
   };
 }
 

@@ -586,7 +586,7 @@ export const MILESTONE_IDS = ["systemBoard", "fabKhz", "rack", "fabMhz", "room",
 
 /** D27: about N seconds of the era's typical hardware at unlock; see §3.2. */
 export const WORK_TIER_OPS: Record<WorkTier, number> = {
-  1: 20, 2: 600, 3: 5_000, 4: 1.5e5, 5: 3e5, 6: 1e6, 7: 2.5e7, 8: 2e8,
+  1: 20, 2: 600, 3: 5_000, 4: 1.5e5, 5: 3e5, 6: 1e6, 7: 2.5e7, 8: 4e7,
   9: 5e9, 10: 2e10, 11: 2.5e10, 12: 3e10, 13: 4e10, 14: 6e10, 15: 1e11,
 };
 

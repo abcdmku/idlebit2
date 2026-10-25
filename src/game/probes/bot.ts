@@ -67,12 +67,38 @@ function fullLoadW(state: GameState, id: number): { idle: number; load: number }
  * Net value one system carries in Credits/s: compute up to its pipe (D10.4), research on the rest,
  * minus energy. Idle threads and cards research, so a system draws full load whenever research runs.
  */
+/** Modeled full-load energy of the fleet, Credits/s. */
+function fleetEnergy(state: GameState): number {
+  let e = 0;
+  state.build.systems.forEach((x, id) => {
+    if (x === null) return;
+    const w = fullLoadW(state, id);
+    e += ENERGY_PRICE * (w.idle + w.load) / Math.max(0.05, 1 - (state.compiled.sys.psuLoss[id] ?? 0));
+  });
+  return e;
+}
+const duty = new WeakMap<GameState['round'], number>();
+/**
+ * Measured duty: the last round's billed energy over the modeled full-load energy (0.1–1). Parts are not
+ * all at full load all round; scaling by what was billed keeps the payback model near the real ledger.
+ */
+function energyDuty(state: GameState): number {
+  const cached = duty.get(state.round);
+  if (cached !== undefined) return cached;
+  const r = state.round.reports.at(-1), model = fleetEnergy(state);
+  const u = r && r.durationTicks > 0 && model > 0 ? Math.min(1, Math.max(0.1, amountToNumber(r.energy) / (r.durationTicks / 10) / model)) : 1;
+  duty.set(state.round, u);
+  return u;
+}
+
 const carried = (state: GameState, id: number): number => {
   const compute = computeRate(state, id) + (state.compiled.sys.gpuOps[id] ?? 0), pipe = state.compiled.sys.pipeSpeed[id] ?? 0;
   const w = fullLoadW(state, id);
   const research = state.research.unlocks.levels.rack ? 0 : RESEARCH_VALUE;
+  // The board PSU loses psuLoss of what it delivers: the wall draw is the parts' watts over (1 - loss).
+  const wall = 1 / Math.max(0.05, 1 - (state.compiled.sys.psuLoss[id] ?? 0));
   return Math.min(compute, pipe) + research * Math.min(RESEARCH_SPAN * pipe, Math.max(0, compute - pipe))
-    - ENERGY_PRICE * (w.idle + w.load);
+    - ENERGY_PRICE * wall * energyDuty(state) * (w.idle + w.load);
 };
 /** Estimated income in ops/s: what every system can carry through its pipe. */
 export const income = (state: GameState): number =>
@@ -182,6 +208,9 @@ function hasSibling(state: GameState, parent: ScopeRef): boolean {
   return false;
 }
 
+/** The newest researched CPU generation (Barebones tier). */
+const newestCpuTier = (state: GameState): number => 31 - Math.clz32(state.research.unlocks.gens.cpu || 1);
+
 /** A gate costing one second of income ranks like a rate part that pays back in this many seconds. */
 const GATE_PAYBACK_S = 20;
 
@@ -195,7 +224,9 @@ export function score(state: GameState, q: Quote): number | null {
   const cost = amountToNumber(q.cost);
   const a = q.action;
   const rate = cpuTarget(a) !== null || a.type === 'upgradePort' || a.type === 'addUnit';
-  if (a.type === 'addUnit' && a.source.kind === 'barebones' && hasSibling(state, a.parent)) return null;
+  // A player copies a working sibling; with capability routing on, a newest-tier barebones server is a cheaper start to build up.
+  if (a.type === 'addUnit' && a.source.kind === 'barebones' && hasSibling(state, a.parent)
+    && !(a.parent.kind === 'rack' && state.build.racks[a.parent.id]?.lb.filters.includes('capability') && a.source.tier === newestCpuTier(state))) return null;
   if (a.type === 'addUnit' && a.parent.kind === 'rack') {
     const room = rackHasRoom(state, a.parent.id);
     if (!room.port || !room.power) return null;
@@ -261,9 +292,17 @@ export function score(state: GameState, q: Quote): number | null {
     const gain = next ? income(next) - income(state) : 0;
     return gain > 0 ? cost / gain : null;
   }
-  if (!supplyNeeded(state, a) || !gateNeeded(state, a, cost)) return null;
+  if (!supplyNeeded(state, a)) {
+    // A more efficient PSU pays back in energy saved, like a rate part.
+    if (!isPsu(a)) return null;
+    const next = tryAction(state, a);
+    const gain = next ? income(next) - income(state) : 0;
+    return gain > 0 ? cost / gain : null;
+  }
+  if (!gateNeeded(state, a, cost)) return null;
   return GATE_PAYBACK_S * cost / Math.max(1, income(state));
 }
+const isPsu = (a: GameAction): boolean => (a.type === 'upgradePart' || a.type === 'replacePart') && a.part.slot.kind === 'psu';
 
 /** The failure detail a capacity gate answers (cache, RAM, drives, GPU), or null. */
 function gateDetail(a: GameAction): readonly string[] | null {
@@ -447,8 +486,10 @@ function buyParts(state: GameState, policy: Policy, log: BotEvent[]): GameState 
     for (const q of buyable(s, quotes)) {
       // The reserve holds back gates and levels, not purchases that raise net income (a native CPU saves energy).
       // Nor purchases that answer a wall the recent rounds ended on (RAM, drives, cache): a player buys those while saving.
-      if (reserve > 0 && (cpuSaving || (!q.gpu && !answersRecentWall(s, q.action))) && cpuTarget(q.action) === null && credits - amountToNumber(q.cost) < reserve) continue;
       const v = score(s, q);
+      // A purchase that pays back within the reserve horizon brings the saved-for research sooner (D32: research costs Credits too).
+      const quick = !cpuSaving && s.research.unlocks.levels.rack && v !== null && v <= RESERVE_HORIZON_S;
+      if (reserve > 0 && !quick && (cpuSaving || (!q.gpu && !answersRecentWall(s, q.action))) && cpuTarget(q.action) === null && credits - amountToNumber(q.cost) < reserve) continue;
       if (v !== null && v < bestScore) { best = q; bestScore = v; }
     }
     if (!best) break;
@@ -545,10 +586,24 @@ function startResearch(state: GameState, log: BotEvent[]): GameState {
  * One decision between ticks: research, purchases, then Return to market when the round is over.
  * Returns the new state; every action taken is appended to `log`.
  */
+/** A player switches on each researched rack routing filter (free, hot): capability keeps tasks off servers that cannot run them. */
+const RACK_FILTERS = ['capability', 'health'] as const;
+function useFilters(state: GameState): GameState {
+  let s = state;
+  for (const id of firstIds(s.build.racks, SAMPLE)) {
+    const lb = s.build.racks[id]!.lb;
+    for (const filter of RACK_FILTERS) {
+      if (lb.filters.includes(filter)) continue;
+      s = tryAction(s, { type: 'setFilter', unit: { kind: 'rack', id: rackId(id) }, filter, on: true }) ?? s;
+    }
+  }
+  return s;
+}
+
 export function decide(state: GameState, policy: Policy, log: BotEvent[]): GameState {
   let s = state;
   if (policy.researches) s = startResearch(s, log);
-  if (policy.buys) s = buyParts(s, policy, log);
+  if (policy.buys) s = buyParts(useFilters(s), policy, log);
   // D27: research holds threads and the market waits behind it, so a player lets a short project
   // finish between rounds before returning.
   if (s.round.phase !== 'running' && !(s.research.active !== null && !s.research.stoppedInsolvent && researchLeftS(s) <= RESEARCH_WAIT_S)) {

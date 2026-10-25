@@ -6,6 +6,7 @@ import { researchId } from '../types/ids';
 import type { GameState } from '../types/state';
 import { fixtureState } from './fixtures';
 import { selectResearchTree } from './selectors';
+import { deriveRenderSnapshot } from './snapshot';
 
 /** A new game with `done` researched. */
 function researched(...done: string[]): GameState {
@@ -50,5 +51,11 @@ describe('research income (round-time, for ETAs)', () => {
     const last = base.round.reports.at(-1)!;
     const s = { ...base, round: { ...base.round, reports: [...base.round.reports.slice(0, -1), { ...last, durationMs: 60_000, data: amount('600'), net: amount('1200') }] } };
     expect(selectResearchTree(s).income).toEqual({ dataPerSec: 10, creditsPerSec: 20 });
+  });
+  it('reads the same on the HUD as on the research tree, in a round and between rounds', () => {
+    const hudIncome = (s: GameState) => deriveRenderSnapshot(s, { focus: { level: 'chip', id: 0 as never }, partner: null }).hud.income;
+    const running = advanceGame(createInitialState(42), 20_000).state, between = fixtureState('rack', 'between');
+    for (const s of [running, between]) expect(hudIncome(s)).toEqual(selectResearchTree(s).income);
+    expect(hudIncome(running)!.creditsPerSec).toBeGreaterThan(0);
   });
 });
