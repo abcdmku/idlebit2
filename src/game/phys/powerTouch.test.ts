@@ -17,7 +17,7 @@ const hotSites = (): GameState => advanceGameOwned(primeMarket(provisionInfrastr
   rack: (rack) => ({ ...MAX_FLEET.rack!(rack), cooler: { gen: 0, level: 1, setpointF: 70 }, pdu: { gen: 0, level: 1, capped: false } }),
 })), 36), 100 * TICK_MS).state;
 
-const researching = (state: GameState): GameState => ({ ...state, research: { ...state.research, active: state.research.completed[0]!, mode: 'shared' } });
+const researching = (state: GameState): GameState => ({ ...state, research: { ...state.research, active: state.research.completed[0]! } });
 
 const FIXTURES: Record<string, () => GameState> = {
   boot: () => FLEETS.boot(),

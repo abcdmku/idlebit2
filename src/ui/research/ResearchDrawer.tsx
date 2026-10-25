@@ -1,5 +1,5 @@
 import { useRef, useState, type CSSProperties } from 'react';
-import { formatOps, selectContextualResearchTree, type GameAction, type ResearchCategory, type ResearchId, type ResearchMode, type ResearchNodeView, type ResearchTreeView, type RoundPhase } from '../../game';
+import { formatOps, selectContextualResearchTree, type GameAction, type ResearchCategory, type ResearchId, type ResearchNodeView, type ResearchTreeView, type RoundPhase } from '../../game';
 import { useDialogFocus } from '../hooks/useDialogFocus';
 import { useGameSelector, useShell, useViewState } from '../storeHooks';
 import { perMinuteText, wholeText } from '../plates/format';
@@ -9,6 +9,7 @@ import { exactAmount, lacksAmount } from '../plates/gpuModel';
 import type { Amount } from '../../game';
 import { ResearchSheet } from './ResearchSheet';
 import { ResearchAnswers } from './ResearchAnswers';
+import { holdText, useHoldRate } from './estimate';
 import '../styles/research.css';
 
 /**
@@ -16,12 +17,8 @@ import '../styles/research.css';
  * only the relevant projects (ResearchSheet); "All research" swaps in the full list below.
  */
 /** The round priority, named with the share of compute research takes (A04; exec/research.ts task shares). */
-export const PRIORITY: Readonly<Record<ResearchMode, { name: string; line: string }>> = {
-  background: { name: 'Background 10%', line: 'Research takes 10% of compute. Tasks come first.' },
-  shared: { name: 'Shared 25%', line: 'Research takes 25% of compute. SLA can dip.' },
-  focus: { name: 'Focus 100%', line: 'Research takes all compute. SLA will fall.' },
-};
-export const PRIORITY_ORDER: readonly ResearchMode[] = ['background', 'shared', 'focus'];
+/** D27: a started project cuts the line; there is no research priority to pick. */
+export const NEXT_IN_LINE_NOTE = 'Goes next in line; tasks wait while it runs';
 
 export const CATEGORY_NAMES: Readonly<Record<ResearchCategory, string>> = {
   compute: 'Compute', memory: 'Memory', accel: 'Acceleration', storage: 'Storage', scheduling: 'Scheduling',
@@ -59,9 +56,11 @@ export interface ResearchListProps {
   data?: Amount;
   /** The drawer rect, stage px. */
   style?: CSSProperties;
+  /** Compute a started project would get now, ops/s (estimate.ts), or null. */
+  hold?: number | null;
 }
 
-export function ResearchList({ tree, phase, focusProject, onAction, onClose, credits, data, style }: ResearchListProps) {
+export function ResearchList({ tree, phase, focusProject, onAction, onClose, credits, data, style, hold = null }: ResearchListProps) {
   const ref = useRef<HTMLElement>(null);
   useDialogFocus(ref, onClose);
   const names = new Map(tree.nodes.map((n) => [n.id, n.name]));
@@ -78,12 +77,7 @@ export function ResearchList({ tree, phase, focusProject, onAction, onClose, cre
     <div className="rl-fab">
       <div className="rl-row"><b>{active ? active.name : 'No project printing'}</b><span>{active ? `${Math.floor(active.progress * 100)}% · ${formatOps(tree.opsPerSec)}/s` : ''}</span></div>
       <i className="rl-bar"><b style={{ width: `${Math.round((active?.progress ?? 0) * 100)}%` }} /></i>
-      {between
-        ? <div className="rl-energy"><span>Full speed between rounds</span><b>{perMinuteText(-Number(tree.creditsPerMinute), false)}</b></div>
-        : <div className="rl-prio" role="radiogroup" aria-label="Research priority during a round">
-          {PRIORITY_ORDER.map((m: ResearchMode) => <button key={m} type="button" role="radio" aria-checked={m === tree.mode}
-            onClick={() => onAction({ type: 'setResearchPriority', mode: m })}>{PRIORITY[m].name}</button>)}
-        </div>}
+      <div className="rl-energy"><span>{NEXT_IN_LINE_NOTE}</span>{between && Number(tree.creditsPerMinute) > 0 && <b>{perMinuteText(-Number(tree.creditsPerMinute), false)}</b>}</div>
     </div>
     <div className="rl-scroll">
       {groups.length === 0 && <p className="rl-empty">Nothing left to research yet.</p>}
@@ -104,7 +98,8 @@ export function ResearchList({ tree, phase, focusProject, onAction, onClose, cre
                 {(n.needsData || unpaid && lacksAmount(data, n.dataCost)) && <span> Needs Data.</span>}
                 {(n.needsCredits || unpaid && lacksAmount(credits, n.creditCost)) && <span> Needs Credits.</span>}</p>
             </div>
-            <button type="button" className="rl-go" disabled={!k.action} onClick={() => k.action && onAction(k.action)}>{k.label}</button>
+            <button type="button" className="rl-go" disabled={!k.action} onClick={() => k.action && onAction(k.action)}>{k.label}
+              {k.label === 'Start' && hold && <small className="rl-hold">{holdText(n.workOps, hold)}</small>}</button>
           </div>;
         })}
       </section>)}
@@ -120,16 +115,16 @@ export function ResearchDrawer() {
 }
 
 function OpenResearch({ project }: { project: ResearchId | null }) {
-  const shell = useShell(), L = useLayout(), [all, setAll] = useState(false);
+  const shell = useShell(), L = useLayout(), [all, setAll] = useState(false), hold = useHoldRate();
   // Hardware changes can reveal projects even when the research badge is unchanged.
-  const key = useGameSelector((s) => `${s.epoch}|${shell.store.getState().build.revision}|${s.research.active}|${Math.floor(s.research.progress * 100)}|${s.research.mode}|${s.research.queued}|${s.hud.data}|${s.hud.credits}|${s.hud.roundState}`, Object.is, 250);
+  const key = useGameSelector((s) => `${s.epoch}|${shell.store.getState().build.revision}|${s.research.active}|${Math.floor(s.research.progress * 100)}|${s.research.queued}|${s.hud.data}|${s.hud.credits}|${s.hud.roundState}`, Object.is, 250);
   const phase = useGameSelector((s) => s.hud.roundState);
   void key;
   const tree = selectContextualResearchTree(shell.store.getState(), project);
   const { credits, data } = shell.store.getSnapshot().hud;
   const onAction = (a: GameAction) => { shell.dispatch(a); };
-  if (all) return <ResearchList style={box(L.drawer)} tree={tree} phase={phase} focusProject={project} credits={credits} data={data}
+  if (all) return <ResearchList style={box(L.drawer)} tree={tree} phase={phase} focusProject={project} credits={credits} data={data} hold={hold}
     onAction={onAction} onClose={() => setAll(false)} />;
-  return <ResearchSheet L={L} tree={tree} phase={phase} focusProject={project} credits={credits} data={data} onAction={onAction}
+  return <ResearchSheet L={L} tree={tree} phase={phase} focusProject={project} credits={credits} data={data} hold={hold} onAction={onAction}
     onClose={() => shell.view.dispatch({ type: 'cancel' })} onAll={() => setAll(true)} />;
 }

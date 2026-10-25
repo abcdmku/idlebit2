@@ -99,7 +99,8 @@ describe('system part-value contract (R40)', () => {
       });
     }
     expect(sum(snap.ram, 'capacityBits')).toBe(c.ramCap[id]);
-    expect(sum(snap.ram, 'rateBits')).toBe(c.ramBw[id]);
+    // Step-curve bandwidths are not whole numbers: the sums agree to rounding.
+    expect(sum(snap.ram, 'rateBits') / c.ramBw[id]!).toBeCloseTo(1, 12);
     expect(sum(snap.storage, 'capacityBits')).toBe(c.storageCap[id]);
     expect(sum(snap.storage, 'rateBits')).toBe(c.ioRate[id]);
     for (let i = 0; i < snap.gpu.length; i += 1) {

@@ -4,7 +4,7 @@ import type { QueueStrategyId, RegionId } from './catalog';
 import type { FailCause, FailCounts, FailDetail, GameEvent } from './events';
 import type { LevelId, NodeRef, RackId, ResearchId, RoomId, SiteId, SystemId } from './ids';
 import type { RoundReport } from './report';
-import type { ResearchMode, RoundPhase } from './state';
+import type { RoundPhase } from './state';
 import type {
   BuildSlotView, ChipQueueEntryView, ResearchQueueEntryView, CompletionView, CoolerView, FailureView, LbView, LinkView, MemTierView, OutcomeView, PartView, QueueEntryView, RackSlotView,
   ServerSlotView, ShardDoneView, SiteView, SupplyView, SwitchView, TaskView, TransferView, UnitMode,
@@ -104,7 +104,6 @@ export interface ResearchBadge {
   readonly active: ResearchId | null;
   readonly name: string | null;
   readonly progress: number;
-  readonly mode: ResearchMode;
   readonly stoppedInsolvent: boolean;
   readonly needsData: boolean;
   readonly queued: number;

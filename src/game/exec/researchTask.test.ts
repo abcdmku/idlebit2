@@ -1,13 +1,15 @@
 import { describe, expect, it } from 'vitest';
-import { advanceGame, advanceGameOwned, applyAction, createInitialState, researchId, type GameState } from '../index';
+import { advanceGame, advanceGameOwned, applyAction, createInitialState, researchId, selectResearchTree, type GameState } from '../index';
 import { G } from '../core/buffers';
 import { researchDef } from '../build/research/tree';
+import { copyGameState } from '../core/advance';
 
 /** D27: research is a task that cuts the line. The boot machine: one 1 Hz core, no scheduler. */
 function bootWithTaskRunning(): GameState {
   const s = createInitialState(42);
   // 0.5 s in, the opening 1-op Bit Flip holds the only core until 1.0 s.
-  const running = advanceGame({ ...s, wallet: { ...s.wallet, data: '10' as never } }, 500).state;
+  // A few Credits cover the 10 W research draw (the CSV energy ratio), as a player at 0:10 has.
+  const running = advanceGame({ ...s, wallet: { ...s.wallet, data: '10' as never, credits: '20' as never } }, 500).state;
   expect(running.hot.sys.running[0]).toBe(1);
   const out = applyAction(running, { type: 'startResearch', project: researchId('pipelining') });
   if (!out.ok) throw new Error(out.rejection.reason);
@@ -22,6 +24,14 @@ describe('research task (D27)', () => {
     expect(waiting.hot.g[G.researchHolders]).toBe(0);
     expect(waiting.market.window[0]!.taskId).toBe(head);
     expect(waiting.hot.g[G.taken]).toBe(taken);
+  });
+
+  it('reports the rate a project would get if taken now, then its running rate (holdOpsPerSec)', () => {
+    // Before any task: the boot core would hold it on its one 1 Hz thread.
+    expect(selectResearchTree(createInitialState(42)).holdOpsPerSec).toBe(1);
+    // Mid-task, the only core has no free thread: nothing would take it now.
+    expect(selectResearchTree(bootWithTaskRunning()).holdOpsPerSec).toBe(0);
+    expect(selectResearchTree(advanceGame(bootWithTaskRunning(), 700).state).holdOpsPerSec).toBe(1);
   });
 
   it('is taken next by the system with room, holds it, and completes the project', () => {
@@ -59,7 +69,7 @@ describe('research task (D27)', () => {
     let split = start;
     for (const ms of [1, 99, 37, 263, 5, 701, 2, 1_300, 40_000, 47_592]) split = advanceGame(split, ms).state;
     expect(split).toEqual(whole);
-    let owned = structuredClone(start);
+    let owned = copyGameState(start);
     for (const ms of [500, 1_500, 88_000]) owned = advanceGameOwned(owned, ms).state;
     expect(owned).toEqual(whole);
   });

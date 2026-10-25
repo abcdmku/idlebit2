@@ -83,7 +83,7 @@ const tree = (phase: 'running' | 'between') => ({
     node('ddr', 'DDR', 'available', { category: 'memory', needsData: true, effect: 'RAM gen 1: 2× bandwidth', dataCost: '2000000' as Amount }),
     node('rackWater', 'Rack water', 'locked', { category: 'cooling', lockedBy: researchId('rack'), effect: 'Rack cooler technology 2: water' }),
     node('pipelining', 'Pipelining', 'done')],
-  active: researchId('fabKhz'), mode: 'shared' as const, opsPerSec: 6400, queue: [], queueSlots: 0, horizon: 'system' as const, lenders: [],
+  active: researchId('fabKhz'), opsPerSec: 6400, holdOpsPerSec: 6400, queue: [], queueSlots: 0, horizon: 'system' as const, lenders: [],
   creditsPerMinute: (phase === 'between' ? '9960' : '0') as Amount,
 });
 const supplyPdu = { ...LEVEL_FIXTURES.rack.pdu, level: 2, capacityW: 4096, deliveredW: 4710, usage: 1.15, overloadS: 6.2, lossW: 520, loss: 0.11 };

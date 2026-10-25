@@ -15,14 +15,10 @@ const CSTATES = [0, 1, 3, 6] as const;
 const cstateOf = (v: number | undefined): CoreView['cstate'] => (CSTATES.includes(v as 0) ? (v as CoreView['cstate']) : 0);
 const genOpen = (state: GameState, part: PartId, gen = 0): boolean => ((state.research.unlocks.gens[part] ?? 0) & (1 << gen)) !== 0;
 
-/**
- * Fraction of this system's threads lent to research (program D10.7, spec §11.2): idle threads plus
- * 10% (Background) or 25% (Shared) of busy ones; Focus lends everything. 0 without a project.
- */
-export function researchShare(state: GameState, busyFrac: number): number {
-  if (state.research.active === null || state.research.stoppedInsolvent) return 0;
-  if (state.research.mode === 'focus' || state.round.phase !== 'running') return 1;
-  return 1 - busyFrac * (state.research.mode === 'shared' ? 0.75 : 0.9);
+/** Fraction of system s's threads held by the research task (D27, spec §11.2). 0 when it is not a holder. */
+export function researchShare(state: GameState, s: number): number {
+  const threads = state.compiled.sys.threads[s] ?? 0, held = state.hot.sys.researchThreads[s] ?? 0;
+  return threads > 0 ? Math.min(1, held / threads) : 0;
 }
 
 /** Lanes of a core. TODO(S5): base[g] × L from the core catalog row; base[g] = 1 assumed. */
@@ -79,8 +75,7 @@ export function chipSnapshot(state: GameState, id: SystemId, parent: NodeRef | n
   const parts = (cpu?.cores ?? []).slice(0, MAX_CORES_PER_CPU);
   const nCores = parts.length;
   const tpc = nCores > 0 ? Math.max(1, Math.round(threads / (nCores * Math.max(1, cpus)))) : 1;
-  const busyFrac = nCores > 0 ? Math.min(1, busyThreads / (nCores * tpc)) : 0;
-  const share = researchShare(state, busyFrac);
+  const share = researchShare(state, id);
 
   // Oldest CPU-stage records fill cores first; each takes rec.threads × count threads.
   const rec = state.hot.rec;

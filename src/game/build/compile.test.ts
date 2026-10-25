@@ -16,8 +16,8 @@ describe('compile', () => {
     expect([c.threadRate[0], c.clockHz[0], c.cacheBits[0], c.memCap[0], c.hasRam[0], c.etaCfg[0]]).toEqual([1, 1, 1, 1, 0, 1]);
     // Bench PSU: 32768 W, 30% loss at L1.
     expect([c.psuCapW[0], c.psuLoss[0]]).toEqual([32768, 0.3]);
-    // Core is a rate part at native: idle 0.1 × 1 W/op/s × 1, load 1 W at full use.
-    expect([c.coreIdleW[0], c.coreLoadW[0]]).toEqual([0.1, 1]);
+    // Core is a ratio part at native (hardware-progression.md §3): full use 1 op/s / (0.010 × E 10) = 10 W, idle 10%.
+    expect([c.coreIdleW[0], c.coreLoadW[0]]).toEqual([1, 9]);
   });
 
   it('a hidden bench rack has no ports or links', () => {

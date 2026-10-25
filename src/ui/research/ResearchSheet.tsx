@@ -8,7 +8,8 @@ import type { ShellLayout } from '../layout';
 import { CloseKey } from '../shell/CloseKey';
 import { box, T } from '../shell/geometry';
 import { GemIcon } from '../plates/icons';
-import { PRIORITY, PRIORITY_ORDER, projectKey } from './ResearchDrawer';
+import { NEXT_IN_LINE_NOTE, projectKey } from './ResearchDrawer';
+import { holdText } from './estimate';
 import { ResearchAnswers } from './ResearchAnswers';
 
 const ORDER: Readonly<Record<ResearchNodeView['state'], number>> = { active: 0, parked: 1, queued: 2, available: 3, locked: 4, done: 5 };
@@ -39,24 +40,23 @@ export interface ResearchSheetProps {
   onAction: (action: GameAction) => void;
   onClose: () => void;
   onAll: () => void;
+  /** Compute a started project would get now, ops/s (estimate.ts), or null. */
+  hold?: number | null;
 }
 
-export function ResearchSheet({ L, tree, phase, focusProject, credits, data, onAction, onClose, onAll }: ResearchSheetProps) {
+export function ResearchSheet({ L, tree, phase, focusProject, credits, data, onAction, onClose, onAll, hold = null }: ResearchSheetProps) {
   const s = L.drawer, wide = L.lh === 24, pad = wide ? 24 : 16, lh = L.lh;
   const prioY = pad + lh + (wide ? 16 : 8), itemY = prioY + 48 + (wide ? 24 : 16);
   const bw = 128, textW = s.w - 2 * pad - bw - 16, between = phase !== 'running';
   const names = new Map(tree.nodes.map(n => [n.id, n.name]));
   const items = relevantProjects(tree, focusProject);
-  const pw = Math.floor((s.w - 2 * pad - 16) / 3 / 8) * 8;
   return <section className="panel sheet research-sheet" style={box(s)} data-k="sheet" role="dialog" aria-label="Research" data-testid="research-drawer"
     onPointerDown={e => e.stopPropagation()}>
     <T x={pad} y={pad} className="head">Research</T>
     <CloseKey L={L} w={s.w} label="Close research" onClose={onClose} />
-    {between
-      ? <T x={pad} y={prioY + (wide ? 8 : 16)} className="mute">Full speed between rounds · <span className="gold">{perMinuteText(-Number(tree.creditsPerMinute), false)}</span></T>
-      : PRIORITY_ORDER.map((m, i) => <button key={m} type="button" role="radio" aria-checked={m === tree.mode} title={PRIORITY[m].line}
-        className={`skey prio${m === tree.mode ? ' on' : ''}`} data-qa-target style={{ left: pad + i * (pw + 8), top: prioY, width: pw, height: 48 }}
-        onClick={() => onAction({ type: 'setResearchPriority', mode: m })}>{PRIORITY[m].name}</button>)}
+    {/* D27: a started project cuts the line; no priority to pick. */}
+    <T x={pad} y={prioY + (wide ? 8 : 16)} w={s.w - 2 * pad} className="mute">{NEXT_IN_LINE_NOTE}{between && Number(tree.creditsPerMinute) > 0
+      ? <> · <span className="gold">{perMinuteText(-Number(tree.creditsPerMinute), false)}</span></> : null}</T>
     {items.length === 0 && <T x={pad} y={itemY} className="dim">Nothing to research yet.</T>}
     <div className="research-projects" style={{ left: pad, right: pad, top: itemY, bottom: pad + 48, lineHeight: `${lh}px` }}>
     {items.map(n => {
@@ -70,8 +70,11 @@ export function ResearchSheet({ L, tree, phase, focusProject, credits, data, onA
         <div className="project-copy mute">{n.effect}</div>
         <ResearchAnswers answers={n.answers} />
         <div className="project-copy dim" style={{ minHeight: lh }}>{!k.action ? need : '\u00a0'}</div>
-        {k.action && <button type="button" className={`skey ${k.label === 'Start' || k.label === 'Resume' ? 'go' : 'plain'}`} data-qa-target
-          style={{ right: 0, top: 0, width: bw, height: 48 }} onClick={() => onAction(k.action!)}>{k.label === 'Start' || k.label === 'Queue' ? <>{k.label}&nbsp;<GemIcon />&nbsp;{wholeText(n.dataCost)}</> : k.label}</button>}
+        {k.action && <button type="button" className={`skey ${k.label === 'Start' || k.label === 'Resume' ? 'go' : 'plain'}${k.label === 'Start' && holdText(n.workOps, hold) ? ' two' : ''}`} data-qa-target
+          style={{ right: 0, top: 0, width: bw, height: 48 }} onClick={() => onAction(k.action!)}>
+          {k.label === 'Start' || k.label === 'Queue' ? <span>{k.label}&nbsp;<GemIcon />&nbsp;{wholeText(n.dataCost)}</span> : k.label}
+          {/* D27: how long it will hold the hardware, so the player can weigh the round. */}
+          {k.label === 'Start' && holdText(n.workOps, hold) && <span className="hold">{holdText(n.workOps, hold)} on your CPU</span>}</button>}
       </div>;
     })}
     </div>

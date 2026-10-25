@@ -28,9 +28,8 @@ function cards(servers = 1): World {
 }
 
 const fullDraw = (w: World, s = 0): number => systemDraw(w, s, DRAW_FULL, physSettings(w)).deliveredW;
-const research = (w: World, mode: 'background' | 'shared' | 'focus'): void => {
+const research = (w: World, _mode?: string): void => {
   w.research.active = researchId('phys-test');
-  w.research.mode = mode;
 };
 
 describe('physical accelerator watts', () => {

@@ -1,7 +1,7 @@
 import type { BoardKind } from './build';
 import type { FilterId, QueueStrategyId, RouteStrategyId } from './catalog';
 import type { PartRef, RackId, ResearchId, RoomId, ScopeRef, SwitchRef, SystemId, UnitKind, UnitRef } from './ids';
-import type { ResearchMode, GameState, TaskRef } from './state';
+import type { GameState, TaskRef } from './state';
 import type { GpuModelId } from './gpu';
 
 /** CPU generation index for barebones systems (Hz 0, kHz 1, MHz 2, GHz 3). */
@@ -54,7 +54,6 @@ export type GameAction =
   | { readonly type: 'unqueueResearch'; readonly project: ResearchId }
   | { readonly type: 'cancelResearch' }
   | { readonly type: 'resumeResearch' }
-  | { readonly type: 'setResearchPriority'; readonly mode: ResearchMode }
   | { readonly type: 'reset' };
 export type GameActionType = GameAction['type'];
 export type ActionOf<T extends GameActionType> = Extract<GameAction, { readonly type: T }>;

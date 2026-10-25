@@ -17,7 +17,7 @@ function researching(): GameState {
     credits: '1000000000000000000000000000000' });
   const id = researchId('bbSubsea');
   return { ...base, research: { ...base.research, completed: base.research.completed.filter((x) => x !== id),
-    active: id, activeProgress: 0, mode: 'shared' } };
+    active: id, activeProgress: 0 } };
 }
 
 const CASES: readonly (readonly [string, () => GameState, number])[] = [

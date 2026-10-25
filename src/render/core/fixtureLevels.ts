@@ -51,7 +51,7 @@ export function fixtureSnapshot(focus: LevelSnapshot, partner: LevelSnapshot | n
       window: [], research: null, headDeadlineTick: round === 'running' ? 99 : null, blockedBy: null, transfers: [],
       inTransfer: 0, queued: 0, running: 0, taken: 0, dismissed: 0, intensity: 1, takesPerSec: 0,
       recentOutcomes: [], liveFailures: null, rates: { met: 0, fail: 0 }, failBin: null },
-    research: { active: null, name: null, progress: 0, mode: 'background', stoppedInsolvent: false, needsData: false, queued: 0, opsPerSec: 0 },
+    research: { active: null, name: null, progress: 0, stoppedInsolvent: false, needsData: false, queued: 0, opsPerSec: 0 },
     unlocked: { chip: true, system: true, rack: true, room: true, global: true },
     home: { chip: { level: 'chip', id: systemId(0) }, system: { level: 'system', id: systemId(0) } },
     round: { index: 1, state: round, lastReport: null, canReturn: false, autoReturn: { available: false, on: false, inMs: null } },

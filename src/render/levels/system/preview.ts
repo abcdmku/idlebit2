@@ -46,7 +46,7 @@ function snapshot(): RenderSnapshot {
     epoch: 1, tick: Math.floor(simTimeMs / 100), simTimeMs, focus, partner: first ? null : partner, events: [], firstSeq: 0, lastSeq: 0,
     hud: { credits: '1495', data: '128', netPerMinute: '889', sla: { met: 1, failed: 0, percent: 100 }, roundState: state, roundIndex: 1, roundElapsedMs: 0, autoReturnInMs: null },
     round: { index: 1, state, lastReport: null, canReturn: paused, autoReturn: { available: false, on: false, inMs: null } },
-    research: { active: null, name: null, progress: 0.4, mode: 'shared', stoppedInsolvent: false, needsData: false, queued: 0, opsPerSec: 0 },
+    research: { active: null, name: null, progress: 0.4, stoppedInsolvent: false, needsData: false, queued: 0, opsPerSec: 0 },
   } as unknown as RenderSnapshot;
 }
 renderer.resize(W, Hh, devicePixelRatio || 1, viewport, framing);

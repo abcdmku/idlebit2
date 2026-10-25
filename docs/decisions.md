@@ -1025,6 +1025,19 @@ The user's words:
   - The system plate gets a memory row: three tier bars with capacity, use and spill. The drive plate shows IO as "spill speed".
   - The research view shows `hotPages` and `unifiedMemory` with their effects.
 
+**D27, 25 Oct: research is a task that cuts the line (user).** Binding. It supersedes D10.7 (research shares), the Background / Shared / Focus modes and idle-time research (spec §11.2, §11.3).
+
+> research should cut in line to be the next item in line
+
+1. **Starting a project** pays its Data (and any Credit fee) as before, and puts the project at the **front of the market queue**. It is the head. The old head drops behind it, and gets a fresh 10 s when it becomes the head again.
+2. **Running it.** Research has no head clock and can't time out or fail on the queue. The next systems with room take it, like any task (slots, one take per slot per tick), each on the threads it has free. It has no payload or transfer, so it starts when taken. It pays no Credits or Data. Its work is the project's work volume, as CPU compute; when that is done, the project completes.
+   - Under D25 it is fine-grain divisible: every system with room takes a share, so a fleet researches faster.
+   - Lost to power, heat or a swap, it keeps its progress and goes back to the queue front.
+3. **One at a time.** Only one project is in line or running.
+4. **The modes are retired.** No research shares, no idle-time research, and GPUs no longer research. Between rounds the market is paused but research still runs: every paused server takes it on all its threads.
+5. **The trade-off is the point.** While research holds a slot, the heads behind it wait: research costs SLA risk during a round and nothing between rounds. Work volumes are re-tuned to about N seconds of the era's typical hardware at unlock (`docs/research.md` §3.2): W1 20 ops (5–10 s at 2–4 Hz) up to W7 3e7. Data costs are unchanged. The D20 opening holds (round 1 without purchases ends at 0:55–1:07).
+6. **Implementation.** `hot.sys.researchThreads` per holder, `G.researchHolders` and `G.researchProject`; the take runs at the start of the route step (`exec/researchTask.ts`). A holder counts one slot and its threads as busy. `SAVE_VERSION` 9, pre-live reset. The feed carries `FeedSnapshot.research: ResearchQueueEntryView | null` beside the task `window`; task entries gain `kind: 'task'`.
+
 ## 16. Shared rules for agents
 
 - **Shared checkout.** Other agents work in the same checkout at the same time. Edit only the files your brief gives you. Never revert someone else's edits. Run no git command that changes state.

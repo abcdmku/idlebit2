@@ -34,7 +34,6 @@ export interface PowerCache {
   compiled: CompiledBuffers | null;
   settings: PhysSettings | null;
   researchOn: boolean;
-  researchMode: string;
   roundPhase: string;
   startTick: number;
   /** Per system: 1 when its last step was a fixed point, so it may be skipped before `due`. */
@@ -126,7 +125,7 @@ function allocCache(c: CompiledBuffers): PowerCache {
   const fill = memberAt.slice(0, nr);
   for (let s = 0; s < n; s += 1) if (member(s)) { const r = c.sys.rack[s]!; memberIds[fill[r]!] = s; fill[r] += 1; }
   return {
-    compiled: null, settings: null, researchOn: false, researchMode: '', roundPhase: '', startTick: -1,
+    compiled: null, settings: null, researchOn: false, roundPhase: '', startTick: -1,
     stable: new Uint8Array(n), due: new Float64Array(n), stampIdle: new Uint8Array(n), stampEmpty: new Uint8Array(n),
     mode: new Uint8Array(n), busy: new Float64Array(n), ram: new Uint16Array(n), io: new Uint16Array(n),
     queueLen: new Uint16Array(n), reserved: new Uint16Array(n), running: new Uint16Array(n), wake: new Int32Array(n),
@@ -154,14 +153,14 @@ export function powerCache(w: World, settings: PhysSettings, researchOn: boolean
     k = allocCache(c);
     caches.set(w.hot, k);
   }
-  if (k.compiled !== c || k.settings !== settings || k.researchOn !== researchOn || k.researchMode !== ''
+  if (k.compiled !== c || k.settings !== settings || k.researchOn !== researchOn
     || k.roundPhase !== w.round.phase || k.startTick !== w.round.startTick) {
     flushStamps(w, k);
     k.stable.fill(0);
     k.rackForce.fill(1);
     k.log = null;
     k.compiled = c; k.settings = settings; k.researchOn = researchOn;
-    k.researchMode = ''; k.roundPhase = w.round.phase; k.startTick = w.round.startTick;
+    k.roundPhase = w.round.phase; k.startTick = w.round.startTick;
   }
   return k;
 }

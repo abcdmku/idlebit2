@@ -13,14 +13,11 @@ import { systemLoad } from './rack';
 export const MAX_LENDERS = 24;
 const R = RES_CLOCKS;
 
-/** Task and lent fractions of one system (spec §11.2). Offline, paused and research-only systems lend everything. */
+/** Task and lent fractions of one system (D27, spec §11.2): the share of its threads holding the research task. */
 function systemShares(state: GameState, s: number): { task: number; lent: number } {
-  const task = systemLoad(state, s);
-  if (state.research.active === null || state.research.stoppedInsolvent) return { task, lent: 0 };
-  const m = state.hot.sys.mode[s];
-  if (m === MODE.offline || m === MODE.paused) return { task: 0, lent: 1 };
-  if (m !== MODE.onMarket && m !== MODE.asleep && m !== MODE.draining) return { task, lent: 0 };
-  return { task, lent: researchShare(state, task) };
+  const lent = researchShare(state, s);
+  const task = state.hot.sys.mode[s] === MODE.paused ? 0 : Math.max(0, systemLoad(state, s) - lent);
+  return { task, lent };
 }
 
 interface Acc { unit: UnitRef; online: boolean; task: number; lent: number; n: number }

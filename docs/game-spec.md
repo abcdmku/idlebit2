@@ -27,7 +27,7 @@ Program D10 (tasks are pulled, never throttled). It supersedes the fixed 2 s cad
 | 22 | **Prefetch.** With a scheduler, the pipe fills free queue slots while cores compute. Without one, the core waits for each transfer. | §6.4, §6.7 |
 | 23 | **One take per slot per tick.** Each slot takes at most one new task per tick. This bounds per-tick work for tiny tasks. | §6.4 |
 | 24 | **Work-weighted SLA.** SLA = (delivered work + G) / (delivered + failed work + G). G is 10 times the largest of the round's five opening tasks. | §4.2 |
-| 25 | **Research shares.** Background reserves 10%, Shared 25%, Focus 100% of compute. Idle time still goes to research. | §11.2 |
+| 25 | **Research is a task that cuts the line (D27).** Starting a project puts it at the queue front; systems with room take it and hold a slot and threads until it completes. No research shares, no idle-time research; between rounds it runs on every paused server. | §11.2 |
 | 26 | **Tick order.** The Arrivals step becomes Market: advance `I` and top up the visible window. Pre-Rack pulls and pipe transfers run inside Execution. The Deadlines step checks the head only. | §14.1 |
 | 27 | **Strategies.** System strategies order the system queue only; the market order is fixed. `mlfq` becomes aging inside the queue. `reserveOnRoute` becomes **queued take**. | §8.1, §7.6 |
 | 28 | **Link catalog scale.** Payload = work makes the A.3 port, uplink, data plane and backbone speeds far too slow from Rack on. A.3 needs a re-base; see its note. | A.3 |
@@ -521,9 +521,9 @@ Stages run in order. At constant rates a stage takes `work / rate`, so a task ta
 
 | Resource | Rate for one task | How it is shared |
 |---|---|---|
-| `compute` | `Σ` rates of its threads × `taskShare` (§11.2). `timeSlice`: `min(want × meanCoreRate, totalCoreRate / running) × taskShare`. | Threads are assigned; not pooled. |
+| `compute` | `Σ` rates of its threads. `timeSlice`: `min(want × meanCoreRate, totalCoreRate / running)`. A D27 research holder's threads are busy (§11.2). | Threads are assigned; not pooled. |
 | `mem` (D26.2) | Split at start into up to three parts by the shard's placement fractions `f_c = c/ws`, `f_r = r/ws`, `f_d = d/ws`, run in that order: the cache part costs no time; the RAM part runs at RAM bandwidth (a shard whose threads span more than one CPU gets at most `0.5 ×`, `socketSpanPenalty`); the disk part runs at disk IO. | Cache: none. RAM: pool. Disk: pool among holders. |
-| `gpu` | Its lifetime domain's ordinary or tensor rate × `taskShare / n`, where `n` counts all active ordinary and tensor tasks on that domain. | Fair sharing per domain, updated at stage events |
+| `gpu` | Its lifetime domain's ordinary or tensor rate × `1 / n`, where `n` counts all active ordinary and tensor tasks on that domain. | Fair sharing per domain, updated at stage events |
 | disk part of `mem` | Disk IO (`Σ` drives). At most `ioConcurrency` shards hold the drives at once (program D1.2); a shard takes a hold when it enters its disk part and one is free, oldest first, and keeps it until that part ends. A storage-node part also crosses both server links (§6.10). | Pool among holders |
 
 **Spill formula** (D26.2). A `mem` stage of `M` bits touched takes `M × f_r / ramRate + M × f_d / diskRate` at constant rates; with `ws = 0` it costs nothing. So per stage: `time = compute / rate + Σ_tier (bits touched in the tier / tier rate)`, with the cache rate taken as infinite: cache serves at core speed, inside the compute time. The fractions are frozen at start, so the parts are ordinary stages on the existing RAM and IO clocks: deterministic and delta-invariant. With `hotPages`, the disk part touches `M × f_d²` bits and the RAM part `M × (f_r + f_d − f_d²)` (to cache when there is no RAM).
@@ -1094,36 +1094,26 @@ Each rack and zone has a crash timer `tHot`, in seconds:
 - `docs/research.md` lists projects. Each has a **Data cost** (whole Data), a `work` volume in compute ops, prerequisites, and effects (Appendix C). The research plate shows Data, work and any exact Credit fee. GPU generation 1 costs 0 Credits; generations 2 through 9 charge `16 * B(g)` Credits once at actual start, in addition to Data and running energy. Other nodes retain their existing fees. The accepted GPU ruling supersedes D3 only for these explicit fees.
 - **Costs are paid when a project actually starts.** Require both Data and any `creditCost`, then debit them atomically once. Switching and resuming preserve progress and paid status and charge neither again. Cancellation refunds neither currency. Nothing else costs Data.
 - One project is active. With the `researchQueue` ceiling the player may queue more, up to that many in total. Queuing reserves and debits neither currency. When the active project completes, the next queued project starts in the same tick only if both balances cover its costs. Otherwise it waits at the head with the missing Data/Credit reason and starts at the first eligible research step.
-- Progress is float64 ops. Excess work carries into the next queued project.
+- Progress is float64 ops. It is kept across losses, rounds, switching and cancellation.
 - Completion is checked at the research step (§14). Effects apply from the next tick.
-- Any compute counts: core ops and GPU/NPU ops alike.
+- Research work is CPU compute only (D27). GPUs and NPUs do not research.
 
-### 11.2 During a round
+### 11.2 Research is a task that cuts the line (D27)
 
-The player picks a mode. It applies to systems that are `onMarket`, `boot` or `goingOffline`. Under D10 the queue never runs dry, so cores are rarely idle. Every mode therefore reserves a share (program D10.7):
+Starting a project, or the next queued project starting, puts the **research task** at the front of the market queue.
 
-| Mode | `taskShare` | Research gets |
-|---|---|---|
-| Background | 0.90 **(s)** | 10% of every core's and GPU's rate, plus idle time and unused budget |
-| Shared | 0.75 **(s)** | 25% of every core's and GPU's rate, plus idle time and unused budget |
-| Focus | 0 | all of every core and GPU. Tasks are still taken and admitted but make no compute or GPU progress, so heads time out. |
+- **In line.** It is the head. It has no clock, and it can't time out, be dismissed or fail on the queue. Nothing behind it is taken while it waits, and the first task behind it has no clock either. Auto-skip leaves the line alone.
+- **Taken.** At the route step (§14, step 4), before routing, every system with room takes it: a free slot by the usual rule (§6.4, one take per slot per tick) and at least one free hardware thread. Each holder keeps **one slot and the threads that were free when it took it** (a fine-grain divisible task, D25) until the project completes. It has no payload and no transfer, and it pays no Credits or Data. When it is taken, the next task becomes the head with a fresh 10 s.
+- **Running.** A holder researches at `threadRate × clockFactor × η_cfg × threads held`, times its rack's e(T). Its threads count as busy for tasks and for power (§9.1), and a holder never sleeps.
+- **Lost.** A holder that leaves `onMarket` or `paused` (dark, crashed, cold, offline, draining) lets go. When no holder is left, the task is back at the queue front with its progress kept.
+- **Done.** When the project completes, every holder lets go, and the next queued project, if any and paid, enters the line.
+- **One at a time.** Only one project is in line or running.
 
-Idle time still exists. A pipe-bound system waits for transfers, and a blocked head stops all taking. That idle time goes to research in every mode. So a system whose pipe is slower than its cores researches nearly for free.
-
-Research ops for one system in a tick:
-
-```text
-ops = Σ cores [(1 − taskShare) × coreRate × dt + idleTime × coreRate]
-    + Σ devices [(1 − taskShare) × deviceRate × dt + unusedBudget]
-```
-
-GPU device rates for research use ordinary rates; legacy NPU research uses its own tensor rate. Accelerator work and per-card duty integrate over GPU stage events, under `gpu-runtime.md`, without double-counting linked cards. The CPU term above retains its existing semantics. A booting system has no tasks, so its CPU time is idle. Accelerator research requires the existing `DRAW_FULL` state; boot is idle-only and does no accelerator research. Dark, crashed, cold and asleep systems do no accelerator research. Research time counts as busy for power (§9.1). An `asleep` system does no research.
-
-**Offline systems** (`mode = offline`) run research at full speed in every mode: `ops = (Σ coreRate + Σ deviceRate) × dt`. With no active project they are powered down.
+The trade-off is the point. Research during a round holds slots and threads, and the tasks behind it wait, so it costs SLA. The research modes (Background, Shared, Focus) and idle-time research are retired.
 
 ### 11.3 Between rounds
 
-In `ended` and `between`, if a project is active and not stopped, every system that is not `dark`, `crashed` or `cold` runs it at full speed, switched online or offline. Its infrastructure is powered (§9.1), heat and overload rules apply, and the energy is billed. With no running project, all hardware is `paused` and draws nothing.
+The market is paused, but research still runs. If a project is active and not stopped, every server in `paused` mode with a link takes it on all its threads, and holders spread over any threads that free up. Their infrastructure is powered (§9.1), heat and overload rules apply, and the energy is billed. Systems that are offline, or hold no research, draw nothing. At Return to market the holders keep their slot and threads, and tasks take the rest.
 
 ### 11.4 Insolvency
 
@@ -1654,7 +1644,6 @@ const upgradePrice = (r: PartRow, g: number, L: number, lanes = 1) =>
 | `gatherShare`, `gatherWaitSeconds` | 0.5, 10 (§7.6) |
 | `checkpointWindowSeconds` | 10 (§7.8) |
 | `dataRatio` | 10 to 100 Credits per Data, per family (`docs/tasks.md`) |
-| `researchFraction` Background / Shared / Focus | 0.10 / 0.25 / 1.00 **(s)** (D10.7) |
 | `smtShare` | 0.6 |
 | `socketSpanRamFactor` | 0.5 |
 | `cStates` (factor / after / wake) | C1 0.5 / 0 / 0; C3 0.15 / 1 / 0.2; C6 0.02 / 1 / 1 s |

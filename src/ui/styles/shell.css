@@ -144,8 +144,6 @@ b, .b { font-weight: 700; }
 
 /* the research sheet: relevant projects only, priority as one compact choice */
 .research-sheet { --fill: #181232; --rim: #ff6bd6; }
-.skey.prio { --face: #29234b; --hi: #5d5296; --lo: #15122a; color: var(--muted); }
-.skey.prio.on { --face: #7a2a6e; --hi: #ff6bd6; --lo: #4a244d; color: var(--paper); }
 .link { position: absolute; color: var(--muted); text-align: center !important; text-decoration: underline; }
 
 /* the callout's leader to its part (A07) and the one-beat flash of a bought "x → y" (A10) */

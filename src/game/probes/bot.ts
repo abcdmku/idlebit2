@@ -444,7 +444,7 @@ export function decide(state: GameState, policy: Policy, log: BotEvent[]): GameS
   if (policy.buys) s = buyParts(s, policy, log);
   // D27: research holds threads and the market waits behind it, so a player lets a short project
   // finish between rounds before returning.
-  if (s.round.phase !== 'running' && !(s.research.active !== null && researchLeftS(s) <= RESEARCH_WAIT_S)) {
+  if (s.round.phase !== 'running' && !(s.research.active !== null && !s.research.stoppedInsolvent && researchLeftS(s) <= RESEARCH_WAIT_S)) {
     const next = tryAction(s, { type: 'returnToMarket' });
     if (next) {
       log.push({ tick: s.clock.tick, kind: 'return', label: `round ${next.round.index}`, cost: '0' });

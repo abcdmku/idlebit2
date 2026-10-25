@@ -42,7 +42,6 @@ function seeded(linkResearch = false): GameState {
   if (linkResearch) {
     w.research.active = researchDef('gpuLink')!.id;
     w.research.activeProgress = researchDef('gpuLink')!.work - 1;
-    w.research.mode = 'shared';
   }
   return commitWorld(initial, w, 0);
 }

@@ -88,7 +88,7 @@ describe('tray effects (R42)', () => {
     const chip = quote(boot, { kind: 'tray', at: { level: 'chip', id } }).quotes;
     expect(chip[0]!.effect).toMatchObject({ capacityBefore: 1, capacityAfter: 2, unit: 'slots' });
     expect(chip[2]!.action.type).toBe('upgradePart');
-    expect(chip[2]!.effect).toMatchObject({ capacityBefore: 1, capacityAfter: 2, unit: 'Hz' });
+    expect(chip[2]!.effect).toMatchObject({ capacityBefore: 1, capacityAfter: 1.5, unit: 'Hz' });
     const system = quote(boot, { kind: 'tray', at: { level: 'system', id } }).quotes;
     expect(system[0]!.effect).toMatchObject({ capacityBefore: 1, capacityAfter: 2, unit: 'slots' });
     expect(system[1]!.effect).toMatchObject({ capacityBefore: 0, capacityAfter: 1, unit: 'slots' });

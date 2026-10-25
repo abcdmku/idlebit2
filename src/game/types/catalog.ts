@@ -42,7 +42,8 @@ export const PART_IDS = [
   'dataPlane', 'grid', 'zone', 'site', 'backbone', 'globalScheduler', 'rack', 'acceleratorBoard',
 ] as const;
 export type PartId = (typeof PART_IDS)[number];
-export type Curve = 'flow' | 'core' | 'linear' | 'fixed';
+/** `step`: the CSV progression for clocks and RAM (hardware-progression.md): ×1.5 per level, 36 levels, prices ×1.7. */
+export type Curve = 'flow' | 'core' | 'linear' | 'fixed' | 'step';
 export type CoolTech = 'air' | 'water' | 'closedLoop';
 export type PartScope = 'chip' | 'system' | 'rack' | 'room' | 'site' | 'global';
 

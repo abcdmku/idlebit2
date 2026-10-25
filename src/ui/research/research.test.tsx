@@ -19,7 +19,7 @@ const node = (id: string, state: ResearchNodeView['state'], over: Partial<Resear
   id: researchId(id), name: id, category: 'compute', state, progress: 0, dataCost: '150000' as Amount, workOps: 3e6, requires: [], lockedBy: null,
   level: 'system', era: 'khz', tier: 6, needsData: false, effect: '', summary: '', answers: [], ...over });
 const tree = (nodes: ResearchNodeView[], over: Partial<ResearchTreeView> = {}): ResearchTreeView => ({
-  nodes, active: null, mode: 'shared', opsPerSec: 6400, queue: [], queueSlots: 0, horizon: 'system', lenders: [], creditsPerMinute: '9960' as Amount, ...over });
+  nodes, active: null, opsPerSec: 6400, holdOpsPerSec: 6400, queue: [], queueSlots: 0, horizon: 'system', lenders: [], creditsPerMinute: '9960' as Amount, ...over });
 
 describe('relevant research (D17 review)', () => {
   it('shows at most three: the opened one, work in progress, cheapest available, then the next unlock', () => {
@@ -84,14 +84,14 @@ describe('research drawer', () => {
     expect(acts).toEqual([{ type: 'startResearch', project: 'systemBoard' }]);
   });
 
-  it('priority during a round; the whole-Credit energy cost between rounds', () => {
-    const t = tree([node('a', 'active', { progress: 0.4 })], { active: researchId('a') });
-    m.render(<ResearchList tree={t} phase="running" focusProject={null} onAction={(a) => acts.push(a)} onClose={() => undefined} />);
-    expect(m.host.querySelector('[aria-checked="true"]')?.textContent).toBe('Shared 25%');
-    click(button(m.host, 'Focus 100%'));
-    expect(acts).toEqual([{ type: 'setResearchPriority', mode: 'focus' }]);
+  it('no priority to pick (D27): a started project goes next in line; the Start key estimates its hold', () => {
+    const t = tree([node('a', 'available')]);
+    m.render(<ResearchList tree={t} phase="running" focusProject={null} hold={250_000} onAction={(a) => acts.push(a)} onClose={() => undefined} />);
+    expect(m.host.querySelector('[role=radio]')).toBeNull();
+    expect(m.host.querySelector('.rl-energy')?.textContent).toBe('Goes next in line; tasks wait while it runs');
+    expect(m.host.querySelector('.rl-hold')?.textContent).toBe('~12 s');
     m.render(<ResearchList tree={t} phase="between" focusProject={null} onAction={(a) => acts.push(a)} onClose={() => undefined} />);
-    expect(m.host.querySelector('.rl-energy')?.textContent).toBe('Full speed between rounds−9,960/min');
+    expect(m.host.querySelector('.rl-energy')?.textContent).toBe('Goes next in line; tasks wait while it runs−9,960/min');
   });
 
   it('keys follow state: queue only with free queue slots, Data shortfall disables', () => {

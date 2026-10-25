@@ -5,6 +5,11 @@ import type { ResearchId } from '../../types/ids';
 export type WattsRule =
   /** Rate parts (§9.1): draw follows the rated rate; pushing past native costs push^0.3 more per unit. */
   | { readonly kind: 'rate'; readonly wPerUnit: number }
+  /**
+   * CPU cores and RAM (hardware-progression.md §3): energy ratio E = nativeRatio / push^a, a = −ln(decay) / ln 1.5,
+   * per energy era; full-use W = rate / (0.010 × E), idle at most 10% of it. `era[g]` maps a generation to its era.
+   */
+  | { readonly kind: 'ratio'; readonly era: readonly number[] }
   /** Non-rate parts: idle[g] × x^0.25, no load. */
   | { readonly kind: 'idle'; readonly idle: readonly number[] }
   | { readonly kind: 'cooler'; readonly wpw: readonly number[] }
@@ -15,6 +20,8 @@ export interface CatalogRow {
   readonly curve: Curve; readonly levelMax?: number;
   /** Primary capacity per generation at L1; base2 the secondary (RAM bandwidth, VRAM, IO, scheduler Q). */
   readonly base: readonly number[]; readonly base2?: readonly number[];
+  /** Primary capacity factor per level (index L − 1) instead of the curve's (RAM, hardware-progression.md §4). */
+  readonly capacityTable?: readonly number[];
   readonly watts: WattsRule;
   /** Whole Credits per generation. */
   readonly price: readonly number[]; readonly upgrade: readonly number[];

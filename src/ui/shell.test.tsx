@@ -148,7 +148,7 @@ describe('deck', () => {
     expect(keys.map(rectOf)).toEqual(before);
     mounted.unmount();
     mounted = deck(store);
-    expect(text('[data-testid=research-key]')).toBe('Research · kHz fab 1.2k ops/s · 2 queued50%');
+    expect(text('[data-testid=research-key]')).toBe('Research · kHz fab running · 1.2k ops/s · 2 queued50%');
   });
   it('the Buy key says how far off the next buy is', () => {
     const store = fakeStore();
@@ -161,7 +161,7 @@ describe('deck', () => {
     const rows = [...mounted.host.querySelectorAll<HTMLElement>('[data-row]')];
     expect(rows.map(r => r.dataset.row)).toEqual(['core', 'cache', 'clock', 'scheduler', 'link']);
     expect(rows[4]!.textContent).toContain('At the Rack switch');
-    expect(rows[2]!.textContent).toMatch(/1 → 2 Hz/);
+    expect(rows[2]!.textContent).toMatch(/1 → [0-9.]+ Hz/);
     expect(rows[1]!.textContent).toMatch(/1 → 2 b/);
   });
   it('phone: the head card spans the width above Build · Research · Buy; Build opens a sheet', () => {
@@ -191,7 +191,7 @@ describe('upgrade callout (D15.4)', () => {
     act(() => mounted!.shell.view.dispatch({ type: 'select', target: target() }));
     const c = $('[data-testid=callout]')!;
     expect(c.textContent).toContain('Clock');
-    expect(c.textContent).toMatch(/1 → 2 Hz/);
+    expect(c.textContent).toMatch(/1 → [0-9.]+ Hz/);
     // docked in the right gutter, level with the part, with a leader to it (A07)
     expect([c.style.left, c.style.top, c.style.width, c.style.height]).toEqual(['1104px', '304px', '288px', '144px']);
     expect($('.leader')!.style.left).toBe('696px');
@@ -270,5 +270,31 @@ describe('round plate with no detail pairs (D26)', () => {
     expect(text('[data-testid=rp-spill]')).toBe('From disk: 74% of work · RAM 4%');
     // no RAM row at the CPU level: the next answer to slowness is the clock
     expect(text('[data-testid=rp-fix]')).toMatch(/Clock/);
+  });
+});
+
+describe('research cuts the line (D27)', () => {
+  const research = (running: boolean) => ({ kind: 'research' as const, key: -3, project: 'pipelining' as never, name: 'Pipelining', work: 3000,
+    progress: running ? 0.42 : 0, running, holders: running ? 1 : 0, threads: running ? 1 : 0, opsPerSec: running ? 1200 : 0 });
+  it('waiting at the front: the strip and the head card show it, with no clock and no Dismiss; the market waits behind', () => {
+    const store = fakeStore();
+    store.set({ feed: { research: research(false), headDeadlineTick: null } });
+    mounted = mount(<><QueueStrip /><OffersScope><Deck /></OffersScope></>, store, DESKTOP);
+    expect(text('[data-testid=research-head]')).toBe('Pipelining next');
+    expect(text('[data-testid=now]')).toContain('Pipelining 3k ops');
+    const cards = [...mounted.host.querySelectorAll<HTMLElement>('.slot .tag')];
+    expect(cards[0]!.dataset.task).toBe('1:1:1');
+    expect(cards[0]!.textContent).toContain('waiting');
+    expect(text('[data-testid=now]')).toContain('Next in line · runs on free threads');
+    expect($('[data-testid=dismiss]')).toBeNull();
+    expect(text('[data-testid=research-key]')).toContain('next in line');
+  });
+  it('once taken it leaves the strip; the tile shows it running', () => {
+    const store = fakeStore();
+    store.set({ feed: { research: research(true) } });
+    mounted = mount(<><QueueStrip /><OffersScope><Deck /></OffersScope></>, store, DESKTOP);
+    expect($('[data-testid=research-head]')).toBeNull();
+    expect($('.head-slot .tag')!.dataset.task).toBe('1:1:1');
+    expect(text('[data-testid=research-key]')).toBe('Research · Pipelining running · 1.2k ops/s42%');
   });
 });

@@ -1,1 +1,1 @@
-export { ResearchDrawer, ResearchList, projectKey, CATEGORY_NAMES, PRIORITY, PRIORITY_ORDER } from './ResearchDrawer';
+export { ResearchDrawer, ResearchList, projectKey, CATEGORY_NAMES, NEXT_IN_LINE_NOTE } from './ResearchDrawer';

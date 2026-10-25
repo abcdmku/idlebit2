@@ -14,11 +14,13 @@ export const CPU: CatalogRow = {
 /** Rate part: rate = lanes × socket clock; native = base lanes × CLOCK.base[g]. */
 export const CORE: CatalogRow = {
   id: 'core', scope: 'chip', names: TIERS.map((t) => `${t} core`), gates: FAB, curve: 'core',
-  base: [1, 2, 4, 8], watts: { kind: 'rate', wPerUnit: 1 },
+  // hardware-progression.md §3: the core generation owns the energy ratio.
+  base: [1, 2, 4, 8], watts: { kind: 'ratio', era: [0, 1, 2, 3] },
   price: [6000, 1.25e5, 4.3e8, 1.9e11], upgrade: [10, 1.2e5, 1.5e9, 7.7e12],
 };
 export const CLOCK: CatalogRow = {
-  id: 'clock', scope: 'chip', names: TIERS.map((t) => `${t} oscillator`), gates: FAB, curve: 'flow',
+  // hardware-progression.md §2: ×1.5 per level, 36 levels; §5: upgrades ×1.7 per level × lanes.
+  id: 'clock', scope: 'chip', names: TIERS.map((t) => `${t} oscillator`), gates: FAB, curve: 'step',
   base: [1, 1e3, 1e6, 1e9], watts: idle(), price: [20, 2e5, 8.6e8, 3.7e11], upgrade: [3, 1.5e4, 9e7, 2.4e11], upgradeDrive: 'lanes',
 };
 export const L1: CatalogRow = {

@@ -41,9 +41,10 @@ describe('selectors', () => {
     expect(locked.lockedBy).not.toBeNull();
 
     const root = roots[0]!;
-    const active = selectResearchTree({ ...base, research: { ...base.research, active: root.id, activeProgress: root.workOps / 4, mode: 'focus' } });
+    const active = selectResearchTree({ ...base, research: { ...base.research, active: root.id, activeProgress: root.workOps / 4 } });
     expect(active.nodes.find((n) => n.id === root.id)).toMatchObject({ state: 'active', progress: 0.25 });
-    expect(active.lenders[0]!.lent).toBeGreaterThan(0);
+    // D27: a started project waits at the queue front until a system takes it; nothing is lent yet.
+    expect(active.lenders[0]!.lent).toBe(0);
     const done = selectResearchTree({ ...base, research: { ...base.research, completed: [researchId(root.id)] } });
     expect(done.nodes.find((n) => n.id === root.id)?.state).toBe('done');
   });

@@ -88,6 +88,4 @@ export const researchHandlers: HandlerMap = {
     if (!solvent(state)) return reject(state, 'funds', 'Credits are negative');
     return accept(withResearch(state, { stoppedInsolvent: false }));
   },
-
-  setResearchPriority: (state, action) => accept(withResearch(state, { mode: action.mode })),
 };

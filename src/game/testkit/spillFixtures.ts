@@ -18,7 +18,8 @@ const lvl = (gen: number, level: number): PartLevel => ({ gen, level });
 const router = (queueLevel: number): RouterBuild => ({ ...baseRouter(1), level: 3, filters: ['capability'], queueLevel });
 const rack = (ports: number, port: number, uplink: number, queue: number) => (r: RackBuild): RackBuild => ({
   ...r,
-  cooler: { gen: 1, level: 8, setpointF: 70 }, pdu: { gen: 1, level: 8, capped: false }, lb: router(queue),
+  // Rear-door water: native MHz servers under the CSV energy ratio put out several GW.
+  cooler: { gen: 2, level: 1, setpointF: 70 }, pdu: { gen: 1, level: 8, capped: false }, lb: router(queue),
   switch: { gen: 0, ports: Array(ports).fill(port), uplinks: [uplink], sameSpeed: true },
 });
 
@@ -41,7 +42,7 @@ const SMALL_RAM: SystemSpec = {
 const SPILL_INTENSITY = 17.5;
 
 /**
- * ECC servers with DDR2 (256 kbit/s a stick at L4): even slots hold 16 Mbit of RAM and no drive; odd slots
+ * ECC servers with DDR2 (162 kbit/s a stick at L5): even slots hold 16 Mbit of RAM and no drive; odd slots
  * 4 Mbit and an SSD at 1/16 of RAM speed. Rack-scale tasks (about 8M units at I 27) split over the rack;
  * the small-RAM shards overflow onto their SSDs. Every server holds a shard of an 8-way split, so a
  * capability-filtered split never waits on a box it can't use.
@@ -51,10 +52,11 @@ const ECC_SPEC: SystemSpec = {
   cpu: { cpu: lvl(2, 1), cores: Array.from({ length: 4 }, () => lvl(2, 1)), clock: lvl(2, 1), l1: lvl(2, 1), l2: null, l3: null },
   cpuCount: 1,
   scheduler: { gen: 2, level: 4, strategy: 'fifo' },
-  ram: [{ gen: 2, level: 4, ecc: true }, { gen: 2, level: 4, ecc: true }],
+  ram: [{ gen: 2, level: 5, ecc: true }, { gen: 2, level: 5, ecc: true }],
   accels: [],
   drives: [],
-  psu: { gen: 3, level: 8, capped: false },
+  // Four native MHz cores draw about 5.3e8 W under the CSV energy ratio (hardware-progression.md §3).
+  psu: { gen: 3, level: 11, capped: false },
   settings: { dvfs: false, turbo: false, cStateLimit: 0 },
 };
 const ECC_DRIVE: SystemSpec = { ...ECC_SPEC, ram: [{ gen: 2, level: 2, ecc: true }, { gen: 2, level: 2, ecc: true }], drives: [lvl(1, 4)] };

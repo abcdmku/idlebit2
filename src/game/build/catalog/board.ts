@@ -4,12 +4,19 @@ import type { CatalogRow } from './types';
 /** Board parts (spec Appendix A.1, post-D5). */
 const UP = [12, 1.2e5, 1.5e9, 7.7e12];
 
-/** base = bits, base2 = bandwidth bit/s (the rated rate). */
+/** RAM capacity factor per level (hardware-progression.md §4, the source sheet's capacity column). */
+export const RAM_CAPACITY_FACTOR: readonly number[] = [1, 2, 4, 6, 8, 12, 16, 20, 24, 28, 32, 40, 48, 56, 64, 80, 96, 112,
+  128, 160, 192, 224, 256, 320, 384, 448, 512, 640, 768, 896, 1024, 1280, 1536, 1792, 2048, 3072];
+
+/**
+ * base = bits, base2 = bandwidth bit/s (the rated rate). The CSV progression (hardware-progression.md §4):
+ * 36 levels, capacity by RAM_CAPACITY_FACTOR, bandwidth ×1.5 and price ×1.7 per level, energy ratio by era.
+ */
 export const RAM: CatalogRow = {
   id: 'ram', scope: 'system', names: ['SDRAM', 'DDR', 'DDR2', 'DDR3', 'DDR4', 'DDR5'],
-  gates: [r('memController'), r('ddr'), r('ddr2'), r('ddr3'), r('ddr4'), r('ddr5')], curve: 'flow',
+  gates: [r('memController'), r('ddr'), r('ddr2'), r('ddr3'), r('ddr4'), r('ddr5')], curve: 'step',
   base: [64, 128, 2 ** 20, 2 ** 30, 2 ** 32, 2 ** 38], base2: [16, 32, 3.2e4, 6.4e7, 2.56e8, 1.28e11],
-  watts: { kind: 'rate', wPerUnit: 0.5 },
+  capacityTable: RAM_CAPACITY_FACTOR, watts: { kind: 'ratio', era: [0, 0, 1, 2, 2, 3] },
   price: [3e5, 4.5e5, 5e6, 3e10, 5e10, 5e13], upgrade: [12, 12, 1.2e5, 1.5e9, 1.5e9, 7.7e12],
 };
 /** GPU metadata for generation adapters. Model evaluation owns specs and prices. */

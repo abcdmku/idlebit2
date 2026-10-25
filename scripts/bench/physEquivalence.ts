@@ -24,8 +24,8 @@ const arg = (key: string) => process.argv.find(a => a.startsWith(`--${key}=`))?.
 const FRAME_MS = Number(arg('frame') ?? 50);
 
 interface Fixture { ticks: number; every: number; make(): GameState }
-const researching = (s: GameState, mode: 'background' | 'shared'): GameState =>
-  ({ ...s, research: { ...s.research, active: s.research.completed[0]!, mode } });
+const researching = (s: GameState, _mode?: string): GameState =>
+  ({ ...s, research: { ...s.research, active: s.research.completed[0]! } });
 const FIXTURES: Record<string, Fixture> = {
   boot: { ticks: 6_000, every: 1_000, make: FLEETS.boot },
   rackFull: { ticks: 6_000, every: 1_000, make: FLEETS.rackFull },
@@ -39,7 +39,7 @@ const FIXTURES: Record<string, Fixture> = {
   /** A project completes within the first ticks: compiled buffers are replaced inside an advance call. */
   bootResearch: { ticks: 3_000, every: 500, make: () => {
     const s = FLEETS.boot(), def = RESEARCH.find((r) => !s.research.completed.includes(r.id))!;
-    return { ...s, research: { ...s.research, active: def.id, mode: 'focus', activeProgress: def.work * 0.99999, queue: [] } };
+    return { ...s, research: { ...s.research, active: def.id, activeProgress: def.work * 0.99999, queue: [] } };
   } },
   /** fleetMax at the architecture's I = 34 (many takes, long QoS FIFOs, gangs); built fresh per run. */
   fleetMax34: { ticks: 1_000, every: 250, make: () => advanceGameOwned(primeMarket(provisionInfrastructure(buildState(MAX_FLEET)), 34), FLEET_WARMUP_TICKS * TICK_MS).state },

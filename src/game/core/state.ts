@@ -27,7 +27,7 @@ export function baseUnlocks(): Unlocks {
 
 export function baseResearch(unlocks: Unlocks = baseUnlocks()): ResearchState {
   return {
-    completed: [], active: null, activeProgress: 0, parked: {}, queue: [], mode: 'background',
+    completed: [], active: null, activeProgress: 0, parked: {}, queue: [],
     stoppedInsolvent: false, needsData: false, unlocks,
   };
 }

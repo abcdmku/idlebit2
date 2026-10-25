@@ -16,15 +16,20 @@ export const ECC_PRICE_FACTOR = 1.25;
 /** Rate parts idle at this share of their native rated draw (§9.1). */
 export const IDLE_SHARE = 0.1;
 
+/** The CSV progression (hardware-progression.md §2, §5): ×1.5 rate per level, ×1.7 price per level, 36 levels. */
+export const STEP_RATE = 1.5;
+export const STEP_LEVEL_MAX = 36;
+
 export const levelFactor = (curve: Curve, level: number): number =>
-  curve === 'flow' ? 2 ** (level - 1) : curve === 'fixed' ? 1 : level;
+  curve === 'flow' ? 2 ** (level - 1) : curve === 'step' ? STEP_RATE ** (level - 1) : curve === 'fixed' ? 1 : level;
 
 /** Highest level of generation g (spec §12.1, A.5), plus a research bonus (rdimm, stacked3d). */
 export const levelMax = (row: CatalogRow, g: number, bonus = 0): number =>
-  (row.levelMax ?? (row.curve === 'flow' ? 11 + g : row.curve === 'core' ? 8 + 2 * g : row.curve === 'linear' ? 8 + g : 1)) + bonus;
+  (row.levelMax ?? (row.curve === 'step' ? STEP_LEVEL_MAX : row.curve === 'flow' ? 11 + g : row.curve === 'core' ? 8 + 2 * g : row.curve === 'linear' ? 8 + g : 1)) + bonus;
 
 /** Primary capacity at (g, L): base[g] × x. */
-export const capacity = (row: CatalogRow, g: number, level: number): number => row.base[g]! * levelFactor(row.curve, level);
+export const capacity = (row: CatalogRow, g: number, level: number): number =>
+  row.base[g]! * (row.capacityTable ? row.capacityTable[Math.min(row.capacityTable.length, Math.max(1, level)) - 1]! : levelFactor(row.curve, level));
 /** Secondary capacity (RAM bandwidth, VRAM, IO rate, scheduler Q) scales by the same x. */
 export const capacity2 = (row: CatalogRow, g: number, level: number): number => (row.base2?.[g] ?? 0) * levelFactor(row.curve, level);
 
@@ -42,11 +47,36 @@ export function rateWatts(wPerUnit: number, native: number, rate: number): Watts
   return { idle: IDLE_SHARE * wPerUnit * native * push ** 0.25, load: wPerUnit * rate * push ** 0.3 };
 }
 
+/** Energy eras (hardware-progression.md §3): native ratio and per-level retention, Hz, kHz, MHz, GHz. */
+export const NATIVE_RATIO: readonly number[] = [10, 6, 3, 2];
+export const RATIO_DECAY: readonly number[] = [0.92, 0.93, 0.95, 0.9625];
+/** The fixed normalization price of the energy ratio, Credits per joule. */
+export const RATIO_REFERENCE_PRICE = 0.01;
+
+/** Energy ratio E of a part running at `rate` against its native rate, in energy era `era`. */
+export function energyRatio(era: number, native: number, rate: number): number {
+  const push = Math.max(1, rate / native);
+  return NATIVE_RATIO[era]! / push ** (-Math.log(RATIO_DECAY[era]!) / Math.log(STEP_RATE));
+}
+
+/** hardware-progression.md §3: full-use W = rate / (0.010 × E); idle = 0.1 × min(native full W × push^0.25, full W). */
+export function ratioWatts(era: number, native: number, rate: number): Watts {
+  if (!(native > 0) || !(rate > 0)) return NONE;
+  const push = Math.max(1, rate / native);
+  const fullW = rate / (RATIO_REFERENCE_PRICE * energyRatio(era, native, rate));
+  const idle = IDLE_SHARE * Math.min((native / (RATIO_REFERENCE_PRICE * NATIVE_RATIO[era]!)) * push ** 0.25, fullW);
+  return { idle, load: fullW - idle };
+}
+
 /** Idle and full-use load watts of one part at (g, L). Cores pass their own rate (lanes × clock) and native. */
 export function partWatts(row: CatalogRow, g: number, level: number, rate?: { rate: number; native: number }): Watts {
   const w = row.watts;
   const x = levelFactor(row.curve, level);
   switch (w.kind) {
+    case 'ratio': {
+      const era = w.era[g] ?? 0;
+      return rate ? ratioWatts(era, rate.native, rate.rate) : ratioWatts(era, ratedRate(row, g, 1), ratedRate(row, g, level));
+    }
     case 'idle': return { idle: (w.idle[g] ?? 0) * x ** 0.25, load: 0 };
     case 'cooler': {
       const qc = row.base[g]! * (w.wpw[g] ?? 0);
@@ -69,8 +99,18 @@ export const ceilCredits = (value: number): bigint => {
 
 export const installPrice = (row: CatalogRow, g: number): bigint => ceilCredits(row.price[g] ?? 0);
 /** Price of L → L + 1 within generation g. `lanes` = lanes driven, for a clock (spec §12.3). */
-export const upgradePrice = (row: CatalogRow, g: number, level: number, lanes = 1): bigint =>
-  ceilCredits((row.upgrade[g] ?? 0) * levelFactor(row.curve, level) ** LEVEL_PRICE_EXP * (row.upgradeDrive === 'lanes' ? lanes : 1));
+export const upgradePrice = (row: CatalogRow, g: number, level: number, lanes = 1): bigint => {
+  const drive = row.upgradeDrive === 'lanes' ? lanes : 1;
+  if (row.curve === 'step') return stepPrice(row.upgrade[g] ?? 0, level, drive);
+  return ceilCredits((row.upgrade[g] ?? 0) * levelFactor(row.curve, level) ** LEVEL_PRICE_EXP * drive);
+};
+/** CSV step price, exact (hardware-progression.md §5): ceil(base × 1.7^(L − 1) × drive), in whole Credits. */
+function stepPrice(base: number, level: number, drive: number): bigint {
+  if (!(base > 0) || !(drive > 0)) return 0n;
+  const p = BigInt(Math.max(0, level - 1)), den = 10n ** p;
+  const num = BigInt(Math.round(base)) * 17n ** p * BigInt(Math.round(drive));
+  return (num + den - 1n) / den;
+}
 /** Sum of upgrades from `from` to `to`. */
 export const upgradesBetween = (row: CatalogRow, g: number, from: number, to: number, lanes = 1): bigint => {
   let total = 0n;

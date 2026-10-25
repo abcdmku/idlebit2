@@ -110,7 +110,6 @@ export interface MarketState {
   readonly intensity: number;
 }
 
-export type ResearchMode = 'background' | 'shared' | 'focus';
 export interface ResearchState {
   readonly completed: readonly ResearchId[];
   readonly active: ResearchId | null;
@@ -119,7 +118,6 @@ export interface ResearchState {
   /** Projects started (Data paid) and then switched away from, with their progress. */
   readonly parked: Readonly<Record<string, number>>;
   readonly queue: readonly ResearchId[];
-  readonly mode: ResearchMode;
   readonly stoppedInsolvent: boolean;
   /** Queue head waits for Data. */
   readonly needsData: boolean;

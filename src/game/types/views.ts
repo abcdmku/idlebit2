@@ -2,7 +2,7 @@ import type { Amount } from '../amount';
 import type { CoolTech, Era, FilterId, MemTier, RegionId, ResearchCategory, Resource, RouteStrategyId, WorkTier } from './catalog';
 import type { FailCause, FailDetail, SupplyKind } from './events';
 import type { FamilyId, LevelId, NodeRef, RackId, ResearchId, RoomId, SiteId, SystemId, UnitKind, UnitRef } from './ids';
-import type { ResearchMode, TaskRef } from './state';
+import type { TaskRef } from './state';
 import type { GpuStats } from './gpu';
 
 /** D23. Kept structurally identical to the renderer's TaskType. */
@@ -416,8 +416,12 @@ export interface LenderView {
 export interface ResearchTreeView {
   readonly nodes: readonly ResearchNodeView[];
   readonly active: ResearchId | null;
-  readonly mode: ResearchMode;
   readonly opsPerSec: number;
+  /**
+   * D27: research ops/s a project would get if taken now: the free threads of the systems with room
+   * during a round, or every paused server's threads between rounds. While a project runs, its current rate.
+   */
+  readonly holdOpsPerSec: number;
   readonly queue: readonly ResearchId[];
   /** 0 until researchQueue. */
   readonly queueSlots: number;

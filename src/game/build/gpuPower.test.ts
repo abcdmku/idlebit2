@@ -32,16 +32,16 @@ describe('GPU whole-system power quotes', () => {
     const small = fixture(), large = fixture(1);
     const weak = modelQuote(small), strong = modelQuote(large);
     expect(weak.gpu).toEqual(strong.gpu);
-    expect(weak.gpuPower!.after.deliveredW).toBeCloseTo(19801.4, 10);
-    expect(strong.gpuPower!.after.deliveredW).toBeCloseTo(19801.4, 10);
+    expect(weak.gpuPower!.after.deliveredW).toBeCloseTo(19810.3, 10);
+    expect(strong.gpuPower!.after.deliveredW).toBeCloseTo(19810.3, 10);
     expect(weak.gpuPower!.after.capacityW).toBe(32768);
     expect(strong.gpuPower!.after.capacityW).toBe(65536);
-    expect(weak.gpuPower!.after.inputW).toBeCloseTo(25741.82, 10);
-    expect(strong.gpuPower!.after.inputW).toBeCloseTo(23761.68, 10);
-    expect(weak.gpuPower!.after.headroomW).toBeCloseTo(12966.6, 10);
-    expect(strong.gpuPower!.after.headroomW).toBeCloseTo(45734.6, 10);
-    expect(weak.gpuPower!.after.lossW).toBeCloseTo(5940.42, 10);
-    expect(strong.gpuPower!.after.lossW).toBeCloseTo(3960.28, 10);
+    expect(weak.gpuPower!.after.inputW).toBeCloseTo(25753.39, 10);
+    expect(strong.gpuPower!.after.inputW).toBeCloseTo(23772.36, 10);
+    expect(weak.gpuPower!.after.headroomW).toBeCloseTo(12957.7, 10);
+    expect(strong.gpuPower!.after.headroomW).toBeCloseTo(45725.7, 10);
+    expect(weak.gpuPower!.after.lossW).toBeCloseTo(5943.09, 10);
+    expect(strong.gpuPower!.after.lossW).toBeCloseTo(3962.06, 10);
   });
 
   it('publishes before/after whole-system power for hot upgrades and replacements separately from card duty', () => {
@@ -57,8 +57,8 @@ describe('GPU whole-system power quotes', () => {
     expect(upgrade.effect!.wattsBefore).toBe(upgrade.gpu!.before!.idleW);
     expect(upgrade.effect!.wattsAfter).toBe(upgrade.gpu!.after.idleW);
     expect(replacement.gpuPower!.before).toEqual(upgrade.gpuPower!.before);
-    expect(replacement.gpuPower!.after.deliveredW).toBeCloseTo(19801.4, 10);
-    expect(replacement.gpuPower!.after.inputW).toBeCloseTo(23761.68, 10);
+    expect(replacement.gpuPower!.after.deliveredW).toBeCloseTo(19810.3, 10);
+    expect(replacement.gpuPower!.after.inputW).toBeCloseTo(23772.36, 10);
   });
 
   it('includes CPU, RAM, all accelerators and drives without changing their component rules', () => {
@@ -83,7 +83,8 @@ describe('GPU whole-system power quotes', () => {
     state.hot.rack.capFactor[0] = 0.5;
     const adjusted = gpuPowerPreview(state, 0, spec).after;
     // CPU load is 1 W at full use, then DVFS .3, throttle .5, and the two .5 caps.
-    expect(normal.deliveredW - adjusted.deliveredW).toBeCloseTo(1 - 0.3 * 0.5 * 0.5 * 0.5, 11);
+    // The native Hz core loads 9 W under the CSV energy ratio (10 W full use, 1 W idle).
+    expect(normal.deliveredW - adjusted.deliveredW).toBeCloseTo(9 * (1 - 0.3 * 0.5 * 0.5 * 0.5), 11);
     expect(adjusted.lossW).toBe(supplyLossW(adjusted.deliveredW, 65536, 0.2));
   });
 
