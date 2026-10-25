@@ -8,7 +8,9 @@ import { FAIL_CAUSES, FAIL_DETAILS, type EventRing, type FailCounts, type FailDe
 import { familyId } from '../types/ids';
 import type { FeedSnapshot } from '../types/snapshot';
 import type { GameState } from '../types/state';
-import type { OutcomeView, QueueEntryView, TaskIcon, TransferView } from '../types/views';
+import type { OutcomeView, QueueEntryView, ResearchQueueEntryView, TaskIcon, TransferView } from '../types/views';
+import { researchDef, TREE_INDEX } from '../build/research/tree';
+import { researchOpsPerSec } from './research';
 import { feedRates } from './feedRates';
 import { linkName, linkTransfer, pipeTransfer } from './flows';
 import { taskRequirements } from './taskRequirements';
@@ -58,7 +60,7 @@ function entry(state: GameState, roundIndex: number, taskId: number, family: num
   const work = def ? payoutAt(def, size) : 0;
   return {
     ...taskRequirements(familyId(family), size, deadline),
-    task: { epoch: state.epoch, roundIndex, taskId }, key: taskId, icons: face.icons,
+    kind: 'task', task: { epoch: state.epoch, roundIndex, taskId }, key: taskId, icons: face.icons,
     committed, dismissible: !committed,
     blockedBy: gate !== 0 ? FAIL_DETAILS[detailIndex(gate)] ?? null : null,
     work, transferS: speed > 0 ? work / speed : null, windowEndTick,
@@ -79,6 +81,21 @@ export function queueWindow(state: GameState): QueueEntryView[] {
     out.push(entry(state, m.roundIndex, t.taskId, t.family, t.size, false, speed, t.deadline, null));
   }
   return out;
+}
+
+/** D27: the research task in line or running, or null. */
+export function researchEntry(state: GameState): ResearchQueueEntryView | null {
+  const r = state.research;
+  if (r.active === null || r.stoppedInsolvent) return null;
+  const def = researchDef(r.active), holders = state.hot.g[G.researchHolders] ?? 0;
+  let threads = 0;
+  if (holders > 0) for (let s = 0; s < state.hot.sys.len; s += 1) threads += state.hot.sys.researchThreads[s] ?? 0;
+  const work = def?.work ?? 0;
+  return {
+    kind: 'research', key: -1 - (TREE_INDEX.get(r.active) ?? 0), project: r.active, name: def?.name ?? r.active, work,
+    progress: work > 0 ? Math.min(1, r.activeProgress / work) : 0, running: holders > 0, holders, threads,
+    opsPerSec: holders > 0 ? researchOpsPerSec(state) : 0,
+  };
 }
 
 const TRANSFERS_SHOWN = 16;
@@ -124,11 +141,14 @@ export function feedSnapshot(state: GameState, prev: FeedSnapshot | null, sameEv
   const running = state.round.phase === 'running';
   const rates = feedRates(state.hot, state.clock.tick);
   const window = queueWindow(state);
+  const research = researchEntry(state);
+  const researchHead = research !== null && !research.running;
   return {
     roundIndex: state.market.roundIndex,
     timing: running ? 'running' : 'onReturn',
     window,
-    headDeadlineTick: running ? headDeadlineTick(state.market.headTick) : null,
+    research,
+    headDeadlineTick: running && !researchHead ? headDeadlineTick(state.market.headTick) : null,
     blockedBy: window[0]?.blockedBy ?? null,
     transfers: transfers(state),
     inTransfer: g[G.transitCount] ?? 0, queued: g[G.queued] ?? 0, running: g[G.running] ?? 0,

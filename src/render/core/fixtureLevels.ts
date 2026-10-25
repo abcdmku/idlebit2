@@ -48,7 +48,7 @@ export function fixtureSnapshot(focus: LevelSnapshot, partner: LevelSnapshot | n
     hud: { credits: ZERO_AMOUNT, data: ZERO_AMOUNT, netPerMinute: ZERO_AMOUNT, sla: { met: 0, failed: 0, percent: 100, deliveredWork: 0, failedWork: 0, grace: 10 },
       roundState: round, roundIndex: 1, roundElapsedMs: o.simTimeMs ?? 0, autoReturnInMs: null },
     feed: { roundIndex: round === 'running' ? 1 : 2, timing: round === 'running' ? 'running' : 'onReturn',
-      window: [], headDeadlineTick: round === 'running' ? 99 : null, blockedBy: null, transfers: [],
+      window: [], research: null, headDeadlineTick: round === 'running' ? 99 : null, blockedBy: null, transfers: [],
       inTransfer: 0, queued: 0, running: 0, taken: 0, dismissed: 0, intensity: 1, takesPerSec: 0,
       recentOutcomes: [], liveFailures: null, rates: { met: 0, fail: 0 }, failBin: null },
     research: { active: null, name: null, progress: 0, mode: 'background', stoppedInsolvent: false, needsData: false, queued: 0, opsPerSec: 0 },

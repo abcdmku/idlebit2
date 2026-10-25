@@ -6,7 +6,7 @@ import type { LevelId, NodeRef, RackId, ResearchId, RoomId, SiteId, SystemId } f
 import type { RoundReport } from './report';
 import type { ResearchMode, RoundPhase } from './state';
 import type {
-  BuildSlotView, ChipQueueEntryView, CompletionView, CoolerView, FailureView, LbView, LinkView, MemTierView, OutcomeView, PartView, QueueEntryView, RackSlotView,
+  BuildSlotView, ChipQueueEntryView, ResearchQueueEntryView, CompletionView, CoolerView, FailureView, LbView, LinkView, MemTierView, OutcomeView, PartView, QueueEntryView, RackSlotView,
   ServerSlotView, ShardDoneView, SiteView, SupplyView, SwitchView, TaskView, TransferView, UnitMode,
 } from './views';
 
@@ -62,7 +62,12 @@ export interface FeedSnapshot {
   readonly timing: 'running' | 'onReturn';
   /** The queue's first QUEUE_VISIBLE entries, head first: returned work at the front, then the window tasks. */
   readonly window: readonly QueueEntryView[];
-  /** The head may be taken through the end of this tick (headTick + 99); null between rounds. */
+  /**
+   * D27: the research task, when a project is active. With `running` false it is the head, in front of
+   * `window` (whose first task then waits and has no clock); with `running` true it has been taken.
+   */
+  readonly research: ResearchQueueEntryView | null;
+  /** The head may be taken through the end of this tick (headTick + 99); null between rounds or while research is the head. */
   readonly headDeadlineTick: number | null;
   /** The head's first missing requirement on the static capability set; null when it can run. */
   readonly blockedBy: FailDetail | null;

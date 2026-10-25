@@ -24,7 +24,7 @@ export function baseSnapshot(): RenderSnapshot {
     epoch: 1, tick: 0, simTimeMs: 0, bootMs: 10_000,
     hud: { credits: amount(0), data: amount(0), netPerMinute: amount(0), sla: { met: 0, failed: 0, percent: 100, deliveredWork: 0, failedWork: 0, grace: 10 },
       roundState: 'running', roundIndex: 1, roundElapsedMs: 0, autoReturnInMs: null },
-    feed: { roundIndex: 1, timing: 'running', window: Array.from({ length: 5 }, (_, i) => entry(i + 1)),
+    feed: { roundIndex: 1, timing: 'running', window: Array.from({ length: 5 }, (_, i) => entry(i + 1)), research: null,
       headDeadlineTick: 99, blockedBy: null, transfers: [], inTransfer: 0, queued: 0, running: 0, taken: 0, dismissed: 0,
       intensity: 1, takesPerSec: 0, recentOutcomes: [], liveFailures: null, rates: { met: 0, fail: 0 }, failBin: null },
     round: { index: 1, state: 'running', lastReport: null, canReturn: false, autoReturn: { available: false, on: false, inMs: null } },
@@ -97,7 +97,7 @@ export function mount(node: ReactNode, store: GameStore, size?: { width: number;
 }
 
 export function entry(key: number, family = 0, committed = false): QueueEntryView {
-  return { ...taskFacts(family), key, task: { epoch: 1, roundIndex: 1, taskId: key },
+  return { ...taskFacts(family), kind: 'task', key, task: { epoch: 1, roundIndex: 1, taskId: key },
     committed, dismissible: !committed, blockedBy: null, icons: ['compute'], work: 1, transferS: 0.001, windowEndTick: null };
 }
 
