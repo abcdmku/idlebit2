@@ -57,6 +57,7 @@ Program D10 (tasks are pulled, never throttled). It supersedes the fixed 2 s cad
 | 52 | **D26.4: GPU memory is separate.** VRAM stays a gate with no spill until `unifiedMemory`, which pools VRAM with RAM and disk. | §6.3, §6.6 |
 | 53 | **D26.5: completion windows.** Families from `rackDist` on carry a window from take (120 / 180 / 240 / 120 s by band, × size jitter). A task not met inside it fails `late` with its full `W`; router-queue time counts. Seven failure causes. | §4.2, §5.1, §14.1 |
 | 54 | **D25.11: split floor.** Every shard carries at least 1 s of work at its target's nominal rate. | §7.7 |
+| 55 | **D31: power at scale.** Asleep systems are never split targets; demand wakes them. Start controllers stage systems, racks and sites at round start and wake them by trigger: the rack's **Power control** unit (battery and smart start in one, a fifth rack slot under the cooler), `roomStart` on the UPS, `globalStart` on the global scheduler. The Power control battery makes each rack's opening unbilled (refill at 25% of marginal price at Return). Off-grid generation at sites cuts imports. Booting bills normally. | §4.1, §4.3, §4.4, §9.3, §9.8–9.10 |
 
 
 ## Changes since D4
@@ -95,7 +96,7 @@ The user's calculation examples and follow-up supersede the generic clock/RAM do
 
 ## 1. The game
 
-The player runs computing hardware that serves a global market of tasks. A **round** starts when the player returns their infrastructure to the market. Tasks wait in an endless global queue. Hardware pulls the head as soon as it has room, over an inbound pipe that starts at 1 kHz. The head must be taken within 10 s of becoming the head. A taken task runs through hardware stages and, when it completes, pays 1 Credit per unit of work plus some Data, which funds research. The market's intensity rises through the round. Tasks grow from 1-bit CPU operations, through RAM, GPU and storage work, to distributed tasks that span racks, zones and regions. Every failed task lowers the round's work-weighted SLA. When SLA falls below 80%, the round ends at once and every system pauses at no cost. Between rounds the player builds, upgrades, replaces, researches and saves configurations, then returns to the market. Energy is billed continuously, so every watt competes with income. The core decision is upgrade versus replace: levels are cheap but lose performance per watt, while native newer generations cost more and run efficiently. The camera zooms from a single CPU through System, Rack and Room to the Global map.
+The player runs computing hardware that serves a global market of tasks. A **round** starts when the player returns their infrastructure to the market. Tasks wait in an endless global queue. Hardware pulls the head as soon as it has room, over an inbound pipe that starts at 1 kHz. The head must be taken within 10 s of becoming the head. A taken task runs through hardware stages and, when it completes, pays 1 Credit per unit of work plus some Data, which funds research. The market's intensity rises with every task drawn, from zero each round (D30). Tasks grow from 1-bit CPU operations, through RAM, GPU and storage work, to distributed tasks that span racks, zones and regions. Every failed task lowers the round's work-weighted SLA. When SLA falls below 80%, the round ends at once and every system pauses at no cost. Between rounds the player builds, upgrades, replaces, researches and saves configurations, then returns to the market. Energy is billed continuously, so every watt competes with income. The core decision is upgrade versus replace: levels are cheap but lose performance per watt, while native newer generations cost more and run efficiently. The camera zooms from a single CPU through System, Rack and Room to the Global map.
 
 ## 2. Units, time and numbers
 
@@ -129,7 +130,7 @@ The saved tree is `World → Site → Zone → Rack → System → Socket`.
 
 - A **system** is one server: a board (`general` or `accelerator`) with 1–4 CPU sockets, RAM modules, GPUs, drives and a fixed board PSU.
 - A **socket** holds one CPU: a package, cores, a clock, L1, and optionally L2 and L3. Every CPU in a system is identical. A system's single scheduler serves all of them.
-- A **rack** has 4 infrastructure slots (cooler, PDU, load balancer, switch) and 12 server slots. A server slot holds a system or a storage node (§6.10).
+- A **rack** has 5 infrastructure slots, top to bottom: cooler, **power control** (D31: battery and smart start, under the cooler), PDU, load balancer, switch. It also has 12 server slots. A server slot holds a system or a storage node (§6.10).
 - A **zone** is one room, one data hall and one availability zone. It has a network rack in the top-left slot (room switch and room load balancer), rows of rack slots, room cooling, one UPS (two with `dualFeed`).
 - A **site** is one data center in one region. It has zones, a data plane that links them, and a grid feed.
 - The **world** has sites, backbone links and, from Regions on, one global scheduler. Site 0 is the **gateway**: the market enters the world there (§7.2).
@@ -184,14 +185,14 @@ A new game starts in `running`, round 1, with the queue's first five tasks alrea
 1. sets `round += 1` and starts the already prepared next-round queue at this tick, preserving its seed, its five visible tasks (IDs, descriptors) and any dismissals made between rounds (§14.3);
 2. sets `deliveredWork = failedWork = 0`, `met = failed = dismissed = 0` and fixes `G` from the five visible tasks (§4.2), so SLA = 100%;
 3. restarts running difficulty at the curve's start (`docs/tasks.md` §3) without regenerating or reseeding;
-4. makes every system whose own switch and every ancestor switch are online `onMarket` at once, unless it is in a downtime (§4.3). Units switched offline stay out. There is no partial return;
+4. makes every system whose own switch and every ancestor switch are online `onMarket` at once, unless it is in a downtime (§4.3). With start controllers (D31, §4.4), each powered scope instead applies its "Start with": global, then zones, then racks; the rest start `standby` or `asleep`. Rack batteries refill (§9.9). Units switched offline stay out. There is no partial return;
 5. resumes research stopped for insolvency (§11.4).
 
 **Round end.** At the SLA step, if the round is `running` and `SLA < 0.80`:
 1. every task in transfer, queued or running is dropped, and the rest of the round's queue is discarded. Dropped tasks count as neither met nor failed and pay nothing;
 2. every online/offline transition, boot and drain completes at once; cold changes complete at once;
 3. the round state becomes `ended` and the report is frozen (§4.7);
-4. prepares round `index + 1` once: its seed and its first five tasks, drawn at the next round's start intensity. Retire the ended round's unused IDs and never reuse them;
+4. prepares round `index + 1` once: its seed and its first five tasks, drawn from `I = 0` (D30). Retire the ended round's unused IDs and never reuse them;
 5. from the next tick, hardware is paused unless research runs. The next round's five tasks stay frozen while stopped and show as "after Return".
 
 Power-failure reboots and crash recoveries keep running between rounds. With no load they finish on their own.
@@ -255,7 +256,8 @@ Every system, rack, zone and site has an online switch, `intent ∈ {online, off
 | `offline` | Round `running`; its own or an ancestor switch is offline and the transition has finished. | no (full) | no | only for research (§11.2) |
 | `goingOffline` | Round `running`; switched offline less than `bootSeconds` ago. | no (full) | only while draining (§4.4) | yes |
 | `boot` | Round `running`; added, or switched online, less than `bootSeconds` ago. | no (full) | no | idle W |
-| `asleep` | `onMarket` conditions hold, but the system is in S3 sleep (§9.3). | yes, if it has room; it wakes first | no | 0.03 × idle W |
+| `standby` | `onMarket` conditions hold, but a start controller has not powered its rack, zone or site (D31, §4.4). | no; a controller powers it on | no | 0 W |
+| `asleep` | `onMarket` conditions hold, but the system is in S3 sleep (§9.3). | no (D31): demand or a controller wakes it | no | 0.03 × idle W |
 | `onMarket` | Otherwise. | yes, if it has room | yes | yes |
 
 **Room.** A system **has room** when `admitted + reserved < slots`, where `admitted` and `reserved` count shards (an unsplit task is one shard) and `reserved` counts those routed to it and still in transfer: every route reserves its slot (§7.6). A router has room when a system below it has room or its own queue has a free slot (§7.1). A system without room is **full**: with no scheduler, that means busy; with a scheduler, its queue is full. Every router, the base first-fit included, sends a task only to a system that can admit it now (§7.7). Systems that are not `onMarket` or `asleep` count as full (program D1.5).
@@ -272,11 +274,25 @@ While a round runs, every online/offline change takes `bootSeconds` (10 s at bas
 - **Base:** at once, every task queued or running there fails with `swap`, and transfers heading there return to the queue front. The systems are `goingOffline` for `bootSeconds`, admit nothing, draw idle watts, then become `offline`.
 - **With `gracefulDrain`:** the systems stop admitting and keep running what they hold. Queued tasks and transfers heading there return to the queue front (§5.2). When the last running task completes, the `bootSeconds` transition starts. Switching the unit back online during the drain cancels it at once.
 
-**Switching a unit online** starts a `boot` of `bootSeconds`. Booting systems draw idle watts and admit nothing. Afterwards they are `onMarket`.
+**Switching a unit online** starts a `boot` of `bootSeconds`. Booting systems draw and bill idle watts (the free warm-up is scrapped) and admit nothing; a rack battery covers them (§9.9). Afterwards they are `onMarket`.
 
 **Toggling during a transition** starts the opposite transition, `bootSeconds` from that moment.
 
 **Adding a unit** mid-round (a system, rack, zone or site) starts its systems in `boot` for `bootSeconds` with `intent = online`. Between rounds new units are added with `intent = online` and no boot.
+
+**Start controllers** (D31). Online is the player's intent; powered is the controller's. Three parts stage the fleet at round start and wake it with demand:
+
+| Scope | Part | Lives in | Stages | Research |
+|---|---|---|---|---|
+| Rack | **Power control** (`powerCtl`): battery and smart start in one unit | its own rack slot, under the cooler | systems: awake or `asleep` | `powerCtl` (kHz W8); gen 1 `powerCtlLiIon`, gen 2 `powerCtlLfp` |
+| Zone | `roomStart` | the room's UPS | racks: powered or `standby` | `roomStart` (MHz W11); gen 1 `startPredict` |
+| Global | `globalStart` | the global scheduler | sites and their zones: online or `standby` | `globalStart` (GHz W14); gen 1 `startPredict` |
+
+- **Settings** (hot, saved, copied with configurations): **Start with** `n` units powered or awake at Return to market (1 to the unit count, default 1). **Wake when** the head has waited `≥ X s` (1–9, default 2), or, with generation 1 (Power control gen 1 at a rack, `startPredict` above), the awake units' busy fraction over the last 10 s is `≥ Y %` (50–95, default 75). **Order**: rack `slot` or `fastest`, room `slot` or `coolest`, global `slot`, `cheapest` (site marginal price, §9.10) or `nearest` (backbone latency).
+- **Step.** Each second in which its trigger holds, a controller wakes or powers the next units in its order: 1 at generation 0, `ceil(0.25 × awake)` at generation 1. Demand waking (§9.3 `s3Sleep`) adds any shortage at once. A controller acts only while its own unit is powered; a scope with no controller powers everything at Return.
+- **Latency** by the controller's level L1–5: system wake 2, 1.5, 1, 0.5, 0.25 s; rack power-on `rackOnS` 2 s × the same ratio; site or zone online `siteOnS` 5 s × the same ratio. These are physical latencies. Waking units draw idle watts.
+- **Back to rest.** Systems sleep by `s3Sleep`. A room controller returns a rack to `standby` after all its systems have slept 30 s; a global controller returns a site after all its racks have been in standby 60 s. A unit holding research (D27) never rests.
+- **Pace.** Generation 0 doubles a rack's awake systems in at most 12 s and a room's racks in at most 24 s; generation 1 doubles any scope in about 3 s. D30 demand doubles every 1.18 `I`, about 30–70 s at the fleet's limit. So a head waits at most `X + latency` extra (4 s at defaults) and waking keeps pace without SLA cost.
 
 ### 4.5 Hot and cold changes
 
@@ -285,7 +301,8 @@ While a round runs, every online/offline change takes `bootSeconds` (10 s at bas
 | Level upgrade of any part; port speed step; port count step; uplink step | hot | none |
 | Strategy, filter, router queue level (§12.7), setpoint, toggle, C-state limit, DVFS or turbo switch | hot | none (program D1.6) |
 | Replace a part with another generation | cold | the unit that owns it |
-| Add or remove a part (core, socket, RAM module, GPU, NPU, drive, scheduler, L2, L3, second UPS) | cold | the owning unit |
+| Add a part into an empty slot (socket, core, RAM module, GPU, NPU, drive, scheduler, L2, L3) | hot | none |
+| Add a second UPS; remove a part | cold | the owning unit |
 | Scrap a system, storage node or rack | cold | that unit; removal is permanent |
 | Load a configuration onto an existing unit (§13.4) | cold if a part is installed or removed, otherwise hot | that unit |
 
@@ -390,6 +407,7 @@ Program D10. The market is an **endless, ordered queue** per round. Nothing arri
 **The queue.**
 - The queue is generated on demand from the round's seeded curve (`docs/tasks.md` §3). Its state is the **window**: the next five tasks, head first, saved with frozen IDs and descriptors (family, size). Nothing behind the window exists yet.
 - When a task leaves the window (taken, failed or dismissed), the rest shift up and one new task is drawn at the back, at the current intensity `I`. The draw happens in the same step, so the window always shows five.
+- **Intensity advances per task drawn (D30).** After each draw `I ← I + 1/k(I)`, `k(I) = 9 + 0.3 I + 0.03 I²` tasks per unit **(s)**. `I` never advances with time, and every round starts at `I = 0`: fast hardware moves through the small early tasks quickly, slow hardware crawls, and the curve is the same for both.
 - Hardware, idle time, utilization, SLA and window occupancy never change `I` or the draws. `I` follows round age only.
 - New tasks have `count = 1`. A split task is one logical task and pays once (D25.5).
 
@@ -410,7 +428,7 @@ Program D10. The market is an **endless, ordered queue** per round. Nothing arri
 - Dismissal changes no SLA sum, met or failed count, Credits, Data or research. The round report counts dismissals separately.
 
 **Between rounds.**
-- Round end prepares the next round once: its seed, round jitters and its first five tasks, drawn at the next round's start intensity. They show as "after Return". The player may dismiss them; each dismissal draws a replacement at that same start intensity.
+- Round end prepares the next round once: its seed, round jitters and its first five tasks, drawn from `I = 0` (D30), each draw advancing `I`. They show as "after Return". The player may dismiss them; each dismissal draws a replacement at the next intensity.
 - Return and auto-return start that queue as is, without reseeding or regenerating. Paused time never ages it.
 
 **Saves.** Save the round index, seed and jitters, the window (IDs, descriptors, `committed`), the queue-front entries, `headTick`, the market RNG words and `I`. Saving, loading, snapshots and opening panels never draw. Validate on load: unique window IDs, known families, finite sizes, `headTick` ordering. Bump the save version and reset older pre-live saves; the implementation owner picks the number.
@@ -801,7 +819,7 @@ Definitions for a candidate `c`:
 | `binPack` (`binPacking`) | all | Index order; only candidates with a system at `running + reserved < Keff` (filling to the running limit, not the queue) and whose own supply was below 90% usage last tick (rack scope: the PSU; zone: the PDU; site: the UPS; global: the grid feed); equal weights. If none qualifies, as `firstFit`. | Shards pack onto running slots on cool supplies; queues and the idle tail stay empty and reach S3. |
 | `linkAware` (`topologyAware`, D25.9) | zone, site, global | Index order; weight `min(rated(c), link(c) / bitsPerOp)`, where `bitsPerOp = 1` (payload is work). | A rack behind a slow uplink gets a small share instead of holding the task back. |
 | `latency` (`latencyAware`) | global | The single site with the lowest `latency + finish`; ties index. A minimum split that one site can't hold spills to the next. | Tasks stay in one region unless it is busy. |
-| `price` (none yet; allowed by program D1.7) | global | The single site with the lowest region energy price; ties `latency`; spills as `latency`. | Work moves to cheap regions. |
+| `price` (none yet; allowed by program D1.7) | global | The single site with the lowest marginal energy price (§9.10); ties `latency`; spills as `latency`. | Work moves to cheap regions. |
 | `affinity` (`lbAffinity`, program D7.7) | all | A task is **specialized** when its family's `affinity` is `accelerator` (`docs/tasks.md`). Specialized tasks split only over candidates containing an `accelerator` system with room; other tasks only over candidates containing a `general` system with room. If no candidate of the preferred class has room, as `firstFit`. Equal weights. | Accelerators stay free for GPU, tensor and big-memory work. Unlike `capability`, it states a preference, not a gate. |
 
 **Site and global scope (program D24).** At the data plane (candidates: zones) and the global scheduler (candidates: sites), `leastWork` and `latency` use a maintained summary instead of the exact `finish` over every system. A zone ranks by its best class: per capability class, the lowest queued work among the zone's systems of that class that can admit now, over the class's `Keff`. To that it adds the entry's est on that class and its transfer time over the zone's backbone and zone links. Only classes that pass the task's gates count. Queued work is the Σ est of the shards a system holds (reserved, queued and running), each at compiled rates (e(T), clock factor and contention at 1) and counted whole until it completes. A site ranks as its best zone; `latency` adds `latency(site)` as before. Ties go to the lowest index. The summary is kept per class and updated on take, completion and hardware change. Within a room (room and rack load balancers), `finish` stays exact. `leastWork` water-fills over the summaries' ranks.
@@ -926,7 +944,7 @@ Each is a research rule (Appendix C). Factors multiply.
 |---|---|---|
 | `coreIdle` (C1, C3, C6) | A core idle for at least `afterS` (0, 1, 1 s). The deepest researched state applies, limited by the system's C-state limit (hot setting). | That core's `idleFactor` = 0.5, 0.15 or 0.02. A task starting on a core in C3 or C6 starts after `wakeS` (0.2 or 1 s), a physical latency. |
 | `packageIdle` | Every core of a socket idle the whole tick. | That socket's clock, caches and the scheduler: `idleFactor = 0.2`. |
-| `s3Sleep` | A system in a rack with no admitted or reserved task for 10 s, and no Shared, Focus or offline research on it. | Mode `asleep`: every part's `idleFactor = 0.03`, no load. A route to it wakes it: 2 s later it is `onMarket`. Transfers to it are not delivered before then, so the wake counts against pickup. |
+| `s3Sleep` | A system in a rack with no admitted or reserved task for 10 s, and not holding research (D27). | Mode `asleep`: every part's `idleFactor = 0.03`, no load. An asleep system is never a split candidate (D31). When a router can't split an entry for lack of awake room, it wakes that shortage, lowest index first (or in its start controller's order). They are `onMarket` after `s3WakeS` (2 s, or the controller's level), drawing idle meanwhile. |
 | `dvfs` (system switch, default on once researched) | At allocation the system's queue is empty and nothing is reserved on it. | Its cores: clock × 0.5, core and clock `loadFactor` 0.3. |
 | `turbo` (system switch) | Not under `dvfs`; previous tick's PSU usage < 0.90; from Rack on, rack `T < 80 °F`. | Clock × 1.25, core and clock `loadFactor` 1.8. |
 | `thermalThrottle` | Rack `T >= 95 °F`; holds until `T < 90 °F`. | The rack's systems: clock × 0.5, core and clock `loadFactor` 0.5. |
@@ -983,7 +1001,10 @@ whole = floor(dataMeter);  data += whole;  dataMeter -= whole
 
 // 3. Energy, through a sub-Credit meter (float64)
 for each price region r in index order:
-    energyMeter += (Σ top-level supply inputs and utility-fed parts billed at r) × dt × price_r
+    // D31: rack batteries cover their PDU input first (§9.9); generation covers the site's grid input next (§9.10)
+    energyMeter += (Σ top-level supply inputs and utility-fed parts billed at r, net of battery and generation) × dt × price_r
+                 + Σ fromGen × dt × fuelPrice
+energyMeter += Σ battery refills × 0.25 × marginal price      // Return-to-market tick only
 whole = floor(energyMeter);  wallet -= whole;  energyMeter -= whole
 ```
 
@@ -992,6 +1013,23 @@ whole = floor(energyMeter);  wallet -= whole;  energyMeter -= whole
 - The wallet changes only by whole Credits, so it never holds a fraction (program D2).
 - The wallet may go negative only through energy debits. Purchases need `wallet >= price`. Research starts need `data >= cost` (§11.1).
 - Round totals and the HUD's energy cost use the whole Credits debited.
+
+### 9.9 Rack batteries (D31)
+
+A rack's **Power control** unit (its fifth infrastructure slot, under the cooler) holds the rack's battery and its smart start (§4.4) as one part. Its generations are Lead-acid (gen 0, basic start), Li-ion (gen 1, adds the `busy` trigger and batch wake) and LFP (gen 2). Levels follow the flow curve: battery capacity ×2 per level and wake latency by level (§4.4). The empty slot is locked until `powerCtl` is researched; then it is bought from its add plate like any infrastructure part.
+- **Discharge.** While the round runs and the rack is powered, the rack PDU's input for the tick (servers in any mode, cooler, switch, LB and losses) is drawn from the battery first: `fromBattery = min(batteryJ, pduInput × dt)`, `batteryJ −= fromBattery`. Only the rest is billed (§9.8). A battery adds no capacity: PDU usage, `tOver`, losses and heat are unchanged.
+- **Battery time** shown on the rack plate and LCD: `batteryJ / pduInput` seconds at current draw, while discharging.
+- **Recharge.** At Return to market (and auto-return) every battery refills to capacity, billed on that tick at `refillJ × 0.25 × the site's marginal price` (§9.10).
+- **Size.** L1 capacity is 60 s of a fresh era rack at full draw **(s)**: about 10 min of an idle awake rack, so it covers boots, wakes and the D30 climb.
+- A `standby` rack draws nothing and keeps its charge.
+
+### 9.10 Off-grid generation (D31)
+
+A site may hold a **Generation** part: Solar farm, Wind farm, Fuel cell, Own plant (generations 0–3, flow curve, output ×2 per level).
+- Output `genW = baseW[g] × 2^(L−1) × factor`, where factor is the region's sun (solar), wind (wind) or 1. L1 base is 10% of the grid feed's generation-0 capacity **(s)**. Output is constant in time.
+- Each tick, `fromGen = min(gridInput, genW)` is billed at the fuel price (0 for solar and wind, 0.4 × region price for fuel cells, 0.25 × for an own plant). Only `gridInput − fromGen` is imported at the region price. Generation adds no grid-feed capacity. Surplus is lost.
+- **Marginal price** of a site: its fuel price while `genW > gridInput`, else the region price. It prices battery refills (§9.9), the `price` strategy (§8.3) and the global controller's `cheapest` order.
+- Region factors (sun / wind): `us-east` 1.0 / 1.0, `us-west` 1.3 / 0.9, `eu-west` 0.8 / 1.2, `eu-north` 0.5 / 1.5, `sa-east` 1.3 / 0.8, `af-south` 1.5 / 1.0, `ap-southeast` 1.2 / 0.7, `ap-northeast` 0.9 / 1.0 **(s)**.
 
 ## 10. Heat
 
@@ -1268,8 +1306,8 @@ A configuration is a named, serializable description of a unit. It never stores 
 |---|---|
 | system | board type; CPU count; for CPU 1 (copied to all): package g; cores (g, L each); clock (g, L); L1, L2, L3 (g, L) or none. Scheduler (g, L, strategy) or none. RAM modules (g, L, ECC). GPUs (kind, model ID, upgrades); legacy NPUs (kind, gen, level). Drives (g, L). PSU (g, L, cap switch). DVFS, turbo and C-state settings. Online switch. |
 | storage node | drives (g, L); PSU (g, L) |
-| rack | cooler (g, L, setpoint); PDU (g, L, cap switch); load balancer (g, L, strategy, filters, queue level `L` 1–32); switch (g, ports with `k` each, uplinks with `k` each, toggle); a system or storage-node configuration per occupied server slot; online switch |
-| zone | rows; room switch (as rack switch); room load balancer (as rack); room cooling (g, L, setpoint); UPS(s) (g, L); a rack configuration per occupied slot; online switch |
+| rack | cooler (g, L, setpoint); power control (g, L, start settings: start with, wake trigger, order; D31) or none; PDU (g, L, cap switch); load balancer (g, L, strategy, filters, queue level `L` 1–32); switch (g, ports with `k` each, uplinks with `k` each, toggle); a system or storage-node configuration per occupied server slot; online switch |
+| zone | rows; room switch (as rack switch); room load balancer (as rack); room cooling (g, L, setpoint); UPS(s) (g, L, room start controller and settings, D31); a rack configuration per occupied slot; online switch |
 | site | data plane (g, `k`, strategy, filters, queue level); grid feed (g, L); a zone configuration per zone; online switch |
 
 ### 13.2 Add-new plate
@@ -1402,6 +1440,7 @@ The core tray offers only physical `Add core`. Selecting a core shows facts and 
 - **Supply:** delivered W, capacity, usage, loss W, `m`, `tOver` (once nonzero), cap switch and `capFactor`.
 - **Cooler:** `T`, `Teq`, `H / Qc`, duty, setpoint, watts, `tHot`, throttle state.
 - **Switch:** ports with `k`, speed and busy flag; uplinks; toggle; port count; prices per port and for the toggle action.
+- **Power control** (D31): battery charge and time at current draw; Start with `n` of 12, wake trigger, order; upgrade and replace. The room UPS plate and the global scheduler plate carry the same Start row for racks and sites.
 - **Load balancer:** strategy, filters, available options, queue level `L/32` with its entries (family, units, whether a whole task or a share), the next queue step "Queue L → L+1" with price and Buy (§12.7), takes per second, misroutes this round. No placements and no reserve switch (D25).
 - **Port** (opened from the CPU view's pipe): speed, transfer in progress, share of time the cores waited on it. Before Rack: the fixed 1 kHz and "Upgrade at the Rack switch" (D15). From Rack on: next step price and Buy, as "x → x" (D15.4).
 - **Network rack:** the room switch and room load balancer, as above.
@@ -1416,7 +1455,7 @@ The core tray offers only physical `Add core`. Selecting a core shows facts and 
 |---|---|
 | CPU | Exactly four parts (program D7.1): clock, cache (one block, total bits; L1, L2, L3 on its plate), scheduler, cores. Per core: lanes, busy fraction this tick, the shard on each thread (task ID, shard index, family, progress fraction, and how many threads that shard holds, so cores running one shard draw as one group), research share, C-state. Effective clock. Cache bits used / capacity per level, and the running shards' bits that spilled past cache (D26.7). Scheduler: queue entries, reserved count, running count, `K`, `Q`, strategy. Empty core sites up to `coreSites`. The inbound pipe (D10.4) is the incoming connector, not a fifth part: its speed, the task in transfer with bits sent / total, and whether the core is waiting on it. Tapping it opens the port plate (§16.3): before Rack the fixed 1 kHz and "Upgrade at the Rack switch"; from Rack on, the next step as "x → x". |
 | System | Board type, CPU count, `η_cfg`. The memory tiers filling (D26.7): cache, RAM and disk capacity, used bits, spilled bits (bits that didn't fit a faster tier) and rate. The shard arriving on the system's port and each running shard (task ID, shard index of count, units, threads held, GPU domain), so a shard is drawn splitting between the CPU and the GPU card. PSU usage, `tOver`, loss W. RAM used / capacity and bandwidth use per module. Per-card GPU/NPU duty, VRAM holds and assigned tasks; GPU model ID, upgrades, cores, clock and effective rate. Drive IO use and holds. Mode. |
-| Rack | Per server slot: mode, busy fraction, admitted and reserved shard counts. Every shard transfer on the uplinks and ports (task ID, shard index of count, target slot, bits sent of total), so a task is drawn arriving on the uplink and fanning out to the servers. LB queue entries.
+| Rack | Power control (under the cooler): battery charge, battery time at current draw, awake count of total, next wake. Per server slot: mode, busy fraction, admitted and reserved shard counts. Every shard transfer on the uplinks and ports (task ID, shard index of count, target slot, bits sent of total), so a task is drawn arriving on the uplink and fanning out to the servers. LB queue entries.
  Per port and uplink: busy flag and speed. Load balancer routes per second. Cooler `T` and duty. PDU usage and `tOver`. `tHot`. |
 | Room | Per rack: `T`, mode, PDU usage. Shard transfers on the zone link and rack uplinks, as for Rack. Room LB queue entries. Network rack ports busy. Room cooling duty; zone `T`. UPS usage and `tOver`. `tHot`. |
 | Global | Per site: region, zones, modes, hottest `T`, grid usage. Shard transfers on the data planes and backbone. Data plane and global scheduler queue entries. Backbone links busy and speed. Global scheduler routes per second. |
@@ -1490,6 +1529,7 @@ Rate parts draw by §9.1 with the `wPerUnit` listed; "idle" is for non-rate part
 | ID | Generations (tech) | Gates | Curve | `base` by g | Watts | `price` by g | `upgrade` by g |
 |---|---|---|---|---|---|---|---|
 | `rackCooler` | Fan tray (air), High-flow air (air), Rear-door water (water), Direct-to-chip water (water) | `rack`, `rackAir2`†, `rackWater`, `rackWater2`† | flow | `Qc` W 5e5, 5e6, 5e9, 5e12 | `wpw` 0.01, 0.008, 0.004, 0.003 (D19) | 2.4e6, 1.2e7, 4.3e11, 3.7e14 | 1.5e6, 1.5e6, 1.8e10, 9e13 |
+| `powerCtl` (D31, rack slot under the cooler) | Lead-acid, Li-ion, LFP | `powerCtl`, `powerCtlLiIon`, `powerCtlLfp` | flow | battery J: 60 s of a fresh era rack at full draw **(s)**; wake latency 2 → 0.25 s by L1–5 | idle 0.01 × a PDU's | `≈ 40 × capacityJ × home price` **(s)** | flow |
 | `pdu` | Basic, Metered, Switched | `rack`, `meteredPdu`, `switchedPdu` | flow | W 1e6, 1.6e7, 1e11 | supply | 2.4e6, 1.2e7, 1.4e11 | 1.5e6, 1.5e6, 1.8e10 |
 | `lb` (rack) | Basic (one generation, D18.3) | `rack` | fixed; queue level 1–32 (§12.7) | no routing capacity (D12.5) | idle 160 | 2.4e6 | — |
 | `lb` (room) | Room basic (one generation, D18.3) | `room` | fixed; queue level 1–32 (§12.7) | no routing capacity (D12.5) | idle 2560 | 9.5e10 | — |

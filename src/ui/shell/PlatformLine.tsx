@@ -5,8 +5,10 @@
 import { useEffect, useRef, useState } from 'react';
 import type { FailCause, FailDetail, FamilyId, RenderSnapshot } from '../../game';
 import { causeLine, familyName } from '../hooks/feedModel';
-import { usePlatformStatus, useShell } from '../storeHooks';
+import { useGameSelector, usePlatformStatus, useShell } from '../storeHooks';
+import { restartKey, restartOf, restartText } from '../queue/restart';
 import { useLayout } from './geometry';
+import { useNewVersion } from './version';
 
 const FAIL_MS = 3000, ROUND_MS = 2000;
 
@@ -80,10 +82,19 @@ function useNotice(notice: string | null): string | null {
   return n && !(n.once && hidden === n.text) ? n.text : null;
 }
 
-export function PlatformLine() {
-  const p = usePlatformStatus(), L = useLayout(), flash = useFlash(), notice = useNotice(p.notice);
-  const status = p.catchingUp ? `Catching up${p.progress === null ? '' : ` · ${p.progress}%`}` : notice;
+export function PlatformLine({ saveNow }: { saveNow?: () => void } = {}) {
+  const p = usePlatformStatus(), L = useLayout(), flash = useFlash(), notice = useNotice(p.notice), newer = useNewVersion();
+  // The focused system restarting (a cold change, a boot) is said plainly in the world itself.
+  const restart = useGameSelector(restartOf, (a, b) => restartKey(a) === restartKey(b), 250);
+  const status = p.catchingUp ? `Catching up${p.progress === null ? '' : ` · ${p.progress}%`}` : notice ?? (restart.on ? restartText(restart) : null);
   const text = status ?? flash?.text ?? null;
+  // A newer build is deployed: a quiet, stable banner in the same place, with a 48 px Reload that saves first.
+  if (newer) return <div className="platform-line version" role="status" data-testid="new-version"
+    style={{ left: L.view.x + L.lat, top: L.view.y + L.view.h - L.lat - 48, maxWidth: L.view.w - 2 * L.lat, height: 48 }}>
+    <span>New version available</span>
+    <button type="button" className="skey" data-qa-target style={{ position: 'relative', width: 96, height: 48 }}
+      onClick={() => { saveNow?.(); window.location.reload(); }}>Reload</button>
+  </div>;
   return <p className={`platform-line${status ? '' : ` ${flash?.tone ?? ''}`}`} role="status" hidden={!text} data-testid="platform-line"
     style={{ left: L.view.x + L.lat, top: L.view.y + L.view.h - L.lat - L.lh, maxWidth: L.view.w - 2 * L.lat, height: L.lh }}>{text}</p>;
 }

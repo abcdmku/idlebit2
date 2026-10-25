@@ -108,7 +108,7 @@ function taskFacts(family = 0): TaskRequirementsView {
 
 export function report(edit: Partial<RoundReport> = {}): RoundReport {
   return {
-    index: 14, startTick: 0, durationTicks: 8450, durationMs: 845_000, met: 28_400,
+    index: 14, startTick: 0, endedBy: 'sla', durationTicks: 8450, durationMs: 845_000, met: 28_400,
     failedByCause: { timeout: 2839, cantRun: 387, misroute: 3903, power: 0, heat: 0, swap: 0, late: 0 },
     failDetail: { timeout: null, cantRun: 'ram', misroute: null, power: null, heat: null, swap: null, late: null },
     details: [{ cause: 'cantRun', detail: 'ram', count: 387 }],

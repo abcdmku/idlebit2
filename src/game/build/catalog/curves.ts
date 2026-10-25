@@ -53,17 +53,17 @@ export const RATIO_DECAY: readonly number[] = [0.92, 0.93, 0.95, 0.9625];
 /** The fixed normalization price of the energy ratio, Credits per joule. */
 export const RATIO_REFERENCE_PRICE = 0.01;
 
-/** Energy ratio E of a part running at `rate` against its native rate, in energy era `era`. */
-export function energyRatio(era: number, native: number, rate: number): number {
+/** Energy ratio E of a part running at `rate` against its native rate, in energy era `era` (with an optional per-part decay table). */
+export function energyRatio(era: number, native: number, rate: number, decay: readonly number[] = RATIO_DECAY): number {
   const push = Math.max(1, rate / native);
-  return NATIVE_RATIO[era]! / push ** (-Math.log(RATIO_DECAY[era]!) / Math.log(STEP_RATE));
+  return NATIVE_RATIO[era]! / push ** (-Math.log(decay[era]!) / Math.log(STEP_RATE));
 }
 
 /** hardware-progression.md §3: full-use W = rate / (0.010 × E); idle = 0.1 × min(native full W × push^0.25, full W). */
-export function ratioWatts(era: number, native: number, rate: number): Watts {
+export function ratioWatts(era: number, native: number, rate: number, decay: readonly number[] = RATIO_DECAY): Watts {
   if (!(native > 0) || !(rate > 0)) return NONE;
   const push = Math.max(1, rate / native);
-  const fullW = rate / (RATIO_REFERENCE_PRICE * energyRatio(era, native, rate));
+  const fullW = rate / (RATIO_REFERENCE_PRICE * energyRatio(era, native, rate, decay));
   const idle = IDLE_SHARE * Math.min((native / (RATIO_REFERENCE_PRICE * NATIVE_RATIO[era]!)) * push ** 0.25, fullW);
   return { idle, load: fullW - idle };
 }
@@ -75,7 +75,7 @@ export function partWatts(row: CatalogRow, g: number, level: number, rate?: { ra
   switch (w.kind) {
     case 'ratio': {
       const era = w.era[g] ?? 0;
-      return rate ? ratioWatts(era, rate.native, rate.rate) : ratioWatts(era, ratedRate(row, g, 1), ratedRate(row, g, level));
+      return rate ? ratioWatts(era, rate.native, rate.rate, w.decay) : ratioWatts(era, ratedRate(row, g, 1), ratedRate(row, g, level), w.decay);
     }
     case 'idle': return { idle: (w.idle[g] ?? 0) * x ** 0.25, load: 0 };
     case 'cooler': {

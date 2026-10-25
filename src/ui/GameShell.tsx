@@ -16,7 +16,7 @@ import { useMediaQuery } from './hooks/useMediaQuery';
 import { NO_INSETS, shellLayout, type SafeInsets, type ShellLayout } from './layout';
 import { PlateLayer } from './plates';
 import { QueueStrip } from './QueueStrip';
-import { ResearchDrawer } from './research';
+import { ResearchScreen } from './research';
 import { RoundPlate } from './RoundPlate';
 import { box, LayoutContext } from './shell/geometry';
 import { ShellContext, createShellValue, type ShellContextValue, type ShellSurface } from './storeHooks';
@@ -33,6 +33,8 @@ export interface GameShellProps {
   /** First level to show (QA `?level=`), if opened. */
   level?: LevelId;
   view?: ViewStore;
+  /** Saves the game now (the runtime's save): the new-version Reload saves before it reloads. */
+  saveNow?: () => void;
   /** Viewport size for tests; the live shell measures itself. */
   size?: { width: number; height: number };
   children?: ReactNode;
@@ -66,7 +68,7 @@ function useShellLayout(size?: { width: number; height: number }) {
   return { ref, layout };
 }
 
-export function GameShell({ store, registry, level, view, size, children }: GameShellProps) {
+export function GameShell({ store, registry, level, view, size, saveNow, children }: GameShellProps) {
   const reducedMotion = useMediaQuery('(prefers-reduced-motion: reduce)');
   const { ref, layout } = useShellLayout(size);
   const shell = useMemo<ShellContextValue>(() => {
@@ -138,12 +140,12 @@ export function GameShell({ store, registry, level, view, size, children }: Game
           <CanvasWorld />
           <Hud />
           <QueueStrip />
-          <PlatformLine />
+          <PlatformLine saveNow={saveNow} />
           <OffersScope>
             <Deck />
             <Callout />
             <PlateLayer />
-            <ResearchDrawer />
+            <ResearchScreen />
             <RoundPlate />
           </OffersScope>
           {children}

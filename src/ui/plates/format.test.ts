@@ -81,3 +81,10 @@ describe('memory tiers (D26, lead ruling)', () => {
     expect(tierText(t('disk', 0, 0))).toEqual({ text: 'none', tone: 'dim' });
   });
 });
+
+describe('count units', () => {
+  it('cores count like slots, lanes and ports', async () => {
+    const { measureUnit } = await import('./format');
+    expect([measureUnit(2, 'cores'), measureUnit(4, 'slots')]).toEqual(['2 cores', '4 slots']);
+  });
+});

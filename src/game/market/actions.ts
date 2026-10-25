@@ -3,7 +3,7 @@ import { accept, reject, type HandlerMap } from '../core/actions';
 import { commitWorld, openWorld } from '../core/world';
 import type { GameState } from '../types/state';
 import { dismissAt, windowIndexOf } from './queue';
-import { startRound } from './rounds';
+import { endRound, startRound } from './rounds';
 
 /**
  * Market actions (spec §4.1, §4.6). Return to market is all-or-nothing: every online unit rejoins
@@ -34,6 +34,11 @@ export const marketHandlers: HandlerMap = {
   returnToMarket: (state) => {
     if (state.round.phase === 'running') return reject(state, 'roundState', 'The round is running');
     return accept(withWorld(state, startRound));
+  },
+  /** The player ends the running round on purpose: the same as an SLA end, no extra cost (spec §4.1). */
+  endRound: (state) => {
+    if (state.round.phase !== 'running') return reject(state, 'roundState', 'No round is running');
+    return accept(withWorld(state, (w) => endRound(w, 'player')));
   },
   dismissReport: (state) => {
     if (state.round.phase !== 'ended') return accept(state);

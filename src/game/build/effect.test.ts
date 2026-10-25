@@ -1,4 +1,5 @@
 import { applyAction } from '../core/actions';
+import { advanceGame } from '../core/advance';
 import { barebonesSpec } from '../core/defaults';
 import { buildState } from '../testkit/builders';
 import type { GameState } from '../types/state';
@@ -25,7 +26,7 @@ describe('part quote effects', () => {
   // Four multi-lane cores, two RAM sticks: system totals are far from any one part's value.
   const spec = barebonesSpec(1), cpu = spec.cpu!;
   const state = buildState({
-    seed: 42, sites: 1, zonesPerSite: 1, racksPerZone: 1, serversPerRack: 1, unlocks: 'max', credits: '1000000000000',
+    seed: 42, sites: 1, zonesPerSite: 1, racksPerZone: 1, serversPerRack: 1, unlocks: 'max', credits: '100000000000000000000',
     system: (sid, rack, slot) => ({ id: sid, rack, slot, online: true, spec: {
       ...spec, cpu: { ...cpu, cores: Array(4).fill({ gen: 1, level: 8 }), l2: { gen: 1, level: 2 } },
       ram: [{ gen: 1, level: 2, ecc: false }, { gen: 1, level: 2, ecc: false }], drives: [{ gen: 1, level: 2 }],
@@ -43,5 +44,33 @@ describe('part quote effects', () => {
     const up = quote(state, { kind: 'part', part: { unit: { kind: 'system', id }, slot: { kind: 'clock', socket: 0 } } }).quotes[0]!;
     expect(up.effect?.unit).toBe('Hz');
     expect(state.compiled.sys.threadRate[0]! * state.compiled.sys.cores[0]!).toBeGreaterThan(chip(state).clock.hz);
+  });
+  /** The tray quote for adding `kind` to system 0, as the deck and the empty site's callout ask it. */
+  const addQuote = (s: GameState, kind: string) =>
+    quote(s, { kind: 'tray', at: { level: 'chip', id } }).quotes.find((q) => q.action.type === 'addPart' && q.action.kind === kind)!;
+  const queueSize = (s: GameState) => chip(s).scheduler?.q ?? 0;
+
+  it('adds the queue as its size, 0 → Q (the board reads "Queue none", then "0 / Q")', () => {
+    const add = addQuote(state, 'scheduler');
+    const next = applyAction(state, add.action).state;
+    expect(queueSize(next)).toBeGreaterThan(0);
+    expect(add.effect).toMatchObject({ capacityBefore: 0, capacityAfter: queueSize(next), unit: 'slots' });
+  });
+
+  it('upgrades the queue as its size, Q → Q′', () => {
+    // Adding the scheduler is a cold change: let the system come back before the hot upgrade.
+    const withQueue = advanceGame(applyAction(state, addQuote(state, 'scheduler').action).state, 5_000).state;
+    const up = quote(withQueue, { kind: 'part', part: { unit: { kind: 'system', id }, slot: { kind: 'scheduler' } } }).quotes
+      .find((q) => q.action.type === 'upgradePart')!;
+    const next = applyAction(withQueue, up.action).state;
+    expect(queueSize(next)).toBeGreaterThan(queueSize(withQueue));
+    expect(up.effect).toMatchObject({ capacityBefore: queueSize(withQueue), capacityAfter: queueSize(next), unit: 'slots' });
+  });
+
+  it('adds a core as the core count, in cores', () => {
+    const add = addQuote(state, 'core');
+    const next = applyAction(state, add.action).state;
+    expect(add.effect).toMatchObject({ capacityBefore: chip(state).cores.length, capacityAfter: chip(next).cores.length, unit: 'cores' });
+    expect(chip(next).cores.length).toBe(chip(state).cores.length + 1);
   });
 });

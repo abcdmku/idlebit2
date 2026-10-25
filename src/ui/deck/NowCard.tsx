@@ -13,6 +13,7 @@ import { drawFlask } from '../art/deckArt';
 import { formatOps } from '../../game';
 import { stripOf } from '../QueueStrip';
 import { headRisk } from '../queue/risk';
+import { restartKey, restartOf, restartText } from '../queue/restart';
 import { AutoReturn, fits, HeadClock, InQueue, roundOf, TaskIcon, windowText } from '../queue/taskText';
 import { box, T, useLayout } from '../shell/geometry';
 import { shallowEqual, useGameSelector, useShell } from '../storeHooks';
@@ -20,6 +21,7 @@ import { shallowEqual, useGameSelector, useShell } from '../storeHooks';
 export function NowCard() {
   const L = useLayout(), shell = useShell(), seconds = useHeadSeconds() ?? 10;
   const q = useGameSelector(stripOf, shallowEqual), r = useGameSelector(roundOf, shallowEqual, 250);
+  const restart = useGameSelector(restartOf, (a, b) => restartKey(a) === restartKey(b), 250);
   // D27: a started project waiting for room holds the front of the line; the card shows it instead.
   const rq = q.research && !q.research.running ? q.research : null;
   const head = rq ? null : q.window[0] ?? null, running = !q.frozen && r.phase === 'running';
@@ -45,6 +47,8 @@ export function NowCard() {
       <span className="aic" style={{ left: ix, top: iy }}><TaskIcon task={head} n={n} /></span>
       <T x={tx} y={lines[0]!} w={w}><b>{familyName(head.family)}</b> <span className="gold">{payoutText(head)}</span></T>
       <T x={tx} y={lines[1]!} w={w}>{!running ? <span className="dim">Starts after Return</span>
+        // A restarting system holds no work: say so, so its 0 Hz cores aren't a mystery.
+        : restart.on && !head.committed ? <span className="warn" data-testid="now-restart">{restartText(restart)}</span>
         : <span className={blocked ? 'warn' : 'mute'}>{blocked ? blockedText(head) : sizeText(head)}</span>}</T>
       <T x={tx} y={lines[2]!} w={w}>{!running ? <AutoReturn />
         : head.committed ? <InQueue task={head} />

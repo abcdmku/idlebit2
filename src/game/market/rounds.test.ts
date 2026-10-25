@@ -14,6 +14,7 @@ import { failTasks } from './sla';
 import { BOOT_CAPS, marketState } from './testState';
 import { FAMILIES } from './families';
 import { dismissAt } from './queue';
+import { nextIntensity } from './curve';
 
 const withAutoReturn = (s: GameState, delay = 150): GameState => ({
   ...s,
@@ -113,14 +114,17 @@ describe('round end and return (spec §4.1, §4.6, §4.7, D12.1)', () => {
     expect(s.events.entries.some((e) => e.kind === 'roundEnded' && e.round === 1)).toBe(true);
   });
 
-  it('opens the next round at max(0, peak I − 6) and draws its preview there (D12.1)', () => {
-    expect(endedAt50(marketState(), 4).market.intensity).toBe(0);
+  it('opens the next round from I = 0 whatever the last one reached, and draws its preview there (D30)', () => {
+    let fifth = 0;
+    for (let n = 0; n < 5; n += 1) fifth = nextIntensity(fifth);
+    expect(endedAt50(marketState(), 4).market.intensity).toBeCloseTo(fifth, 12);
     const ended = endedAt50(marketState(), 20);
-    expect(ended.market).toMatchObject({ roundIndex: 2, intensity: 14 });
+    expect(ended.market.roundIndex).toBe(2);
+    expect(ended.market.intensity).toBeCloseTo(fifth, 12);
     const back = applyAction(ended, { type: 'returnToMarket' }).state;
-    expect(back.round).toMatchObject({ phase: 'running', index: 2, startTick: 51, peakIntensity: 14 });
-    // Opening tasks at I = 14 are far larger than Bit Flips, and so is the grace prior.
-    expect(back.round.grace).toBeGreaterThan(100);
+    expect(back.round).toMatchObject({ phase: 'running', index: 2, startTick: 51, peakIntensity: 0 });
+    // The opening tasks are 1-op Bit Flips again.
+    expect(back.market.window.every((t) => t.size <= 2)).toBe(true);
     expect(back.market.headTick).toBe(51);
   });
 

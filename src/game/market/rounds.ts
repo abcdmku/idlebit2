@@ -4,9 +4,8 @@ import { pushEvent, roundDetails } from '../core/events';
 import { resetRoundTotals, roundTotals } from '../core/ledger';
 import { MODE, restingMode, setUnitMode } from '../core/timers';
 import type { World } from '../core/world';
-import type { RoundReport } from '../types/report';
+import type { RoundEndedBy, RoundReport } from '../types/report';
 import { dropAllWork } from '../exec';
-import { startIntensity } from './curve';
 import { clearFront, graceOf, prepareQueue } from './queue';
 import { countOutcomes, failCounts, resetCounters, slaBelowThreshold } from './sla';
 import { familyType, TASK_TYPE_IDS } from './taskTypes';
@@ -52,7 +51,7 @@ export function startRound(w: World): void {
   r.startTick = w.tick;
   r.endTick = null;
   r.autoReturnTick = null;
-  r.peakIntensity = w.market.intensity;
+  r.peakIntensity = 0;
   r.grace = graceOf(w.market.window);
   r.researchOps = 0;
   w.market.headTick = w.tick;
@@ -63,11 +62,11 @@ export function startRound(w: World): void {
   pushEvent(w, { kind: 'roundStarted', round: r.index });
 }
 
-function freezeReport(w: World): RoundReport {
+function freezeReport(w: World, endTick: number, endedBy: RoundEndedBy): RoundReport {
   const r = w.round, g = w.hot.g;
-  const durationTicks = w.tick + 1 - r.startTick;
+  const durationTicks = endTick - r.startTick;
   return {
-    index: r.index, startTick: r.startTick, durationTicks, durationMs: durationTicks * TICK_MS,
+    index: r.index, startTick: r.startTick, durationTicks, durationMs: durationTicks * TICK_MS, endedBy,
     byType: roundTypes(w),
     met: g[G.met]!, failedByCause: failCounts(w), ...roundDetails(w.hot.detailRound), peakIntensity: r.peakIntensity,
     dismissed: g[G.dismissed]!, deliveredWork: g[G.deliveredWork]!, failedWork: g[G.failedWork]!,
@@ -77,21 +76,25 @@ function freezeReport(w: World): RoundReport {
 }
 
 /**
- * Ends the running round inside this tick: drops every task and the rest of the queue without
- * counting them, completes every transition, pauses the hardware, freezes the report, prepares the
- * next round's five at its start I (D12.1) and arms auto-return.
+ * Ends the running round: drops every task and the rest of the queue without counting them,
+ * completes every transition, pauses the hardware, freezes the report, prepares the next round's
+ * queue from I = 0 (D30) and arms auto-return. The SLA step ends it inside the tick being run; the
+ * endRound action ends it between ticks, after the last tick run (`w.tick` is already the next one).
  */
-export function endRound(w: World): void {
+export function endRound(w: World, endedBy: RoundEndedBy = 'sla'): void {
   const r = w.round;
-  const report = freezeReport(w);
+  const endTick = endedBy === 'player' ? w.tick : w.tick + 1;
+  const report = freezeReport(w, endTick, endedBy);
   clearFront(w);
   dropAllWork(w);
   r.phase = 'ended';
   const m = w.market;
-  m.intensity = startIntensity(r.peakIntensity);
+  // D30: every round starts from the beginning.
   m.roundIndex = r.index + 1;
-  m.window = prepareQueue(w.hot, w.seed, r.index + 1, m.intensity);
-  r.endTick = w.tick + 1;
+  const next = prepareQueue(w.hot, w.seed, r.index + 1, 0);
+  m.window = next.tasks;
+  m.intensity = next.intensity;
+  r.endTick = endTick;
   r.reports = [...r.reports, report].slice(-ROUND_REPORTS_KEPT);
   w.report.roundsEnded.push(report);
   const unlocks = w.research.unlocks;

@@ -19,6 +19,7 @@ export type ConfigSource =
  */
 export type GameAction =
   | { readonly type: 'returnToMarket' }
+  | { readonly type: 'endRound' }
   | { readonly type: 'dismissReport' }
   | { readonly type: 'dismissTask'; readonly task: TaskRef }
   | { readonly type: 'setAutoReturn'; readonly on: boolean }

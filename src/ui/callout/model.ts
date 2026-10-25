@@ -37,6 +37,22 @@ export function nodeName(ref: NodeRef, focus: LevelSnapshot): string {
   }
 }
 
+/** What an empty site adds, from the renderer's stable target id, and the deck row that sells it. */
+const SITE_PART: Readonly<Record<string, { label: string; row: string | null }>> = {
+  cpu: { label: 'CPU', row: 'cpu' }, ram: { label: 'RAM', row: 'ram' }, gpu: { label: 'GPU', row: 'gpu' },
+  drive: { label: 'Storage', row: 'storage' }, storage: { label: 'Storage', row: 'storage' }, psu: { label: 'PSU', row: 'psu' },
+};
+export function slotSite(t: HitTarget, focus: LevelSnapshot): { name: string; row: string | null } {
+  if (focus.level === 'chip') {
+    if (t.id === 'queue') return { name: 'Add queue', row: 'scheduler' };
+    const core = /^site([0-9]+)$/.exec(t.id);
+    if (core) return { name: `Add Core ${Number(core[1]) + 1}`, row: 'core' };
+  }
+  const board = /^slot-([a-z]+)[0-9]*$/.exec(t.id), part = board ? SITE_PART[board[1]!] : undefined;
+  if (part) return { name: `Add ${part.label}`, row: part.row };
+  return { name: focus.level === 'rack' ? 'Add server' : focus.level === 'room' ? 'Add rack' : focus.level === 'global' ? 'Add site' : 'Add part', row: null };
+}
+
 /** The board's own labels where they differ from the plate titles (A07). */
 const BOARD_NAME: Partial<Record<PartSlotKind, string>> = { l1: 'Cache', scheduler: 'Queue' };
 
@@ -45,7 +61,7 @@ export function targetName(t: HitTarget, focus: LevelSnapshot): string {
   if (site) return regionName(site.region);
   if (t.drill && (t.kind === 'child' || t.kind === 'unit')) return nodeName(t.drill, focus);
   if (t.kind === 'port') return t.port === -1 ? 'Uplink' : `Port ${(t.port ?? 0) + 1}`;
-  if (t.kind === 'slot') return 'Empty slot';
+  if (t.kind === 'slot') return slotSite(t, focus).name;
   if (t.kind === 'unit' && t.unit) return t.unit.kind === 'system' ? `System ${t.unit.id + 1}` : t.unit.kind === 'rack' ? `Rack ${rackLetter(t.unit.id)}` : 'Unit';
   if (t.part) {
     const k = t.part.slot.kind;
@@ -90,8 +106,14 @@ export function calloutModel(t: HitTarget, focus: LevelSnapshot, quotes: QuoteRe
   // A core: an installed one reads its own upgrade and rate; an empty core site offers the next core.
   const core = t.part?.slot.kind === 'core' ? t.part.slot : null;
   const own = core && offers ? offers.cores[core.index] ?? null : null;
-  const row = own ?? (kind && offers ? offers.rows.find(r => r.slot === kind) ?? null : null);
-  if (row) {
+  // An empty site reads as what you'd add there ("Add queue", "Add Core 2", "Add RAM") and its deck row's offer.
+  const site = t.kind === 'slot' ? slotSite(t, focus) : null;
+  const siteRow = site?.row && offers ? offers.rows.find(r => r.key === site.row && r.quote) ?? null : null;
+  const row = own ?? siteRow ?? (kind && offers ? offers.rows.find(r => r.slot === kind) ?? null : null);
+  if (site && siteRow) {
+    // The deck row says "Add RAM" with no change; here the effect line shows what the add gives ("0 → 2 slots").
+    offer = siteRow; change = siteRow.quote?.effect ? changeText(siteRow.quote.effect) : siteRow.change;
+  } else if (row) {
     offer = row; change = row.change;
     if (own) { if (!own.quote?.effect && focus.level === 'chip') change = formatHertz(focus.clock.effectiveHz); }
     else if (core) name = `Add Core ${(offers?.cores.length ?? 0) + 1}`;
@@ -110,10 +132,22 @@ export function calloutModel(t: HitTarget, focus: LevelSnapshot, quotes: QuoteRe
   const research = lock?.code === 'research' && !offer!.where && !/^Upgrade at /.test(lock.text) ? lock.text.replace(/^Needs /, '') : null;
   if (research) {
     // Locked grammar (A07): the title is what you get, line 2 what it needs, the key opens it.
-    if (t.kind === 'slot') name = `Add ${offer!.quote!.label}`;
     change = `Needs research: ${research}`;
   }
   return { name, change, offer, research, drill };
+}
+
+/**
+ * Phone (A07): below the tapped part when there is room, else above it, else docked across the bottom
+ * of the free world just above the head card. Computed from the part's own rect, so the same part
+ * always gets the same place, and the part stays in view.
+ */
+export function placePhone(t: Rect, size: { w: number; h: number }, bounds: Rect): Rect {
+  const { w, h } = size, x = clamp(Math.round((t.x + t.w / 2 - w / 2) / 8) * 8, bounds.x, bounds.x + bounds.w - w);
+  const below = Math.ceil((t.y + t.h + 8) / 8) * 8, above = Math.floor((t.y - 8 - h) / 8) * 8;
+  if (below + h <= bounds.y + bounds.h) return { x, y: below, w, h };
+  if (above >= bounds.y) return { x, y: above, w, h };
+  return { x: bounds.x, y: bounds.y + bounds.h - h, w: bounds.w, h };
 }
 
 /** Desktop (A07): the callout docks in the world's right gutter, its top level with the part's, clamped. */

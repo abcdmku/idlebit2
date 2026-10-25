@@ -33,14 +33,15 @@ describe('the endless queue (program D10, spec §5.2)', () => {
   });
 
   it('pulls the head as soon as the core frees, and draws one replacement per take', () => {
-    // The 1 Hz core finishes a 1-op Bit Flip each second; a 1 ms transfer lands it.
+    // The 1 Hz core runs one small task at a time (1–2 ops, D30's early sizes); each take draws one replacement.
     const s = advanceGame(marketState(), 10_000).state;
-    expect(s.hot.g[G.taken]).toBe(10);
-    expect(s.hot.g[G.met]).toBe(9);
-    expect(s.market.window.map((t) => t.taskId)).toEqual([11, 12, 13, 14, 15]);
-    expect(s.market.headTick).toBe(90);
+    const taken = s.hot.g[G.taken]!;
+    expect(taken).toBeGreaterThanOrEqual(5);
+    expect(s.hot.g[G.met]).toBeGreaterThanOrEqual(taken - 1);
+    expect(s.hot.g[G.met]).toBeLessThanOrEqual(taken);
+    expect(s.market.window.map((t) => t.taskId)).toEqual([1, 2, 3, 4, 5].map((n) => taken + n));
     // Two draws (family, size) per task drawn after the five prepared ones.
-    expect(s.hot.g[G.rngDraws]).toBe(marketState().hot.g[G.rngDraws]! + 2 * 10);
+    expect(s.hot.g[G.rngDraws]).toBe(marketState().hot.g[G.rngDraws]! + 2 * taken);
   });
 
   it('times out an untaken head at the end of headTick + 99 and promotes the next with a fresh 10 s', () => {
@@ -150,7 +151,9 @@ describe('the endless queue (program D10, spec §5.2)', () => {
 
   it('primes a running round at an endgame intensity with five tasks drawn there (testkit)', () => {
     const s = primeMarket(marketState(), 40);
-    expect(s.market.intensity).toBe(40);
+    // D30: the five tasks are drawn from I = 40 one step apart; the next draw comes after them.
+    expect(s.market.intensity).toBeGreaterThan(40);
+    expect(s.market.intensity).toBeLessThan(40.2);
     expect(s.market.window).toHaveLength(5);
     expect(s.round.grace).toBeGreaterThan(1e9);
     expect(() => primeMarket({ ...s, round: { ...s.round, phase: 'between' } })).toThrow();

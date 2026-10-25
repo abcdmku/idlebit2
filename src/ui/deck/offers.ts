@@ -73,7 +73,7 @@ export function extraRequest(at: NodeRef, def: RowDef): QuoteRequest | null {
   return null;
 }
 
-const COUNTS: ReadonlySet<string> = new Set(['lanes', 'slots', 'ports']);
+const COUNTS: ReadonlySet<string> = new Set(['lanes', 'slots', 'cores', 'ports']);
 
 /** One measurement through the shared formatters: "1 b", "21.4 kb", "1.5 kHz", "4 slots". */
 export const measure = (n: number, unit: EffectPreview['unit']): string => measureUnit(n, unit);
@@ -118,7 +118,8 @@ export function offerOf(def: RowDef, q: Quote | undefined, link = def.key === 'l
   const e = q.effect, first = !!e && COUNTS.has(e.unit) && e.capacityBefore === 0;
   const credits = q.currency === 'credits', price = q.locked || !credits ? null : whole(q.cost);
   // At the top of a ladder the step is a no-op: show where it stands ("32 slots"), not "32 → 32".
-  const change = first ? '' : !e ? q.label : e.capacityBefore === e.capacityAfter ? measure(e.capacityBefore, e.unit) : changeText(e);
+  // A first add keeps its "Add RAM" name and shows what it gives ("0 → 2 slots"), as the board does (user).
+  const change = !e ? q.label : e.capacityBefore === e.capacityAfter ? measure(e.capacityBefore, e.unit) : changeText(e);
   return { ...def, name: first ? `Add ${def.name}` : def.name, change,
     quote: q, price, affordable: !q.locked && credits && q.affordable, lock: q.locked?.text ?? null, where: false, right: rightOf(q, price, false) };
 }

@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { POOL_DOMAIN, selectResearchTree, type Amount, type GpuGeneration, type GpuStats, type PartView, type Quote, type ResearchTreeView, type SystemId, type TaskView } from '../../game';
 import { useGameSelector, useQuote, useShell } from '../storeHooks';
-import { projectKey } from '../research/ResearchDrawer';
+import { projectKey } from '../research/model';
 import { familyName } from '../hooks/feedModel';
 import { TaskTypeLabel } from '../art/TaskType';
 import { useLayout } from '../shell/geometry';

@@ -166,7 +166,7 @@ function fixtureEvents(o: DressOptions): GameEvent[] {
 export function fixtureReport(index: number, durationTicks: number): RoundReport {
   return {
     byType: [{ type: 'compute', metWork: 128_400, failedWork: 27_500, dismissed: 4 }],
-    index, startTick: 0, durationTicks, durationMs: durationTicks * TICK_MS, met: 1_284,
+    index, startTick: 0, endedBy: 'sla', durationTicks, durationMs: durationTicks * TICK_MS, met: 1_284,
     failedByCause: { timeout: 190, cantRun: 61, misroute: 12, power: 9, heat: 0, swap: 3, late: 0 },
     failDetail: { timeout: 'link', cantRun: 'ram', misroute: 'cache', power: 'psu', heat: null, swap: 'cold', late: null },
     details: [{ cause: 'timeout', detail: 'link', count: 150 }, { cause: 'cantRun', detail: 'ram', count: 61 }],

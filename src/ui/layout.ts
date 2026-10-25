@@ -41,8 +41,10 @@ interface Common {
   readonly dismiss: Rect;
   readonly buy: Rect;
   readonly research: Rect;
-  /** The research drawer (desktop) or sheet (phone), over the world. */
+  /** The build sheet's column (desktop bay 2), over the world. */
   readonly drawer: Rect;
+  /** The research screen: below the strip, over the world and the deck (the strip keeps showing the line). */
+  readonly lab: Rect;
   /** Ladder rungs: the 16 × 16 art icon at N, centred; phone rungs are 48 px tap targets. */
   readonly rungs: readonly [Rect, Rect, Rect, Rect, Rect];
   /** The ladder row's height (the band's first row). */
@@ -132,7 +134,7 @@ function desktop(N: 2 | 3, aw: number, ah: number, safe: SafeInsets): DesktopLay
     now, dismiss: r(now.x + now.w - lat - 144, now.y + lat, 144, KEY_H),
     buy: r(world.x, deckY + rowsH, b1w, KEY_H), research: r(b2x, deckY + rowsH, b2w, KEY_H),
     rows: [row(0), row(1), row(2), row(3), row(4)],
-    drawer: r(b2x, top, b2w, view.h),
+    drawer: r(b2x, top, b2w, view.h), lab: r(world.x, top, world.w, H - U - top),
     rungs: band0, rungRow: band.h, rungLabel, sla, wallet,
     pipeSrc: { x: headSlot.x + lat + 8 * N, y: top }, pipeRunY: top + U,
     calloutBounds: inset(view, lat), callout: { w: 288, h: N === 3 ? 144 : 112 },
@@ -164,10 +166,10 @@ function phone(aw: number, ah: number, safe: SafeInsets): PhoneLayout {
     world, view, band, strip, headSlot, cards: [card(0), card(1), card(2), card(3)],
     now, dismiss: r(now.x + now.w - 16 - KEY_W, now.y + 16, KEY_W, KEY_H),
     build, research, buy: r(buyX, ctrlY, W - U - buyX, ctrlH),
-    drawer: r(U, sheetY, world.w, world.y + world.h - sheetY),
+    drawer: r(U, sheetY, world.w, world.y + world.h - sheetY), lab: r(U, top, world.w, H - U - top),
     rungs: band0, rungRow, rungLabel: r(walletX, band.y, 0, rungRow),
     sla: r(band.x, band.y + rungRow, band.w, 32), wallet: r(walletX, band.y, band.x + band.w - U - walletX, rungRow),
     pipeSrc: { x: headSlot.x + 8 + 16, y: top }, pipeRunY: top + U,
-    calloutBounds: inset(view, lat), callout: { w: 200, h: 104 },
+    calloutBounds: inset(view, lat), callout: { w: 288, h: 104 },
   };
 }

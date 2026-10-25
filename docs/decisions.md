@@ -1059,7 +1059,7 @@ The user's words:
 1. **Default speed.** Switch generation 0's default port is **100 kHz** (k = 6). The lone system's pipe before Rack is that port, fixed until the Rack switch (D15 stands).
 2. **Rack-era ports** step up from 100 kHz into MHz at the clock-parity prices (D14), which keep them in MHz; switch generation 1 (`sw100k`) starts at 1 MHz. The generation tops stay where they were, because rack uplinks (room-switch speeds) are validated against them. D25's "an uplink must carry its ports combined" stands.
 3. **Pacing intent.** Compute climbs through Hz at the CPU level to about 1 kHz around System (20–30 min), through kHz across the System era, and reaches the 100 kHz pipe as Rack comes within reach (5–7 h). Before that, compute is the bottleneck, so kHz upgrades pay all through the System era.
-4. **Lead ruling on the climb (option a).** The CSV kHz clock climbs in about 15–60 s per level on a bare core, so the lane and core multipliers are Data-gated across the System era (2 → 4 → 8 at W5–W7, octaCore and outOfOrder at W7). The CSV clock prices stay.
+4. **Lead ruling on the climb (options a and i).** The CSV kHz clock climbs in about 15–60 s per level, so the lane and core multipliers are Data-gated across the System era (superscalar and quadCore at W6, outOfOrder and octaCore at W7), and the kHz core's energy decay is 0.85 per pushed level instead of the CSV's 0.93 (`hardware-progression.md` §3 departure): a kHz core turns uneconomic near 18k ops/s, so compute climbs with cores toward the 100 kHz pipe. `fabKhz` is W4 again (needs `systemBoard` and `pipelining`). The CSV clock prices stay.
 5. **Rack** is research tier W8 (12,000,000 Data), sized to the System era's income under the 100 kHz pipe.
 
 **D19 amendment, 25 Oct (user):**
@@ -1067,6 +1067,196 @@ The user's words:
 > system should be closer to 20-30 mins and rack at 5-7 hours is good
 
 System's band is **20–30 min** (was 30–60), and Rack's is **5–7 h**. `systemBoard` is research tier W3 (6,000 Data).
+
+**D30, 25 Oct: every round starts from the beginning; intensity advances per task (user).** Binding. It replaces D12.1's offset start (previous peak − 6) and the time-based ramp `dI/dt = 1/T(I)`.
+
+> tasks shouldn't start relative to you they should always start from the beginning. when you have fast systems they will just blast through the lower tasks
+
+1. **Start at zero.** Every round starts at `I = 0`; the prepared next-round queue is drawn from 0.
+2. **Intensity by task drawn.** Each task drawn into the queue (it replaces one taken, failed or dismissed) is drawn at the current `I`, then `I ← I + 1/k(I)` with `k(I) = 9 + 0.3 I + 0.03 I²` tasks per unit of `I` **(s)**. Hardware never changes the curve, only how fast a round moves along it: fast systems blast through the small early tasks. Dismissing draws a replacement and so advances `I`.
+3. **Round length.** The quadratic term gives later intensities more tasks per unit (each about 2–3% bigger than the last near the Rack-era wall), so a round lasts minutes near its wall at any fleet size.
+4. **What stays.** Family windows and weights, D26 windows and bands stay keyed on `I`. `I` advances at draw events, which are already deterministic, so delta invariance holds. Saves keep `I`.
+5. **Measured (real sim, `scripts/balance/opening.ts`, 8 seeds).** Round 1 without purchases ends at 0:36–1:16 (median 0:55) on Can't run · cache; an active round 1 at 7:39–9:03.
+
+**D31, 25 Oct: power at scale: start controllers, rack batteries and off-grid generation (user).** Binding. It amends `s3Sleep` (spec §9.3), Return to market (§4.1), §4.4 and the energy ledger (§9.8).
+
+The user's words:
+
+> maybe we can have battery or off grid power for global tier and smart start sequence research that can ease the early phases of starting up
+
+> battery could be rack level which increases the time until billed for each rack
+
+> battery/smart startup should show up as a new rack space under the cooling (they are one unit for both)
+
+> smart start can be a power upgrade as well and you would configure it there per rack, data rooms can trigger which racks are powered on and global schedulers which datacenters come online these are all new research and upgrades that come at the correct phase
+
+**The problem.**
+- Under D30 every round restarts at `I = 0`, so a large fleet sits through tiny tasks with every system awake.
+- The free 10 s warm-up is scrapped (user): booting and waking systems draw and bill idle watts like any powered part.
+- Idle is about 10% of full draw, plus cooler and supply overhead. Through the climb a big data center bills more than it earns (item 6).
+
+**The answer.** Start controllers make the powered fleet follow demand, rack batteries make each rack's opening (boot included) unbilled, and off-grid generation lowers the bill for the whole round.
+
+1. **Sleep never gets split work (D25 fix).**
+   - An `asleep` or `standby` system is never a split candidate. Under D25's spread, the old rule ("a route to an asleep system wakes it") woke every sleeping system on every take, so `s3Sleep` saved nothing.
+   - Asleep systems wake by **demand** through the router above them.
+   - **Base demand wake** (with `s3Sleep`, no controller): when a router can't split an entry because no awake child has room, or a minimum split lacks awake systems, it wakes that shortage, lowest index first. That is 1 system for an ordinary task, or the missing members.
+   - A woken system is `onMarket` after `s3WakeS` (2 s), a physical latency, drawing idle watts while it wakes. The head's clock keeps running.
+   - Systems still fall asleep after 10 s with nothing admitted or reserved and not holding research (D27).
+2. **Start controllers: smart start as a power upgrade at each scope.** Each is a part with research generations and Credit levels, plus a small configuration on its plate.
+
+   | Scope | Part (slot) | Controls | Opens |
+   |---|---|---|---|
+   | Rack | **Power control** (`powerCtl`), the battery and smart start as one unit in a new rack slot under the cooling (item 3) | which **systems** are awake at round start, and their wake order | Rack era (`powerCtl`, kHz W8) |
+   | Room (zone) | `roomStart`, on the room's **UPS** (room Power) | which **racks** are powered at round start, and their order | Room era (`roomStart`, MHz W11) |
+   | Global | `globalStart`, on the **global scheduler** | which **sites (data centers)** and their zones are online at round start, and their order | Global, with Regions (`globalStart`, GHz W14) |
+
+   - **Configuration** (the same three stable controls at every scope, saved per unit):
+     - **Start with** `n`: units awake or powered at Return to market (1 … the unit count; default 1).
+     - **Wake when**: `head waits ≥ X s`, with X from 1 to 9 and default 2. The second-generation part adds `busy ≥ Y %`: the awake units' busy fraction over the last 10 s, Y from 50 to 95 and default 75.
+     - **Order**: rack `slot` or `fastest` (rated compute); room `slot` or `coolest` (rack °F); global `slot`, `cheapest` (site marginal price, item 4) or `nearest` (backbone latency).
+   - **Step.**
+     - Each second in which the trigger holds, the controller wakes the next units in its order: 1 unit at generation 0, or `ceil(25% × awake)` at generation 1 (predictive).
+     - Demand waking (item 1) still adds any shortage at once.
+     - **Levels** cut the wake latency of the units it controls: L1–5 give 2, 1.5, 1, 0.5 and 0.25 s (0.25 s above L5).
+     - **Generation 1** (predictive) is Power control gen 1 at the rack, and `startPredict` for the room and global controllers.
+   - **Power states.**
+     - A **system** that is not woken is `asleep`: 0.03 × idle, no load.
+     - A **rack** a room controller has not powered is `standby`: the rack and everything in it draw 0 W, including the cooler, switch, LB and battery. Powering a rack on takes `rackOnS` (2 s at L1, cut by the room controller's level). Its own rack controller then starts its "Start with" systems.
+     - A **zone or site** the global controller has not brought online is `standby` in the same way, with `siteOnS` 5 s at L1.
+   - **Hierarchy.** A controller acts only while its unit is powered: a `standby` rack ignores its own controller until its room powers it on. Without a controller at a scope, every unit at that scope is powered at Return (today's behavior).
+   - **Back to sleep.** Systems fall asleep by `s3Sleep` (10 s idle). A room controller returns a rack to `standby` after all its systems have slept for 30 s, and a global controller does the same for a site after its racks have been off for 60 s. A unit holding research (D27) never sleeps.
+   - **Saves and configurations.** `StartCtl { gen, level, startWith, trigger: { headWaitS, busyPct | null }, order }` lives on `RackBuild.power.start`, `ZoneBuild.power.start` and `GlobalBuild.scheduler.start`. Named rack, room and site configurations store it, and Copy copies it (spec §13.1).
+   - **With D25.** Splits see only awake systems in powered racks. A wake adds candidates from the next tick. The D25.11 floor is unchanged.
+   - **With D30, the climb.**
+     - Demand doubles every 1.18 units of `I`, which is about 15–35 tasks under D30's `k(I)`. When the fleet just keeps up, takes come every few seconds, so a doubling takes about 30–70 s.
+     - Generation 0 doubles a rack of `n` awake systems in `n` seconds (at most 12 s), and a room of `n` racks in `n` s (at most 24 s). Generation 1 doubles any scope in about 3 s.
+     - The head's worst added wait is the trigger plus the latency, `X + wake` (4 s at defaults), inside its 10 s. So waking keeps pace and costs no early SLA, as long as the trigger is at 4 s or less at generation 0.
+3. **Rack batteries: time until billed.**
+   - **One unit, its own slot (user).** The battery and the rack's smart start are one part, **Power control** (`powerCtl`).
+     - It has a new, **fifth** rack infrastructure slot, drawn directly **under the cooling unit**. Slot order, top to bottom: cooling, power control, power (PDU), load balancer, switch. This supersedes the 4-slot rack of program §6 and D1.
+     - The slot shows empty and locked ("Needs Power control") until `powerCtl` is researched. Then tapping it opens the add plate with the price, as for any infrastructure part.
+     - A generation or level raises the battery's capacity and the smart start's capability together.
+   - **Discharge.** While the round runs and the rack is powered, the rack's PDU input is drawn from the battery, not billed. That input covers servers (booting, waking, asleep or busy), cooler, switch, LB and losses. When it is empty, utility billing starts as normal. A `standby` rack draws nothing and doesn't touch its battery.
+   - **Battery time** is `charge J ÷ current PDU input W`, so it scales with the rack's draw. It stacks with the controllers: a rack started with one awake system draws a few percent of full, so its battery lasts many times longer.
+   - **Sized for the opening.** L1 holds 60 s of a fresh era rack at full draw. That is about 10 min of a fully awake idle rack, which covers a mid-round boot (10 s at idle) and the D30 climb with room to spare. Staged, it lasts far longer.
+   - **Recharge.** Each battery refills fully at Return to market (and auto-return).
+     - **Pick: billed at 25% of its site's marginal price (item 4).** Why: it keeps the opening cheap rather than free, makes every round's surge covered whatever the gap between rounds (15 s auto-return included), and keeps offline catch-up deterministic. With renewable off-grid headroom at the site, the marginal price is 0, so the refill is free.
+     - The refill is billed on the Return tick and shown in the round report.
+   - **Not a supply.** A battery adds no capacity: PDU usage, overload and heat are unchanged. Battery time is billing time only.
+   - **Generations and levels.**
+     - Generation 0, Lead-acid (kHz, Rack): basic start control.
+     - Generation 1, Li-ion (MHz): adds the predictive `busy` trigger and batch waking.
+     - Generation 2, LFP (GHz): the largest capacity per level.
+     - All three use the flow curve: capacity ×2 per level, L1–11+g; wake latency follows the level (item 2).
+     - Price parity: install `≈ 40 × capacityJ × home price`. A battery pays back in about 50 full openings at 75% off.
+   - **The Power control unit's face, its plate and the rack LCD** show "BAT 4:12": time left at current draw, counting down only while it discharges. Then they show "GRID", next to the awake count "6/12".
+4. **Off-grid generation (Global).**
+   - A site part, **Generation**, installed at the site plate.
+   - Generations are technologies:
+     - Solar farm (`solarFarm`, GHz W12): output × the region's sun factor.
+     - Wind farm (`windFarm`, GHz W13): × wind factor.
+     - Fuel cell (`fuelCell`, GHz W13): constant output, fuel at 0.4 × region price.
+     - Own plant (`ownPlant`, GHz W14): constant and large, fuel at 0.25 × region price.
+   - Output is constant in time; the game has no day/night.
+   - **Use.** Each tick the site's grid-feed input is met first by generation, up to its output; only the rest is imported at the region price. Generation adds no grid-feed capacity.
+   - **Surplus** is lost, except that it sets the site's **marginal price**: 0 for renewables, the fuel price for fuel kinds, the region price without headroom. That price is used for rack-battery refills (item 3) and by the `price` strategy and the global controller's `cheapest` order.
+   - **Region factors** (sun, wind):
+
+     | Region | Sun | Wind |
+     |---|---:|---:|
+     | `us-east` | 1.0 | 1.0 |
+     | `us-west` | 1.3 | 0.9 |
+     | `eu-west` | 0.8 | 1.2 |
+     | `eu-north` | 0.5 | 1.5 |
+     | `sa-east` | 1.3 | 0.8 |
+     | `af-south` | 1.5 | 1.0 |
+     | `ap-southeast` | 1.2 | 0.7 |
+     | `ap-northeast` | 0.9 | 1.0 |
+
+     A sunny cheap region gets cheaper, while dear `eu-west` or `ap-northeast` saves most per watt generated.
+   - **Sizing and price.** L1 output is 10% of the site's grid-feed generation base; output ×2 per level. Price parity: install `≈ 4 h × output × home price`, renewables 1.5× the fuel kinds.
+5. **Eras.**
+   - **Rack era (kHz):** Power control gen 0 (`powerCtl`, kHz W8). Racks first idle here.
+   - **MHz:** Power control gen 1 (`powerCtlLiIon`, MHz W10), then the room controller (`roomStart`, MHz W11) with Room. `startPredict` (MHz W11) brings the room and global controllers' generation 1.
+   - **GHz:**
+     - Power control gen 2 (`powerCtlLfp`, GHz W12).
+     - Generation (`solarFarm` W12 … `ownPlant` W14).
+     - The global controller (`globalStart`, W14) with Regions, the first time there is more than one data center to stage.
+   - The node rows are in `docs/research.md`, "D31 proposed nodes"; the sim agent adds them to the tree data after the current CPU-content pass.
+6. **Model note (back of envelope; the real sim must measure the climb).** Let `G` be a large GHz fleet's potential gross per second at full use, with full electrical draw about `0.45 G` (a native share of 0.35 plus supply loss and cooling) and idle about `0.045 G`. Assume the D30 climb (utilization under 10%) is 10% of a 25-min round, at about 5% utilization, and the rest runs at 80%. Boot and wake now bill (no free warm-up).
+
+   | Case | Energy share in the climb | Energy share over the round |
+   |---|---:|---:|
+   | Baseline: all powered, all awake | about 130%: it loses money | 46.8% |
+   | Start controllers, generation 0 (powered ≈ 2 × load; sleepers 0.03; standby racks 0) | about 50% | 46.2% |
+   | + Power control battery at L1 (covers the climb several times over) | about 12% (only the 25% refill) | 45.6% |
+   | + renewable generation at 30% of peak draw | 0% | about 29% |
+   | Same with a fuel cell instead | about 20% | about 36% |
+
+   - **Controllers and batteries** fix the opening the user worried about: net per minute turns positive from the first second, boot included. They move the whole-round share by only about 1 point, because idle energy is small next to load once tasks are big.
+   - **Off-grid generation** is the whole-round lever.
+   - **Sizes and prices** are starting values: balance re-measures the climb's length and share in the real sim and sizes battery L1 to cover it.
+
+**Implementation contract (D31).** One `SAVE_VERSION` bump with a pre-live reset.
+
+*Sim (`src/game/**`):*
+- **Modes.** `UNIT_MODES` adds `standby` (powered off by a start controller: 0 W, not a split candidate). Hot `hot.rack.powered`, `hot.zone.powered` and `hot.site.powered` (u8), `hot.sys.wakeT` (exists for S3), plus per-controller `busy10s` (EMA) and `triggerSince` (tick).
+- **Split and wake.**
+  - `split` excludes `asleep` and `standby` systems, and routers below a `standby` unit.
+  - `wake(router, k)` in `net/` picks units in the controller's order.
+  - Base demand wake runs in `split` when it returns null for lack of awake room.
+  - Controller steps run in a `start` sub-phase at the start of the route step, top-down (global, zones, racks), before the D25 dispatch, and only for powered units.
+- **Return to market.** Each powered scope applies its controller's "Start with": global, then zones, then racks. Units without a controller start powered and awake.
+- **Parts.**
+  - **Rack: `powerCtl`.** A fifth rack infrastructure part, `RackBuild.powerCtl: { gen, level, start: StartCtl } | null`, with gen 0–2 and a flow level: battery capacity ×2 per level, and wake latency by level.
+  - **Infra slot.** `InfraSlot` adds `'powerCtl'`, and `QuoteRequest.infra.slot` with it. Install goes through `addPart`/`installInfra` on that slot once researched.
+  - **Layout.** The rack layout constant lists the five slots in draw order: cooling, powerCtl, power, lb, switch.
+  - **Room and global.** `roomStart` (on the UPS, `ZoneBuild.power.start`) and `globalStart` (on the global scheduler, `GlobalBuild.scheduler.start`) are `StartCtl` parts. Gen 0 is basic; gen 1, from `startPredict`, adds the `busy` trigger and batch waking. Linear levels L1–5 set the wake latency.
+  - Actions `setStartConfig { unit: ScopeRef; startWith; headWaitS; busyPct | null; order }`, hot and validated against the part's generation. Upgrades use `upgradePart`.
+- **Battery.**
+  - Capacity comes from `powerCtl`; hot `hot.rack.batteryJ` (f64), saved.
+  - In the power step, while the round runs and the rack is powered, take `min(batteryJ, pduInput × dt)` and bill only the rest.
+  - At Return, refill and bill `refillJ × 0.25 × siteMarginalPrice`.
+- **Generation.**
+  - `SiteBuild.generation: PartLevel | null` (gen 0–3 = solar, wind, fuel cell, own plant); compiled `site.genW` = output × region factor; the region table gains `sun` and `wind`.
+  - Ledger: `fromGen = min(gridInput, genW)`, billed at the fuel price; the rest imported at the region price.
+  - `siteMarginalPrice` feeds the battery refill, the `price` strategy and the `cheapest` order.
+- **Report.** `RoundReport.energy: { billed, fromBattery, batteryRefill, fromGeneration, fuel }`.
+- **Tests that matter.**
+  1. Delta invariance and owned-vs-pure on a room fixture with all three controllers, batteries and mid-round wakes.
+  2. No split ever targets an asleep or standby system.
+  3. A gen-0 rack controller started with 1 system wakes the rest within `n` seconds under a rising D30 climb with no head timeouts.
+  4. A standby rack draws 0 W and its battery doesn't drain. A rack without Power control powers all its systems at Return.
+  5. A rack's first `capacityJ / inputW` seconds of a round (boot included) bill 0, then bill at the price; Return refills it and bills 25%.
+  6. A site with a 30% generator imports only draw above its output, and its racks' refills cost 0.
+  7. Configuration copy and save round-trip `StartCtl`.
+
+*Render (`src/render/**`):*
+- `ServerSlotView.state`: draw `asleep` dim and `standby` dark, with a wake pulse during `wakeT`.
+- `RackSlotView` (room) and `ZoneView` / `SiteView` (global) get `powered: boolean` and `wakeMs: number | null`.
+- `RackSnapshot.powerCtl: PowerCtlView | null`, where `PowerCtlView` has:
+  - `{ generation, level }`;
+  - `battery: { capacityJ, chargeJ, secondsLeft: number | null, discharging: boolean }`;
+  - `start: StartCtlView` with `StartCtlView { generation, level, startWith, headWaitS, busyPct, order, awake, total, nextWakeInMs }`.
+- **The rack cabinet draws a fifth infrastructure unit directly under the cooler**: the Power control box, with a charge bar, the battery time and an awake-count readout. An empty slot draws an empty bay with a lock until researched.
+- The rack LCD shows "BAT 4:12", then "GRID", and the awake count "6/12". The slot's hit target opens its plate.
+- `RoomSnapshot.power.start` and `GlobalSnapshot.scheduler.start` use `StartCtlView` too.
+- `SiteView.generation: { kind, outputW, usedW, marginalPrice } | null`.
+- Every light is real: the battery bar drains at the real draw rate.
+
+*UI (`src/ui/**`):*
+- **Power control plate** (tap the new slot under the cooling):
+  - empty: the add/buy row with its price, or the lock reason;
+  - installed: a battery row ("Battery L2 · 4:12 at current draw", charge bar), the upgrade and replace callouts;
+  - a **Start** row with three fixed controls: "Start with [n] of 12" stepper, "Wake when head waits [X] s" stepper (plus "or busy ≥ [Y] %" once gen 1), and an "Order" toggle (Slot / Fastest);
+  - the tray at Rack lists Power control as a fifth infrastructure item.
+- **Room power plate (UPS):** the same Start row for racks (Order: Slot / Coolest).
+- **Global scheduler plate:** the same Start row for sites (Order: Slot / Cheapest / Nearest).
+- **Site plate:** a Generation row with output, use and fuel, plus its buy and upgrade callout.
+- **Configuration plates** show and copy the Start settings.
+- **Research view** shows the new nodes. **Round report** adds the energy breakdown lines.
+- Controls never move: the steppers keep fixed geometry, and locked options are greyed until their generation is owned.
 
 ## 16. Shared rules for agents
 

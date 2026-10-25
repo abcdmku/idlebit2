@@ -72,7 +72,8 @@ export function initialHot(state: Pick<GameState, 'compiled' | 'seed' | 'round'>
  * `headTick`. Draws the round seed, jitters and five tasks from `hot`.
  */
 export function preparedMarket(hot: HotBuffers, seed: number, roundIndex: number, I = 0, headTick = 0): MarketState {
-  return { roundIndex, window: prepareQueue(hot, seed, roundIndex, I), headTick, intensity: I };
+  const { tasks, intensity } = prepareQueue(hot, seed, roundIndex, I);
+  return { roundIndex, window: tasks, headTick, intensity };
 }
 
 /** A new game: round 1 running with its five tasks saved, so the first screen is playable (spec §4.1). */

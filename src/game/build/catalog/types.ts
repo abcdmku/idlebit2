@@ -9,7 +9,7 @@ export type WattsRule =
    * CPU cores and RAM (hardware-progression.md §3): energy ratio E = nativeRatio / push^a, a = −ln(decay) / ln 1.5,
    * per energy era; full-use W = rate / (0.010 × E), idle at most 10% of it. `era[g]` maps a generation to its era.
    */
-  | { readonly kind: 'ratio'; readonly era: readonly number[] }
+  | { readonly kind: 'ratio'; readonly era: readonly number[]; readonly decay?: readonly number[] }
   /** Non-rate parts: idle[g] × x^0.25, no load. */
   | { readonly kind: 'idle'; readonly idle: readonly number[] }
   | { readonly kind: 'cooler'; readonly wpw: readonly number[] }

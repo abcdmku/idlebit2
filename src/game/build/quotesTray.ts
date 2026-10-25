@@ -44,7 +44,10 @@ function addOrUpgrade(state: GameState, system: SystemId, kind: 'ram' | 'drive',
   const part = kind === 'drive' ? 'storage' : kind;
   const g = Math.max(0, newestGen(state.research.unlocks, part, PARTS[part].base.length));
   const add: Option = [{ type: 'addPart', system, kind, generation: g }, planAdd(state, system, kind, g)];
-  return [add, ...cheapest(state, list.map((_, index) => ({ unit: { kind: 'system', id: system }, slot: { kind, index } })))];
+  // The cheapest step first: a level on an installed module is often far cheaper than another module, and a new
+  // module at L1 next to levelled ones would cut the pooled bandwidth to its own (compile: the slowest module's).
+  return [add, ...cheapest(state, list.map((_, index) => ({ unit: { kind: 'system', id: system }, slot: { kind, index } })))]
+    .sort(([, x], [, y]) => Number((x.ok ? 0n : 1n) - (y.ok ? 0n : 1n)) || Number((planPrice(x) ?? 0n) - (planPrice(y) ?? 0n)));
 }
 
 function chipTray(state: GameState, id: SystemId): Item[] {

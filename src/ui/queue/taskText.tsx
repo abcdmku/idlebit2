@@ -9,6 +9,7 @@ import { familyName, sizeText, transferText } from '../hooks/feedModel';
 import { clockText } from '../hooks/format';
 import { blockedText, taskBits } from '../hooks/taskRequirements';
 import { shallowEqual, useGameSelector } from '../storeHooks';
+import { restartKey, restartOf } from './restart';
 
 export function TaskIcon({ task, n }: { task: QueueEntryView; n: number }) {
   return <ArtCanvas w={16} h={16} n={n} artKey={String(task.family)} draw={g => drawTaskIcon(g, task.family)} />;
@@ -48,12 +49,23 @@ export function HeadClock({ blocked, risk, short = false, testId = 'head-clock' 
   return <span className={risk && !short ? 'bad' : blocked ? 'warn' : clockTone(seconds)} data-testid={testId}>{text}</span>;
 }
 
-/** A taken task back at the front: no take clock, but its completion window runs (D25.7, D26.5). */
+/**
+ * A taken task back at the front of the line (returned after a restart or a lost shard): it has no take
+ * clock. It reads "Taken · waiting for the CPU" (a system, once Rack is open), or "Waiting · CPU
+ * restarting 7 s" while the system restarts, plus its completion window when it has one (D26.5).
+ * It is never "in LB queue": router-queue entries live in the load balancer, not in the strip.
+ */
 export function InQueue({ task, short = false, testId = 'head-clock' }: { task: QueueEntryView; short?: boolean; testId?: string }) {
   const left = useWindowLeft(task.windowEndTick);
-  if (left === null || task.deadline === null) return <span className="cyan" data-testid={testId}>{short ? 'in LB queue' : 'In LB queue'}</span>;
-  const low = left * 1000 <= task.deadline * TICK_MS / 4;
-  return <span className={low ? 'warn' : 'cyan'} data-testid={testId}>{short ? `${clockText(left * 1000)} left` : `In LB queue · ${clockText(left * 1000)} left`}</span>;
+  const r = useGameSelector(restartOf, (a, b) => restartKey(a) === restartKey(b), 250);
+  const rack = useGameSelector(s => s.unlocked.rack);
+  const low = left !== null && task.deadline !== null && left * 1000 <= task.deadline * TICK_MS / 4;
+  if (short) {
+    const text = r.on ? 'restarting' : left !== null ? `${clockText(left * 1000)} left` : 'taken';
+    return <span className={r.on || low ? 'warn' : 'cyan'} data-testid={testId}>{text}</span>;
+  }
+  const head = r.on ? `Waiting · CPU restarting${r.seconds === null ? '' : ` ${r.seconds} s`}` : `Taken · waiting for ${rack ? 'a system' : 'the CPU'}`;
+  return <span className={r.on || low ? 'warn' : 'cyan'} data-testid={testId}>{head}{left !== null ? ` · ${clockText(left * 1000)} left` : ''}</span>;
 }
 
 /** Between rounds the queue is frozen until Return (spec §4.1.5). */

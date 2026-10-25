@@ -52,7 +52,7 @@ describe('L2 shell geometry', () => {
   it('every box sits on the 8 px grid and the strip and ladder on the lattice, at every size', () => {
     for (const [w, h] of [[1440, 900], [1920, 1080], [1280, 800], [1200, 760], [1100, 700], [1366, 768], [390, 780], [375, 667], [430, 932]] as const) {
       const L = shellLayout(w, h);
-      const boxes = [L.world, L.band, L.strip, L.headSlot, ...L.cards, L.now, L.dismiss, L.buy, L.research, L.drawer, L.sla, L.wallet, ...L.rungs,
+      const boxes = [L.world, L.band, L.strip, L.headSlot, ...L.cards, L.now, L.dismiss, L.buy, L.research, L.drawer, L.lab, L.sla, L.wallet, ...L.rungs,
         ...(L.kind === 'desktop' ? L.rows : [L.build])];
       for (const b of boxes) for (const e of edges(b)) expect(on(e, 8), `${w}x${h} edge ${e}`).toBe(true);
       for (const b of [L.headSlot, ...L.cards, ...L.rungs]) for (const e of edges(b)) expect(on(e, L.lat), `${w}x${h} lattice ${e}`).toBe(true);

@@ -2,7 +2,7 @@
 
 Research designer, 24 October 2026. Inputs: `docs/decisions.md` (binding), IdleBit at `C:\Users\Borg\Documents\GitHub\IdleBit` (`src/game/content/research.ts`, `content/dispatcherJobs.ts`, `content/upgrades.ts`, the tier, cooling, accelerator, facility, cloud and automation definitions, `game-spec.md`, `FEATURES.md`), the v2 tree (the v2 spec §Research and Appendix A, and the v2 mockup research data, both in the BitRouge repository).
 
-The tree has 162 nodes in ten categories, including D12 Auto-skip. D26 (memory hierarchy) repurposed Virtual memory as Hot pages and added Unified memory. D25 (divisible tasks) turned the gang placements and queued take into split research and deleted Global gang; see §5.5. D15 removed Network speed: port steps open with the structure a link plugs into. The accepted GPU ruling adds nine generation nodes, separates tensor technology from generation unlocks, and adds exact Credit fees for generations 2 through 9. GPU campaign pacing remains unproved. Revision 2 applies the lead's decision log (program §15a, D1): FIFO first-fit load balancing, one shared boot time, VRAM per level, regional prices and outside air, a growing offline cap and cooling generations. Every number below is a starting value for the balance owner unless the program fixes it.
+The tree has 170 nodes in ten categories, including D12 Auto-skip. The CPU-tab pass added eight later-era CPU nodes (§10). D26 (memory hierarchy) repurposed Virtual memory as Hot pages and added Unified memory. D25 (divisible tasks) turned the gang placements and queued take into split research and deleted Global gang; see §5.5. D15 removed Network speed: port steps open with the structure a link plugs into. The accepted GPU ruling adds nine generation nodes, separates tensor technology from generation unlocks, and adds exact Credit fees for generations 2 through 9. GPU campaign pacing remains unproved. Revision 2 applies the lead's decision log (program §15a, D1): FIFO first-fit load balancing, one shared boot time, VRAM per level, regional prices and outside air, a growing offline cap and cooling generations. Every number below is a starting value for the balance owner unless the program fixes it.
 
 ## 1. Rules the tree follows
 
@@ -177,9 +177,10 @@ Fleet caps follow `docs/architecture.md` §1.9. The largest fleet is 8 sites × 
 | Ceiling | Start | Ladder (node) |
 |---|---|---|
 | Servers per rack | 12 | user rule, no node |
-| Cores per CPU | 1 | 2 `dualCore`, 4 `quadCore`, 8 `octaCore`, 16 `cores16`, 32 `chiplets` (cap, D7.2) |
+| Cores per CPU | 1 | 2 `dualCore`, 4 `quadCore`, 8 `octaCore`, 12 `ringBus`, 16 `cores16`, 24 `meshCores`, 32 `chiplets` (cap, D7.2) |
 | Scheduler queue Q and running K | Q 2, K 1 | levels; Q ≤ 32, K ≤ 32 and ≤ cores (D7.2) |
-| Lanes per core | 1 | 2 `pipelining`, 4 `superscalar`, 8 `outOfOrder`, 16 `simd`, 32 `wideVector` |
+| Lanes per core | 1 | 2 `pipelining`, 4 `superscalar`, 8 `outOfOrder`, 12 `branchPredict`, 16 `simd`, 24 `fma`, 32 `wideVector`, 64 `dualVector`, 112 `matrixTiles` (the GHz core's L14 top) |
+| L3 levels past `11 + g` | 0 | 1 `l3Slices`, 2 `edramL3` |
 | Hardware threads per core | 1 | 2 `smt` |
 | CPU sockets per system | 1 | 2 `dualSocket`, 4 `quadSocket`; 2 on accelerator systems |
 | RAM slots | 1 | 2 `dualChannel`, 4 `quadChannel` (general cap); 8 on accelerator systems `accelSystem` (8-channel bandwidth `octaChannel`) |
@@ -210,22 +211,30 @@ Program §7 says better generations lower the loss fraction. These are starting 
 
 Columns: id, short name, prerequisites, the zoom level where it first matters, era and work tier, the mechanical effect, and what it answers. An empty prerequisite cell means the node is a root.
 
-### 5.1 Compute (21)
+### 5.1 Compute (29)
 
 | id | Name | Requires | Level | Era / tier | Effect | Short | Answers |
 |---|---|---|---|---|---|---|---|
 | `pipelining` | Pipelining | | CPU | Hz W3 | Lane ceiling per core 1→2. The Core plate can now buy lane levels. | Cores run 2 ops a cycle | `bits`, `pickup` |
 | `superscalar` | Superscalar | pipelining | CPU | Hz W4 | Lane ceiling 2→4. | Cores run 4 ops a cycle | `ints` |
 | `outOfOrder` | Out-of-order | superscalar, fabKhz | CPU | kHz W7 | Lane ceiling 4→8. | Cores run 8 ops a cycle | `ints`, `threads` |
-| `simd` | SIMD | outOfOrder, fabMhz | CPU | MHz W10 | Lane ceiling 8→16. | Cores run 16 ops a cycle | `threads`, `rackDist` |
-| `wideVector` | Wide vectors | simd, fabGhz | CPU | GHz W12 | Lane ceiling 16→32. | Cores run 32 ops a cycle | `roomDist` member specs |
+| `simd` | SIMD | outOfOrder, fabMhz | CPU | MHz W10 | Lane ceiling to 16. | Cores run 16 ops a cycle | `threads`, `rackDist` |
+| `wideVector` | Wide vectors | simd, fabGhz | CPU | GHz W12 | Lane ceiling to 32. | Cores run 32 ops a cycle | `roomDist` member specs |
+| `branchPredict` | Branch prediction | outOfOrder, rack | CPU | kHz W8 | Lane ceiling 8→12: a kHz core (2 base lanes) reaches L6 of its 10 levels. Lanes past native push the core's energy ratio down (`hardware-progression.md` §3). | Cores run 12 ops a cycle | `threads`, `pickup` |
+| `fma` | Fused multiply-add | simd, room | CPU | MHz W11 | Lane ceiling 16→24: an MHz core (4 base lanes) reaches L6 of 12. | Cores run 24 ops a cycle | `rackDist`, `roomDist` |
+| `dualVector` | Dual vector units | wideVector, dataCenter | CPU | GHz W13 | Lane ceiling 32→64: a GHz core (8 base lanes) reaches L8 of 14 and an MHz core its L12 top. | Cores run 64 ops a cycle | `multiAz`, `density` |
+| `matrixTiles` | Matrix tiles | dualVector, regions | CPU | GHz W14 | Lane ceiling 64→112: a GHz core reaches its L14 top (8 × 14 lanes). From here every core generation is limited only by its catalog range (spec §12.1, `8 + 2g`). | Cores run 112 ops a cycle | `region`, `density` |
 | `dualCore` | Dual core | fifoSched | CPU | Hz W3 | Core sites 1→2. The Core tray item is enabled. | Up to 2 cores per CPU | `pickup`, `bits` |
 | `quadCore` | Quad core | dualCore, l2Cache | CPU | Hz W4 | Core sites 2→4. | Up to 4 cores per CPU | `threads` |
 | `octaCore` | 8 cores | quadCore, fabKhz | CPU | kHz W7 | Core sites 4→8. | Up to 8 cores per CPU | `threads`, `density` |
-| `cores16` | 16 cores | octaCore, fabMhz | CPU | MHz W10 | Core sites 8→16. | Up to 16 cores per CPU | `rackDist`, `density` |
-| `chiplets` | Chiplets | cores16, fabGhz | CPU | GHz W12 | Core sites 16→32, the cap per CPU (D7.2). | Up to 32 cores per CPU | `roomDist`, `density` |
+| `cores16` | 16 cores | octaCore, fabMhz | CPU | MHz W10 | Core sites to 16. | Up to 16 cores per CPU | `rackDist`, `density` |
+| `chiplets` | Chiplets | cores16, fabGhz | CPU | GHz W12 | Core sites to 32, the cap per CPU (D7.2). | Up to 32 cores per CPU | `roomDist`, `density` |
 | `stacked3d` | Stacked cache | chiplets, dataCenter | CPU | GHz W13 | Cores stay capped at 32 (D7.2), so this is cache. L3 gen 4 (stacked SRAM): 8× L3 capacity per level at gen 3's watts, so big per-member working sets fit in cache. | Stacked L3: 8× cache per level | `region` member specs, `density` |
-| `fabKhz` | kHz fab | systemBoard, superscalar | System | kHz W4 | Gen 1 of core (2 base lanes), clock (1 kHz base), L1, L2, L3, scheduler and CPU package. Opens Barebones kHz. | Opens kHz chips and Barebones kHz | all bands, `energy` |
+| `ringBus` | Ring bus | octaCore, rack | CPU | kHz W8 | Core sites 8→12. | Up to 12 cores per CPU | `threads`, `density` |
+| `meshCores` | Mesh interconnect | cores16, room | CPU | MHz W11 | Core sites 16→24; `chiplets` takes them to the 32 cap. | Up to 24 cores per CPU | `roomDist`, `density` |
+| `l3Slices` | L3 slices | l3Cache, fabMhz | CPU | MHz W10 | `l3LevelBonus` 0→1: every L3 generation gets one level past its `11 + g` top, 2× the top capacity, on the usual flow price and watt curves. | L3 cache gets 1 more level | `ram`, `rackDist` |
+| `edramL3` | eDRAM L3 | l3Slices, fabGhz | CPU | GHz W12 | `l3LevelBonus` 1→2: two levels past the `11 + g` top, 4× the normal top capacity. | L3 cache gets 2 more levels | `ram`, `roomDist` |
+| `fabKhz` | kHz fab | systemBoard, pipelining | System | kHz W4 | Gen 1 of core (2 base lanes), clock (1 kHz base), L1, L2, L3, scheduler and CPU package. Opens Barebones kHz. | Opens kHz chips and Barebones kHz | all bands, `energy` |
 | `fabMhz` | MHz fab | fabKhz, rack | Rack | MHz W9 | Gen 2 of every chip part. Opens Barebones MHz. | Opens MHz chips and Barebones MHz | all bands, `energy` |
 | `fabGhz` | GHz fab | fabMhz, room | Room | GHz W11 | Gen 3 of every chip part. Opens Barebones GHz. | Opens GHz chips and Barebones GHz | all bands, `energy` |
 | `l2Cache` | L2 cache | pipelining | CPU | Hz W3 | New chip part L2, shared by all cores. Capacity 8× an L1 of the same level, for 2× the watts. Adds to the cache tier (D26): bits that fit cache cost no memory time, so bigger cache speeds RAM-heavy work and delays spill. | Adds shared L2 cache, 8× L1 size | `ints`, `gate` |
@@ -439,7 +448,7 @@ Network scopes (rack load balancer, then room, site and backbone):
 
 | Category | Nodes |
 |---|---:|
-| Compute | 21 |
+| Compute | 29 |
 | Memory | 13 |
 | Acceleration | 18 |
 | Storage | 7 |
@@ -449,7 +458,7 @@ Network scopes (rack load balancer, then room, site and backbone):
 | Cooling | 14 |
 | Structure | 8 |
 | Operations | 17 |
-| **Total** | **162** |
+| **Total** | **170** |
 
 ## 6. The first hours
 
@@ -488,7 +497,7 @@ Sources: `content/research.ts` (legacy research), `content/dispatcherJobs.ts` (d
 | Cache Mapping | Adapted | Cache exists from the start; the next cache step is `l2Cache`, then `l3Cache`. |
 | Cache / Cache Speed upgrades | Adapted | Cache levels stay ungated. Cache speed dropped: v3 cache is a capacity gate. |
 | Benchmark Harness, benchmark compute tasks | Dropped | Payback inspection is UI work, and benchmark tasks don't exist in v3. |
-| Multi-Core Control, Add Core | Adopted | `dualCore`, `quadCore`, `octaCore`, `cores16`, `chiplets` (32-core cap, D7.2). |
+| Multi-Core Control, Add Core | Adopted | `dualCore`, `quadCore`, `octaCore`, `ringBus`, `cores16`, `meshCores`, `chiplets` (32-core cap, D7.2). |
 | Local Scheduler, CPU Queue Slot | Adopted | `fifoSched`; queue slots become scheduler Q levels. |
 | System Scheduler, System Queue Slot, scheduler SKUs (2/4/6/12/24 slot) | Adapted | Scheduler levels (Q, K) and scheduler generations through the fab nodes. |
 | Scheduler Watchdog, Deadlock Cooldown | Dropped | v3 has no deadlock; misroutes fail at once. The safety-net idea lives on in `powerCap` and `thermalThrottle`. |
@@ -566,7 +575,7 @@ export type Era = "hz" | "khz" | "mhz" | "ghz";
 export type WorkTier = 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12 | 13 | 14 | 15;
 
 export const DATA_BY_TIER: Record<WorkTier, number> = {
-  1: 1, 2: 100, 3: 2_000, 4: 9_000, 5: 8_000, 6: 50_000, 7: 1_000_000, 8: 4_000_000,
+  1: 1, 2: 100, 3: 2_500, 4: 9_000, 5: 8_000, 6: 50_000, 7: 1_000_000, 8: 2.7e6,
   9: 1.5e7, 10: 4e7, 11: 6e7, 12: 2e8, 13: 4e8, 14: 3e9, 15: 1e10,
 };
 /** Structure unlocks and fab generations cost 3x their tier's Data. */
@@ -671,24 +680,32 @@ const n = (
 
 export const RESEARCH_V3: readonly ResearchNode[] = [
   // Compute
-  n("pipelining", "Pipelining", "compute", [], "cpu", "hz", 3, 2_000, [cap("lanesPerCore", 2)], ["bits", "pickup"]),
-  n("superscalar", "Superscalar", "compute", ["pipelining"], "cpu", "hz", 4, 9_000, [cap("lanesPerCore", 4)], ["ints"]),
+  n("pipelining", "Pipelining", "compute", [], "cpu", "hz", 3, 2_500, [cap("lanesPerCore", 2)], ["bits", "pickup"]),
+  n("superscalar", "Superscalar", "compute", ["pipelining"], "cpu", "hz", 6, 50_000, [cap("lanesPerCore", 4)], ["ints"]),
   n("outOfOrder", "Out-of-order", "compute", ["superscalar", "fabKhz"], "cpu", "khz", 7, 1_000_000, [cap("lanesPerCore", 8)], ["ints", "threads"]),
   n("simd", "SIMD", "compute", ["outOfOrder", "fabMhz"], "cpu", "mhz", 10, 4e7, [cap("lanesPerCore", 16)], ["threads", "rackDist"]),
   n("wideVector", "Wide vectors", "compute", ["simd", "fabGhz"], "cpu", "ghz", 12, 2e8, [cap("lanesPerCore", 32)], ["roomDist"]),
-  n("dualCore", "Dual core", "compute", ["fifoSched"], "cpu", "hz", 3, 2_000, [cap("coreSites", 2)], ["pickup", "bits"]),
-  n("quadCore", "Quad core", "compute", ["dualCore", "l2Cache"], "cpu", "hz", 4, 9_000, [cap("coreSites", 4)], ["threads"]),
+  n("branchPredict", "Branch prediction", "compute", ["outOfOrder", "rack"], "cpu", "khz", 8, 2.7e6, [cap("lanesPerCore", 12)], ["threads", "pickup"]),
+  n("fma", "Fused multiply-add", "compute", ["simd", "room"], "cpu", "mhz", 11, 6e7, [cap("lanesPerCore", 24)], ["rackDist", "roomDist"]),
+  n("dualVector", "Dual vector units", "compute", ["wideVector", "dataCenter"], "cpu", "ghz", 13, 4e8, [cap("lanesPerCore", 64)], ["multiAz", "density"]),
+  n("matrixTiles", "Matrix tiles", "compute", ["dualVector", "regions"], "cpu", "ghz", 14, 3e9, [cap("lanesPerCore", 112)], ["region", "density"]),
+  n("dualCore", "Dual core", "compute", ["fifoSched"], "cpu", "hz", 3, 2_500, [cap("coreSites", 2)], ["pickup", "bits"]),
+  n("quadCore", "Quad core", "compute", ["dualCore", "l2Cache"], "cpu", "hz", 6, 50_000, [cap("coreSites", 4)], ["threads"]),
   n("octaCore", "8 cores", "compute", ["quadCore", "fabKhz"], "cpu", "khz", 7, 1_000_000, [cap("coreSites", 8)], ["threads", "density"]),
   n("cores16", "16 cores", "compute", ["octaCore", "fabMhz"], "cpu", "mhz", 10, 4e7, [cap("coreSites", 16)], ["rackDist", "density"]),
   n("chiplets", "Chiplets", "compute", ["cores16", "fabGhz"], "cpu", "ghz", 12, 2e8, [cap("coreSites", 32)], ["roomDist", "density"]),
   n("stacked3d", "Stacked cache", "compute", ["chiplets", "dataCenter"], "cpu", "ghz", 13, 4e8, [gen("l3", 4)], ["region", "density"]),
-  n("fabKhz", "kHz fab", "compute", ["systemBoard", "superscalar"], "system", "khz", 4, 27_000, chipGen(1), ["bits", "ints", "threads", "energy"]),
+  n("ringBus", "Ring bus", "compute", ["octaCore", "rack"], "cpu", "khz", 8, 2.7e6, [cap("coreSites", 12)], ["threads", "density"]),
+  n("meshCores", "Mesh interconnect", "compute", ["cores16", "room"], "cpu", "mhz", 11, 6e7, [cap("coreSites", 24)], ["roomDist", "density"]),
+  n("l3Slices", "L3 slices", "compute", ["l3Cache", "fabMhz"], "cpu", "mhz", 10, 4e7, [cap("l3LevelBonus", 1)], ["ram", "rackDist"]),
+  n("edramL3", "eDRAM L3", "compute", ["l3Slices", "fabGhz"], "cpu", "ghz", 12, 2e8, [cap("l3LevelBonus", 2)], ["ram", "roomDist"]),
+  n("fabKhz", "kHz fab", "compute", ["systemBoard", "pipelining"], "system", "khz", 4, 27_000, chipGen(1), ["bits", "ints", "threads", "energy"]),
   n("fabMhz", "MHz fab", "compute", ["fabKhz", "rack"], "rack", "mhz", 9, 4.5e7, chipGen(2), ["ram", "rackDist", "energy"]),
   n("fabGhz", "GHz fab", "compute", ["fabMhz", "room"], "room", "ghz", 11, 1.8e8, chipGen(3), ["roomDist", "energy"]),
-  n("l2Cache", "L2 cache", "compute", ["pipelining"], "cpu", "hz", 3, 2_000, [gen("l2", 0)], ["ints", "gate"]),
+  n("l2Cache", "L2 cache", "compute", ["pipelining"], "cpu", "hz", 3, 2_500, [gen("l2", 0)], ["ints", "gate"]),
   n("l3Cache", "L3 cache", "compute", ["l2Cache", "systemBoard"], "system", "hz", 5, 8_000, [gen("l3", 0)], ["ints", "ram"]),
   n("smt", "SMT", "compute", ["timeSlice", "octaCore"], "cpu", "khz", 7, 1_000_000, [cap("threadsPerCore", 2), rule("smt", { shareRate: 0.6 })], ["pickup"]),
-  n("dualSocket", "Dual socket", "compute", ["octaCore", "rack"], "system", "khz", 8, 4_000_000, [cap("cpuSockets", 2), rule("socketFactor", { s2: 0.92 }), rule("socketSpanPenalty", { ramBandwidth: 0.5 })], ["density", "threads"]),
+  n("dualSocket", "Dual socket", "compute", ["octaCore", "rack"], "system", "khz", 8, 2.7e6, [cap("cpuSockets", 2), rule("socketFactor", { s2: 0.92 }), rule("socketSpanPenalty", { ramBandwidth: 0.5 })], ["density", "threads"]),
   n("quadSocket", "4 sockets", "compute", ["dualSocket"], "system", "khz", 9, 1.5e7, [cap("cpuSockets", 4), rule("socketFactor", { s3: 0.85, s4: 0.78 })], ["density", "rackDist"]),
   n("dma", "DMA engine", "compute", ["memController"], "system", "hz", 5, 8_000, [rule("dma")], ["ram", "storage"]), // D26: RAM and disk parts
   n("prefetch", "Prefetcher", "compute", ["dma", "l3Cache"], "system", "khz", 6, 50_000, [rule("prefetch")], ["ram"]),
@@ -703,7 +720,7 @@ export const RESEARCH_V3: readonly ResearchNode[] = [
   n("dualChannel", "Dual channel", "memory", ["memController"], "system", "hz", 5, 8_000, [cap("ramSlots", 2), rule("multiChannel")], ["ram"]),
   n("quadChannel", "Quad channel", "memory", ["dualChannel", "fabKhz"], "system", "khz", 7, 1_000_000, [cap("ramSlots", 4), rule("dimmFactor", { d3: 0.95, d4: 0.9 })], ["ram"]),
   n("octaChannel", "8 channels", "memory", ["quadChannel", "accelSystem", "fabMhz"], "system", "mhz", 10, 4e7, [rule("multiChannel", { accelChannels: 8 })], ["gpu", "roomDist"]),
-  n("ecc", "ECC memory", "memory", ["ddr2", "rack"], "rack", "khz", 8, 4_000_000, [rule("ecc", { price: 1.25, watts: 1.1 })], ["storage", "rackDist", "gate"]),
+  n("ecc", "ECC memory", "memory", ["ddr2", "rack"], "rack", "khz", 8, 2.7e6, [rule("ecc", { price: 1.25, watts: 1.1 })], ["storage", "rackDist", "gate"]),
   n("rdimm", "Registered DIMM", "memory", ["quadChannel", "ecc"], "rack", "mhz", 9, 1.5e7, [rule("registeredCapacity", { factor: 2 })], ["rackDist", "roomDist"]),
   n("lowVoltRam", "Low-voltage RAM", "memory", ["ddr2"], "system", "khz", 7, 1_000_000, [rule("ramWatts", { factor: 0.7 })], ["energy", "overload"]),
   n("hotPages", "Hot pages", "memory", ["memController", "storageCtl"], "system", "hz", 5, 8_000, [rule("hotPages", { diskExponent: 2 })], ["storage", "ram"]),
@@ -711,7 +728,7 @@ export const RESEARCH_V3: readonly ResearchNode[] = [
   // Acceleration
   n("gpuGen1", "GPU gen 1, 1 kHz", "accel", ["memController"], "system", "hz", 5, 8_000, [gen("gpu", 0)], ["gpu"]),
   n("gpuGen2", "GPU gen 2, 10 kHz", "accel", ["gpuGen1", "fabKhz"], "system", "khz", 7, 1_000_000, [gen("gpu", 1), gen("npu", 1)], ["gpu"]),
-  n("gpuGen3", "GPU gen 3, 100 kHz", "accel", ["gpuGen2", "rack"], "system", "khz", 8, 4_000_000, [gen("gpu", 2)], ["gpu"]),
+  n("gpuGen3", "GPU gen 3, 100 kHz", "accel", ["gpuGen2", "rack"], "system", "khz", 8, 2.7e6, [gen("gpu", 2)], ["gpu"]),
   n("gpuGen4", "GPU gen 4, 1 MHz", "accel", ["gpuGen3", "fabMhz"], "system", "mhz", 10, 4e7, [gen("gpu", 3)], ["gpu"]),
   n("gpuGen5", "GPU gen 5, 10 MHz", "accel", ["gpuGen4", "room"], "system", "mhz", 11, 6e7, [gen("gpu", 4)], ["gpu"]),
   n("gpuGen6", "GPU gen 6, 100 MHz", "accel", ["gpuGen5", "fabGhz"], "system", "ghz", 12, 2e8, [gen("gpu", 5)], ["gpu"]),
@@ -724,7 +741,7 @@ export const RESEARCH_V3: readonly ResearchNode[] = [
   n("unifiedMemory", "Unified memory", "accel", ["hbm", "gpuGen8"], "system", "ghz", 14, 3e9, [rule("unifiedMemory")], ["gpu", "roomDist"]),
   n("hbm", "HBM", "accel", ["gddr6", "fabMhz"], "system", "mhz", 10, 4e7, [rule("vramPerLevel", { factor: 16 }), rule("vramScale", { idle: 0.5 })], ["roomDist"]),
   n("dualGpu", "Dual GPU", "accel", ["gpuGen2", "fabKhz"], "system", "khz", 7, 1_000_000, [cap("gpuSlots", 2)], ["gpu"]),
-  n("accelSystem", "Accelerator box", "accel", ["dualSocket", "quadChannel", "dualGpu"], "rack", "khz", 8, 4_000_000, [rule("accelBoard", { sockets: 2, ramSlots: 8, gpuSlots: 8 })], ["gpu", "rackDist", "roomDist", "density"]),
+  n("accelSystem", "Accelerator box", "accel", ["dualSocket", "quadChannel", "dualGpu"], "rack", "khz", 8, 2.7e6, [rule("accelBoard", { sockets: 2, ramSlots: 8, gpuSlots: 8 })], ["gpu", "rackDist", "roomDist", "density"]),
   n("gpuLink", "GPU link", "accel", ["dualGpu", "gpuGen2"], "system", "khz", 7, 1_000_000, [rule("gpuLink")], ["gpu"]),
   n("npu", "NPU", "accel", ["gpuGen2"], "system", "khz", 7, 1_000_000, [gen("npu", 0), rule("npuTensorOnly", { watts: 0.25 })], ["energy"]),
 
@@ -735,28 +752,28 @@ export const RESEARCH_V3: readonly ResearchNode[] = [
   n("scm", "Storage-class mem", "storage", ["nvme", "fabGhz"], "system", "ghz", 12, 2e8, [gen("storage", 3)], ["multiAz"]),
   n("raid0", "Striping", "storage", ["storageCtl"], "system", "hz", 6, 50_000, [cap("driveSlots", 4)], ["storage"]),
   n("ncq", "Command queuing", "storage", ["ssd"], "system", "khz", 7, 1_000_000, [rule("ncq", { concurrent: 4 })], ["storage", "pickup"]),
-  n("sharedStorage", "Rack storage", "storage", ["raid0", "rack"], "rack", "khz", 8, 4_000_000, [gen("storageNode", 0), rule("sharedStorage")], ["storage", "density"]),
+  n("sharedStorage", "Rack storage", "storage", ["raid0", "rack"], "rack", "khz", 8, 2.7e6, [gen("storageNode", 0), rule("sharedStorage")], ["storage", "density"]),
 
   // Scheduling: system scope
   n("fifoSched", "FIFO scheduler", "scheduling", [], "cpu", "hz", 1, 1, [gen("scheduler", 0), strat("system", "fifo")], ["pickup"]),
   n("sjf", "Shortest job first", "scheduling", ["fifoSched"], "cpu", "hz", 2, 100, [strat("system", "sjf")], ["bits", "ints"]),
   n("timeSlice", "Time slicing", "scheduling", ["fifoSched"], "cpu", "hz", 2, 100, [strat("system", "timeSlice")], ["pickup"]),
-  n("priorityQ", "Priority", "scheduling", ["sjf"], "cpu", "hz", 3, 2_000, [strat("system", "priority")], ["energy"]),
-  n("mlfq", "Aging (MLFQ)", "scheduling", ["sjf", "timeSlice"], "cpu", "hz", 3, 2_000, [strat("system", "mlfq")], ["pickup"]),
-  n("workStealing", "Work stealing", "scheduling", ["quadCore"], "cpu", "hz", 4, 9_000, [rule("workStealing")], ["threads"]),
-  n("numaAware", "NUMA-aware", "scheduling", ["dualSocket"], "system", "khz", 8, 4_000_000, [rule("numaAware")], ["ram", "rackDist"]),
+  n("priorityQ", "Priority", "scheduling", ["sjf"], "cpu", "hz", 3, 2_500, [strat("system", "priority")], ["energy"]),
+  n("mlfq", "Aging (MLFQ)", "scheduling", ["sjf", "timeSlice"], "cpu", "hz", 3, 2_500, [strat("system", "mlfq")], ["pickup"]),
+  n("workStealing", "Work stealing", "scheduling", ["quadCore"], "cpu", "hz", 6, 50_000, [rule("workStealing")], ["threads"]),
+  n("numaAware", "NUMA-aware", "scheduling", ["dualSocket"], "system", "khz", 8, 2.7e6, [rule("numaAware")], ["ram", "rackDist"]),
   // Scheduling: network scopes
-  n("lbCapability", "Capability-aware", "scheduling", ["rack"], "rack", "khz", 8, 4_000_000, [filt("net", "capability")], ["misroute"]),
-  n("lbHealth", "Health checks", "scheduling", ["lbCapability"], "rack", "khz", 8, 4_000_000, [filt("net", "health")], ["overload", "heat"]),
-  n("lbRoundRobin", "Round robin", "scheduling", ["rack"], "rack", "khz", 8, 4_000_000, [strat("net", "roundRobin")], ["overload", "heat"]),
-  n("lbLeastConn", "Least conns", "scheduling", ["lbRoundRobin"], "rack", "khz", 8, 4_000_000, [strat("net", "leastConn")], ["pickup", "overload"]),
-  n("lbWeighted", "Weighted", "scheduling", ["lbLeastConn"], "rack", "khz", 8, 4_000_000, [strat("net", "weighted")], ["pickup"]),
+  n("lbCapability", "Capability-aware", "scheduling", ["rack"], "rack", "khz", 8, 2.7e6, [filt("net", "capability")], ["misroute"]),
+  n("lbHealth", "Health checks", "scheduling", ["lbCapability"], "rack", "khz", 8, 2.7e6, [filt("net", "health")], ["overload", "heat"]),
+  n("lbRoundRobin", "Round robin", "scheduling", ["rack"], "rack", "khz", 8, 2.7e6, [strat("net", "roundRobin")], ["overload", "heat"]),
+  n("lbLeastConn", "Least conns", "scheduling", ["lbRoundRobin"], "rack", "khz", 8, 2.7e6, [strat("net", "leastConn")], ["pickup", "overload"]),
+  n("lbWeighted", "Weighted", "scheduling", ["lbLeastConn"], "rack", "khz", 8, 2.7e6, [strat("net", "weighted")], ["pickup"]),
   n("lbLeastWork", "Least work left", "scheduling", ["lbWeighted", "telemetry"], "rack", "mhz", 9, 1.5e7, [strat("net", "leastWork")], ["pickup", "transfer"]),
   n("lbPowerAware", "Power-aware", "scheduling", ["lbHealth", "telemetry"], "rack", "mhz", 9, 1.5e7, [filt("net", "power")], ["overload"]),
   n("binPacking", "Bin packing", "scheduling", ["lbRoundRobin", "s3Sleep", "telemetry"], "rack", "mhz", 9, 1.5e7, [strat("net", "binPack")], ["energy", "overload"]),
-  n("lbAffinity", "Workload affinity", "scheduling", ["accelSystem", "lbCapability"], "rack", "khz", 8, 4_000_000, [strat("net", "affinity")], ["gpu", "pickup", "energy"]),
+  n("lbAffinity", "Workload affinity", "scheduling", ["accelSystem", "lbCapability"], "rack", "khz", 8, 2.7e6, [strat("net", "affinity")], ["gpu", "pickup", "energy"]),
   n("shardSteal", "Shard stealing", "scheduling", ["lbHealth"], "rack", "mhz", 9, 1.5e7, [rule("shardSteal")], ["pickup", "transfer"]),
-  n("splitGather", "Gather", "scheduling", ["lbCapability"], "rack", "khz", 8, 4_000_000, [rule("gather", { share: 0.5, waitS: 10 })], ["rackDist", "pickup"]),
+  n("splitGather", "Gather", "scheduling", ["lbCapability"], "rack", "khz", 8, 2.7e6, [rule("gather", { share: 0.5, waitS: 10 })], ["rackDist", "pickup"]),
   n("stealRoom", "Cross-rack stealing", "scheduling", ["shardSteal", "room"], "room", "mhz", 11, 6e7, [rule("stealRoom")], ["roomDist", "pickup"]),
   n("thermalAware", "Thermal-aware", "scheduling", ["lbPowerAware", "room"], "room", "mhz", 11, 6e7, [filt("room", "thermal")], ["heat"]),
   n("topologyAware", "Topology-aware", "scheduling", ["stealRoom"], "room", "ghz", 11, 6e7, [strat("net", "linkAware")], ["transfer", "roomDist"]),
@@ -766,19 +783,19 @@ export const RESEARCH_V3: readonly ResearchNode[] = [
   n("priceAware", "Price-aware", "scheduling", ["latencyAware"], "global", "ghz", 14, 3e9, [strat("global", "price")], ["energy"]),
 
   // Networking
-  n("sw100k", "Switch gen 1", "network", ["rack"], "rack", "khz", 8, 4_000_000, [gen("switch", 1)], ["transfer"]),
+  n("sw100k", "Switch gen 1", "network", ["rack"], "rack", "khz", 8, 2.7e6, [gen("switch", 1)], ["transfer"]),
   n("sw1M", "Switch gen 2", "network", ["sw100k", "fabMhz"], "rack", "mhz", 10, 4e7, [gen("switch", 2)], ["transfer", "rackDist"]),
   n("sw10M", "Switch gen 3", "network", ["sw1M", "room"], "room", "mhz", 11, 6e7, [gen("switch", 3)], ["roomDist"]),
   n("sw100M", "Switch gen 4", "network", ["sw10M", "fabGhz"], "room", "ghz", 12, 2e8, [gen("switch", 4)], ["roomDist"]),
   n("sw1G", "Switch gen 5", "network", ["sw100M", "dataCenter"], "global", "ghz", 13, 4e8, [gen("switch", 5)], ["multiAz"]),
   n("sw10G", "Switch gen 6", "network", ["sw1G", "regions"], "global", "ghz", 14, 3e9, [gen("switch", 6)], ["region"]),
-  n("portExpansion", "8-port switch", "network", ["rack"], "rack", "khz", 8, 4_000_000, [cap("rackPorts", 8), cap("roomPorts", 8)], ["density"]),
-  n("densePorts", "12-port switch", "network", ["portExpansion"], "rack", "khz", 8, 4_000_000, [cap("rackPorts", 12), cap("roomPorts", 16)], ["density"]),
+  n("portExpansion", "8-port switch", "network", ["rack"], "rack", "khz", 8, 2.7e6, [cap("rackPorts", 8), cap("roomPorts", 8)], ["density"]),
+  n("densePorts", "12-port switch", "network", ["portExpansion"], "rack", "khz", 8, 2.7e6, [cap("rackPorts", 12), cap("roomPorts", 16)], ["density"]),
   n("spineLeaf", "Spine-leaf", "network", ["densePorts", "room"], "room", "ghz", 11, 6e7, [cap("roomPorts", 24)], ["density"]),
   n("lag", "Link aggregation", "network", ["portExpansion"], "rack", "mhz", 9, 1.5e7, [cap("uplinks", 2)], ["transfer"]),
   n("lag4", "4-way uplinks", "network", ["lag", "room"], "room", "ghz", 11, 6e7, [cap("uplinks", 4)], ["transfer", "roomDist"]),
   n("cutThrough", "Cut-through", "network", ["lag", "room"], "room", "mhz", 11, 6e7, [rule("cutThrough", { perHopMs: 1 })], ["transfer"]),
-  n("qos", "QoS queues", "network", ["lbCapability"], "rack", "khz", 8, 4_000_000, [rule("qos")], ["pickup", "transfer"]),
+  n("qos", "QoS queues", "network", ["lbCapability"], "rack", "khz", 8, 2.7e6, [rule("qos")], ["pickup", "transfer"]),
   n("dpFiber", "Fiber plane", "network", ["dataCenter"], "global", "ghz", 13, 4e8, [gen("dataPlane", 1), rule("linkScale", { bandwidth: 10, latency: 0.5 })], ["multiAz", "transfer"]),
   n("dpDwdm", "DWDM plane", "network", ["dpFiber"], "global", "ghz", 13, 4e8, [gen("dataPlane", 2), rule("linkScale", { bandwidth: 10, latency: 0.5 })], ["multiAz"]),
   n("bbDarkFiber", "Dark fiber", "network", ["regions"], "global", "ghz", 14, 3e9, [gen("backbone", 1), rule("linkScale", { bandwidth: 10, latency: 0.5 })], ["region"]),
@@ -787,20 +804,20 @@ export const RESEARCH_V3: readonly ResearchNode[] = [
 
   // Power
   n("cstateC1", "C1 halt", "power", [], "cpu", "hz", 1, 1, [rule("coreIdle", { factor: 0.5, afterS: 0, wakeS: 0 })], ["energy"]),
-  n("cstateC3", "C3 sleep", "power", ["cstateC1", "dualCore"], "cpu", "hz", 3, 2_000, [rule("coreIdle", { factor: 0.15, afterS: 1, wakeS: 0.2 })], ["energy"]),
+  n("cstateC3", "C3 sleep", "power", ["cstateC1", "dualCore"], "cpu", "hz", 3, 2_500, [rule("coreIdle", { factor: 0.15, afterS: 1, wakeS: 0.2 })], ["energy"]),
   n("cstateC6", "C6 power gate", "power", ["cstateC3", "fabKhz"], "cpu", "khz", 7, 1_000_000, [rule("coreIdle", { factor: 0.02, afterS: 1, wakeS: 1 })], ["energy"]),
   n("packageC", "Package C-states", "power", ["cstateC6", "l3Cache"], "system", "khz", 7, 1_000_000, [rule("packageIdle", { factor: 0.2 })], ["energy"]),
-  n("s3Sleep", "Suspend (S3)", "power", ["packageC", "rack"], "rack", "khz", 8, 4_000_000, [rule("s3Sleep", { afterS: 10, factor: 0.03, wakeS: 2 })], ["energy"]),
+  n("s3Sleep", "Suspend (S3)", "power", ["packageC", "rack"], "rack", "khz", 8, 2.7e6, [rule("s3Sleep", { afterS: 10, factor: 0.03, wakeS: 2 })], ["energy"]),
   n("dvfs", "P-states (DVFS)", "power", ["cstateC1", "systemBoard"], "system", "hz", 5, 8_000, [rule("dvfs", { clock: 0.5, loadWatts: 0.3 })], ["energy", "overload"]),
   n("turbo", "Turbo boost", "power", ["dvfs", "fabKhz"], "system", "khz", 7, 1_000_000, [rule("turbo", { clock: 1.25, loadWatts: 1.8, maxUsage: 0.9, maxF: 80 })], ["pickup"]),
   n("powerCap", "Power capping", "power", ["dvfs", "telemetry"], "system", "hz", 6, 50_000, [rule("powerCap", { step: 0.1 })], ["overload"]),
   n("loadShed", "Load shedding", "power", ["powerCap", "room"], "room", "mhz", 11, 6e7, [rule("loadShed", { atTimerS: 5 })], ["overload"]),
   n("psu80", "80 Plus", "power", ["systemBoard"], "system", "hz", 4, 9_000, [gen("psu", 1), rule("lossFraction", { psu: 0.2 })], ["energy", "heat"]),
   n("psuBronze", "80 Plus Bronze", "power", ["psu80", "fabKhz"], "system", "khz", 7, 1_000_000, [gen("psu", 2), rule("lossFraction", { psu: 0.15 })], ["energy", "heat"]),
-  n("psuGold", "80 Plus Gold", "power", ["psuBronze", "rack"], "rack", "khz", 8, 4_000_000, [gen("psu", 3), rule("lossFraction", { psu: 0.1 })], ["energy", "heat"]),
+  n("psuGold", "80 Plus Gold", "power", ["psuBronze", "rack"], "rack", "khz", 8, 2.7e6, [gen("psu", 3), rule("lossFraction", { psu: 0.1 })], ["energy", "heat"]),
   n("psuPlatinum", "80 Plus Platinum", "power", ["psuGold", "fabMhz"], "rack", "mhz", 10, 4e7, [gen("psu", 4), rule("lossFraction", { psu: 0.07 })], ["energy", "heat"]),
   n("psuTitanium", "80 Plus Titanium", "power", ["psuPlatinum", "fabGhz"], "room", "ghz", 12, 2e8, [gen("psu", 5), rule("lossFraction", { psu: 0.04 })], ["energy", "heat"]),
-  n("meteredPdu", "Metered PDU", "power", ["rack"], "rack", "khz", 8, 4_000_000, [gen("pdu", 1), rule("lossFraction", { pdu: 0.03 }), rule("supplyCapacity", { pdu: 4 })], ["overload"]),
+  n("meteredPdu", "Metered PDU", "power", ["rack"], "rack", "khz", 8, 2.7e6, [gen("pdu", 1), rule("lossFraction", { pdu: 0.03 }), rule("supplyCapacity", { pdu: 4 })], ["overload"]),
   n("switchedPdu", "Switched PDU", "power", ["meteredPdu", "room"], "room", "mhz", 11, 6e7, [gen("pdu", 2), rule("lossFraction", { pdu: 0.02 }), rule("supplyCapacity", { pdu: 4 })], ["overload"]),
   n("dualFeed", "A+B feeds", "power", ["switchedPdu", "upsOnline"], "room", "ghz", 11, 6e7, [rule("dualFeed")], ["overload", "roomDist"]),
   n("upsOnline", "Online UPS", "power", ["room"], "room", "mhz", 11, 6e7, [gen("ups", 1), rule("lossFraction", { ups: 0.06 }), rule("supplyCapacity", { ups: 4 })], ["overload", "energy"]),
@@ -809,9 +826,9 @@ export const RESEARCH_V3: readonly ResearchNode[] = [
   n("hvIntake", "HV intake", "power", ["substation", "regions"], "global", "ghz", 14, 3e9, [gen("grid", 2), rule("lossFraction", { grid: 0.02 }), rule("supplyCapacity", { grid: 8 })], ["overload"]),
 
   // Cooling
-  n("thermalThrottle", "Thermal throttle", "cooling", ["rack"], "rack", "khz", 8, 4_000_000, [rule("thermalThrottle", { atF: 95, untilF: 90, clock: 0.5 })], ["heat"]),
-  n("rackVarSpeed", "Fan control", "cooling", ["rack", "telemetry"], "rack", "khz", 8, 4_000_000, [rule("rackSetpoint", { minF: 55, maxF: 80 })], ["energy"]),
-  n("rackAir2", "High-flow air", "cooling", ["rack"], "rack", "khz", 8, 4_000_000, [gen("rackCooler", 1)], ["heat"]),
+  n("thermalThrottle", "Thermal throttle", "cooling", ["rack"], "rack", "khz", 8, 2.7e6, [rule("thermalThrottle", { atF: 95, untilF: 90, clock: 0.5 })], ["heat"]),
+  n("rackVarSpeed", "Fan control", "cooling", ["rack", "telemetry"], "rack", "khz", 8, 2.7e6, [rule("rackSetpoint", { minF: 55, maxF: 80 })], ["energy"]),
+  n("rackAir2", "High-flow air", "cooling", ["rack"], "rack", "khz", 8, 2.7e6, [gen("rackCooler", 1)], ["heat"]),
   n("rackWater", "Rear-door water", "cooling", ["rackVarSpeed", "fabMhz"], "rack", "mhz", 10, 4e7, [gen("rackCooler", 2), rule("rackWater", { tau: 0.1, wattsPerWatt: 0.5 })], ["heat", "energy"]),
   n("rackWater2", "Direct-to-chip", "cooling", ["rackWater", "fabGhz"], "rack", "ghz", 12, 2e8, [gen("rackCooler", 3)], ["heat", "energy", "density"]),
   n("hotColdAisle", "Hot/cold aisle", "cooling", ["room"], "room", "mhz", 11, 6e7, [rule("roomLeak", { factor: 0.6 })], ["heat", "energy"]),
@@ -825,8 +842,8 @@ export const RESEARCH_V3: readonly ResearchNode[] = [
   n("closedLoop2", "Two-phase loop", "cooling", ["closedLoop", "regions"], "global", "ghz", 14, 3e9, [gen("roomCooler", 5)], ["heat", "energy"]),
 
   // Structure
-  n("systemBoard", "System", "structure", ["dualCore", "l2Cache"], "system", "hz", 3, 6_000, [view("system"), gen("psu", 0)], ["ram", "gpu", "storage"]),
-  n("rack", "Rack", "structure", ["fabKhz"], "rack", "khz", 8, 12_000_000, [view("rack"), gen("rackCooler", 0), gen("pdu", 0), gen("lb", 0), gen("switch", 0)], ["density", "rackDist"]),
+  n("systemBoard", "System", "structure", ["dualCore", "l2Cache"], "system", "hz", 3, 7_500, [view("system"), gen("psu", 0)], ["ram", "gpu", "storage"]),
+  n("rack", "Rack", "structure", ["fabKhz"], "rack", "khz", 8, 8.1e6, [view("rack"), gen("rackCooler", 0), gen("pdu", 0), gen("lb", 0), gen("switch", 0)], ["density", "rackDist"]),
   n("room", "Room", "structure", ["rack", "fabMhz"], "room", "mhz", 10, 1.2e8, [view("room"), gen("roomCooler", 0), gen("ups", 0), gen("row", 0)], ["density", "roomDist"]),
   n("hallExpansion", "Third row", "structure", ["room", "spineLeaf"], "room", "ghz", 11, 6e7, [cap("roomRows", 3)], ["density"]),
   n("dataCenter", "Data center", "structure", ["room", "stealRoom"], "global", "ghz", 12, 6e8, [view("global"), gen("dataPlane", 0), gen("grid", 0), gen("zone", 0), cap("siteZones", 2)], ["multiAz"]),
@@ -837,18 +854,18 @@ export const RESEARCH_V3: readonly ResearchNode[] = [
   // Operations
   n("telemetry", "Telemetry", "operations", ["systemBoard"], "system", "hz", 5, 8_000, [rule("telemetry")], ["overload", "heat"]),
   n("autoReturn", "Auto-return", "operations", ["telemetry"], "system", "hz", 5, 8_000, [rule("autoReturn", { delayS: 120 })], ["idle"]),
-  n("autoSkip", "Auto-skip", "operations", ["autoReturn", "lbCapability"], "rack", "khz", 8, 4_000_000, [rule("autoSkip")], ["idle", "gate"]),
-  n("cronTuning", "Cron tuning", "operations", ["autoReturn", "rack"], "rack", "khz", 8, 4_000_000, [rule("autoReturn", { delayS: 15 })], ["idle"]),
+  n("autoSkip", "Auto-skip", "operations", ["autoReturn", "lbCapability"], "rack", "khz", 8, 2.7e6, [rule("autoSkip")], ["idle", "gate"]),
+  n("cronTuning", "Cron tuning", "operations", ["autoReturn", "rack"], "rack", "khz", 8, 2.7e6, [rule("autoReturn", { delayS: 15 })], ["idle"]),
   n("offline12", "12 h offline", "operations", ["autoReturn"], "system", "khz", 6, 50_000, [rule("offlineCap", { hours: 12 })], ["idle"]),
-  n("offline24", "24 h offline", "operations", ["offline12", "cronTuning"], "rack", "khz", 8, 4_000_000, [rule("offlineCap", { hours: 24 })], ["idle"]),
+  n("offline24", "24 h offline", "operations", ["offline12", "cronTuning"], "rack", "khz", 8, 2.7e6, [rule("offlineCap", { hours: 24 })], ["idle"]),
   n("offline48", "48 h offline", "operations", ["offline24", "room"], "room", "mhz", 11, 6e7, [rule("offlineCap", { hours: 48 })], ["idle"]),
   n("researchQueue", "Research queue", "operations", ["autoReturn", "fabKhz"], "system", "khz", 7, 1_000_000, [cap("researchQueue", 3)], ["idle"]),
   n("gracefulDrain", "Graceful drain", "operations", ["telemetry"], "system", "hz", 6, 50_000, [rule("gracefulDrain")], ["downtime"]),
   n("fastBoot", "Fast boot", "operations", ["gracefulDrain"], "system", "khz", 6, 50_000, [rule("bootSeconds", { seconds: 5 })], ["downtime"]),
   n("warmBoot", "Warm boot", "operations", ["fastBoot", "rack"], "rack", "mhz", 9, 1.5e7, [rule("bootSeconds", { seconds: 2 })], ["downtime"]),
-  n("configSave", "Saved configs", "operations", ["rack"], "rack", "khz", 8, 4_000_000, [rule("configSave")], ["density"]),
+  n("configSave", "Saved configs", "operations", ["rack"], "rack", "khz", 8, 2.7e6, [rule("configSave")], ["density"]),
   n("rollingUpgrade", "Rolling upgrade", "operations", ["configSave", "gracefulDrain"], "rack", "mhz", 9, 1.5e7, [rule("rollingUpgrade")], ["downtime"]),
-  n("hotPlug", "Hot-plug drives", "operations", ["storageCtl", "rack"], "rack", "khz", 8, 4_000_000, [rule("hotPlug")], ["downtime"]),
+  n("hotPlug", "Hot-plug drives", "operations", ["storageCtl", "rack"], "rack", "khz", 8, 2.7e6, [rule("hotPlug")], ["downtime"]),
   n("liveMigration", "Live migration", "operations", ["gracefulDrain", "sw1M"], "rack", "mhz", 10, 4e7, [rule("liveMigration")], ["downtime", "heat"]),
   n("hotSwap", "Hot swap", "operations", ["rollingUpgrade", "room"], "room", "ghz", 11, 6e7, [rule("hotSwap")], ["downtime"]),
   n("checkpointing", "Checkpointing", "operations", ["stealRoom"], "room", "ghz", 11, 6e7, [rule("checkpointing", { windowS: 10 })], ["roomDist", "overload", "heat"]),
@@ -869,7 +886,7 @@ Keep the existing ten-field `n(...)` tuples and numeric Data arguments. Copy `RE
 
 D10's Network speed node and queue-only SJF, aging and Queued take text are applied in §5 and §9. D12's Auto-skip is an Operations node at Rack, kHz W8, costing 400,000,000 Data. It requires both Auto-return and Capability-aware routing, making it a mid-game automation reward after the player can identify incompatible work. It dismisses only heads that no online hardware can run.
 
-The sync test (`src/game/build/research/tree.sync.test.ts`) byte-compares §5 and §9 with generated `tree.data.ts` and `tree.text.ts` and asserts 162 nodes after D26 (161 after D25; the sim owner updates the assertion). Regenerate both files with `WRITE_TREE=1 npx vitest run src/game/build/research/tree.sync.test.ts`. The §9 catalog checks still apply, including the three roots, acyclic prerequisites, nondecreasing tiers and exact tier Data costs.
+The sync test (`src/game/build/research/tree.sync.test.ts`) byte-compares §5 and §9 with generated `tree.data.ts` and `tree.text.ts` and asserts 170 nodes after the CPU-tab pass (162 after D26, 161 after D25; the research owner updates the assertion). Regenerate both files with `WRITE_TREE=1 npx vitest run src/game/build/research/tree.sync.test.ts`. The §9 catalog checks still apply, including the three roots, acyclic prerequisites, nondecreasing tiers and exact tier Data costs.
 
 ### Applied under D25 (divisible tasks, LB queues)
 
@@ -896,6 +913,61 @@ Tiers and Data costs are unchanged. The `PlacementId` type and the `placement` e
 | `dma`, `prefetch`, `l2Cache`, `l3Cache` | RAM stream and IO stages. | RAM and disk parts of memory stages; cache traffic is free. |
 
 The tree has 162 nodes. Tiers and Data costs are unchanged; `unifiedMemory` costs W14 Data and work.
+
+### Applied under the CPU-tab pass (later-era CPU nodes)
+
+> in later parts of the game there will still be lower level upgrades
+
+The research screen tabs nodes by the part they grow from (`src/game/view/researchParts.ts`), and the CPU tab ran thin after Hz. Eight nodes keep the CPU's own parts growing through kHz, MHz and GHz. Each uses an effect the runtime already consumes: the `lanesPerCore` and `coreSites` ceilings, and the `l3LevelBonus` ceiling, which `build/locks.ts` already applies to L3 but no node granted. Data and work follow §3's tiers.
+
+| Part | kHz | MHz | GHz |
+|---|---|---|---|
+| Clock (lanes) | `branchPredict` 12 | `fma` 24 | `dualVector` 64, `matrixTiles` 112 |
+| Cores | `ringBus` 12 | `meshCores` 24 | — (32 is the D7.2 cap) |
+| Cache | — | `l3Slices` +1 L3 level | `edramL3` +2 L3 levels |
+| Queue | — | — | — (see below) |
+
+The lane ceiling used to stop at 32. That left MHz core levels 9–12 and GHz core levels 5–14 unreachable, although the core curve allows `8 + 2g` levels (spec §12.1). `dualVector` and `matrixTiles` open them. `CEILINGS_MAX.lanesPerCore` (`core/constants.ts`, used by the max-research test fixture) should follow to 112. Lanes past native still lower the core's energy ratio, so the higher ceilings are a choice, not free speed.
+
+CPU-tab nodes per era (fabs excluded):
+
+| Tab | Hz | kHz | MHz | GHz |
+|---|---:|---:|---:|---:|
+| CPU, before | 14 | 4 | 2 | 3 |
+| CPU, after | 14 | 6 | 5 | 6 |
+
+**Not added: effects the runtime does not consume yet.** Each needs a sim change first:
+
+1. **Queue.** No existing effect can grow the scheduler after Hz. Every system strategy is researched in Hz, and scheduler generations come from the fabs. Under `locks.ts` (`Q ≤ 32`) and compile (`K, Q ≤ 32`), generations 1, 2 and 3 all top out at K 16 and Q 32, so the MHz and GHz schedulers add only idle watts. A 16-core SMT CPU already has 32 threads. Proposed: a `schedulerSlots` ceiling replacing the hard 32 in `locks.ts` and `MAX_SCHED_K`/`MAX_SCHED_Q`, granted by MHz per-core run queues (64) and GHz work-stealing deques (128).
+2. **Turbo generations.** The `turbo` and `dvfs` rule params are ignored: phys reads `TURBO_CLOCK`, `TURBO_LOAD` and `DVFS_*` constants. Reading the params would let Turbo 2.0 (MHz, clock 1.4) and per-core DVFS (GHz) be data-only nodes.
+3. **SMT share and SMT4.** `smt.shareRate` is unread, and `threadsPerCore` stops at 2 (`CEILINGS_MAX`, exec thread placement). A GHz SMT4 node needs both.
+4. **Deeper C-states.** `coreIdle` matches its factor against the three fixed `CSTATES`; a C7/C10 node needs a fourth entry.
+5. **Prefetcher generations.** `prefetch` has no params, and it maps to RAM.
+
+**Runtime gap found:** `stacked3d` grants L3 generation 4, but the L3 catalog row has only four generations (`build/catalog/chip.ts`), so the node currently unlocks nothing. Spec A.1 lists generation 4 (2^39 bits, gen-3 watts); the catalog needs that fifth entry.
+
+### D31 proposed nodes (power at scale), not yet in §5, §9 or the tree data
+
+The sim agent adds these after the current CPU-content pass. Tiers use the §3 Data and work tables; nothing existing changes tier. With them the tree has 172 nodes.
+
+| id | Name | Tab / part | Level | Era / tier | Requires | Effect | Text |
+|---|---|---|---|---|---|---|---|
+| `powerCtl` | Power control | `rackPower` / `powerCtl` | Rack | kHz W8 | `s3Sleep`, `meteredPdu` | `gen(powerCtl, 0)`: the fifth rack slot, under the cooler. Lead-acid battery plus a gen-0 start controller (Start with, head-wait trigger, slot or fastest order). | Battery and smart start for a rack |
+| `powerCtlLiIon` | Li-ion power control | `rackPower` / `powerCtl` | Rack | MHz W10 | `powerCtl`, `fabMhz` | `gen(powerCtl, 1)`: more capacity per level, adds the busy trigger and batch wake (`ceil(25% × awake)` per second). | Bigger battery, predictive wake |
+| `powerCtlLfp` | LFP power control | `rackPower` / `powerCtl` | Rack | GHz W12 | `powerCtlLiIon`, `fabGhz` | `gen(powerCtl, 2)`: the largest battery per level. | Largest rack battery |
+| `roomStart` | Room start control | `ups` / `roomStart` | Room | MHz W11 | `powerCtl`, `room` | `gen(roomStart, 0)` on the UPS: racks start in standby (0 W) and power on by trigger in slot or coolest order. | Rooms power racks on as load rises |
+| `startPredict` | Predictive start | `ups` / `roomStart` | Room | MHz W11 | `roomStart`, `telemetry` | `gen(roomStart, 1)` and `gen(globalStart, 1)`: busy trigger and batch wake for rooms and the global scheduler. | Wake ahead of the load |
+| `globalStart` | Global start control | `globalScheduler` / `globalStart` | Global | GHz W14 | `roomStart`, `regions` | `gen(globalStart, 0)` on the global scheduler: sites and their zones start in standby and come online by trigger in slot, cheapest or nearest order. | Bring data centers online as needed |
+| `solarFarm` | Solar farm | `site` / `generation` | Global | GHz W12 | `dataCenter` | `gen(generation, 0)`: site output × region sun factor, no fuel. | Free power from the sun |
+| `windFarm` | Wind farm | `site` / `generation` | Global | GHz W13 | `solarFarm`, `regions` | `gen(generation, 1)`: output × region wind factor, no fuel. | Free power from the wind |
+| `fuelCell` | Fuel cell | `site` / `generation` | Global | GHz W13 | `solarFarm`, `substation` | `gen(generation, 2)`: constant output; fuel at 0.4 × region price. | Steady on-site power |
+| `ownPlant` | Own plant | `site` / `generation` | Global | GHz W14 | `fuelCell`, `hvIntake` | `gen(generation, 3)`: large constant output; fuel at 0.25 × region price. | Your own power station |
+
+Changed by D31 (text only, no new node):
+- **`s3Sleep`:** an asleep system is never a split target; routers wake asleep systems by demand.
+- **`priceAware`:** ranks sites by marginal price, so a site with generation headroom ranks at its fuel price.
+
+New `PartId`s: `powerCtl`, `roomStart`, `globalStart`, `generation`. New ceiling: none. No new rule IDs; the controllers' behavior comes from their part generation.
 
 ### Settled by the decision log (program §15a, D1)
 

@@ -381,7 +381,23 @@ export interface OutcomeView {
 /* ---------- Lazy selector results (not part of the snapshot) ---------- */
 
 export type ResearchNodeState = 'done' | 'active' | 'parked' | 'queued' | 'available' | 'locked';
+/**
+ * The owned part a research node grows from (research screen concept C). `fab`: the CPU fabs (a
+ * whole CPU generation). `structure`: the nodes that open a level (system board, rack, room, data center, regions).
+ */
+export type ResearchPartId =
+  | 'cores' | 'clock' | 'cache' | 'queue' | 'fab'
+  | 'cpu' | 'ram' | 'drive' | 'gpu' | 'psu' | 'board'
+  | 'switch' | 'lb' | 'rackCooling' | 'rackPower'
+  | 'netRack' | 'roomCooling' | 'ups'
+  | 'dataPlane' | 'backbone' | 'site' | 'globalScheduler'
+  | 'structure';
+/** The hardware level a part belongs to: the research tab, whatever era the node unlocks in. */
+export type ResearchTabId = 'cpu' | 'system' | 'rack' | 'room' | 'global';
 export interface ResearchNodeView {
+  /** The root it grows from, and that root's hardware tab (a CPU part's node is on the CPU tab in every era). */
+  readonly part: ResearchPartId;
+  readonly tab: ResearchTabId;
   /** Deduplicated D23 task types answered by this node's catalog bands. */
   readonly answers: readonly TaskTypeId[];
   readonly needsCredits?: boolean;

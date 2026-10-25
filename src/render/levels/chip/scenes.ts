@@ -4,8 +4,8 @@
 import { familyId, systemId } from '../../../game';
 import type { ChipSnapshot, CoreView, TransferView } from '../../../game';
 
-export type CpuScene = 'boot' | 'landing' | 'mid' | 'shard' | 'max' | 'paused';
-export const CPU_SCENES: readonly CpuScene[] = ['boot', 'landing', 'mid', 'shard', 'max', 'paused'];
+export type CpuScene = 'boot' | 'landing' | 'mid' | 'shard' | 'max' | 'paused' | 'ring' | 'mesh';
+export const CPU_SCENES: readonly CpuScene[] = ['boot', 'landing', 'mid', 'shard', 'max', 'paused', 'ring', 'mesh'];
 let next = 383;
 interface Run { readonly taskId: number; readonly family: number; readonly shard: number; readonly threads: number }
 const core = (busy: boolean, progress: number, research = 0, run: Run | null = null): CoreView => {
@@ -34,7 +34,9 @@ export function chipScene(scene: CpuScene, simTimeMs = 2000): ChipSnapshot {
   const transfer = scene === 'landing' || scene === 'mid' ? sceneTransfer() : null;
   // 'shard': a Parallel task's shard 2 of 4 runs on both cores, 40% done.
   const split: Run = { taskId: 500, family: 13, shard: 2, threads: 2 };
-  const cores = boot ? [core(false, 0)] : max ? maxCores()
+  // 'ring': ringBus, 12 sites with 9 cores; 'mesh': meshCores, 24 sites with 18 cores and the rest locked.
+  const ring = scene === 'ring', mesh = scene === 'mesh', grid = ring ? 12 : mesh ? 24 : 0;
+  const cores = boot ? [core(false, 0)] : max ? maxCores() : grid ? Array.from({ length: ring ? 9 : 18 }, (_, i) => core(i % 3 !== 2, (i * 0.13) % 1))
     : scene === 'shard' ? [core(true, 0.4, 0, split), core(true, 0.4, 0, split)]
       : [core(true, 0.62), core(scene !== 'paused', 0.25)];
   const hz = max ? 4e9 : 1024, bits = max ? 2 ** 28 : 64;
@@ -44,12 +46,13 @@ export function chipScene(scene: CpuScene, simTimeMs = 2000): ChipSnapshot {
   return {
     level: 'chip', parent: { level: 'system', id: systemId(0) }, systemId: systemId(0), cpuCount: 1, online: 'onMarket', tier: 0,
     clock: { hz, effectiveHz: hz, generation: max ? 3 : 1, level: 1 },
-    coreSites: max ? 32 : boot ? 1 : 2, cores, researchShare: 0.1,
+    coreSites: max ? 32 : ring ? 10 : mesh ? 20 : boot ? 1 : 2, cores, researchShare: 0.1,
     pipe: { speed: 1000, transfer, waiting: scene === 'landing' },
     cache: { capacityBits: bits, usedBits: boot ? 0 : max ? 2 ** 26 : 48, spilledOutBits: 0, levels: [{ kind: 'l1', bits, generation: 0, level: 1 }] },
     queue: boot ? [] : Array.from({ length: max ? 20 : 2 }, (_, i) => ({ taskId: 400 + i, family: familyId([4, 0, 1, 3][i % 4]!) })),
     scheduler: boot ? null : { generation: 0, level: 1, strategy: 'fifo', q: max ? 32 : 4, k: 2, queued: max ? 20 : 2, running: 2, reserved: 0 },
-    slots: boot ? [{ kind: 'core', index: 1, locked: true }, { kind: 'scheduler', index: 0, locked: true }] : [],
+    slots: boot ? [{ kind: 'core', index: 1, locked: true }, { kind: 'scheduler', index: 0, locked: true }]
+      : grid ? Array.from({ length: grid - (ring ? 10 : 20) }, (_, i) => ({ kind: 'core' as const, index: (ring ? 10 : 20) + i, locked: true })) : [],
     psu: { kind: 'psu', generation: 0, level: 1, capacityW: 64, deliveredW: 0.65, usage: 0.01, overloadS: 0, failed: false,
       rebootMs: null, loss: 0.3, lossW: 0.2, capped: false, capFactor: 1, creditsPerMinute: 0.5 },
   };

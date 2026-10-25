@@ -119,12 +119,12 @@ describe('head card (user, 25 Oct: the main task below, above the deck)', () => 
     act(() => $('[data-testid=dismiss]')!.click());
     expect(store.actions).toEqual([{ type: 'dismissTask', task: store.getSnapshot().feed.window[0]!.task }]);
   });
-  it('a blocked head says what it needs; returned work has no clock and cannot be dismissed', () => {
+  it('a blocked head says what it needs; returned work has no clock, is never "in LB queue" before Rack, and cannot be dismissed', () => {
     const store = fakeStore(), feed = store.getSnapshot().feed;
     store.set({ feed: { window: [{ ...entry(20, 0, true), workingSetBits: 2, blockedBy: 'cache' }, ...feed.window.slice(1)] } });
     mounted = card(store);
     expect(text('[data-testid=now]')).toContain('Needs 2 b cache');
-    expect(text('[data-testid=head-clock]')).toBe('In LB queue');
+    expect(text('[data-testid=head-clock]')).toBe('Taken · waiting for the CPU');
     expect(($('[data-testid=dismiss]') as HTMLButtonElement).disabled).toBe(true);
   });
   it('between rounds the same key reads Return, in the same place', () => {
@@ -308,5 +308,18 @@ describe('research cuts the line (D27)', () => {
     expect($('[data-testid=research-head]')).toBeNull();
     expect($('.head-slot .tag')!.dataset.task).toBe('1:1:1');
     expect(text('[data-testid=research-key]')).toBe('Research · Pipelining running · 1.2k ops/s42%');
+  });
+});
+
+describe('a restarting system says so (user, 25 Oct)', () => {
+  it('the head card and the world line read Restarting; returned work waits for the CPU', async () => {
+    const { PlatformLine } = await import('./shell/PlatformLine');
+    const store = fakeStore(), s = store.getSnapshot();
+    store.set({ focus: { ...s.focus, online: 'cold' } as never });
+    mounted = mount(<><PlatformLine /><OffersScope><Deck /></OffersScope></>, store, DESKTOP);
+    expect(text('[data-testid=now-restart]')).toBe('Restarting');
+    expect(text('[data-testid=platform-line]')).toBe('Restarting');
+    act(() => store.set({ feed: { window: [{ ...entry(20, 0, true) }, ...s.feed.window.slice(1)] } }));
+    expect(text('[data-testid=head-clock]')).toBe('Waiting · CPU restarting');
   });
 });

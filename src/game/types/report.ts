@@ -11,8 +11,12 @@ export interface RoundTypeTally {
   readonly dismissed: number;
 }
 
+/** Why a round ended: SLA fell below 80%, or the player ended it (endRound action, spec §4.1). */
+export type RoundEndedBy = 'sla' | 'player';
+
 /** Frozen at round end (spec §4.7). Credits and Data are integer Amounts. */
 export interface RoundReport {
+  readonly endedBy: RoundEndedBy;
   /** Only types with met/failed work or dismissals, in D23 display order. */
   readonly byType: readonly RoundTypeTally[];
   readonly index: number;

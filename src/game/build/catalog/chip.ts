@@ -15,8 +15,9 @@ export const CPU: CatalogRow = {
 /** Rate part: rate = lanes × socket clock; native = base lanes × CLOCK.base[g]. */
 export const CORE: CatalogRow = {
   id: 'core', scope: 'chip', names: TIERS.map((t) => `${t} core`), gates: FAB, curve: 'core',
-  // hardware-progression.md §3: the core generation owns the energy ratio.
-  base: [1, 2, 4, 8], watts: { kind: 'ratio', era: [0, 1, 2, 3] },
+  // hardware-progression.md §3: the core generation owns the energy ratio. Departure (§3, D29): the kHz core decays
+  // 0.85 per pushed level (CSV 0.93), so kHz compute climbs across the System era and meets the 100 kHz pipe near Rack.
+  base: [1, 2, 4, 8], watts: { kind: 'ratio', era: [0, 1, 2, 3], decay: [0.92, 0.85, 0.95, 0.9625] },
   price: [6000, 1.25e5, 4.3e8, 1.9e11], upgrade: [10, 1.2e5, 1.5e9, 7.7e12],
 };
 export const CLOCK: CatalogRow = {

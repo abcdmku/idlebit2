@@ -9,10 +9,10 @@ export const PRIME_INTENSITY = 53;
 export function primeMarket(state: GameState, intensity: number = PRIME_INTENSITY): GameState {
   if (state.round.phase !== 'running') throw new Error('primeMarket: the round must be running');
   const hot = cloneHot(state.hot);
-  const window = prepareQueue(hot, state.seed, state.round.index, intensity);
+  const { tasks: window, intensity: next } = prepareQueue(hot, state.seed, state.round.index, intensity);
   return {
     ...state, hot,
     round: { ...state.round, peakIntensity: Math.max(state.round.peakIntensity, intensity), grace: graceOf(window) },
-    market: { ...state.market, window, intensity, headTick: state.clock.tick },
+    market: { ...state.market, window, intensity: next, headTick: state.clock.tick },
   };
 }

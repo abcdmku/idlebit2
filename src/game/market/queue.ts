@@ -5,7 +5,7 @@ import { nextFloat, reseedForRound, roundSeed, seedRng } from '../core/rng';
 import type { World } from '../core/world';
 import { NO_DETAIL } from '../types/events';
 import type { QueuedTask } from '../types/state';
-import { baseRate, baseWeight, CURVE, sizeJitter, taskSize } from './curve';
+import { baseWeight, CURVE, nextIntensity, sizeJitter, taskSize } from './curve';
 import { FAMILIES, payoutAt } from './families';
 import { canRunFleet, detailIndex } from './fleet';
 import { failTasks } from './sla';
@@ -43,8 +43,11 @@ export function drawTask(hot: HotBuffers, I: number): QueuedTask {
   return { taskId, family: family.id, size, deadline };
 }
 
-/** Round preparation, once, at initialization or the previous round's end: seed, jitters, five tasks at I. */
-export function prepareQueue(hot: HotBuffers, seed: number, roundIndex: number, I: number): QueuedTask[] {
+/**
+ * Round preparation, once, at initialization or the previous round's end: seed, jitters, and the first
+ * five tasks from I, each draw advancing I (D30). Returns the tasks and the intensity of the next draw.
+ */
+export function prepareQueue(hot: HotBuffers, seed: number, roundIndex: number, I: number): { tasks: QueuedTask[]; intensity: number } {
   reseedForRound(hot, seed, roundIndex);
   const host = { rng: new Uint32Array(4), g: new Float64Array(G.rngDraws + 1) };
   seedRng(host.rng, (roundSeed(seed, roundIndex) ^ JITTER_SALT) >>> 0);
@@ -53,8 +56,9 @@ export function prepareQueue(hot: HotBuffers, seed: number, roundIndex: number, 
     hot.fam.dataRatio[f.id] = f.dataRatio * (1 + CURVE.dataJit * (2 * nextFloat(host) - 1));
   }
   const tasks: QueuedTask[] = [];
-  for (let i = 0; i < QUEUE_VISIBLE; i += 1) tasks.push(drawTask(hot, I));
-  return tasks;
+  let at = I;
+  for (let i = 0; i < QUEUE_VISIBLE; i += 1) { tasks.push(drawTask(hot, at)); at = nextIntensity(at); }
+  return { tasks, intensity: at };
 }
 
 /** The SLA grace prior G (spec §4.2): 10 × the largest work among the five opening tasks. */
@@ -84,11 +88,13 @@ function materialize(w: World, r: number, t: QueuedTask): void {
   rec.deadline[r] = t.deadline ?? -1;
 }
 
-/** Removes window entry i and draws its replacement at the back at the current I. */
+/** Removes window entry i and draws its replacement at the back at the current I, which then advances one task (D30). */
 function leaveWindow(w: World, i: number): void {
-  const tasks = w.market.window;
+  const tasks = w.market.window, m = w.market;
   tasks.splice(i, 1);
-  tasks.push(drawTask(w.hot, w.market.intensity));
+  tasks.push(drawTask(w.hot, m.intensity));
+  if (m.intensity > w.round.peakIntensity) w.round.peakIntensity = m.intensity;
+  m.intensity = nextIntensity(m.intensity);
 }
 
 /**
@@ -212,15 +218,12 @@ function failHead(w: World): void {
 }
 
 /**
- * Market (tick step 2): advance I by round age and start this tick's rate row. With Auto-skip
- * (D12.3), dismiss uncommitted heads no static-capability hardware can run; at most one window's
- * worth per tick, an engine bound that a real queue never reaches.
+ * Market (tick step 2): start this tick's rate row (I advances per task drawn, D30, not with time). With
+ * Auto-skip (D12.3), dismiss uncommitted heads no static-capability hardware can run; at most one
+ * window's worth per tick, an engine bound that a real queue never reaches.
  */
 export function marketPhase(w: World): void {
   if (w.round.phase !== 'running') return;
-  const m = w.market;
-  m.intensity += DT_S * baseRate(m.intensity);
-  if (m.intensity > w.round.peakIntensity) w.round.peakIntensity = m.intensity;
   const ring = w.hot.ring, row = ringRow(w);
   ring.at[row] = w.tick;
   ring.taken[row] = 0;

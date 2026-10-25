@@ -1,21 +1,23 @@
 import type { FamilyDef } from '../types/catalog';
 
-/** Round-age difficulty and seeded variation (docs/tasks.md §3, program D12.1). */
+/** Task-count difficulty and seeded variation (docs/tasks.md §3, D30). */
 export const CURVE = {
-  /** Ramp: one unit of I takes T(I) = min(Tmax, T0 × 2^(I / H)) seconds. D20: steep early, so an un-upgraded round 1 ends near 60 s. */
-  T0: 4.5, H: 3.5, Tmax: 250,
-  /** A round opens at max(0, previous peak I − startBack). */
-  startBack: 6,
+  /**
+   * D30: every round starts at I = 0 and each task drawn advances I by 1 / k(I): k tasks per unit of I,
+   * k(I) = k0 + k1 × I + k2 × I². Hardware never changes the curve, only how fast a round moves along it; later
+   * intensities take more tasks per unit, so a fast fleet's round still lasts minutes near its wall.
+   */
+  k0: 9, k1: 0.3, k2: 0.03,
   sizeJit: 0.2, weightJit: 0.3, dataJit: 0.1,
   ramp: 1,
   sizeExp: 0.85,
 } as const;
 
-/** dI/dt in units of I per second. */
-export const baseRate = (I: number): number => 1 / Math.min(CURVE.T0 * 2 ** (I / CURVE.H), CURVE.Tmax);
+/** Tasks per unit of I at I (D30). */
+export const tasksPerUnit = (I: number): number => CURVE.k0 + CURVE.k1 * I + CURVE.k2 * I * I;
+/** The intensity after one more task is drawn at I (D30). */
+export const nextIntensity = (I: number): number => I + 1 / tasksPerUnit(I);
 export const sizeScale = (I: number): number => 2 ** (CURVE.sizeExp * I);
-/** The next round's opening intensity (D12.1). */
-export const startIntensity = (peak: number): number => Math.max(0, peak - CURVE.startBack);
 
 /**
  * Frozen task size s in whole units (D25.1, docs/tasks.md §2): round(U(I) × j), and at least

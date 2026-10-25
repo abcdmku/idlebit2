@@ -91,7 +91,7 @@ export function planReplace(state: GameState, ref: PartRef, g: number, preserveC
   return planned({ build, price, cold: coldScopes(state, coldScope(ref), ref) }, preserveCapacity ? `${label} · L${level}` : label);
 }
 
-/** Cold add (spec §6.1, §12.3). A new CPU copies CPU 1 (D7.3). Cores go into every CPU. */
+/** Add into an empty slot, always hot (spec §4.5, §6.1, §12.3). A new CPU copies CPU 1 (D7.3). Cores go into every CPU. */
 export function planAdd(state: GameState, system: SystemId, kind: BoardPartKind, g: number, ecc = false): Plan {
   if (kind === 'gpu') return fail('invalid', 'Choose a GPU model');
   const spec = specOf(state, system);
@@ -99,14 +99,13 @@ export function planAdd(state: GameState, system: SystemId, kind: BoardPartKind,
   const u = state.research.unlocks;
   const n = spec.cpuCount;
   const cpu = spec.cpu;
-  const scope = coldScopes(state, { kind: 'system', id: system }, kind === 'drive' ? { unit: { kind: 'system', id: system }, slot: { kind: 'drive', index: 0 } } : undefined);
   const commit = (next: SystemSpec, price: bigint, label: string, cap: { have: number; limit: number; key?: Parameters<typeof ceilingLock>[1] } | null, part: LeveledPartId | null): Plan => {
     if (part) { const lock = genLock(u, part, g); if (lock) return locked(lock, label, price); }
     if (cap && cap.have + 1 > cap.limit) {
       const lock = cap.key ? ceilingLock(u, cap.key, cap.have + 1) : null;
       return locked(lock ?? { code: 'cap', node: null, text: 'No free slot' }, label, price);
     }
-    return planned({ build: withSpec(state.build, system, next), price, cold: scope }, label);
+    return planned({ build: withSpec(state.build, system, next), price }, label);
   };
   const L1: PartLevel = { gen: g, level: 1 };
   if (kind === 'socket') {

@@ -158,6 +158,11 @@ export interface ChipSnapshot {
   readonly parent: NodeRef | null;
   readonly systemId: SystemId;
   readonly online: UnitMode;
+  /**
+   * Seconds left in the system's boot / cold / goingOffline transition, else null (same as
+   * SystemSnapshot.timerS). The view always sets it; optional only until hand-built fixtures add it.
+   */
+  readonly timerS?: number | null;
   readonly tier: number;
   /** Identical CPUs in the system; the view shows one, cores pool under one scheduler. */
   readonly cpuCount: number;

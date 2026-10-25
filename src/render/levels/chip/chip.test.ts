@@ -279,3 +279,16 @@ describe('CPU incoming queue wells', () => {
     expect(fills.some(q => q.y === empty.y + empty.h - 2 && q.x === empty.x && q.h === 2 && q.c === bandColor(t.family))).toBe(false);
   });
 });
+
+describe('CPU research core grids', () => {
+  it.each(['desktop', 'phone'] as const)('draws 12 sites as 4 × 3 and 24 as 6 × 4 on the art grid (%s)', form => {
+    const f = floorOf(form);
+    for (const [n, cols, rows] of [[12, 4, 3], [24, 6, 4]] as const) {
+      const s = coreSites(f, n);
+      expect(s).toHaveLength(n);
+      expect(new Set(s.map(r => r.x)).size).toBe(cols); expect(new Set(s.map(r => r.y)).size).toBe(rows);
+      for (const r of s) { expect(Number.isInteger(r.x) && Number.isInteger(r.w)).toBe(true); expect(r.x + r.w).toBeLessThanOrEqual(f.cores.x + f.cores.w); expect(r.y + r.h).toBeLessThanOrEqual(f.cores.y + f.cores.h); }
+    }
+    expect(coreSites(f, 10)).toHaveLength(12); expect(coreSites(f, 20)).toHaveLength(24); expect(coreSites(f, 3)).toHaveLength(4);
+  });
+});

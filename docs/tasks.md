@@ -81,19 +81,22 @@ Without GPU link, one actual GPU must meet both gates. Linked GPUs sum cores, VR
 
 ## 3. The intensity curve
 
-### 3.1 Ramp
+### 3.1 Ramp (D30)
 
-`I` rises with round age only (program §3). A round opens at the intensity the last one earned (D12.1): start `I` = max(0, previous peak − 6), and round 1 starts at 0.
+Every round starts at `I = 0`, and `I` advances one step per task drawn into the queue (D30), never with time:
 
 ```text
-dI/dt = 1 / T(I)        T(I) = min(250, 7 × 2^(I / 5)) seconds per unit of I      (s)
+I ← I + 1 / k(I)        k(I) = 9 + 0.3 I + 0.03 I²  tasks per unit of I      (s)
 ```
 
-| I | 0 | 5 | 10 | 15 | 20 | 24.8 and up |
+| I | 0 | 5 | 10 | 15 | 20 | 25 |
 |---|---:|---:|---:|---:|---:|---:|
-| T(I), seconds per unit | 7 | 14 | 28 | 56 | 112 | 250 |
+| k(I), tasks per unit | 9 | 11.3 | 15 | 20.3 | 27 | 35.3 |
+| Tasks drawn to reach I | 0 | 52 | 117 | 204 | 321 | 476 |
 
-D20 sets the steep opening. With no purchases, a 1 Hz core with 1 bit of cache meets 2-bit AND Mask at `I` 1.6 and tasks longer than 10 s near `I` 4. Round 1 then ends at about 60 s (55–67 s over 8 seeds in the real sim), on `Can't run · cache` and `Timed out`. A player who buys cache, clock and the queue as they come reaches the 1 kHz pipe wall at `I` ≈ 14, at 4:23–5:08. From `I` ≈ 25 the cap of 250 s per unit keeps Rack-era and later rounds at 20–50 min. Superseded: the D12.1 ramp `min(250, 25 × 2^(I/12))` and the pre-D12 piecewise ramp (40, 25, 25, 80 s per unit).
+Each task is about `2^(0.85 / k)` times bigger than the last (8% at I = 0, 2–3% near the Rack-era wall at I 20–25). Hardware moves along the same curve at its own speed: fast systems blast through the small early tasks in seconds and meet their own wall; a slow one crawls. Near the wall a take costs up to 10 s, so a round lasts about the climb's tail plus the SLA window (D28), minutes at any fleet size.
+
+D20 in the real sim (`scripts/balance/opening.ts`, 8 seeds): round 1 with no purchases ends at 0:36–1:16 (median 0:55) on Can't run · cache, with AND Mask (2 bits) in the mix from I 0.6 and Compare from 1.6; an active round 1 lasts 7:39–9:03 and peaks near I 13. Superseded: the time ramps `T(I)` (D12.1, D20, D28) and the offset start (previous peak − 6).
 
 ### 3.2 Round-age difficulty
 
@@ -178,8 +181,8 @@ Fifty families. Work coefficients (compute ops, memory bits touched, GPU ops), w
 |---|---|---|---:|---|---:|---|---|---:|---|---:|---:|
 | `bitFlip` | bits | 0-5 | 10 | compute 1 | 4,096 | 1 b | - | 1 | - | - | 1 |
 | `parity` | bits | 0.8-6.5 | 8 | compute 1 | 4,096 | 1 b | - | 1 | - | - | 1 |
-| `andMask` | bits | 1.6-7 | 6 | compute 1 | 4,096 | 2 b | - | 1 | - | - | 1 |
-| `compare` | bits | 2.4-8 | 7 | compute 2 | 4,096 | 2 b | - | 1 | - | - | 2 |
+| `andMask` | bits | 0.6-7 | 14 | compute 1 | 4,096 | 2 b | - | 1 | - | - | 1 |
+| `compare` | bits | 1.6-8 | 10 | compute 2 | 4,096 | 2 b | - | 1 | - | - | 2 |
 | `intAdd` | bits | 3.2-9 | 8 | compute 2 | 4,096 | 3 b | - | 1 | - | - | 2 |
 | `popcount` | ints | 4-9.5 | 6 | compute 2 | 4,096 | 4 b | - | 1 | - | - | 2 |
 | `crc8` | ints | 4.4-10 | 7 | compute 3 | 4,096 | 8 b | - | 1 | - | - | 3 |
@@ -192,19 +195,19 @@ Fifty families. Work coefficients (compute ops, memory bits touched, GPU ops), w
 | `hashBatch` | threads | 10-18 | 6 | compute 6 | 64 | 768 b | - | 1 | - | - | 6 |
 | `lzCompress` | threads | 10.8-18.5 | 6 | compute 5 | 64 | 512 b | - | 1 | - | - | 5 |
 | `monteCarlo` | threads | 11.6-18 | 5 | compute 6 | 16 | 64 b | - | 1 | - | - | 6 |
-| `jsonParse` | ram | 12.5-20 | 7 | compute 5 | 65,536 | 256 b + 1 b/u | - | 1 | - | - | 5 |
-| `mergeSort` | ram | 13.1-21 | 8 | compute 2, memory 3 | 256 | 2 b/u | - | 1 | - | - | 5 |
-| `kvGet` | ram | 13.7-22 | 7 | compute 1, memory 4 | 64 | 4 b/u | **accel** | 1 | - | - | 5 |
-| `sqlJoin` | ram | 14.5-23 | 7 | compute 2, memory 4 | 256 | 4 b/u | **accel** | 1 | - | - | 6 |
+| `jsonParse` | ram | 11.5-20 | 7 | compute 5 | 65,536 | 256 b + 4 b/u | **accel** | 1 | - | - | 5 |
+| `mergeSort` | ram | 12-21 | 8 | compute 2, memory 3 | 256 | 8 b/u | **accel** | 1 | - | - | 5 |
+| `kvGet` | ram | 12.5-22 | 7 | compute 1, memory 4 | 64 | 12 b/u | **accel** | 1 | - | - | 5 |
+| `sqlJoin` | ram | 13-23 | 7 | compute 2, memory 4 | 256 | 12 b/u | **accel** | 1 | - | - | 6 |
 | `graphBfs` | ram | 18-26 | 5 | compute 1, memory 5 | 256 | 8 b/u | **accel** | 1 | - | - | 6 |
 | `matmul` | ram | 20-28 | 6 | compute 4, memory 2 | 64 | 2 b/u | - | 1 | - | - | 6 |
-| `imageBlur` | gpu | 15-24 | 7 | memory 1, gpu 10 | 64 | 1 b/u | 1 GPU core, VRAM 1 b/u, **accel** | 1 | - | - | 11 |
-| `thumbnail` | gpu | 15.6-23 | 6 | compute 1, memory 1, gpu 6 | 16 | 1 b/u | 1 GPU core, VRAM 1 b/u, **accel** | 1 | - | - | 8 |
+| `imageBlur` | gpu | 12.5-24 | 7 | memory 1, gpu 4 | 64 | 1 b/u | 1 GPU core, VRAM 1 b/u, **accel** | 1 | - | - | 5 |
+| `thumbnail` | gpu | 13-23 | 6 | compute 1, memory 1, gpu 3 | 16 | 1 b/u | 1 GPU core, VRAM 1 b/u, **accel** | 1 | - | - | 5 |
 | `transcode` | gpu | 19.5-28 | 7 | compute 1, memory 2, gpu 10 | 4,096 | 1 b/u | 4 GPU cores, VRAM 2 b/u, **accel** | 1 | - | - | 13 |
 | `inference` | gpu | 17-29 | 8 | memory 1, gpu 12 | 64 | 1 b/u | VRAM 4 b/u, *tensor*, **accel** | 1 | - | - | 13 |
 | `rayTrace` | gpu | 22-30 | 5 | gpu 14 | 16 | 0 | 16 GPU cores, VRAM 2 b/u, **accel** | 1 | - | - | 14 |
-| `logIngest` | storage | 16.5-26 | 7 | compute 1, memory 4 | 256 | 8 b/u | - | 1 | - | - | 5 |
-| `backup` | storage | 17.2-27 | 6 | memory 6 | 65,536 | 16 b/u | - | 1 | - | - | 6 |
+| `logIngest` | storage | 12.5-26 | 7 | compute 1, memory 4 | 256 | 16 b/u | - | 1 | - | - | 5 |
+| `backup` | storage | 13.2-27 | 6 | memory 6 | 65,536 | 24 b/u | - | 1 | - | - | 6 |
 | `indexBuild` | storage | 18.5-29 | 6 | compute 2, memory 5 | 4,096 | 6 b/u | - | 1 | - | - | 7 |
 | `compaction` | storage | 21-31 | 5 | compute 1, memory 6 | 4,096 | 9 b/u | - | 1 | - | - | 7 |
 | `sqlScan` | storage | 23-33 | 6 | compute 2, memory 6 | 256 | 4 b/u | - | 1 | - | - | 8 |

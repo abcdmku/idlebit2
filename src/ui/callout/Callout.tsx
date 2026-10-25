@@ -10,7 +10,7 @@ import type { Offer } from '../deck/offers';
 import { plateRequest } from '../plates/PlateLayer';
 import { box, T, useLayout } from '../shell/geometry';
 import { useGameSelector, useQuote, useShell, useViewState } from '../storeHooks';
-import { calloutModel, dockCallout, leaderRect, placeCallout } from './model';
+import { calloutModel, dockCallout, leaderRect, placeCallout, placePhone } from './model';
 
 /** On the CPU the callout sits beside the package (L2): the cache spans the die, 16 art px in from the package, plus its 3 px frame. */
 const PACKAGE_INSET_ART = 19;
@@ -65,9 +65,11 @@ function Open({ target: t, focus }: { target: HitTarget; focus: LevelSnapshot })
   const d = L.kind === 'desktop';
   // The renderer keeps the right gutter clear on desktop; a part that reaches into it falls back to beside-it placement.
   const dock = d ? dockCallout(part, L.callout, L.calloutBounds) : null;
-  const at = dock && dock.x >= part.x + part.w ? dock : placeCallout(around, L.callout, L.calloutBounds, L.lat);
+  // Phone: below the part, else above, else docked above the head card; always from the part's own rect.
+  const at = !d ? placePhone(part, L.callout, L.calloutBounds)
+    : dock && dock.x >= part.x + part.w ? dock : placeCallout(around, L.callout, L.calloutBounds, L.lat);
   const leader = leaderRect(part, at, L.N);
-  const pad = d ? 16 : 8, bw = d ? 80 : 56, gap = 8, by = at.h - pad - KEY_H;
+  const pad = d ? 16 : 8, bw = 80, gap = 8, by = at.h - pad - KEY_H;
   const o = m.offer, act = o ? offerAction(o as Offer) : null;
   const keys: { id: string; label: string; tone: string; disabled?: boolean; run: () => void }[] = [];
   if (o?.quote && !o.where && (o.price !== null || act)) {

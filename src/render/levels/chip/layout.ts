@@ -37,11 +37,15 @@ const FLOORS: Readonly<Record<WorldForm, Floor>> = { desktop: floorplan(SPEC.des
 export const floorOf = (form: WorldForm = 'desktop'): Floor => FLOORS[form];
 
 export const MAX_CORES = 32;
-const GRIDS: Readonly<Record<number, readonly [number, number]>> = { 2: [2, 1], 4: [2, 2], 8: [4, 2], 16: [4, 4], 32: [8, 4] };
+/** Core grids by site count (cols × rows), including the research steps 12 (`ringBus`) and 24 (`meshCores`). */
+const GRIDS: Readonly<Record<number, readonly [number, number]>> = { 2: [2, 1], 4: [2, 2], 8: [4, 2], 12: [4, 3], 16: [4, 4], 24: [6, 4], 32: [8, 4] };
+const GRID_SIZES = [2, 4, 8, 12, 16, 24, 32] as const;
+/** The grid that holds `count` sites: the actual count when it is a grid size, else the next one up. */
+export const gridSize = (count: number): number => GRID_SIZES.find(n => n >= count) ?? MAX_CORES;
 const sites = new Map<string, readonly Rect[]>();
-/** Core sites: two big sites (L2), or a grid once research opens more. Installing a core never moves its peers. */
+/** Core sites: two big sites (L2), or a grid of the actual site count once research opens more. Installing a core never moves its peers. */
 export function coreSites(f: Floor, count: number): readonly Rect[] {
-  const n = Math.min(MAX_CORES, Math.max(2, 2 ** Math.ceil(Math.log2(Math.max(1, count)))));
+  const n = gridSize(Math.min(MAX_CORES, Math.max(2, count)));
   const key = `${f.pkg.w}:${n}`, found = sites.get(key);
   if (found) return found;
   const [cols, rows] = GRIDS[n]!, z = f.cores, big = n === 2;

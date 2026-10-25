@@ -88,7 +88,7 @@ export const hertz = (hz: number) => formatHertz(hz);
 export const bits = (b: number) => formatSize(b);
 export const ops = (n: number) => formatOps(n);
 
-const COUNTS: ReadonlySet<string> = new Set(['lanes', 'slots', 'ports']);
+const COUNTS: ReadonlySet<string> = new Set(['lanes', 'slots', 'cores', 'ports']);
 /** One effect quantity: "21.4 kb", "8 kHz", "53.4k ops", "53.4k ops/s", "4 slots", "234 W". */
 export function measureUnit(n: number, unit: EffectPreview['unit']): string {
   switch (unit) {

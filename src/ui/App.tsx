@@ -13,12 +13,14 @@ export interface AppProps {
   level?: LevelId;
   /** Runs once the shell has mounted (boot attaches the DEV bridge here). */
   onMount?: () => (() => void) | void;
+  /** The runtime's save, for the new-version Reload. */
+  saveNow?: () => void;
 }
 
 /** The runtime belongs to boot and the platform; the shell only reads the store and dispatches. */
-export function App({ store, registry, level, onMount }: AppProps) {
+export function App({ store, registry, level, onMount, saveNow }: AppProps) {
   useEffect(() => onMount?.() ?? undefined, [onMount]);
-  return <GameShell store={store} registry={registry} level={level} />;
+  return <GameShell store={store} registry={registry} level={level} saveNow={saveNow} />;
 }
 
 const LEVELS: readonly LevelId[] = ['chip', 'system', 'rack', 'room', 'global'];
@@ -37,6 +39,6 @@ export async function boot(): Promise<void> {
   const host = document.getElementById('root');
   if (!host) throw new Error('Missing #root');
   const onMount = () => attachLiveBridge(store, runtime);
-  createRoot(host).render(<App store={store} registry={registry} level={level} onMount={onMount} />);
+  createRoot(host).render(<App store={store} registry={registry} level={level} onMount={onMount} saveNow={() => runtime.save()} />);
   if (import.meta.hot) import.meta.hot.dispose(() => runtime.dispose());
 }

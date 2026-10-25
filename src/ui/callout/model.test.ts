@@ -86,3 +86,25 @@ describe('callout quote effects', () => {
     expect(model.offer?.quote?.effect).toEqual(link.effect);
   });
 });
+
+describe('empty sites and phone placement (user bug, 25 Oct)', () => {
+  const at = { level: 'chip', id: systemId(0) } as const;
+  const site = (id: string): HitTarget => ({ id, kind: 'slot', owner: at, drill: null, part: null, unit: { kind: 'system', id: systemId(0) },
+    sw: null, port: null, slot: 0, rect: { x: 0, y: 0, w: 8, h: 8 } });
+  it('names an empty site by what it adds, and reads its deck row', async () => {
+    const { slotSite } = await import('./model');
+    const chip = fixtureSnapshot('chipBoot').focus, state = createInitialState(42);
+    expect([slotSite(site('queue'), chip), slotSite(site('site1'), chip)]).toEqual([{ name: 'Add queue', row: 'scheduler' }, { name: 'Add Core 2', row: 'core' }]);
+    const offers = buildOffers('chip', quote(state, { kind: 'tray', at }).quotes, null);
+    const m = calloutModel(site('queue'), chip, null, offers);
+    expect(m.name).toBe('Add queue');
+    expect(m.offer).toBe(offers.rows.find(r => r.key === 'scheduler'));
+  });
+  it('phone: below the part when it fits, else above, else docked above the head card; the part stays clear', async () => {
+    const { placePhone } = await import('./model');
+    const bounds = { x: 16, y: 160, w: 352, h: 440 }, size = { w: 200, h: 104 };
+    expect(placePhone({ x: 100, y: 200, w: 80, h: 40 }, size, bounds)).toEqual({ x: 40, y: 248, w: 200, h: 104 });
+    expect(placePhone({ x: 100, y: 500, w: 80, h: 40 }, size, bounds)).toEqual({ x: 40, y: 384, w: 200, h: 104 });
+    expect(placePhone({ x: 40, y: 200, w: 300, h: 380 }, size, bounds)).toEqual({ x: 16, y: 496, w: 352, h: 104 });
+  });
+});

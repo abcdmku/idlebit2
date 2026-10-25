@@ -59,7 +59,7 @@ decay       = [0.92, 0.93, 0.95, 0.9625]
 
 With native lanes and a matching-generation oscillator, `E = nativeRatio[g] × decay[g]^(L_clock - 1)`. Extra lane levels also increase `push`. Extra cores add their own watts. The oscillator does not carry the cores' load a second time.
 
-Hz/kHz retain the source's decay. MHz/GHz use 0.95/0.9625 **(s)** instead of the source's 0.94/0.96 to place operating loss near L23/L20 under the user's latest roughly-30-to-20 target. These are adopted balance values, not claims about the source cells.
+Hz cores and RAM retain the source's decay. **Departure (lead ruling, 25 Oct, D29):** the kHz **core** decays 0.85 per pushed level instead of the source's 0.93. It keeps kHz compute climbing across the System era so the 100 kHz pipe wall lands near Rack (D29): with 0.93 a single kHz core stays economic to about 266k ops/s and the clock (15–60 s per level at the CSV prices) races to the pipe within 20 min of the kHz package; with 0.85 a kHz core turns uneconomic near 18k ops/s, so compute grows with the Data-gated core count (2, 4, 8). The CSV's prices and clocks are unchanged, and kHz-era RAM (DDR2) keeps 0.93. MHz/GHz use 0.95/0.9625 **(s)** instead of the source's 0.94/0.96 to place operating loss near L23/L20 under the user's latest roughly-30-to-20 target. These are adopted balance values, not claims about the source cells.
 
 **The core generation owns this ratio.** Putting a new clock on old cores does not grant the new cores' native ratio. `push` still compares against those old cores' native lanes and clock. Research completion alone never changes installed parts' generation.
 

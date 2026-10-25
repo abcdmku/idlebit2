@@ -75,7 +75,7 @@ const carried = (state: GameState, id: number): number => {
     - ENERGY_PRICE * (w.idle + w.load);
 };
 /** Estimated income in ops/s: what every system can carry through its pipe. */
-const income = (state: GameState): number =>
+export const income = (state: GameState): number =>
   state.build.systems.reduce((sum, s, id) => sum + (s === null ? 0 : carried(state, id)), 0);
 
 /** Gross Credits per second over the last round, or the carried estimate before any round ended. */
@@ -159,6 +159,13 @@ export function candidateRequests(state: GameState): QuoteRequest[] {
 
 const CPU_RATE_SLOTS = new Set(['core', 'clock', 'cpu']);
 
+/** The system whose RAM an upgrade or added module changes, or null. */
+function ramTarget(a: GameAction): number | null {
+  if (a.type === 'addPart' && a.kind === 'ram') return a.system;
+  if (a.type === 'upgradePart' && a.part.unit.kind === 'system' && a.part.slot.kind === 'ram') return a.part.unit.id;
+  return null;
+}
+
 /** The system whose CPU compute an action changes, or null. */
 function cpuTarget(a: GameAction): number | null {
   if (a.type === 'replaceCpu') return a.system;
@@ -217,6 +224,16 @@ export function score(state: GameState, q: Quote): number | null {
     const base = ladderSpeed(LADDERS.switch.baseK[0]!);
     return gain > 0 && pipe > 0 ? (cost + (pipe > base ? Number(portSpeedPrice(base, pipe, 1)) : 0)) / gain : null;
   }
+  // RAM bandwidth carries every task's memory traffic (D26): a player keeps it up with the cores, like a clock.
+  const ramSys = ramTarget(a);
+  if (ramSys !== null) {
+    const c = state.compiled.sys, need = Math.min(computeRate(state, ramSys), c.pipeSpeed[ramSys] ?? Infinity), before = c.ramBw[ramSys] ?? 0;
+    if (before < need && !ramPastRatio(state, a)) {
+      const next = tryAction(state, a);
+      const gain = next ? Math.min(need, next.compiled.sys.ramBw[ramSys] ?? 0) - before : 0;
+      if (gain > 0) return cost / gain;
+    }
+  }
   if (rate) {
     const next = tryAction(state, a);
     const target = cpuTarget(a);
@@ -267,7 +284,8 @@ const CHEAP_GATE_S = 60;
 function gateNeeded(state: GameState, a: GameAction, cost: number): boolean {
   const details = gateDetail(a);
   if (ramPastRatio(state, a)) return false;
-  if (!details || cost <= CHEAP_GATE_S * Math.max(1, income(state))) return true;
+  // Drive levels raise IO watts for spill traffic: bought only for a named wall, never just because they are cheap.
+  if (!details || (cost <= CHEAP_GATE_S * Math.max(1, income(state)) && !details.includes('disk'))) return true;
   return lastFailedOn(state, details);
 }
 /**
@@ -318,7 +336,21 @@ export function buyable(state: GameState, quotes: readonly Quote[]): Quote[] {
   const running = state.round.phase === 'running';
   return quotes.filter((q) => q.currency === 'credits' && q.locked === null && q.affordable
     && amountCompare(q.cost, '0') > 0 && !(running && q.cold)
-    && psuImproves(state, q) && gpuImproves(q) && gpuFitsSupply(state, q));
+    && psuImproves(state, q) && gpuImproves(q) && gpuFitsSupply(state, q) && memoryImproves(state, q));
+}
+
+/** A RAM or drive purchase must keep the system's memory bandwidth (and a replacement its capacity): a new module at L1 can be 100× slower. */
+function memoryImproves(state: GameState, q: Quote): boolean {
+  const a = q.action;
+  // RAM bandwidth is the slowest module's (compile: min over modules): adding an L1 module next to a levelled one can cut it 300×.
+  const id = a.type === 'replacePart' && a.part.unit.kind === 'system' && (a.part.slot.kind === 'ram' || a.part.slot.kind === 'drive') ? a.part.unit.id
+    : a.type === 'addPart' && (a.kind === 'ram' || a.kind === 'drive') ? a.system : -1;
+  if (id < 0) return true;
+  const next = tryAction(state, a);
+  if (!next) return false;
+  const b = state.compiled.sys, n = next.compiled.sys;
+  if (a.type === 'addPart') return (b.ramBw[id] ?? 0) === 0 || n.ramBw[id]! >= b.ramBw[id]!;
+  return n.memCap[id]! >= b.memCap[id]! && n.ramBw[id]! >= b.ramBw[id]! && n.ioRate[id]! >= b.ioRate[id]!;
 }
 
 /** Replacements must keep capacity and efficiency; level upgrades trade efficiency for capacity. */
@@ -364,7 +396,7 @@ function tryAction(state: GameState, action: GameAction): GameState | null {
  * a sensible player saves for the essential node rather than spending on parts.
  */
 const RESERVE_HORIZON_S = 1800;
-function creditReserve(state: GameState): number {
+export function creditReserve(state: GameState): number {
   const tree = selectResearchTree(state);
   // A fee more than half an hour of gross income away is a goal, not a reason to stop building.
   const horizon = RESERVE_HORIZON_S * grossRate(state);
@@ -387,14 +419,16 @@ function creditReserve(state: GameState): number {
 }
 
 /** Cost of replacing the weakest system's CPU with the newest generation, when it is not affordable yet but pays back within an hour; else 0. */
-const CPU_SAVE_PAYBACK_S = 3600;
-function nextCpuSave(state: GameState): number {
+// A new generation is worth more than its first-level gain (its clock headroom): save when it pays back within four hours.
+const CPU_SAVE_PAYBACK_S = 14_400;
+export function nextCpuSave(state: GameState): number {
   const id = sampleSystems(state)[0];
   if (id === undefined) return 0;
   const q = quote(state, { kind: 'tray', at: { level: 'system', id: systemId(id) } }).quotes.find((x) => x.action.type === 'replaceCpu');
-  if (!q || q.affordable || q.locked !== null) return 0;
+  // Affordable but cold mid-round still counts: the reserve holds until the round ends and the bot can buy it.
+  if (!q || q.locked !== null) return 0;
   const cost = amountToNumber(q.cost);
-  const rich = tryAction({ ...state, wallet: { ...state.wallet, credits: q.cost } }, q.action);
+  const rich = tryAction({ ...state, round: { ...state.round, phase: 'between' }, wallet: { ...state.wallet, credits: q.cost } }, q.action);
   const gain = rich ? income(rich) - income(state) : 0;
   return gain > 0 && cost / gain <= CPU_SAVE_PAYBACK_S ? cost : 0;
 }
@@ -402,6 +436,8 @@ function nextCpuSave(state: GameState): number {
 function buyParts(state: GameState, policy: Policy, log: BotEvent[]): GameState {
   let s = state;
   const reserve = creditReserve(state);
+  // Saving for a new CPU generation (minutes of payback) holds back everything else; saving for the first GPU lets wall answers through.
+  const cpuSaving = reserve > 0 && reserve === nextCpuSave(state);
   for (let n = 0; n < policy.maxBuysPerDecision; n += 1) {
     const quotes = candidateRequests(s).flatMap((r) => quote(s, r).quotes);
     let best: Quote | null = null, bestScore = Infinity;
@@ -409,7 +445,7 @@ function buyParts(state: GameState, policy: Policy, log: BotEvent[]): GameState 
     for (const q of buyable(s, quotes)) {
       // The reserve holds back gates and levels, not purchases that raise net income (a native CPU saves energy).
       // Nor purchases that answer a wall the recent rounds ended on (RAM, drives, cache): a player buys those while saving.
-      if (reserve > 0 && !q.gpu && cpuTarget(q.action) === null && !answersRecentWall(s, q.action) && credits - amountToNumber(q.cost) < reserve) continue;
+      if (reserve > 0 && (cpuSaving || (!q.gpu && !answersRecentWall(s, q.action))) && cpuTarget(q.action) === null && credits - amountToNumber(q.cost) < reserve) continue;
       const v = score(s, q);
       if (v !== null && v < bestScore) { best = q; bestScore = v; }
     }

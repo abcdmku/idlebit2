@@ -25,7 +25,8 @@ export function planInstallGpu(state: GameState, system: SystemId, model: GpuMod
   const card = { kind: 'gpu' as const, model, upgrades: 0 };
   const accels = index === null ? [...spec.accels, card] : spec.accels.map((old, slot) => slot === index ? card : old);
   return planned({ build: withSpec(state.build, system, { ...spec, accels }), price,
-    cold: coldScopes(state, { kind: 'system', id: system }), kill: [{ kind: 'system', id: system }],
+    // Spec §4.5: a card into an empty slot is hot; replacing a card is cold.
+    cold: index === null ? [] : coldScopes(state, { kind: 'system', id: system }), kill: [{ kind: 'system', id: system }],
     inventoryChangedSystems: [system] }, label);
 }
 

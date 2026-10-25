@@ -77,7 +77,7 @@ describe('one grammar and one list (A08, A14)', () => {
     const rows = buildOffers('system', tray, null).rows;
     expect(rows.map(r => r.key)).toEqual(['cpu', 'ram', 'storage', 'link', 'psu']);
     expect(rows.map(r => [r.name, r.change, r.right.kind])).toEqual([
-      ['CPU', '1 → 2 slots', 'research'], ['Add RAM', '', 'price'], ['Storage', '1 → 2 slots', 'max'], ['Pipe', '—', 'none'], ['PSU', '—', 'none']]);
+      ['CPU', '1 → 2 slots', 'research'], ['Add RAM', '0 → 1 slots', 'price'], ['Storage', '1 → 2 slots', 'max'], ['Pipe', '—', 'none'], ['PSU', '—', 'none']]);
     expect(rows[0]!.right).toEqual({ kind: 'research', node: 'Dual socket' });
   });
   it('the System lists its PSU from the part quote, and the tile names the next unlock when nothing is priced', () => {

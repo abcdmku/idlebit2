@@ -9,7 +9,7 @@ import { DRAW_NONE, DRAW_SLEEP, drawKind } from '../phys/draw';
 import type { CacheLevelView, ChipSnapshot, CoreSleep, CoreView, SchedulerView } from '../types/snapshot';
 import type { GameState } from '../types/state';
 import type { BuildSlotView } from '../types/views';
-import { modeName, psuView } from './common';
+import { modeName, psuView, systemTimerS } from './common';
 import { inboundTransfer, shardOf } from './flows';
 import { forEachRunning, stageProgress } from './tasks';
 import { spilledOutOfCache } from './memory';
@@ -133,7 +133,7 @@ export function chipSnapshot(state: GameState, id: SystemId, parent: NodeRef | n
   }
   const capacityBits = cpuCacheBits(state, id);
   return {
-    level: 'chip', parent, systemId: id, online: modeName(h.mode[id]), tier: cpu?.cpu.gen ?? 0, cpuCount: cpus,
+    level: 'chip', parent, systemId: id, online: modeName(h.mode[id]), timerS: systemTimerS(state.hot, id), tier: cpu?.cpu.gen ?? 0, cpuCount: cpus,
     clock: { hz, effectiveHz: hz * (h.clockFactor[id] ?? 1), generation: cpu?.clock.gen ?? 0, level: cpu?.clock.level ?? 1 },
     coreSites: Math.min(state.research.unlocks.ceilings.coreSites, MAX_CORES_PER_CPU), cores,
     cache: {

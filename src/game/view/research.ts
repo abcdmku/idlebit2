@@ -8,6 +8,7 @@ import type { LevelId } from '../types/ids';
 import type { ResearchBadge } from '../types/snapshot';
 import type { GameState, ResearchState } from '../types/state';
 import type { ResearchNodeState, ResearchNodeView, ResearchTreeView } from '../types/views';
+import { researchRoot } from './researchParts';
 import { researchCreditsPerMinute, researchLenders } from './lenders';
 import { answerTypes } from '../market/taskTypes';
 
@@ -103,6 +104,7 @@ export function researchTree(state: GameState): ResearchTreeView {
       level: def.level, era: def.era, tier: def.tier,
       needsData: st === 'queued' && amountCompare(cost, state.wallet.data) > 0,
       effect: effectText(def.id), summary: def.summary, answers: answerTypes(def.answers),
+      ...researchRoot(def.id),
     });
   }
   const slots = r.unlocks.ceilings.researchQueue;

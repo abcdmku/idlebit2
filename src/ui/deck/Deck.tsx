@@ -4,7 +4,7 @@
 // and the world's callouts (A08).
 import { useEffect, useMemo, useState } from 'react';
 import { formatOps, selectContextualResearchTree } from '../../game';
-import { projectKey } from '../research/ResearchDrawer';
+import { projectKey } from '../research/model';
 import { ArtCanvas } from '../art/ArtCanvas';
 import { drawFlask, drawMiniIcon, drawPartIcon } from '../art/deckArt';
 import { wholeText } from '../hooks/format';
