@@ -1,8 +1,9 @@
 // The research screen (concept C, "grows from your hardware"). Tabs by hardware level, each showing
-// only its own level's parts; the default tab follows the zoom. Every prerequisite is a link that
-// jumps to its project, switching tab when needed. D27: Start puts a project at the front of the
-// market line; one project at a time.
-import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
+// only its own level's parts; the default tab follows the zoom. Tapping a tile opens it in place with
+// everything about the project, one tile at a time, and the list follows it into view. Every
+// prerequisite is a link that opens its project, switching tab when needed. Back and Escape shut an
+// open tile before they close the screen. D27: Start puts a project at the front of the market line.
+import { useLayoutEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
 import { selectContextualResearchTree, selectResearchTree, type GameAction, type LevelId, type NodeRef, type RenderSnapshot, type ResearchId,
   type ResearchTabId, type ResearchTreeView } from '../../game';
 import { ArtCanvas } from '../art/ArtCanvas';
@@ -11,17 +12,15 @@ import { useDialogFocus } from '../hooks/useDialogFocus';
 import type { ShellLayout } from '../layout';
 import { LockIcon } from '../plates/icons';
 import { wholeText } from '../plates/format';
+import { useInnerBack } from '../shell/backGuard';
 import { box, useLayout } from '../shell/geometry';
 import { useGameSelector, useShell, useViewState } from '../storeHooks';
-import { DetailPanel, DetailSheet } from './ResearchDetail';
+import { followTile } from './expand';
 import { PartSection } from './ResearchTree';
-import { buildBoard, LEVEL_TAB, tabRows, TAB_ICON, TAB_NAMES, type Board } from './model';
+import { buildBoard, LEVEL_TAB, tabRows, TAB_ICON, TAB_NAMES } from './model';
 import { incomeOf, type Wallet } from './money';
 import { nodeStatus, NO_LINE, type KeyContext, type LineState } from './status';
 import '../styles/research.css';
-
-/** The phone sheet folded: name and state, what it changes, price and hold, and the key. */
-const SHEET_H = 168;
 
 export interface ResearchViewProps {
   L: ShellLayout;
@@ -31,6 +30,7 @@ export interface ResearchViewProps {
   unlocked: Readonly<Record<LevelId, boolean>>;
   /** The zoom level: the tab that opens first. */
   level: LevelId;
+  /** Opens on this project's tile. */
   focusProject: ResearchId | null;
   wallet: Wallet;
   line: LineState;
@@ -39,54 +39,56 @@ export interface ResearchViewProps {
   onClose: () => void;
 }
 
-/** The row a tab opens on: the project in line, else the first startable, short or locked row. */
-function firstRow(board: Board, tab: ResearchTabId, ctx: KeyContext): ResearchId | null {
-  const m = board.tabs.get(tab);
-  if (!m) return null;
-  const rows = tabRows(m), order = ['running', 'next', 'stopped', 'ready', 'after', 'paused', 'queued', 'short', 'locked'];
-  const rank = (id: ResearchId) => order.indexOf(nodeStatus(ctx.byId.get(id)!, ctx).kind);
-  return rows.map(n => n.id).sort((a, b) => rank(a) - rank(b))[0] ?? null;
-}
-
 export function ResearchView(p: ResearchViewProps) {
   const { L, tree, line, onAction, onClose } = p;
   const ref = useRef<HTMLElement>(null), treeRef = useRef<HTMLDivElement>(null);
-  useDialogFocus(ref, onClose);
   const board = useMemo(() => buildBoard(tree, p.visible, p.unlocked, p.focusProject), [tree, p.visible, p.unlocked, p.focusProject]);
   const byId = useMemo(() => new Map(tree.nodes.map(n => [n.id, n])), [tree]);
   const ctx: KeyContext = { byId, line, wallet: p.wallet, income: incomeOf(tree.income), tree, between: p.between };
+  const startFocus = p.focusProject && board.where.has(p.focusProject) ? p.focusProject : null;
   const [tab, setTab] = useState<ResearchTabId>(() => {
-    const want = (p.focusProject && board.where.get(p.focusProject)) || LEVEL_TAB[p.level];
+    const want = (startFocus && board.where.get(startFocus)) || LEVEL_TAB[p.level];
     return board.tabs.has(want) ? want : board.owned[board.owned.length - 1]!;
   });
-  const [picked, setPicked] = useState<ResearchId | null>(() => p.focusProject ?? firstRow(board, tab, ctx));
+  const [open, setOpen] = useState<ResearchId | null>(startFocus);
   const [unfolded, setUnfolded] = useState<ReadonlySet<string>>(new Set());
-  const [sheetOpen, setSheetOpen] = useState(false);
-  const [scrollTo, setScrollTo] = useState<{ id: ResearchId; n: number } | null>(null);
+  // A tile to bring fully into view once it is laid out; `n` makes every request follow again.
+  const [follow, setFollow] = useState<{ id: ResearchId; focus: boolean; n: number } | null>(startFocus ? { id: startFocus, focus: false, n: 0 } : null);
   const model = board.tabs.get(tab) ?? board.tabs.get(board.owned[0]!)!;
-  const node = picked ? byId.get(picked) ?? null : null;
   const phone = L.kind === 'phone', iconN = L.N;
 
-  const showTab = (t: ResearchTabId) => { setTab(t); setPicked(firstRow(board, t, ctx)); setSheetOpen(false); };
-  /** Jump to a project: its tab, selected, scrolled into view and focused. */
+  const openTile = (id: ResearchId, focus: boolean) => { setOpen(id); setFollow(f => ({ id, focus, n: (f?.n ?? 0) + 1 })); };
+  /** A header tap: open that tile (shutting the open one), or shut it when it is the open one. */
+  const toggle = (id: ResearchId) => { if (open === id) setOpen(null); else openTile(id, false); };
+  /** A link: the project's tab, its tile open, followed into view and focused. */
   const jump = (id: ResearchId) => {
     const t = board.where.get(id);
     if (!t) return;
-    setTab(t); setPicked(id); setSheetOpen(false); setScrollTo(s => ({ id, n: (s?.n ?? 0) + 1 }));
+    setTab(t); openTile(id, true);
   };
+  const showTab = (t: ResearchTabId) => {
+    if (t === tab) return;
+    setTab(t); setOpen(null); setFollow(null);
+    treeRef.current?.scrollTo?.({ top: 0 });
+  };
+  /** Back and Escape: an open tile shuts first. */
+  const shut = () => { if (!open) return false; setOpen(null); return true; };
+  useDialogFocus(ref, () => { if (!shut()) onClose(); });
+  useInnerBack(shut);
+
   // Opening research on another project while it is open jumps there.
   const lastFocus = useRef(p.focusProject);
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (p.focusProject && p.focusProject !== lastFocus.current) jump(p.focusProject);
     lastFocus.current = p.focusProject;
     // eslint-disable-next-line react-hooks/exhaustive-deps -- only a new focus jumps
   }, [p.focusProject]);
-  useEffect(() => {
-    if (!scrollTo) return;
-    const el = treeRef.current?.querySelector<HTMLElement>(`[data-project="${scrollTo.id}"]`);
-    el?.scrollIntoView?.({ block: 'nearest' });
-    el?.focus({ preventScroll: true });
-  }, [scrollTo]);
+  useLayoutEffect(() => {
+    const box = treeRef.current, tile = follow && box?.querySelector<HTMLElement>(`[data-tile="${follow.id}"]`);
+    if (!box || !tile) return;
+    if (follow!.focus) tile.querySelector<HTMLElement>('[data-project]')?.focus({ preventScroll: true });
+    return followTile(box, tile);
+  }, [follow]);
   const fold = (key: string) => setUnfolded(s => { const n = new Set(s); if (!n.delete(key)) n.add(key); return n; });
 
   const ready = (t: ResearchTabId) => {
@@ -115,10 +117,8 @@ export function ResearchView(p: ResearchViewProps) {
       {p.between && cpm > 0 && <span className="gold">−{wholeText(cpm)}/min</span>}</button>
       : <span className="lab-line idle">Nothing in line</span>}</div>;
 
-  const detail = { node, tree, board, ctx, onAction, onJump: jump };
-  const sheetH = sheetOpen && node ? Math.floor(L.lab.h * 0.72 / 8) * 8 : SHEET_H;
-  const tree$ = { ctx, selected: picked, onPick: (id: ResearchId) => setPicked(id), onJump: jump };
-  return <section ref={ref} className={`lab ${L.kind}`} style={{ ...box(L.lab), '--ib': `${16 * iconN + 8}px`, '--dw': `${L.N === 3 ? 480 : 384}px`, '--sheet': `${SHEET_H}px` } as CSSProperties}
+  const tiles = { detail: { tree, board, ctx, onAction, onJump: jump }, open, onToggle: toggle };
+  return <section ref={ref} className={`lab ${L.kind}`} style={{ ...box(L.lab), '--ib': `${16 * iconN + 8}px` } as CSSProperties}
     data-k="sheet" data-testid="research-drawer" role="dialog" aria-modal="true" aria-label="Research" tabIndex={-1} onPointerDown={e => e.stopPropagation()}>
     <header className="lab-head">
       {title}
@@ -127,12 +127,13 @@ export function ResearchView(p: ResearchViewProps) {
     </header>
     {phone && tabs}
     <div ref={treeRef} className="lab-tree" role="tabpanel" aria-label={TAB_NAMES[model.tab]}>
-      {model.parts.length === 0 && !model.next && <p className="lab-empty">Nothing to research here yet.</p>}
-      {model.parts.map(g => <PartSection key={g.part} g={g} spec={tree.parts[g.part]?.spec ?? ''} iconN={iconN} open={unfolded.has(`${model.tab}:${g.part}`)}
-        onFold={() => fold(`${model.tab}:${g.part}`)} {...tree$} />)}
-      {model.next && <PartSection g={model.next} spec="" iconN={iconN} open={false} onFold={() => undefined} {...tree$} />}
+      <div className="lab-col">
+        {model.parts.length === 0 && !model.next && <p className="lab-empty">Nothing to research here yet.</p>}
+        {model.parts.map(g => <PartSection key={g.part} g={g} spec={tree.parts[g.part]?.spec ?? ''} iconN={iconN}
+          folded={!unfolded.has(`${model.tab}:${g.part}`)} onFold={() => fold(`${model.tab}:${g.part}`)} {...tiles} />)}
+        {model.next && <PartSection g={model.next} spec="" iconN={iconN} folded onFold={() => undefined} {...tiles} />}
+      </div>
     </div>
-    {phone ? <DetailSheet {...detail} open={sheetOpen} onToggle={() => setSheetOpen(o => !o)} height={sheetH} /> : <DetailPanel {...detail} />}
   </section>;
 }
 

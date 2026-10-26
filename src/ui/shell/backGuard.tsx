@@ -8,8 +8,22 @@ import type { ShellContextValue } from '../storeHooks';
 export const GUARD = { idlebit2: 'guard' } as const;
 const isGuard = (state: unknown) => (state as { idlebit2?: string } | null)?.idlebit2 === 'guard';
 
-/** Close the topmost menu: view menus innermost first, then the round report. False when nothing was open. */
+/** Layers inside an open sheet (an expanded research tile): each closes its layer and says whether it had one open. */
+const innerLayers: (() => boolean)[] = [];
+/** Registers an inner layer for the component's lifetime; Back and Escape close it before its sheet. */
+export function useInnerBack(close: () => boolean): void {
+  const ref = useRef(close);
+  ref.current = close;
+  useEffect(() => {
+    const layer = () => ref.current();
+    innerLayers.push(layer);
+    return () => { innerLayers.splice(innerLayers.indexOf(layer), 1); };
+  }, []);
+}
+
+/** Close the topmost menu: inner layers, view menus innermost first, then the round report. False when nothing was open. */
 export function closeTopmost(shell: Pick<ShellContextValue, 'view' | 'store' | 'dispatch'>): boolean {
+  for (let i = innerLayers.length - 1; i >= 0; i -= 1) if (innerLayers[i]!()) return true;
   const before = shell.view.getState();
   shell.view.dispatch({ type: 'back' });
   if (shell.view.getState() !== before) return true;

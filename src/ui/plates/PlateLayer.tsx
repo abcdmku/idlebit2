@@ -20,6 +20,7 @@ import { SupplyPlate } from './SupplyPlate';
 import { PowerCtlPlate } from './PowerCtlPlate';
 import { PowerKeys } from './PowerKeys';
 import { isPowerCtl } from './targets';
+import { CoreKey } from './CoreKey';
 import { StartRow } from './StartRow';
 import { GenerationRow } from './GenerationRow';
 import { SwitchPlate } from './SwitchPlate';
@@ -88,6 +89,24 @@ export function powerScope(t: HitTarget, focus: LevelSnapshot): ScopeRef | null 
   return null;
 }
 
+/**
+ * The target opens a plate on its first tap (user, 26 Oct). Not: the global scheduler before it exists
+ * (A23), an empty CPU or board site (bought from its callout, QA-10; a GPU bay opens the picker), and units
+ * seen from above with nothing more to show than their callout (a rack in a room, a room on the map).
+ */
+export function hasPlate(t: HitTarget, focus: LevelSnapshot): boolean {
+  if (t.part?.slot.kind === 'globalScheduler') return focus.level === 'global' && !!focus.scheduler;
+  if (t.part?.slot.kind === 'core') return focus.level === 'chip';
+  if (t.kind === 'slot' && !t.part && (focus.level === 'chip' || focus.level === 'system')) return gpuPlateSlot(t, focus) !== undefined;
+  if (sledOf(t, focus) !== null) return true;
+  return !!plateRequest(t, focus) || t.kind === 'unit';
+}
+
+/** A server sled tapped in its rack: its system (the sled's own plate, D34 user ruling 26 Oct). */
+export function sledOf(t: Pick<HitTarget, 'kind' | 'drill'>, focus: LevelSnapshot): UnitRef | null {
+  return t.kind === 'child' && focus.level === 'rack' && t.drill?.level === 'system' ? { kind: 'system', id: t.drill.id } as UnitRef : null;
+}
+
 /** The router a target is (D25.7): the rack LB, the room LB in the network rack, or the global scheduler. */
 export function routerOf(t: HitTarget, focus: LevelSnapshot): ScopeRef | null {
   const s = t.part?.slot.kind;
@@ -138,7 +157,7 @@ function TargetPlate({ target: t, focus }: { target: HitTarget; focus: LevelSnap
   // Display names, never IDs (QA-07); the catalog doesn't change while a plate is open.
   const researchNames = useMemo(() => new Map<ResearchId, string>(selectResearchTree(shell.store.getState()).nodes.map(n => [n.id, n.name])), [shell.store]);
   const common: Omit<PlateCommon, 'quotes'> = {
-    readAnchor, subscribeFrame, bounds: surface.plateBounds, bootS: bootMs / 1000,
+    readAnchor, subscribeFrame, bounds: surface.plateBounds, bootS: bootMs / 1000, beside: surface.layout.kind === 'desktop',
     onAction: (a: GameAction) => { shell.dispatch(a); },
     // One level, as Back and Escape do: the plate closes to its callout.
     onClose: () => view.dispatch({ type: 'back' }),
@@ -181,6 +200,11 @@ function TargetPlate({ target: t, focus }: { target: HitTarget; focus: LevelSnap
     return null;
   }
   const save = (unit: UnitRef) => view.dispatch({ type: 'select', target: { ...t, id: `${t.id}:save`, kind: 'save', unit, rect: { ...t.rect } } });
+  const sled = sledOf(t, focus);
+  if (sled) return unitPlate(sled, focus, { ...common, onSave: save, market: marketOf(shell.store.getState(), sled), power }, (slot) => {
+    const id = focus.level === 'rack' ? focus.servers[slot]?.systemId : null;
+    if (id !== null && id !== undefined) view.dispatch({ type: 'select', target: { ...t, id: `${t.id}:${slot}`, drill: { level: 'system', id } as never }, plate: true });
+  }, () => { if (t.drill) view.dispatch({ type: 'drill', ref: t.drill }); });
   if (t.kind === 'unit' && t.unit) return unitPlate(t.unit, focus, { ...common, onSave: save, market: marketOf(shell.store.getState(), t.unit), power }, (slot) => {
     const next = { ...t, id: `${t.id.replace(/\d+$/, '')}${slot}`, slot, unit: focus.level === 'rack' && focus.servers[slot].systemId !== null
       ? { kind: 'system', id: focus.servers[slot].systemId! } as UnitRef : t.unit };
@@ -216,9 +240,11 @@ function TargetPlate({ target: t, focus }: { target: HitTarget; focus: LevelSnap
       {powerKeys(!!focus.start, focus.start?.level ?? 0, 'Start controller', true)}
     </LbPlate>;
     const facts = partFacts(focus, s);
+    // D34: a core's detail and, first, the key that sells the next core (or the clock once cores are maxed).
     if (facts && s.kind === 'core') return <PlateFrame {...common} title={facts.title} sub={facts.sub} className="part core">
       <Status text={facts.status} />
       <Lines lines={facts.lines} slots={2} />
+      <CoreKey onAction={common.onAction} onResearch={common.onResearch} researchName={common.researchName} />
     </PlateFrame>;
     if (facts) return <PartPlate {...common} quotes={quotes} {...facts} unblocks={unblocks}>
       {s.kind === 'gpu' && focus.level === 'system' && focus.gpu.find(p => p.slot === s.index)?.kind === 'npu'

@@ -2,19 +2,17 @@
 // deck, the callout and plates, through `shell.dispatch`, and the sim re-quotes them.
 import type { HitTarget } from '../../render/core';
 import type { ShellContextValue } from '../storeHooks';
+import { hasPlate } from '../plates/PlateLayer';
 
-type Shell = Pick<ShellContextValue, 'view'>;
+type Shell = Pick<ShellContextValue, 'view' | 'store'>;
 
 /**
- * Empty space cancels. A tap selects (its callout opens); tapping a selected unit again goes inside
- * it, as in the approved mockup.
+ * One tap opens a part's whole detail with its keys (user, 26 Oct): its plate where it has one, else its
+ * callout. The same part again closes it; another part swaps straight to that one; empty space closes.
  */
 export function activateTarget(shell: Shell, hit: HitTarget | null): void {
-  if (!hit) { shell.view.dispatch({ type: 'cancel' }); return; }
-  if (hit.drill && shell.view.getState().selectedId === hit.id) {
-    shell.view.dispatch({ type: 'drill', ref: hit.drill }); return;
-  }
-  shell.view.dispatch({ type: 'select', target: hit });
+  if (!hit || shell.view.getState().selectedId === hit.id) { shell.view.dispatch({ type: 'cancel' }); return; }
+  shell.view.dispatch({ type: 'select', target: hit, plate: hasPlate(hit, shell.store.getSnapshot().focus) });
 }
 
 export function zoomGesture(shell: Shell, direction: 'in' | 'out', hit: HitTarget | null): void {

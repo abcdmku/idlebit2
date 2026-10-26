@@ -14,7 +14,7 @@ const target = { id: 'clock', kind: 'part', owner: { level: 'chip', id: 0 }, dri
   rect: { x: 0, y: 0, w: 8, h: 8 } } as unknown as HitTarget;
 
 describe('back closes the topmost menu, one per press', () => {
-  it('task detail, then the plate (to its callout), the callout, the sheet; then nothing', () => {
+  it('task detail, then the part detail (one layer), the sheet; then nothing', () => {
     const store = fakeStore();
     mounted = mount(<></>, store);
     const v = mounted.shell.view;
@@ -24,8 +24,8 @@ describe('back closes the topmost menu, one per press', () => {
     v.dispatch({ type: 'select', target }); v.dispatch({ type: 'openPlate' });
     const seen: string[] = [];
     const step = () => { closeTopmost(mounted!.shell); const s = v.getState(); seen.push(`${s.plate}/${!!s.selected}/${s.sheet}`); };
-    step(); step();
-    expect(seen).toEqual(['false/true/null', 'false/false/null']);
+    step();
+    expect(seen).toEqual(['false/false/null']);
     v.dispatch({ type: 'openTask', task: '1:1:1' });
     expect(v.getState().task).toBe('1:1:1');
     expect(closeTopmost(mounted.shell)).toBe(true);

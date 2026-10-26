@@ -11,6 +11,8 @@ import { LayoutContext } from '../shell/geometry';
 import { button, click, mount, type Mounted } from '../plates/testkit';
 import { ResearchScreen, ResearchView, type ResearchViewProps } from './ResearchScreen';
 import { projectKey } from './model';
+import { scrollGoal } from './expand';
+import { closeTopmost } from '../shell/backGuard';
 import { NO_LINE, type LineState } from './status';
 
 let m: Mounted, acts: GameAction[];
@@ -38,9 +40,12 @@ const rowText = (id: string) => {
   const b = row(id);
   return b ? [b.querySelector('.lr-st')?.textContent, b.querySelector('.lr-ax')?.textContent].filter(Boolean).join(' / ') : null;
 };
-const key = () => m.host.querySelector<HTMLButtonElement>('.ld-key')!;
-const detail = () => m.host.querySelector('.ld-panel, .ld-sheet')!;
-const selected = () => m.host.querySelector<HTMLElement>('.lab-tree [aria-pressed="true"]')?.dataset.project;
+/** The open tile, its details and its key. */
+const openTile = () => m.host.querySelector<HTMLElement>('.lab-tree .rw.open');
+const detail = () => openTile()!.querySelector('.ld-body')!;
+const key = () => openTile()!.querySelector<HTMLButtonElement>('.ld-key')!;
+const selected = () => openTile()?.dataset.tile;
+const head = (id: string) => row(id)!;
 const tabNames = () => [...m.host.querySelectorAll('[role=tab]')].map(b => b.getAttribute('aria-label'));
 
 // The user's phone screenshot: FIFO scheduler and C1 halt done, 267 Data.
@@ -78,8 +83,8 @@ describe('truthful states', () => {
     expect(detail().querySelector('.ld-facts')!.textContent).toContain('Need 2,233 more Data, no income right now');
   });
 
-  it('no answers chips: rows and the detail show no task types', () => {
-    view(early());
+  it('no answers chips: rows and the details show no task types', () => {
+    view(early(), { focusProject: r('dualCore') });
     expect(m.host.querySelector('.lr-pips, .ld-chip, [data-task-type]')).toBeNull();
     expect(detail().textContent).not.toMatch(/Answers/);
   });
@@ -103,11 +108,12 @@ describe('truthful states', () => {
 });
 
 describe('prerequisites are links', () => {
-  it('a locked row jumps to what it needs, selecting it', () => {
+  it('a locked row jumps to what it needs, opening its tile', () => {
     view(early());
     click(row('l2Cache')!.closest('li')!.querySelector('[data-needs]'));
     expect(selected()).toBe('pipelining');
-    expect(detail().querySelector('h3')?.textContent).toBe('Pipelining');
+    expect(detail().querySelector('.ld-effect')?.textContent).toBe('pipelining effect.');
+    expect(document.activeElement).toBe(head('pipelining'));
     expect(acts).toEqual([]);
   });
 
@@ -215,22 +221,82 @@ describe('D27 keys', () => {
   });
 });
 
-describe('phone sheet', () => {
-  it('folded it holds the change, price, hold and key; open it holds everything', () => {
-    view(early(), { L: shellLayout(390, 780), focusProject: r('dualCore') });
-    const sheet = m.host.querySelector('.ld-sheet')!;
-    expect(sheet.querySelector('.ld-change')?.textContent).toBe('Cores per CPU1→2');
-    expect(sheet.querySelector('.ld-line')?.textContent).toBe('2,50025kholds ~50 s');
-    expect(sheet.querySelector('.ld-key')?.textContent).toBe('Start · goes next in line');
-    expect(sheet.querySelector('.ld-facts')).toBeNull();
-    click(sheet.querySelector('.ld-top'));
-    const facts = m.host.querySelector('.ld-sheet.open .ld-facts')!.textContent;
+describe('tiles open in place', () => {
+  it('a tap opens a tile with everything about the project; one tile at a time; its header shuts it', () => {
+    view(early(), { L: shellLayout(390, 780) });
+    expect(openTile()).toBeNull();
+    click(head('dualCore'));
+    expect(selected()).toBe('dualCore');
+    expect(head('dualCore').getAttribute('aria-expanded')).toBe('true');
+    const facts = detail().querySelector('.ld-facts')!.textContent;
     expect(facts).toContain('✓ FIFO scheduler');
-    expect(facts).toContain('Leads to');
-    // A jump folds the sheet so the target row shows.
-    click(m.host.querySelector('.ld-sheet [data-goto="cstateC3"]'));
-    expect(m.host.querySelector('.ld-sheet.open')).toBeNull();
-    expect(selected()).toBe('cstateC3');
+    expect(facts).toContain('5k ops · holds your hardware ~50 s');
+    expect([...detail().querySelectorAll<HTMLElement>('[data-goto]')].map(b => b.dataset.goto)).toEqual(['cstateC3', 'systemBoard']);
+    expect(detail().textContent).toContain('and 1 later');
+    expect(key().textContent).toBe('Start · goes next in line');
+    // Another tap moves the one open tile; the shutting one keeps no live keys.
+    click(head('pipelining'));
+    expect(selected()).toBe('pipelining');
+    expect(m.host.querySelectorAll('.lab-tree .rw.open')).toHaveLength(1);
+    expect(head('dualCore').getAttribute('aria-expanded')).toBe('false');
+    expect(row('dualCore')!.closest('li')!.querySelector('.tx')?.hasAttribute('inert') ?? true).toBe(true);
+    click(head('pipelining'));
+    expect(openTile()).toBeNull();
+  });
+
+  it('keys work inside the tile', () => {
+    view(early());
+    click(head('pipelining'));
+    click(key());
+    expect(acts).toEqual([{ type: 'startResearch', project: 'pipelining' }]);
+  });
+
+  it('a link opens its target and scrolls the list until all of it shows', () => {
+    m.render(<div data-reduced-motion="true"><ResearchView L={shellLayout(390, 780)} tree={early()} visible={new Set(early().nodes.map(n => n.id))}
+      unlocked={CPU_ONLY} level="chip" focusProject={null} wallet={rich} line={NO_LINE} between={false} onAction={a => acts.push(a)} onClose={() => undefined} /></div>);
+    const box = m.host.querySelector<HTMLElement>('.lab-tree')!, tile = row('systemBoard')!.closest('li')!;
+    // The list shows 0..300; the System tile sits at 900..1100 once laid out.
+    const at = (el: Element, top: number, height: number) => { el.getBoundingClientRect = () => ({ top, height, bottom: top + height } as DOMRect); };
+    at(box, 0, 300); at(tile, 900, 200);
+    Object.defineProperty(box, 'clientHeight', { value: 300 }); Object.defineProperty(box, 'scrollHeight', { value: 2000 });
+    click(head('dualCore'));
+    click(detail().querySelector('[data-goto="systemBoard"]'));
+    expect(selected()).toBe('systemBoard');
+    expect(box.scrollTop).toBe(808);
+  });
+
+  it('back and Escape shut the open tile before they close research', () => {
+    const base = createInitialState(42);
+    const store = createGameStore({ initialState: base });
+    const vs = createViewStore(store.getSnapshot, initialView(store.getSnapshot()));
+    const layout = shellLayout(390, 780);
+    const shell = createShellValue(store, vs, createLevelRegistry(), { renderer: null, layout, plateBounds: layout.calloutBounds,
+      frameListeners: new Set(), buildQuotes: null, drawCount: 0 });
+    vs.dispatch({ type: 'openResearch', project: r('fifoSched') });
+    m.render(<ShellContext.Provider value={shell}><LayoutContext.Provider value={layout}><ResearchScreen /></LayoutContext.Provider></ShellContext.Provider>);
+    expect(selected()).toBe('fifoSched');
+    act(() => { closeTopmost(shell); });
+    expect(openTile()).toBeNull();
+    expect(vs.getState().sheet).toBe('research');
+    act(() => { closeTopmost(shell); });
+    expect(vs.getState().sheet).toBeNull();
+    act(() => { vs.dispatch({ type: 'openResearch', project: r('fifoSched') }); });
+    expect(selected()).toBe('fifoSched');
+    const esc = () => act(() => { document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })); });
+    esc();
+    expect(openTile()).toBeNull();
+    expect(vs.getState().sheet).toBe('research');
+    esc();
+    expect(vs.getState().sheet).toBeNull();
+    store.dispose();
+  });
+
+  it('the list follows a tile to the nearest scroll that shows all of it', () => {
+    const view300 = { top: 100, height: 300 };
+    expect(scrollGoal(view300, { top: 150, height: 100 })).toBe(100);
+    expect(scrollGoal(view300, { top: 350, height: 100 })).toBe(158);
+    expect(scrollGoal(view300, { top: 40, height: 100 })).toBe(32);
+    expect(scrollGoal(view300, { top: 500, height: 400 })).toBe(492);
   });
 });
 
@@ -252,7 +318,7 @@ describe('connected research screen', () => {
     expect(names()).toContain('GPU gen 1, 1 kHz');
     expect(names()).not.toContain('GPU gen 9, 100 GHz');
     expect(names()).not.toContain('DDR');
-    expect(m.host.querySelector('.ld-panel h3')?.textContent).toBe('GPU gen 1, 1 kHz');
+    expect(selected()).toBe('gpuGen1');
     const system = state.build.systems[0]!;
     act(() => store.replaceState({ ...state, build: { ...state.build, revision: state.build.revision + 1,
       systems: [{ ...system, spec: { ...system.spec, ram: [{ gen: 0, level: 1, ecc: false }] } }] } }));

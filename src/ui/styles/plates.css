@@ -235,3 +235,7 @@
 
 /* A quiet key (Leave, Dismiss): plain, never the deck's row class */
 .v3-plate .key.quiet { background: #29234b; color: #efeaff; box-shadow: inset 0 -4px 0 #1b1437, inset 0 2px 0 #5d5296, 0 0 0 2px #0e0b1c; }
+
+/* More below: a fade on the scrolling plate's bottom edge, gone once the end is in view */
+.v3-plate[data-more="true"]::after { content: ''; position: sticky; display: block; bottom: -12px; height: 32px; margin: -32px -12px -12px;
+  background: linear-gradient(#1b143700, #1b1437); pointer-events: none; }

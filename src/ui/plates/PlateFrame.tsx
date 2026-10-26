@@ -14,6 +14,8 @@ export interface PlatePosition {
   subscribeFrame?: ((update: () => void) => () => void) | null;
   /** Pin to the top of the safe area (the save prompt, clear of an on-screen keyboard). */
   pinTop?: boolean;
+  /** Desktop: dock in the world's right gutter level with the part (as the callout did), else beside it, so the part stays in view. */
+  beside?: boolean;
 }
 
 export interface PlateFrameProps extends PlatePosition {
@@ -35,37 +37,50 @@ export interface PlateFrameProps extends PlatePosition {
 
 /** The plate body: a fixed-width dark slab with a paper rim. It never resizes while open. */
 export function PlateFrame({ title, sub, pips, head, className = '', closeKey = true, as = 'section', onSubmit, initialFocus,
-  onClose, children, readAnchor, bounds, subscribeFrame, pinTop }: PlateFrameProps) {
+  onClose, children, readAnchor, bounds, subscribeFrame, pinTop, beside }: PlateFrameProps) {
   const ref = useRef<HTMLElement>(null);
   useDialogFocus(ref, onClose, initialFocus);
   useLayoutEffect(() => {
     const root = ref.current;
     if (!root) return;
     const target: Rect = { x: 0, y: 0, w: 0, h: 0 };
+    // A plate that scrolls says so: a fade over its bottom edge while more lies below.
+    const more = () => { root.dataset.more = String(root.scrollHeight - root.scrollTop - root.clientHeight > 2); };
+    root.addEventListener('scroll', more, { passive: true });
     const position = () => {
       const parent = root.offsetParent as HTMLElement | null;
       const pw = parent?.clientWidth || innerWidth, ph = parent?.clientHeight || innerHeight;
       const safe = bounds ?? { x: 8, y: 142, w: pw - 16, h: ph - 142 - 160 };
-      root.style.setProperty('--plate-safe-height', `${Math.max(0, safe.h - 8)}px`);
       root.style.setProperty('--plate-safe-width', `${Math.max(0, safe.w)}px`);
       const a = !pinTop && readAnchor?.(target) ? target : null;
+      // Never over the tapped part (phone): when the plate fits neither below nor above it, it takes the
+      // roomier side and scrolls there, so the part stays in view.
+      const below = a ? safe.y + safe.h - (a.y + a.h + 8) : 0, above = a ? a.y - 8 - safe.y : 0;
+      root.style.setProperty('--plate-safe-height', `${Math.max(0, safe.h - 8)}px`);
+      if (a && !beside && !pinTop && root.scrollHeight > below && root.scrollHeight > above && Math.max(below, above) >= 160)
+        root.style.setProperty('--plate-safe-height', `${Math.floor(Math.max(below, above))}px`);
       const width = root.offsetWidth, height = root.offsetHeight;
       const clamp = (n: number, lo: number, hi: number) => Math.max(lo, Math.min(n, Math.max(lo, hi)));
-      const x = a ? a.x + a.w / 2 - width / 2 : safe.x + (safe.w - width) / 2;
+      const dock = safe.x + safe.w - width, right = a ? a.x + a.w + 16 : 0;
+      const side = !!a && !!beside;
+      const x = side ? (a!.x + a!.w + 8 <= dock ? dock : right + width <= safe.x + safe.w ? right : a!.x - width - 16)
+        : a ? a.x + a.w / 2 - width / 2 : safe.x + (safe.w - width) / 2;
       const y = pinTop ? safe.y + 4
-        : a ? (a.y + a.h + 8 + height <= safe.y + safe.h ? a.y + a.h + 8 : a.y - height - 8)
+        : side ? a!.y
+        : a ? (a.y + a.h + 8 + height <= safe.y + safe.h ? a.y + a.h + 8 : a.y - height - 8 >= safe.y ? a.y - height - 8 : below >= above ? a.y + a.h + 8 : a.y - height - 8)
         : safe.y + (safe.h - height) / 2;
       root.style.left = `${Math.round(clamp(x, safe.x, safe.x + safe.w - width))}px`;
       root.style.top = `${Math.round(clamp(y, safe.y, safe.y + safe.h - height))}px`;
       root.dataset.anchored = String(Boolean(a));
+      more();
     };
     position();
     const observer = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(position);
     observer?.observe(root);
     window.addEventListener('resize', position);
     const stop = subscribeFrame?.(position);
-    return () => { stop?.(); observer?.disconnect(); window.removeEventListener('resize', position); };
-  }, [bounds, readAnchor, subscribeFrame, pinTop]);
+    return () => { stop?.(); observer?.disconnect(); window.removeEventListener('resize', position); root.removeEventListener('scroll', more); };
+  }, [bounds, readAnchor, subscribeFrame, pinTop, beside]);
 
   const body = <>
     <header className="p-head">

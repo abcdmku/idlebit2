@@ -35,7 +35,8 @@ export type ViewCommand =
   | { readonly type: 'zoomTo'; readonly level: LevelId }
   | { readonly type: 'zoomStep'; readonly direction: 'in' | 'out'; readonly drill?: NodeRef | null }
   | { readonly type: 'drill'; readonly ref: NodeRef }
-  | { readonly type: 'select'; readonly target: HitTarget }
+  /** `plate`: open its full plate at once (one tap shows the detail and its keys, user 26 Oct). */
+  | { readonly type: 'select'; readonly target: HitTarget; readonly plate?: boolean }
   | { readonly type: 'openPlate' }
   | { readonly type: 'openResearch'; readonly project?: ResearchId | null }
   | { readonly type: 'toggleSheet'; readonly sheet: Sheet }
@@ -116,7 +117,7 @@ export function createViewStore(read: () => RenderSnapshot, initial: ViewState):
         return move(command.ref, null);
       case 'select': {
         const t = command.target;
-        return { ...state, selectedId: t.id, selected: { ...t, rect: { ...t.rect } }, plate: false, sheet: null };
+        return { ...state, ...CLEAR, selectedId: t.id, selected: { ...t, rect: { ...t.rect } }, plate: command.plate ?? false, sheet: null };
       }
       case 'openPlate':
         return state.selected && !state.plate ? { ...state, plate: true } : state;
@@ -131,9 +132,8 @@ export function createViewStore(read: () => RenderSnapshot, initial: ViewState):
       case 'openTask':
         return { ...state, ...CLEAR, sheet: null, researchProject: null, task: command.task };
       case 'back':
-        // Innermost first: a task detail, then a plate (back to its callout), the callout, then a sheet.
+        // Innermost first: a task detail, then a part's detail (plate or callout: one layer), then a sheet.
         if (state.task) return { ...state, task: null };
-        if (state.plate) return { ...state, plate: false };
         if (state.selected) return { ...state, ...CLEAR };
         if (state.sheet) return { ...state, sheet: null, researchProject: null };
         return state;

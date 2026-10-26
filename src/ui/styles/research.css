@@ -1,8 +1,8 @@
 /* The research screen (concept C: projects hang off the parts you own). D2.1: one body size; only
    the title, part names and the project name use --head. The shell places it with an inline rect
    (layout lab); everything inside is flow layout on the 8 px grid.
-   Desktop: header (title and line | tabs | Back), then the tree and the side panel.
-   Phone: header, tabs, the tree, and the bottom sheet over it. */
+   Desktop: header (title and line | tabs | Back), then the tree in one readable column.
+   Phone: header, tabs, then the tree. A tile opens in place with the project's details. */
 .lab { position: absolute; z-index: 11; box-sizing: border-box; pointer-events: auto; color: #efeaff; background: #1c1838;
   box-shadow: 0 0 0 2px #8c90ad, 0 4px 0 2px #0e0b1c, inset 0 2px #c9cce0;
   font: 400 var(--body, 13px)/var(--lh, 16px) "Chakra Petch", sans-serif; font-variant-ligatures: none;
@@ -18,8 +18,9 @@
 .lab .px-ic.lock { width: 14px; height: 16px; }
 .lab .mute { color: var(--muted); }
 .lab .gold { color: var(--gold); }
-.lab.desktop { display: grid; gap: 16px; padding: 16px; grid-template-columns: minmax(0, 1fr) var(--dw, 480px); grid-template-rows: 48px minmax(0, 1fr); --rg: 0px; }
-.lab.desktop .lab-head { grid-column: 1 / 3; }
+.lab.desktop { display: grid; gap: 16px; padding: 16px; grid-template-columns: minmax(0, 1fr); grid-template-rows: 48px minmax(0, 1fr); --rg: 0px; }
+/* the tree keeps a readable line length on wide screens */
+.lab.desktop .lab-col { max-width: 832px; margin: 0 auto; }
 .lab.desktop .lab-tabs { margin-left: auto; grid-auto-flow: column; }
 .lab.phone { display: flex; flex-direction: column; gap: 8px; padding: 8px 8px 0; }
 
@@ -57,7 +58,7 @@ button.lab-line:hover .nm { text-decoration: underline; }
 /* the tree: each part a heading, its projects hang on 2 px rails with pixel elbows */
 .lab-tree { background: var(--well); overflow-y: auto; overscroll-behavior: contain; touch-action: pan-y; min-height: 0;
   padding: 8px 16px 16px; scrollbar-width: thin; scrollbar-color: var(--rail) var(--well); }
-.lab.phone .lab-tree { flex: 1; margin: 0 -8px; padding: 8px 8px calc(var(--sheet) + 16px); scroll-padding-bottom: calc(var(--sheet) + 8px); }
+.lab.phone .lab-tree { flex: 1; margin: 0 -8px; padding: 8px 8px 16px; }
 .lab-empty { color: var(--dim); margin: 24px 0; text-align: center; }
 .lp + .lp { margin-top: 8px; }
 .lp-head { min-height: 48px; display: grid; grid-template-columns: var(--ib) auto minmax(0, 1fr) auto; column-gap: 12px; align-items: center; }
@@ -98,7 +99,6 @@ button.lp-done:hover { color: #efeaff; }
 .lr.bar::before, .lr.bar::after { content: ''; position: absolute; left: 0; bottom: 0; height: 4px; }
 .lr.bar::before { right: 0; background: #1c1838; }
 .lr.bar::after { width: var(--fill, 0%); background: var(--bar, var(--gold)); }
-.lr[aria-pressed="true"] { outline: 2px solid #efeaff; outline-offset: -2px; }
 .lr:hover { background: #312a5c; }
 
 .rw.ready .lr { background: var(--hi); box-shadow: inset 0 2px #5d5296, inset 0 -3px #271f55; }
@@ -117,9 +117,9 @@ button.lp-done:hover { color: #efeaff; }
 .rw.done .lr-nm { font-weight: 500; }
 .lab.phone .rw.locked .lr { padding: 0 6px; }
 
-/* a locked row's "Needs X": its own key over the right of the row (same grid cell), jumping to X */
-.rw.locked { display: grid; }
-.rw.locked > .lr, .rw.locked > .lr-link { grid-area: 1 / 1; }
+/* a locked row's "Needs X": its own key over the right of the header (same grid cell), jumping to X */
+.tile-head { display: grid; }
+.tile-head > .lr, .tile-head > .lr-link { grid-area: 1 / 1; }
 .lr-link { position: relative; z-index: 1; justify-self: end; width: 55%; padding: 0 12px; display: grid; align-content: center; justify-items: end;
   grid-template-rows: var(--lh, 16px) var(--lh, 16px); row-gap: var(--rg); color: var(--muted); }
 .lr-link > span { max-width: 100%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -134,15 +134,21 @@ button.lp-done:hover { color: #efeaff; }
 .pt .short { color: var(--dim); }
 .rw.locked .pt > span, .rw.done .pt > span { color: var(--dim); }
 
-/* detail: the side panel (desktop) and the bottom sheet (phone) */
-.ld-panel { background: #241e48; box-shadow: inset 0 2px #463b80, inset 0 -3px #0e0b1c; padding: 16px; min-width: 0; min-height: 0;
-  display: flex; flex-direction: column; gap: 16px; }
-.ld-panel .ld-scroll { flex: 1; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; gap: 16px; scrollbar-width: thin; scrollbar-color: var(--rail) #241e48; }
-.ld-head h3 { font-size: var(--head); font-weight: 700; }
-.ld-where { margin: 4px 0 0; display: flex; flex-wrap: wrap; gap: 0 12px; color: var(--muted); }
-.ld-state { font-weight: 600; white-space: nowrap; }
-.ld-state.go { color: var(--data); } .ld-state.off { color: #efeaff; } .ld-state.run { color: var(--print-text); }
-.ld-state.wait, .ld-state.warn { color: var(--gold); } .ld-state.done { color: var(--muted); }
+/* an open tile: the header unchanged, its details below in the same frame. The height opens 0fr → 1fr
+   and the content fades in (200 ms ease-out); under reduced motion both are instant. */
+/* the open frame is drawn over the header and details alike */
+.tile { position: relative; }
+.rw.open > .tile::after { content: ''; position: absolute; inset: 0; z-index: 2; pointer-events: none; box-shadow: inset 0 0 0 2px #efeaff; }
+.tx { display: grid; grid-template-rows: 0fr; transition: grid-template-rows 200ms ease-out; }
+.tx.open { grid-template-rows: 1fr; }
+.tx-in { min-height: 0; overflow: hidden; opacity: 0; transition: opacity 200ms ease-out; }
+.tx.open > .tx-in { opacity: 1; }
+@media (prefers-reduced-motion: reduce) { .lab .tx, .lab .tx-in { transition: none; } }
+[data-reduced-motion="true"] .lab .tx, [data-reduced-motion="true"] .lab .tx-in { transition: none; }
+.ld-body { display: flex; flex-direction: column; gap: 16px; padding: 16px 12px 12px; background: #241e48; box-shadow: inset 0 -3px #0e0b1c; }
+.lab.phone .ld-body { padding: 12px 8px 8px; gap: 12px; }
+.lab.phone .ld-facts { grid-template-columns: 64px minmax(0, 1fr); column-gap: 8px; }
+.lab.phone .ld-link { padding: 0 8px; }
 .ld-effect { margin: 0; }
 .ld-change { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 8px; padding: 8px 12px; background: var(--well); }
 .ld-change > span { color: var(--muted); margin-right: 4px; }
@@ -158,7 +164,6 @@ button.lp-done:hover { color: #efeaff; }
   box-shadow: inset 0 0 0 2px #2c2650; text-decoration: underline; text-underline-offset: 3px; text-decoration-thickness: 2px; }
 .ld-link:hover { color: #efeaff; }
 .ld-note { color: var(--muted); padding-left: 12px; box-shadow: inset 2px 0 var(--gold); }
-.ld-empty { color: var(--dim); margin: 0; }
 
 .ld-keys { display: grid; grid-template-columns: minmax(0, 1fr); gap: 8px; flex: none; }
 .ld-keys.two { grid-template-columns: minmax(0, 1fr) 96px; }
@@ -176,17 +181,3 @@ button.lp-done:hover { color: #efeaff; }
 .ld-key.go.fill { background: linear-gradient(#2a9a68, #2a9a68) 0 0 / var(--fill, 0%) 100% no-repeat, #1f7a52; }
 .ld-aside { height: 48px; text-align: center; font-weight: 600; background: var(--lo); color: #efeaff; box-shadow: inset 0 -3px var(--well), inset 0 2px var(--rail); }
 
-.ld-sheet { position: absolute; left: 0; right: 0; bottom: 0; z-index: 1; display: flex; flex-direction: column; gap: 8px; padding: 0 8px 8px;
-  background: #241e48; box-shadow: 0 -2px 0 #8c90ad, inset 0 2px #463b80; }
-.ld-sheet > .ld-empty { padding-top: 16px; }
-/* the sheet's head: the grip (drawn at the top centre), name, state and chevron; tapping it opens the sheet */
-.ld-top { flex: none; height: 48px; display: flex; align-items: center; gap: 12px; padding-top: 8px;
-  background: linear-gradient(#8c90ad, #8c90ad) 50% 6px / 48px 4px no-repeat; }
-.ld-name { flex: 1 1 auto; min-width: 0; font-size: var(--head); font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.ld-top .chev { color: var(--muted); }
-.ld-fold { flex: 1; min-height: 0; display: flex; flex-direction: column; gap: 8px; }
-.ld-fold .ld-change { padding: 0; background: none; }
-.ld-sum, .ld-line { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.ld-line { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
-.ld-sheet .ld-scroll { flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; display: flex; flex-direction: column; gap: 16px; padding-bottom: 8px; }
-.ld-sheet .ld-scroll .ld-where { margin: 0; }

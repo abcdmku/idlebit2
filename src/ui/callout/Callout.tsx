@@ -8,7 +8,7 @@ import type { HitTarget, Rect } from '../../render/core';
 import { useShellOffers } from '../deck/useOffers';
 import { offerAction, PriceText, RightText } from '../deck/offerUi';
 import type { Offer } from '../deck/offers';
-import { gpuPlateSlot, plateRequest } from '../plates/PlateLayer';
+import { plateRequest } from '../plates/PlateLayer';
 import { marketKey, marketLine, marketOf, targetUnit } from '../plates/market';
 import { box, T, useLayout } from '../shell/geometry';
 import { useGameSelector, useQuote, useShell, useViewState } from '../storeHooks';
@@ -48,13 +48,6 @@ export function Callout() {
   return <Open key={t.id} target={t} focus={focus} />;
 }
 
-/** The target has a plate to open (the global scheduler has none until it is installed, A23). */
-export function hasPlate(t: HitTarget, focus: LevelSnapshot): boolean {
-  if (t.part?.slot.kind === 'globalScheduler') return focus.level === 'global' && !!focus.scheduler;
-  // An empty site on a CPU or board ("Add queue", "Add RAM") is bought from the callout; only a GPU bay opens a plate (QA-10).
-  if (t.kind === 'slot' && !t.part && (focus.level === 'chip' || focus.level === 'system')) return gpuPlateSlot(t, focus) !== undefined;
-  return !!plateRequest(t, focus) || t.kind === 'unit';
-}
 
 function Open({ target: t, focus }: { target: HitTarget; focus: LevelSnapshot }) {
   const L = useLayout(), shell = useShell(), offers = useShellOffers();
@@ -93,7 +86,6 @@ function Open({ target: t, focus }: { target: HitTarget; focus: LevelSnapshot })
       } });
   }
   if (m.drill) { const ref = m.drill; keys.push({ id: 'open', label: 'Open', tone: 'plain', run: () => shell.view.dispatch({ type: 'drill', ref }) }); }
-  if (hasPlate(t, focus)) keys.push({ id: 'more', label: 'More', tone: 'plain', run: () => shell.view.dispatch({ type: 'openPlate' }) });
   // The market key is wider ("Off market"); the keys beside it narrow so three still fit.
   const keyW = (i: number) => market ? (i === 0 ? 96 : 72) : 80;
   const keyRight = (i: number) => pad + Array.from({ length: i }, (_, j) => keyW(j) + gap).reduce((a, b) => a + b, 0);

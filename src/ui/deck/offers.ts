@@ -162,8 +162,6 @@ export interface Offers {
   readonly best: number;
   /** With nothing priced: the first research that opens a row ("Next: Dual socket · research"). */
   readonly unlock: Offer | null;
-  /** Chip: each installed core's own upgrade (the tray quotes after the four primary ones), by core index. */
-  readonly cores: readonly (Offer | null)[];
 }
 
 /** What the deck needs from the level beyond quotes: the chip's cache level count (to name the level). */
@@ -218,6 +216,5 @@ export function buildOffers(level: LevelId, tray: readonly Quote[] | null, link:
   const pick = walled >= 0 ? walled : best >= 0 ? best : cheapest;
   const research = rows.filter(o => o.right.kind === 'research' && o.quote?.locked?.node);
   const unlock = pick >= 0 ? null : research.find(o => wall.includes(o.key)) ?? research[0] ?? null;
-  const cores = level === 'chip' ? (tray ?? []).slice(4).map((q, i) => offerOf(row(`core${i}`, 'core', `Core ${i + 1}`, 'core'), q)) : [];
-  return { rows, next: pick >= 0 ? rows[pick]! : null, best, unlock, cores };
+  return { rows, next: pick >= 0 ? rows[pick]! : null, best, unlock };
 }
