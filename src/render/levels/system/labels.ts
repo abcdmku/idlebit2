@@ -58,7 +58,8 @@ function values(s: SystemSnapshot): Omit<PartLabel, 'top' | 'mid' | 'lx' | 'end'
   const cores = s.chip.cores.length;
   out.push({ key: 'cpu', name: 'CPU', value: `${formatHertz(s.chip.clock.hz)} · ${whole(cores)} ${cores === 1 ? 'core' : 'cores'}${times(s.cpuCount)}`,
     side: 'L', r: siteRect(b, 'cpu', 0) });
-  out.push({ key: 'psu', name: 'PSU', value: wattsText(s.psu.capacityW), side: 'R', r: { ...PSU } });
+  // the system's power supply (user: never "PSU" or "Board PSU")
+  out.push({ key: 'psu', name: 'Power supply', value: wattsText(s.psu.capacityW), side: 'R', r: { ...PSU } });
   const ram = m.installed.ram, drive = m.installed.drive, gpu = m.installed.gpu;
   // R40: per-stick capacity and the slowest channel ("16.4 + 16.4 kb · 1 kHz"); per-drive size and IO.
   if (ram.length) {

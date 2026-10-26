@@ -47,9 +47,9 @@ export const STORAGE: CatalogRow = {
   curve: 'flow', base: [2048, 2 ** 24, 2 ** 34, 2 ** 44], base2: [512, 2000, 1.6e7, 6.4e10], watts: { kind: 'rate', wPerUnit: 1 },
   price: [3e5, 5e6, 3e10, 5e13], upgrade: UP,
 };
-/** Board PSU: a supply (capacity W, loss only). */
+/** The system's power supply (player-facing "Power supply"; id psu): a supply (capacity W, loss only). */
 export const PSU: CatalogRow = {
-  id: 'psu', scope: 'system', names: ['Bench', '80 Plus', 'Bronze', 'Gold', 'Platinum', 'Titanium'],
+  id: 'psu', scope: 'system', names: ['Power supply', '80 Plus power supply', 'Bronze power supply', 'Gold power supply', 'Platinum power supply', 'Titanium power supply'],
   gates: [r('systemBoard'), r('psu80'), r('psuBronze'), r('psuGold'), r('psuPlatinum'), r('psuTitanium')], curve: 'flow',
   // D8: each era's legal levels hold its largest native GPU through u1.
   base: [32768, 65536, 1.25e5, 1.25e6, 4e8, 5e13], watts: { kind: 'supply', loss: [0.3, 0.2, 0.15, 0.1, 0.07, 0.04], lossPerLevel: 0.01 },

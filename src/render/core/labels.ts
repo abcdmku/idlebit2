@@ -42,6 +42,16 @@ export class LabelBuffer implements LabelWriter {
   private runCount = 0;
   private current: Label | null = null;
   clear(): void { this.count = 0; this.runCount = 0; this.current = null; }
+  /** Copy `b` (labels and runs) into this buffer. */
+  copyFrom(b: LabelBuffer): void {
+    this.clear();
+    for (let i = 0; i < b.count; i++) Object.assign(this.labels[i]!, b.labels[i]!);
+    this.count = b.count;
+    let n = 0;
+    for (let i = 0; i < b.count; i++) n = Math.max(n, b.labels[i]!.end);
+    for (let i = 0; i < n; i++) Object.assign(this.runs[i]!, b.runs[i]!);
+    this.runCount = n;
+  }
   label(id: string, x: number, y: number, align: LabelAlign = 'left', tag = false): LabelWriter {
     if (this.count >= MAX_LABELS) { this.current = null; return this; }
     const l = this.labels[this.count++];
@@ -83,11 +93,31 @@ function lineWidth(g: CanvasRenderingContext2D, b: LabelBuffer, l: Label, line: 
   return w;
 }
 const snap = (v: number, origin: number, grid: number) => origin + Math.round((v - origin) / grid) * grid;
+
+/**
+ * A level's rest labels frozen for a zoom (user: text must not shuffle while the camera moves): the
+ * layout as it was at rest, and each label's lattice snap at that rest camera kept as a fixed screen
+ * offset, so through the zoom every label rides rigidly on its anchor, at whole pixels, with no relayout.
+ */
+export class FrozenLabels {
+  readonly buf = new LabelBuffer();
+  readonly dx = new Float32Array(MAX_LABELS); readonly dy = new Float32Array(MAX_LABELS);
+  level: string | null = null; type: Typography | null = null;
+  freeze(b: LabelBuffer, level: string, cam: Camera, vp: Rect, ratio: PixelRatio, t: Typography): void {
+    this.buf.copyFrom(b); this.level = level; this.type = t;
+    for (let i = 0; i < b.count; i++) {
+      const l = b.labels[i]!; toScreen(cam, vp, ratio, l.x, l.y, at);
+      // left/right snap the anchor x; centred labels snap their left edge, which the width keeps fixed
+      this.dx[i] = l.align === 'center' ? 0 : snap(at.x, vp.x, t.grid) - at.x; this.dy[i] = snap(at.y, vp.y, t.grid) - at.y;
+    }
+  }
+  clear(): void { this.buf.clear(); this.level = null; this.type = null; }
+}
 /**
  * Draw every label, projected through `cam`. `g` has an identity transform; text is drawn in CSS px.
  * `alpha` fades them through a zoom (A27).
  */
-export function drawLabels(g: CanvasRenderingContext2D, b: LabelBuffer, cam: Camera, vp: Rect, ratio: PixelRatio, t: Typography, alpha = 1): void {
+export function drawLabels(g: CanvasRenderingContext2D, b: LabelBuffer, cam: Camera, vp: Rect, ratio: PixelRatio, t: Typography, alpha = 1, frozen: FrozenLabels | null = null): void {
   if (!b.count || alpha <= 0) return;
   g.save();
   g.setTransform(ratio.x, 0, 0, ratio.y, 0, 0);
@@ -97,11 +127,13 @@ export function drawLabels(g: CanvasRenderingContext2D, b: LabelBuffer, cam: Cam
   for (let i = 0; i < b.count; i++) {
     const l = b.labels[i];
     toScreen(cam, vp, ratio, l.x, l.y, at);
-    const top = snap(at.y, vp.y, t.grid);
+    // At rest: on the type lattice. Frozen (a zoom): the rest snap as a fixed offset, at whole pixels.
+    const top = frozen ? Math.round(at.y + frozen.dy[i]!) : snap(at.y, vp.y, t.grid);
     for (let line = 0; line < l.lines; line++) {
       const w = lineWidth(g, b, l, line, t);
       if (w <= 0) continue;
-      const left = l.align === 'left' ? snap(at.x, vp.x, t.grid) : l.align === 'right' ? snap(at.x, vp.x, t.grid) - w : snap(at.x - w / 2, vp.x, t.grid);
+      const left = frozen ? Math.round(l.align === 'left' ? at.x + frozen.dx[i]! : l.align === 'right' ? at.x + frozen.dx[i]! - w : at.x - w / 2)
+        : l.align === 'left' ? snap(at.x, vp.x, t.grid) : l.align === 'right' ? snap(at.x, vp.x, t.grid) - w : snap(at.x - w / 2, vp.x, t.grid);
       const y = top + line * t.line;
       if (line === 0 && l.lead) leader(g, l, left, w, y, t.line, cam, vp, ratio, n);
       if (l.tag) { g.fillStyle = TAG_FILL; g.fillRect(left - 6, y, Math.ceil(w) + 12, t.line); }

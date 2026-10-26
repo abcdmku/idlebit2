@@ -7,7 +7,7 @@ type Sys = Extract<LevelSnapshot, { level: 'system' }>;
 
 export interface SummaryRow { readonly key: string; readonly label: string; readonly value: string; readonly part: PartRef | null }
 
-/** CPU, cache, RAM, storage, GPU and PSU load, in words. */
+/** CPU, cache, RAM, storage, GPU and power supply load, in words. */
 export function summaryRows(f: Sys): SummaryRow[] {
   const unit = { kind: 'system', id: f.systemId as SystemId } as const;
   const tier = (t: 'cache' | 'ram' | 'disk') => f.memory.tiers.find(x => x.tier === t);
@@ -19,7 +19,7 @@ export function summaryRows(f: Sys): SummaryRow[] {
     { key: 'ram', label: 'RAM', value: mem('ram'), part: f.ram.length ? { unit, slot: { kind: 'ram', index: 0 } } : null },
     { key: 'drive', label: 'Storage', value: mem('disk'), part: f.storage.length ? { unit, slot: { kind: 'drive', index: 0 } } : null },
     { key: 'gpu', label: 'GPU', value: f.gpu.length ? `${f.gpu.length} ${f.gpu.length === 1 ? 'card' : 'cards'}` : 'none', part: f.gpu.length ? { unit, slot: { kind: 'gpu', index: f.gpu[0]!.slot } } : null },
-    { key: 'psu', label: 'PSU', value: `${watts(f.psu.deliveredW)} of ${watts(f.psu.capacityW)}`, part: { unit, slot: { kind: 'psu' } } },
+    { key: 'psu', label: 'Power supply', value: `${watts(f.psu.deliveredW)} of ${watts(f.psu.capacityW)}`, part: { unit, slot: { kind: 'psu' } } },
   ] as SummaryRow[];
 }
 

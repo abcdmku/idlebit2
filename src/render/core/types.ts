@@ -63,6 +63,8 @@ export interface HitTarget {
 export interface ViewPresentation {
   /** HitTarget id to bracket, or null. */
   readonly selectedId: string | null;
+  /** HitTarget id under the pointer (desktop hover) or the finger (phone press): the same bracket, fainter. */
+  readonly hoverId?: string | null;
   /** A tray item picked for placement: build slots of this kind light up. */
   readonly picked: string | null;
   /** Tray quotes the UI already holds for the visible level; null leaves ghosts unpriced. */
@@ -193,6 +195,8 @@ export interface CanvasRenderer {
   hit(xCss: number, yCss: number): HitTarget | null;
   /** CSS rect of the focus-world target with this id (the callout anchor). */
   anchor(id: string, out: Rect): boolean;
+  /** A touch press on `target` (from `hit`): its reduced-strength bracket until `press(null)`. Hover uses `ViewPresentation.hoverId`. */
+  press(target: HitTarget | null): void;
   /** The zoom in progress. The UI drops the scope partner once this is null again. */
   readonly transition: TransitionInfo | null;
   dispose(): void;

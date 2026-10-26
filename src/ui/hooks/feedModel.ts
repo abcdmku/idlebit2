@@ -9,7 +9,7 @@ export const CAUSE_NAME: Readonly<Record<FailCause, string>> = {
   timeout: 'Timed out', cantRun: "Can't run", misroute: 'Misrouted', power: 'Power', heat: 'Heat', swap: 'Swap', late: 'Late',
 };
 const DETAIL_WORD: Readonly<Partial<Record<FailDetail, string>>> = {
-  ram: 'RAM', gpu: 'GPU', gpuCores: 'GPU cores', vram: 'VRAM', ecc: 'ECC', psu: 'PSU', pdu: 'PDU', ups: 'UPS', cold: 'Cold change',
+  ram: 'RAM', gpu: 'GPU', gpuCores: 'GPU cores', vram: 'VRAM', ecc: 'ECC', psu: 'Power supply', pdu: 'PDU', ups: 'UPS', cold: 'Cold change',
 };
 export const detailName = (d: FailDetail): string => DETAIL_WORD[d] ?? d[0]!.toUpperCase() + d.slice(1);
 export function causeText(cause: FailCause, detail: FailDetail | null): string {

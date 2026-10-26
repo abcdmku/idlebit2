@@ -5,7 +5,7 @@ import type { SystemSnapshot } from '../../../game';
 import { P, R, copyRect, partVersionOf, resetHitTarget, setRect } from '../../core';
 import type { HitTarget, LevelRegistry, LevelRenderer, Rect } from '../../core';
 import { writeLabels } from './labels';
-import { CABLE_X, FOCUS, PSU, SAVE, WORLD, packageRect, siteRect, worldRect } from './layout';
+import { CABLE_X, FOCUS, PSU, PSU_TILE, SAVE, WORLD, packageRect, siteRect, worldRect } from './layout';
 import { boardModel, boardPartRef, slotOf } from './model';
 import { drawSystemMini } from './mini';
 import { drawBoard } from './world';
@@ -70,7 +70,7 @@ export function createSystemRenderer(registry: LevelRegistry): LevelRenderer<'sy
       }
       if (i < out.length) {
         const t = resetHitTarget(out[i++]!, 'psu', 'part', owner(s));
-        t.part = boardPartRef(s.systemId, 'psu'); setRect(t.rect, PSU.x - 2, PSU.y - 7, PSU.w + 4, PSU.h + 9);
+        t.part = boardPartRef(s.systemId, 'psu'); copyRect(PSU_TILE, t.rect);
       }
       if (s.saveable && i < out.length) {
         const t = resetHitTarget(out[i++]!, 'save', 'save', owner(s));

@@ -37,7 +37,7 @@ Program D1.5 makes every network scope start as FIFO first-fit.
 | Coolers | Full duty, no setpoint. |
 | Boot time | 10 s, shared by every online/offline transition, post-failure reboot, mid-round add and cold change (D1.8). |
 
-**First-fit piles load on low slots.** Server 1 runs full while server 12 idles. That pushes server 1's board PSU into the ×1.5 and ×3 heat bands and its overload timer. At room scope, rack 1 runs hot and its PDU loads up while later racks sit cool. Slow server 1 also queues work that a fast idle server 5 could finish sooner. The researched strategies answer this: round robin and least connections spread load, weighted and least-work spread it by speed, the health and power filters steer around supplies in trouble, thermal-aware steers around hot racks, and bin packing keeps the concentration but caps it by power headroom so the idle tail can sleep.
+**First-fit piles load on low slots.** Server 1 runs full while server 12 idles. That pushes server 1's power supply into the ×1.5 and ×3 heat bands and its overload timer. At room scope, rack 1 runs hot and its PDU loads up while later racks sit cool. Slow server 1 also queues work that a fast idle server 5 could finish sooner. The researched strategies answer this: round robin and least connections spread load, weighted and least-work spread it by speed, the health and power filters steer around supplies in trouble, thermal-aware steers around hot racks, and bin packing keeps the concentration but caps it by power headroom so the idle tail can sleep.
 
 ## 2. Market bands and problems
 
@@ -156,7 +156,7 @@ Names are proposals; the spec owner may rename them.
 | GPU adapter index | displayed gen 1 `gpuGen1` | displayed gen 2 `gpuGen2` | displayed gen 3 `gpuGen3` | displayed gen 4 `gpuGen4` | displayed gen 5 `gpuGen5` | displayed gen 6 `gpuGen6`; indices 6/7/8 are displayed gens 7/8/9, `gpuGen7`/`gpuGen8`/`gpuGen9` |
 | NPU | `npu` | `npu` + `gpuGen2` | `npu` + `tensorCores` | `npu` + `matrixGpu` | | |
 | Storage | HDD `storageCtl` | SSD `ssd` | NVMe `nvme` | Storage-class memory `scm` | | |
-| Board PSU | Bench supply `systemBoard` | 80 Plus `psu80` | Bronze `psuBronze` | Gold `psuGold` | Platinum `psuPlatinum` | Titanium `psuTitanium` |
+| Power supply | Bench supply `systemBoard` | 80 Plus `psu80` | Bronze `psuBronze` | Gold `psuGold` | Platinum `psuPlatinum` | Titanium `psuTitanium` |
 | Rack cooler (D1.11, spec A.2: air gens 0–1, water gens 2–3) | Fan tray `rack` | High-flow air `rackAir2` | Rear-door water `rackWater` | Direct-to-chip water `rackWater2` | | |
 | Rack PDU | Basic PDU `rack` | Metered `meteredPdu` | Switched `switchedPdu` | | | |
 | Load balancer (one generation; D18.3 deleted `lbL4` and `lbAsic`) | Basic LB `rack` | | | | | |
@@ -204,7 +204,7 @@ Program §7 says better generations lower the loss fraction. These are starting 
 
 | Supply | Gen 0 | Gen 1 | Gen 2 | Gen 3 | Gen 4 | Gen 5 |
 |---|---|---|---|---|---|---|
-| Board PSU | 30% | 20% | 15% | 10% | 7% | 4% |
+| Power supply | 30% | 20% | 15% | 10% | 7% | 4% |
 | Rack PDU | 4% | 3% | 2% | | | |
 | Room UPS | 12% | 6% | 3% | | | |
 | Grid feed | 5% | 3% | 2% | | | |
@@ -310,7 +310,7 @@ Network scopes (rack load balancer, then room, site and backbone):
 |---|---|---|---|---|---|---|---|
 | `lbCapability` | Capability-aware | rack | Rack | kHz W8 | Filter: never route a shard to a system that fails its gates (working set, VRAM, storage, ECC). It removes children with no system that can run one grain. It never dispatches a split whose shards would not fit their targets: the task waits, in the LB queue or as the head, instead of misrouting (D25.9). The grain is not a gate. Cheap on purpose; it is the first Rack fix. | LB skips servers that can't run it | `misroute` |
 | `lbRoundRobin` | Round robin | rack | Rack | kHz W8 | Strategy: rotate through servers that can admit, starting after the last one used. Spreads load and heat off slot 1. | LB: round robin across servers | `overload`, `heat` |
-| `lbHealth` | Health checks | lbCapability | Rack | kHz W8 | Filter: skip servers whose board PSU overload timer or rack crash timer is above 0. First-fit already skips full and booting servers; this one stops feeding a server that is counting down to failure. | LB skips failing servers | `overload`, `heat` |
+| `lbHealth` | Health checks | lbCapability | Rack | kHz W8 | Filter: skip servers whose power supply overload timer or rack crash timer is above 0. First-fit already skips full and booting servers; this one stops feeding a server that is counting down to failure. | LB skips failing servers | `overload`, `heat` |
 | `lbLeastConn` | Least conns | lbRoundRobin | Rack | kHz W8 | Strategy (D25): shares in proportion to each child's free slots, so a nearly full child gets a small share. | LB: shares by free slots | `pickup`, `overload` |
 | `lbWeighted` | Weighted | lbLeastConn | Rack | kHz W8 | Strategy (D25): shares in proportion to each child's rated compute ops/s among its systems with room. For mixed-generation racks, where equal shares wait on the slowest server. | LB: shares by server speed | `pickup`, mixed fleets |
 | `lbLeastWork` | Least work left | lbWeighted, telemetry | Rack | MHz W9 | Strategy (D25): shares chosen so every child's predicted finish (queued work / rate + transfer + its share / rate) is as equal as whole units allow. IdleBit's least-finish-time routing. | LB: shares that finish together | `pickup`, `transfer` |
@@ -360,10 +360,10 @@ Network scopes (rack load balancer, then room, site and backbone):
 | `packageC` | Package C-states | cstateC6, l3Cache | System | kHz W7 | When every core is idle, cache, clock and scheduler draw 0.2× idle watts. | Idle CPUs drop to 0.2× watts | `energy` |
 | `s3Sleep` | Suspend (S3) | packageC, rack | Rack | kHz W8 | A server with no admitted task for 10 s sleeps at 0.03× its idle watts. Routing a task to it wakes it in 2 s, which counts against pickup. | Idle servers sleep after 10 s | `energy` |
 | `dvfs` | P-states (DVFS) | cstateC1, systemBoard | System | Hz W5 | While a system's queue is empty, its running cores run at 0.5× clock and 0.3× load watts. Full clock returns when a task queues. | Cores downclock when queue is empty | `energy`, `overload` |
-| `turbo` | Turbo boost | dvfs, fabKhz | System | kHz W7 | Cores run at 1.25× clock for 1.8× load watts while the board PSU is under 90% usage and (from Rack on) the rack is under 80 °F. They drop to 1× otherwise. | Cores boost to 1.25× clock | `pickup` |
+| `turbo` | Turbo boost | dvfs, fabKhz | System | kHz W7 | Cores run at 1.25× clock for 1.8× load watts while the power supply is under 90% usage and (from Rack on) the rack is under 80 °F. They drop to 1× otherwise. | Cores boost to 1.25× clock | `pickup` |
 | `powerCap` | Power capping | dvfs, telemetry | System | Hz W6 | A supply set to cap never exceeds 100% from compute load. Cores below it throttle clock in 10% steps instead, so the overload timer doesn't accrue. Applies to PSU and PDU. | Supplies cap at 100%, cores throttle | `overload` |
 | `loadShed` | Load shedding | powerCap, room | Room | MHz W11 | When a UPS or grid overload timer reaches 5 s, research pauses and the least-used rack drains to offline. | Overload sheds the least-used rack | `overload` |
-| `psu80` | 80 Plus | systemBoard | System | Hz W4 | Board PSU gen 1, loss 30%→20%. | 80 Plus PSU: loss 30% → 20% | `energy`, `heat` |
+| `psu80` | 80 Plus | systemBoard | System | Hz W4 | Power supply gen 1, loss 30%→20%. | 80 Plus power supply: loss 30% → 20% | `energy`, `heat` |
 | `psuBronze` | 80 Plus Bronze | psu80, fabKhz | System | kHz W7 | PSU gen 2, loss 15%. | Bronze PSU: loss 15% | `energy`, `heat` |
 | `psuGold` | 80 Plus Gold | psuBronze, rack | Rack | kHz W8 | PSU gen 3, loss 10%. | Gold PSU: loss 10% | `energy`, `heat` |
 | `psuPlatinum` | 80 Plus Platinum | psuGold, fabMhz | Rack | MHz W10 | PSU gen 4, loss 7%. | Platinum PSU: loss 7% | `energy`, `heat` |
@@ -409,7 +409,7 @@ Network scopes (rack load balancer, then room, site and backbone):
 
 | id | Name | Requires | Level | Era / tier | Effect | Short | Answers |
 |---|---|---|---|---|---|---|---|
-| `systemBoard` | System | dualCore, l2Cache | System | Hz W4 | Opens the System level. The chip becomes the CPU on a board with a fixed board PSU (gen 0) and SDRAM (RAM gen 0, D37: no separate RAM research). Tray: CPU, RAM, GPU, Storage; GPU and Storage still gated by their nodes. | Opens the System level | `ram`, `gpu`, `storage` |
+| `systemBoard` | System | dualCore, l2Cache | System | Hz W4 | Opens the System level. The chip becomes the CPU on a board with a fixed power supply (gen 0) and SDRAM (RAM gen 0, D37: no separate RAM research). Tray: CPU, RAM, GPU, Storage; GPU and Storage still gated by their nodes. | Opens the System level | `ram`, `gpu`, `storage` |
 | `rack` | Rack | fabKhz | Rack | kHz W6 | Opens Rack. A free starter rack with air cooler, basic PDU, 4-port gen-0 switch (ports at 1 kHz, shared port/uplink ceiling 500 GHz) and a round-robin load balancer. Server port speeds can now be upgraded on the rack switch (D15); before this the pipe is fixed at 1 kHz. The system becomes server 1. | Opens the Rack level | `density`, `rackDist` |
 | `room` | Room | rack, fabMhz | Room | MHz W10 | Opens Room (one AZ hall): network rack with room switch and load balancer, CRAC, standby UPS, 2 rows. Rack uplinks can now be upgraded on the network rack (D15). | Opens the Room level | `density`, `roomDist` |
 | `hallExpansion` | Third row | room, spineLeaf | Room | GHz W11 | A third row of 8 rack slots: racks per room 16 → 24. `spineLeaf` supplies ports for racks 17–24. | Racks per room 16 → 24 | `density` |
@@ -474,7 +474,7 @@ The path below is the real campaign bot's (`src/game/probes/bot.ts`, seed 42, D1
 | rounds 2 to Rack | no network node | The dual-core Hz chip outruns its fixed 1 kHz pipe in round 2. Until Rack, income is capped at 1,000 ops/s and tasks over 10,000 ops time out (D15) | |
 | 5:00–10:00 | `sjf`, `timeSlice`, `superscalar`, `quadCore`, `priorityQ`, `mlfq`, `workStealing`, `cstateC3` (W2–W3) | The off-path budget allows them while `systemBoard` is saved for | `cstateC1` |
 | 0:46–0:53 | `systemBoard` (W4, 36,000 Data) | "Can't run · RAM" from JSON Parse and Merge Sort. The first real save-up: about 40 min of capped Data | finish `cstateC3` first if the bill is high |
-| 0:58–1:10 | `memController`, `psu80` (W4, 12,000 each) | `ram` band; the board PSU limits a fast Hz chip | `l3Cache` |
+| 0:58–1:10 | `memController`, `psu80` (W4, 12,000 each) | `ram` band; the power supply limits a fast Hz chip | `l3Cache` |
 | 1:10–3:30 | save for `fabKhz` (W6 milestone, 150,000 Data) | Hz parts are at their ceilings; Credits pile up for kHz parts | W5 nodes within the off-path budget |
 | 3:33 | `fabKhz` | kHz era: the upgrade-or-replace moment for the CPU. kHz parts speed research, not income: the pipe still caps it | |
 | 3:50–4:00 | `gpuGen1`, `storageCtl` (W5, 15,000 each) | Their bands open above the pipe wall, so the first card and drive pay only after Rack | `hotPages`, `l3Cache` |
@@ -498,7 +498,7 @@ Sources: `content/research.ts` (legacy research), `content/dispatcherJobs.ts` (d
 | System Scheduler, System Queue Slot, scheduler SKUs (2/4/6/12/24 slot) | Adapted | Scheduler levels (Q, K) and scheduler generations through the fab nodes. |
 | Scheduler Watchdog, Deadlock Cooldown | Dropped | v3 has no deadlock; misroutes fail at once. The safety-net idea lives on in `powerCap` and `thermalThrottle`. |
 | PSU Management | Adapted | `powerCap`. |
-| PSU Capacity upgrade, PSU SKUs (Barebones, Compact, Balanced, Headroom) | Adapted | Board PSU levels plus the 80 Plus ladder (`psu80` to `psuTitanium`). |
+| PSU Capacity upgrade, PSU SKUs (Barebones, Compact, Balanced, Headroom) | Adapted | Power supply levels plus the 80 Plus ladder (`psu80` to `psuTitanium`). |
 | Bootloader (36 levels, boot 10 s → 0.1 s) | Adapted | `fastBoot` (10 s → 5 s) and `warmBoot` (→ 2 s), on the one boot time shared by online/offline, reboot and cold changes (D1.8). |
 | RAM Control, dispatcher Memory controllers L1 | Adopted | `memController`. |
 | Memory controllers L2–L4 (kHz, MHz, GHz eras) | Adapted | Split into `fabKhz`/`fabMhz`/`fabGhz` and the DDR ladder. |
@@ -990,4 +990,4 @@ New `PartId`s: `powerCtl`, `roomStart`, `globalStart`, `generation`. New ceiling
 
 ### Objections to the program
 
-1. **Thermal-aware routing has no rack-scope meaning.** One rack is one thermal lump, so the program's "thermal-aware" only works from the room load balancer up. The tree places it there. First-fit's heat story inside a rack is the board PSU's heat band, which `lbHealth` and `lbPowerAware` answer.
+1. **Thermal-aware routing has no rack-scope meaning.** One rack is one thermal lump, so the program's "thermal-aware" only works from the room load balancer up. The tree places it there. First-fit's heat story inside a rack is the power supply's heat band, which `lbHealth` and `lbPowerAware` answer.

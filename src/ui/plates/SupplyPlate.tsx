@@ -8,7 +8,7 @@ import type { PlateCommon } from './types';
 
 /** A supply fails at 10 accumulated overload seconds (program §7). */
 export const OVERLOAD_FAIL_S = 10;
-const TITLE: Readonly<Record<SupplyView['kind'], string>> = { psu: 'Board PSU', pdu: 'Rack PDU', ups: 'UPS', grid: 'Site grid' };
+const TITLE: Readonly<Record<SupplyView['kind'], string>> = { psu: 'Power supply', pdu: 'Rack PDU', ups: 'UPS', grid: 'Site grid' };
 
 /** The overload timer appears only once it is nonzero; a failed supply shows its reboot. */
 export function supplyLines(s: SupplyView): Line[] {

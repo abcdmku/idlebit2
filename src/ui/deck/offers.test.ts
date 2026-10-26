@@ -81,13 +81,13 @@ describe('one grammar and one list (A08, A14)', () => {
     expect(rows.map(r => r.key)).toEqual(['cpu', 'ram', 'storage', 'link', 'psu']);
     expect(rows.map(r => [r.name, r.change, r.right.kind])).toEqual([
       // QA-08, QA-23: a maxed row says only where it stands; one slot is singular
-      ['CPU', '1 → 2 slots', 'research'], ['Add RAM', '0 → 1 slot', 'price'], ['Storage', '1 slot', 'max'], ['Pipe', '—', 'none'], ['PSU', '—', 'none']]);
+      ['CPU', '1 → 2 slots', 'research'], ['Add RAM', '0 → 1 slot', 'price'], ['Storage', '1 slot', 'max'], ['Pipe', '—', 'none'], ['Power supply', '—', 'none']]);
     expect(rows[0]!.right).toEqual({ kind: 'research', node: 'Dual socket' });
   });
   it('the System lists its PSU from the part quote, and the tile names the next unlock when nothing is priced', () => {
     const psu = offer(effect('W', 32_800, 65_500));
     const o = buildOffers('system', null, null, [psu]);
-    expect(o.rows.at(-1)).toMatchObject({ key: 'psu', slot: 'psu', name: 'PSU', price: 12 });
+    expect(o.rows.at(-1)).toMatchObject({ key: 'psu', slot: 'psu', name: 'Power supply', price: 12 });
     // QA-05: a supply is featured only near its limit
     expect(o.next).toBeNull();
     expect(buildOffers('system', null, null, [psu], { cacheLevels: 1, supplyNear: new Set(['psu']) }).next?.key).toBe('psu');

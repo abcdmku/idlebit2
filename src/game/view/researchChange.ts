@@ -20,7 +20,7 @@ const CEILING_LABEL: Partial<Record<CeilingId, string>> = {
 };
 const GEN_LABEL: Partial<Record<PartId, string>> = {
   core: 'Cores', clock: 'Clock', l1: 'L1 cache', l2: 'L2 cache', l3: 'L3 cache', ram: 'RAM', gpu: 'GPU', npu: 'NPU',
-  storage: 'Drive', storageNode: 'Storage node', psu: 'PSU', switch: 'Switch', lb: 'Load balancer', pdu: 'PDU', ups: 'UPS',
+  storage: 'Drive', storageNode: 'Storage node', psu: 'Power supply', switch: 'Switch', lb: 'Load balancer', pdu: 'PDU', ups: 'UPS',
   rackCooler: 'Rack cooling', roomCooler: 'Room cooling', dataPlane: 'Data plane', backbone: 'Backbone', grid: 'Grid feed',
 };
 

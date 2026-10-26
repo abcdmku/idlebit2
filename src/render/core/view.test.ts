@@ -163,3 +163,54 @@ describe('draw order', () => {
     expect(pop).toBeGreaterThan(label);
   });
 });
+
+describe('labels across a zoom (user: no text shuffles)', () => {
+  it('keeps only the outgoing level frozen labels mid-zoom, never re-lays out, and fades the landed ones in after', () => {
+    const { renderer, registry, main } = setup();
+    const sys = registry.level('system') as { labels?: unknown }, chip = registry.level('chip') as { labels?: unknown };
+    let chipCalls = 0, zooming = false;
+    sys.labels = (_s: unknown, _v: unknown, _f: unknown, out: { label(id: string, x: number, y: number): { text(t: string): unknown } }) => { out.label('board', 20, 20).text('Board'); };
+    chip.labels = (_s: unknown, _v: unknown, _f: unknown, out: { label(id: string, x: number, y: number): { text(t: string): unknown } }) => { if (zooming) chipCalls++; out.label('core', 20, 20).text('Core'); };
+    renderer.draw(fixtureSnapshot(fixtureSystem()), VIEW, { nowS: 10, sincePublishMs: 0 });
+    zooming = true;
+    const seen: string[][] = [];
+    for (const t of [10.02, 10.06, 10.1, 10.3, 10.6]) {
+      main.texts.length = 0;
+      renderer.draw(fixtureSnapshot(fixtureChip(), fixtureSystem()), VIEW, { nowS: t, sincePublishMs: 0 });
+      if (renderer.transition) seen.push(main.texts.map(x => x.text));
+    }
+    expect(seen.length).toBeGreaterThan(2);
+    for (const texts of seen) { expect(texts).not.toContain('Core'); expect(texts.filter(x => x !== 'Board')).toEqual([]); }
+    expect(chipCalls).toBe(0);
+    zooming = false;
+    renderer.draw(fixtureSnapshot(fixtureChip(), fixtureSystem()), VIEW, { nowS: 12, sincePublishMs: 0 });
+    expect(renderer.transition).toBeNull();
+    main.texts.length = 0;
+    renderer.draw(fixtureSnapshot(fixtureChip(), fixtureSystem()), VIEW, { nowS: 12.5, sincePublishMs: 0 });
+    expect(main.texts.map(x => x.text)).toContain('Core');
+  });
+});
+
+describe('hover and press highlight', () => {
+  const brackets = () => contexts.flatMap(c => c.fills).filter(f => f.c === P.paper && f.x >= SAVE_AT.x - 4 && f.x <= SAVE_AT.x + SAVE_AT.w + 4);
+  it('brackets the hovered target, or the pressed one, at reduced strength; full strength when selected; press(null) clears', () => {
+    const { renderer } = setup(), s = fixtureSnapshot(fixtureSystem());
+    renderer.draw(s, VIEW, { nowS: 1, sincePublishMs: 0 });
+    for (const c of contexts) c.fills.length = 0;
+    renderer.draw(s, { ...VIEW, hoverId: 'save' }, { nowS: 1.1, sincePublishMs: 0 });
+    const hover = brackets();
+    expect(hover.length).toBeGreaterThan(0); expect(hover.every(f => f.a < 1)).toBe(true);
+    for (const c of contexts) c.fills.length = 0;
+    renderer.draw(s, { ...VIEW, selectedId: 'save' }, { nowS: 1.2, sincePublishMs: 0 });
+    expect(brackets().every(f => f.a === 1)).toBe(true);
+    const t = renderer.hit(0, 0) ?? { id: 'save' } as never;
+    renderer.press({ ...(t as object), id: 'save' } as never);
+    for (const c of contexts) c.fills.length = 0;
+    renderer.draw(s, VIEW, { nowS: 1.3, sincePublishMs: 0 });
+    expect(brackets().length).toBeGreaterThan(0);
+    renderer.press(null);
+    for (const c of contexts) c.fills.length = 0;
+    renderer.draw(s, VIEW, { nowS: 1.4, sincePublishMs: 0 });
+    expect(brackets()).toEqual([]);
+  });
+});

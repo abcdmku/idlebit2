@@ -6,9 +6,9 @@ import { BG, P, R, darkFx, drawGhost, drawSaveIcon, drawUnitLamp, glowBit, lampS
 import type { GhostState, LevelRegistry, Point, Rect, ViewPresentation, WorldFrame } from '../../core';
 import { boardStatic } from './board';
 import { drawLeaders, firstRow } from './labels';
-import { CABLE_X, CONNECTOR, LAMP, POWERED, PSU, SAVE, packageRect, siteCentre, siteRect, worldRect } from './layout';
+import { CABLE_X, CONNECTOR, LAMP, POWERED, PSU, PSU_TILE, SAVE, packageRect, siteCentre, siteRect, worldRect } from './layout';
 import type { SiteType } from './layout';
-import { boardModel, pickedType } from './model';
+import { boardModel, pickedType, slotOf } from './model';
 import { drawGpuSpill, drawReadLights, drawTiers } from './memory';
 import type { BoardModel, Site } from './model';
 import { drawGpuPiece, drawInbound, inboundOf } from './shards';
@@ -92,8 +92,35 @@ export function drawBoard(g: G, s: SystemSnapshot, view: ViewPresentation, frame
   }
   const usage = s.psu.capacityW > 0 ? s.psu.deliveredW / s.psu.capacityW : 0;
   drawPsu(g, PSU, usage, s.psu.failed || s.psu.overloadS > 0 || s.psu.capped);
+  drawTiles(g, s, m, view);
   // Leaders belong to the labels: desktop only, and like the labels never during a zoom.
   if (frame.form !== 'phone' && !frame.zoom) drawLeaders(g, s, firstRow(frame));
+}
+
+/**
+ * Every tappable part reads as its own component (user): a 1 art px outline on exactly its hit rect
+ * (the CPU package, each slot's part, each open slot, the power supply), and a "+" on each open slot,
+ * bright when its add is affordable, dim otherwise. A locked slot is a tile too (its callout says what
+ * unlocks it), with no "+". The tiles are the same set and rects as the level's hit targets (index.ts).
+ */
+const TILE_EDGE = 'rgba(191, 178, 255, 0.55)';
+function drawTiles(g: G, s: SystemSnapshot, m: BoardModel, view: ViewPresentation): void {
+  const b = m.b;
+  for (const site of m.sites) {
+    if (site.state !== 'part' && !slotOf(s, site)) continue;
+    if (site.type === 'cpu' && site.state === 'part') packageRect(b, site.index, hit); else siteRect(b, site.type, site.index, hit);
+    outline(g, hit, TILE_EDGE);
+    if (site.state === 'open') plus(g, hit, quoteState(view.quotes, site.type) === 'picked');
+  }
+  outline(g, PSU_TILE, TILE_EDGE);
+}
+function outline(g: G, r: Rect, c: string): void {
+  R(g, r.x, r.y, r.w, 1, c); R(g, r.x, r.y + r.h - 1, r.w, 1, c); R(g, r.x, r.y + 1, 1, r.h - 2, c); R(g, r.x + r.w - 1, r.y + 1, 1, r.h - 2, c);
+}
+function plus(g: G, r: Rect, bright: boolean): void {
+  if (r.w < 7 || r.h < 7) return;
+  const cx = r.x + (r.w >> 1), cy = r.y + (r.h >> 1), c = bright ? P.paper : P.silkLo;
+  R(g, cx - 3, cy - 1, 7, 3, P.ink); R(g, cx - 1, cy - 3, 3, 7, P.ink); R(g, cx - 2, cy, 5, 1, c); R(g, cx, cy - 2, 1, 5, c);
 }
 
 const stages = new Set<SiteType>();

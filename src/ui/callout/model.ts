@@ -21,7 +21,7 @@ export function nodeName(ref: NodeRef, focus: LevelSnapshot): string {
 /** What an empty site adds, from the renderer's stable target id, and the deck row that sells it. */
 const SITE_PART: Readonly<Record<string, { label: string; row: string | null }>> = {
   cpu: { label: 'CPU', row: 'cpu' }, ram: { label: 'RAM', row: 'ram' }, gpu: { label: 'GPU', row: 'gpu' },
-  drive: { label: 'Storage', row: 'storage' }, storage: { label: 'Storage', row: 'storage' }, psu: { label: 'PSU', row: 'psu' },
+  drive: { label: 'Storage', row: 'storage' }, storage: { label: 'Storage', row: 'storage' }, psu: { label: 'Power supply', row: 'psu' },
 };
 export function slotSite(t: HitTarget, focus: LevelSnapshot): { name: string; row: string | null } {
   if (focus.level === 'chip') {

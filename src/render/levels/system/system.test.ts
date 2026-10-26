@@ -89,7 +89,7 @@ describe('system value labels', () => {
   const s = systemScene('system'), gpu = s.gpu[0]!.gpu!;
   const expected = {
     cpu: `CPU|${formatHertz(s.chip.clock.hz)} · ${whole(s.chip.cores.length)} cores`,
-    psu: `PSU|${wattsText(s.psu.capacityW)}`,
+    psu: `Power supply|${wattsText(s.psu.capacityW)}`,
     ram: `RAM|${sizes(s.ram.map(p => p.capacityBits!))} · ${formatHertz(Math.min(...s.ram.map(p => p.rateBits!)))}`,
     drive: `Drive|${formatSize(s.storage[0]!.capacityBits!)} · ${formatHertz(s.storage[0]!.rateBits!)}`,
     gpu: `GPU|G${gpu.model} · ${whole(gpu.cores)} cores · ${formatSize(gpu.vramBits)}`,
@@ -176,5 +176,24 @@ describe('D26 memory tiers', () => {
     const texts: string[] = [];
     for (let i = 0; i < out.count; i++) { const l = out.labels[i]!; for (let k = l.first; k < l.end; k++) texts.push(out.runs[k]!.text); }
     expect(texts.some(t => t.endsWith('spilled'))).toBe(true);
+  });
+});
+
+describe('system parts as tiles (user: where to click)', () => {
+  it('outlines every tappable part on exactly its hit rect, and marks open slots with a "+"', () => {
+    const s = systemScene('system'), fills = draw(s, 0), out = Array.from({ length: 32 }, createHitTarget);
+    const n = setup().targets(s, VIEW, out, 0);
+    const parts = out.slice(0, n).filter(t => t.kind === 'part' || t.kind === 'slot');
+    expect(parts.length).toBeGreaterThan(4);
+    for (const t of parts) {
+      const r = t.rect;
+      expect(fills.some(f => f.x === r.x && f.y === r.y && f.w === r.w && f.h === 1)).toBe(true);
+      expect(fills.some(f => f.x === r.x && f.y === r.y + r.h - 1 && f.w === r.w && f.h === 1)).toBe(true);
+    }
+    const open = new Set(boardModel(s).sites.filter(x => x.state === 'open').map(x => `slot-${x.type}${x.index}`));
+    for (const t of parts.filter(p => p.kind === 'slot' && open.has(p.id))) {
+      const cx = t.rect.x + (t.rect.w >> 1), cy = t.rect.y + (t.rect.h >> 1);
+      expect(fills.some(f => f.x === cx - 2 && f.y === cy && f.w === 5 && f.h === 1)).toBe(true);
+    }
   });
 });

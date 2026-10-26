@@ -21,6 +21,8 @@ export const CABLE_X = 33;
 export const CONNECTOR = { x: CABLE_X - 3, y: BOARD.y - 2, w: 7, h: 4 } as const;
 /** The board PSU in the rear strip (mockup core/power.js SUPPLIES.system). */
 export const PSU: Readonly<Rect> = { x: 57, y: 47, w: 46, h: 10 };
+/** The power supply's tile: its body and the 5 px top it stands up to (the hit rect and the outline). */
+export const PSU_TILE: Readonly<Rect> = { x: PSU.x - 2, y: PSU.y - 7, w: PSU.w + 4, h: PSU.h + 9 };
 /** Reserved spot for the save icon: rear right corner, clear of the PSU and the pipe's connector. */
 export const SAVE = { x: 138, y: 37 } as const;
 /** The system's online lamp, inline after the board silk. */

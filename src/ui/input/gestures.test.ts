@@ -75,3 +75,18 @@ describe('what a drag or wheel pans at rest (panKind)', () => {
     expect([panKind(rack(1), true, false), panKind(rack(2), false, false)]).toEqual([null, 'rack']);
   });
 });
+
+describe('the cursor says what you can tap (user, 26 Oct)', () => {
+  it('desktop: pointer over a target, default elsewhere', () => {
+    const canvas = document.createElement('canvas');
+    let over = true;
+    const renderer = { transition: null, hit: () => (over ? { id: 'cache' } : null) } as never;
+    const dispose = bindGestures(canvas, { renderer: () => renderer, tap: vi.fn(), zoom: vi.fn() });
+    const hover = () => { const e = new Event('pointermove'); Object.assign(e, { pointerId: 1, clientX: 10, clientY: 10, pointerType: 'mouse' }); canvas.dispatchEvent(e); };
+    hover();
+    expect(canvas.style.cursor).toBe('pointer');
+    over = false; hover();
+    expect(canvas.style.cursor).toBe('');
+    dispose();
+  });
+});

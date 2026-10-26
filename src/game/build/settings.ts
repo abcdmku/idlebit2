@@ -97,7 +97,7 @@ export function planPowerCap(state: GameState, part: PartRef, on: boolean): Plan
     const id = part.unit.id;
     return b.racks[id] ? planned({ build: { ...b, racks: b.racks.map((r, i) => (i === id && r ? { ...r, pdu: { ...r.pdu, capped: on } } : r)) }, price: 0n }, 'Power cap') : fail('invalid', 'No such rack');
   }
-  return fail('invalid', 'Only a PSU or PDU can cap');
+  return fail('invalid', 'Only a power supply or PDU can cap');
 }
 
 function editSettings(state: GameState, system: SystemId, patch: Partial<SystemSettings>, label: string): Plan {

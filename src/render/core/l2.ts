@@ -3,6 +3,7 @@
 // http://127.0.0.1:6174/src/render/core/l2.html?form=desktop|phone&level=chip|system|rack|room|global
 //   &zoom=<from level>&hold=<0..1>  hold a zoom from that level into or out of `level`
 //   &scene=boot|landing|mid|max|paused  swap the CPU snapshot for a renderer QA scene
+//   &hover=<target id>  the hover/press bracket on that target (QA)
 //   &pops=<age ms>  payout pops on the level's first components, held at that age (QA only)
 import { fixtureSnapshot, fixtureState } from '../../game/fixtures';
 import { deriveRenderSnapshot } from '../../game';
@@ -98,7 +99,7 @@ await loadCanvasFont(document);
 const renderer = createCanvasRenderer(canvas, registry);
 await loadCanvasFont(document);
 renderer.resize(W, H, window.devicePixelRatio || 1, vp, framing);
-const view: ViewPresentation = { selectedId: q.get('sel'), picked: null, quotes: null, reducedMotion: false };
+const view: ViewPresentation = { selectedId: q.get('sel'), hoverId: q.get('hover'), picked: null, quotes: null, reducedMotion: false };
 let t = 0, current = from ? start : target;
 function frame(now: number): void {
   t = now / 1000;

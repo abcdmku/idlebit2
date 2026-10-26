@@ -38,10 +38,14 @@ export function bindGestures(canvas: HTMLCanvasElement, handlers: GestureHandler
     canvas.focus({ preventScroll: true });
     pointers.set(event.pointerId, { x: event.clientX, y: event.clientY, startX: event.clientX, startY: event.clientY });
     canvas.setPointerCapture?.(event.pointerId);
+    // Phone: the renderer flashes the pressed part, when it draws presses.
+    if (event.pointerType !== 'mouse') (handlers.renderer() as { press?: (t: unknown) => void } | null)?.press?.(hit(event.clientX, event.clientY));
     if (pointers.size === 2) { const [a, b] = [...pointers.values()]; baseline = Math.hypot(a.x - b.x, a.y - b.y); pinched = true; }
     event.preventDefault();
   };
   const move = (event: PointerEvent) => {
+    // Desktop: the pointer cursor only over something you can tap (user, 26 Oct).
+    if (event.pointerType === 'mouse' && pointers.size === 0) { canvas.style.cursor = hit(event.clientX, event.clientY) ? 'pointer' : ''; return; }
     const pointer = pointers.get(event.pointerId); if (!pointer) return;
     pointer.x = event.clientX; pointer.y = event.clientY;
     const pan = handlers.pan;

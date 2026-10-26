@@ -128,7 +128,7 @@ Rules for numbers:
 
 The saved tree is `World → Site → Zone → Rack → System → Socket`.
 
-- A **system** is one server: a board (`general` or `accelerator`) with 1–4 CPU sockets, RAM modules, GPUs, drives and a fixed board PSU.
+- A **system** is one server: a board (`general` or `accelerator`) with 1–4 CPU sockets, RAM modules, GPUs, drives and a fixed power supply.
 - A **socket** holds one CPU: a package, cores, a clock, L1, and optionally L2 and L3. Every CPU in a system is identical. A system's single scheduler serves all of them.
 - A **rack** has 5 infrastructure slots, top to bottom: cooler, **power control** (D31: battery and smart start, under the cooler), PDU, load balancer, switch. It also has 12 server slots. A server slot holds a system or a storage node (§6.10).
 - A **zone** is one room, one data hall and one availability zone. It has a network rack in the top-left slot (room switch and room load balancer), rows of rack slots, room cooling, one UPS (two with `dualFeed`).
@@ -143,7 +143,7 @@ Fleet caps are set in `docs/architecture.md` §1.9: 12 servers per rack, 2 then 
 
 | Zoom level | Opened by (research effect) | What the player gets for free |
 |---|---|---|
-| CPU (formerly Chip) | start | One system: socket 1 with package gen 0, one core gen 0 L1 (1 lane), clock gen 0 L1 (1 Hz), L1 cache gen 0 L1 (1 bit). Board PSU gen 0 L1 (dormant until System, §9.2). No scheduler, RAM, GPU or storage. |
+| CPU (formerly Chip) | start | One system: socket 1 with package gen 0, one core gen 0 L1 (1 lane), clock gen 0 L1 (1 Hz), L1 cache gen 0 L1 (1 bit). Power supply gen 0 L1 (dormant until System, §9.2). No scheduler, RAM, GPU or storage. |
 | System | `view: system` | The same system, now shown as a board. |
 | Rack | `view: rack` | A barebones rack (§13.2) holding the existing system in server slot 1. |
 | Room | `view: room` | A barebones zone holding the existing rack in its first rack slot. |
@@ -451,7 +451,7 @@ Program D10. The market is an **endless, ordered queue** per round. Nothing arri
 | RAM module | 0 to the board's RAM slots | Each has its own generation, level and ECC flag. Channels (dual, quad) stay bandwidth technology (§6.2). |
 | GPU or NPU | 0 to the board's GPU slots | GPU saves `{kind: 'gpu', model: GpuModelId, upgrades}`. Legacy NPU saves `{kind: 'npu', gen, level}`. |
 | drive | 0 to `driveSlots` | Each has its own generation and level. Drives are the disk tier (§6.2); no task requires one (D26.3). |
-| board PSU | exactly 1 | |
+| power supply | exactly 1 | |
 
 ### 6.2 Capabilities
 
@@ -590,7 +590,7 @@ A task returned to the queue front keeps its ID, descriptor and queue order and 
 
 ### 6.10 Storage nodes
 
-With `sharedStorage`, a server slot can hold a **storage node**: drives and a board PSU, no CPU. It takes a switch port like a server and is never a routing target.
+With `sharedStorage`, a server slot can hold a **storage node**: drives and a power supply, no CPU. It takes a switch port like a server and is never a routing target.
 
 Under D26 the storage node is the rack's **shared disk tier**. A shard whose working set doesn't fit its own cache, RAM and drives spills the rest onto the node's free capacity (§6.5 placement, after local drives). The disk part of its `mem` stages for those bits runs as a transfer over the node's server link and then the shard's server link (§7.4), at the node's IO rate if that is lower than a link. The shard holds its slot (and its threads, unless `dma`) until the transfer completes. The node's holds follow the drive rules of §6.6. The node also counts toward every rack server's hierarchy for the memory gate (§6.3).
 
@@ -914,7 +914,7 @@ GPU models use the coefficient and split idle rules in `gpu-progression.md`, not
 
 | Supply | Part | Feeds | Input from |
 |---|---|---|---|
-| board PSU | `psu` | its system's parts | rack PDU (before Rack: utility) |
+| power supply | `psu` | its system's parts | rack PDU (before Rack: utility) |
 | rack PDU | `pdu` | the rack's PSU inputs, storage node PSUs, cooler, switch, load balancer | zone UPS (before Room: utility) |
 | UPS | `ups` | the zone's PDU inputs, network rack, room cooling | site grid feed (before Global: utility) |
 | grid feed | `grid` | the site's UPS inputs and data plane | utility |
@@ -934,7 +934,7 @@ lossFraction = loss[g] + lossPerLevel × (L − 1)   // Appendix A; pushing an o
 
 Loss is real power: it is billed and becomes heat in the lump that holds the supply (§10.3).
 
-Before System the board PSU is dormant: no capacity limit, no usage shown, no loss. It appears with the System view.
+Before System the power supply is dormant: no capacity limit, no usage shown, no loss. It appears with the System view.
 
 **`dualFeed`.** A zone may hold a second UPS. Each rack PDU input is split equally between the two. If one UPS is dark, the other carries every PDU input alone.
 
@@ -976,7 +976,7 @@ A failure reaches exactly the subtree under the failed supply: a system, a rack,
 
 ### 9.5 Power capping
 
-With `powerCap`, a board PSU or rack PDU can be set to cap (hot switch). It keeps `capFactor ∈ {0.1, 0.2, …, 1.0}`, saved in state, starting at 1.
+With `powerCap`, a power supply or rack PDU can be set to cap (hot switch). It keeps `capFactor ∈ {0.1, 0.2, …, 1.0}`, saved in state, starting at 1.
 - During the tick, every core clock below it is multiplied by its `capFactor` (and by its ancestors' factors).
 - After the power step: `need` = its delivered watts recomputed with its cores' load at `capFactor = 1`. If `need > capacity`, step `capFactor` down by 0.1 for each 10% of excess, to at least 0.1; if `need <= 0.9 × capacity`, step it up by 0.1.
 - A capped supply's `tOver` only counts ticks where its idle draw plus child supply inputs alone exceed capacity. Compute load never makes it fail.

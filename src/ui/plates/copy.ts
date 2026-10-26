@@ -33,7 +33,7 @@ export const COOL_TECH: Readonly<Record<CoolTech, string>> = { air: 'Air', water
 
 /** Plate title per part slot kind. */
 export const SLOT_TITLE: Readonly<Record<PartSlotKind, string>> = {
-  cpu: 'CPU', clock: 'Clock', l1: 'L1 cache', l2: 'L2 cache', l3: 'L3 cache', core: 'Core', scheduler: 'Scheduler', psu: 'Board PSU',
+  cpu: 'CPU', clock: 'Clock', l1: 'L1 cache', l2: 'L2 cache', l3: 'L3 cache', core: 'Core', scheduler: 'Scheduler', psu: 'Power supply',
   ram: 'RAM', gpu: 'GPU', drive: 'Storage', rackCooler: 'Rack cooling', pdu: 'Rack PDU', lb: 'Load balancer', switch: 'Switch',
   roomCooler: 'Room cooling', roomLb: 'Room load balancer', roomSwitch: 'Network rack', ups: 'UPS', dataPlane: 'Data plane', grid: 'Site grid',
   backbone: 'Backbone link', globalScheduler: 'Global scheduler',

@@ -24,7 +24,7 @@ const STRATEGY: Readonly<Record<RouteStrategyId, string>> = {
 const routerSpec = (r: RouterBuild): string => `${STRATEGY[r.strategy] ?? r.strategy} · queue ${r.queueLevel}`;
 const switchSpec = (sw: SwitchBuild): string =>
   sw.ports.length ? `${formatHertz(ladderSpeed(Math.max(...sw.ports)))} · ${plural(sw.ports.length, 'port')}` : NONE;
-const psuName = (gen: number): string => (gen >= 2 ? `80 Plus ${partName('psu', gen)}` : partName('psu', gen));
+const psuName = (gen: number): string => partName('psu', gen);
 
 /** The system the specs are read at: the focused system, the first system of a focused rack or room, else the player's first. */
 function systemAt(state: GameState, at: NodeRef | null): number {

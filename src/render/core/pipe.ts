@@ -86,7 +86,7 @@ const lattice = (v: number, lat: number) => Math.round(v / lat) * lat;
  * moving entry without tags. Reads only the snapshot and the presentation time.
  */
 export function drawPipe(g: CanvasRenderingContext2D, s: RenderSnapshot, timeMs: number, paused: boolean, f: RestFraming,
-  vp: Rect, ratio: PixelRatio, entry: Point | null, type: Typography, rest = true, art: Rect | null = null): void {
+  vp: Rect, ratio: PixelRatio, entry: Point | null, type: Typography, rest = true, art: Rect | null = null, tagAlpha = 1): void {
   const p = f.pipe;
   if (!p) return;
   const n = f.scale, x0 = p.x / n, y0 = p.y / n, ry = p.runY / n;
@@ -134,7 +134,7 @@ export function drawPipe(g: CanvasRenderingContext2D, s: RenderSnapshot, timeMs:
     }
   }
   screen.cx = vp.x + vp.w / 2; screen.cy = vp.y + vp.h / 2; screen.s = ratio.x;
-  drawLabels(g, tags, screen, vp, ratio, type);
+  drawLabels(g, tags, screen, vp, ratio, type, tagAlpha);
 }
 /** Rough CSS width of a label line at the body size (Chakra Petch averages under 0.6 em), plus its backing. */
 const tagWidth = (text: string, type: Typography): number => Math.ceil(text.length * type.body * 0.6) + 8;

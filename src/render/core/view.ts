@@ -10,7 +10,11 @@ import { createEffectPool } from './fx';
 import { loadCanvasFont } from './fonts';
 import { copyRect, contains, rect } from './geom';
 import { arbitrateHit } from './hit';
-import { DESKTOP_TYPE, LabelBuffer, PHONE_TYPE, drawLabels, typeForScale } from './labels';
+import { DESKTOP_TYPE, FrozenLabels, LabelBuffer, PHONE_TYPE, drawLabels, typeForScale } from './labels';
+/** Seconds the landed level's labels take to fade in after a zoom (user: no text shuffles mid-zoom). */
+export const LABELS_FADE_S = 0.15;
+/** The hover/press bracket's strength against the selection's. */
+export const HOVER_ALPHA = 0.45;
 import type { Typography } from './labels';
 import { BG, P } from './palette';
 import { zoomPath } from './paths';
@@ -39,7 +43,8 @@ export { reportRenderError } from './errors';
 export function createCanvasRenderer(canvas: HTMLCanvasElement, registry: LevelRegistry): CanvasRendererDebug {
   const g = context2d(canvas), viewport = rect(), ratio: PixelRatio = { x: 1, y: 1 };
   const cam = camera(), targetCam = camera(), oldTarget = camera(), framingFrom = camera(), localCam = camera();
-  let labelType: Typography | null = null;
+  let labelType: Typography | null = null, labelsSince = -Infinity, pressedId: string | null = null;
+  const frozen = new FrozenLabels();
   const artRect = rect(), artSrc = rect(), artTl = { x: 0, y: 0 }, artBr = { x: 0, y: 0 };
   const focusRect = rect(), visible = rect(), entry = { x: 0, y: 0 }, corner = { x: 0, y: 0 }, scratch = rect(), hitOut = createHitTarget(), zoom = new ZoomTransition(), effects = createEffectPool(1), fb = new Feedback(), popClip = rect();
   const area: { w: number; h: number; scale: number } = { w: 0, h: 0, scale: 1 };
@@ -98,10 +103,14 @@ export function createCanvasRenderer(canvas: HTMLCanvasElement, registry: LevelR
     bg.save();
     try { level(s).draw(bg, s, view!, frame!); } catch (error) { reportRenderError(`${s.level} draw`, error); }
     bg.restore(); bg.globalAlpha = 1;
-    if (focusWorld && view!.selectedId && !zoom.active) {
+    const sel = view!.selectedId, hov = pressedId ?? view!.hoverId ?? null;
+    if (focusWorld && (sel || hov) && !zoom.active) {
       const count = fillTargets(s);
-      for (let i = 0; i < count; i++) if (targets[i].id === view!.selectedId) {
-        const r = targets[i].rect; brackets(bg, r.x - 1, r.y - 1, r.w + 2, r.h + 2, P.paper); break;
+      for (let i = 0; i < count; i++) {
+        const id = targets[i].id, r = targets[i].rect;
+        if (id === sel) brackets(bg, r.x - 1, r.y - 1, r.w + 2, r.h + 2, P.paper);
+        // what the pointer is over: the selection bracket at reduced strength (every level alike)
+        else if (id === hov) { const a = bg.globalAlpha; bg.globalAlpha = a * HOVER_ALPHA; brackets(bg, r.x - 1, r.y - 1, r.w + 2, r.h + 2, P.paper); bg.globalAlpha = a; }
       }
     }
     const ox = (viewport.x + viewport.w / 2) * ratio.x + (size.x - c.cx) * c.s, oy = (viewport.y + viewport.h / 2) * ratio.y + (size.y - c.cy) * c.s;
@@ -115,7 +124,8 @@ export function createCanvasRenderer(canvas: HTMLCanvasElement, registry: LevelR
     g.restore();
   }
   function endZoom(nowS: number): void {
-    if (zoom.active) chain.end(nowS);
+    // the landed level's labels fade in from here, on their final layout
+    if (zoom.active) { chain.end(nowS); labelsSince = nowS; }
     zoom.active = false; info = null; framingStart = -Infinity;
     if (frame) frame.zoom = null;
   }
@@ -123,7 +133,9 @@ export function createCanvasRenderer(canvas: HTMLCanvasElement, registry: LevelR
     const focus = s.focus, id = idOf(focus);
     if (curLevel === focus.level && curId === id) return;
     const prev = curLevel === null ? null : { level: curLevel, id: curId } as ReturnType<typeof refOf>;
-    hint = prev; curLevel = focus.level; curId = id; endZoom(nowS); fb.leaveWorld(); restPan.reset();
+    // Freeze the outgoing level's rest labels before anything moves (they ride its camera out).
+    if (prev && labelType && !zoom.active) frozen.freeze(labels, prev.level, cam, viewport, ratio, labelType); else frozen.clear();
+    hint = prev; curLevel = focus.level; curId = id; pressedId = null; endZoom(nowS); fb.leaveWorld(); restPan.reset();
     if (!prev || !s.partner || !isRef(s.partner, prev)) { chain.reset(); return; }
     const path = zoomPath(registry, s.partner, focus, viewport, children, form);
     if (!path) { chain.reset(); return; }
@@ -191,7 +203,7 @@ export function createCanvasRenderer(canvas: HTMLCanvasElement, registry: LevelR
     toScreen(cam, viewport, ratio, art.x, art.y, artTl); toScreen(cam, viewport, ratio, art.x + art.w, art.y + art.h, artBr);
     artRect.x = artTl.x; artRect.y = artTl.y; artRect.w = artBr.x - artTl.x; artRect.h = artBr.y - artTl.y;
     toScreen(cam, viewport, ratio, at.x, at.y, corner);
-    drawPipe(g, snapshot!, frame!.timeMs, frame!.paused, framing, viewport, ratio, corner, type, true, artRect);
+    drawPipe(g, snapshot!, frame!.timeMs, frame!.paused, framing, viewport, ratio, corner, type, true, artRect, labelAlpha(nowS));
   }
   function drawZoom(s: RenderSnapshot): boolean {
     const partner = s.partner;
@@ -226,13 +238,17 @@ export function createCanvasRenderer(canvas: HTMLCanvasElement, registry: LevelR
   let zoomLayer: ZoomLayer | null = null;
   function layer(): ZoomLayer {
     if (!zoomLayer || zoomLayer.framing !== framing || zoomLayer.form !== form) {
-      zoomLayer = { g, zoom, vp: viewport, ratio, framing, form, labels, level, report: reportRenderError };
+      zoomLayer = { g, zoom, vp: viewport, ratio, framing, form, frozen, level, report: reportRenderError };
     }
     return zoomLayer;
   }
   /** The rest world's labels, over the world art; the payout pops draw over them (drawFrame). */
-  function drawWorldLabels(): void {
-    if (labelType) drawLabels(g, labels, cam, viewport, ratio, labelType);
+  function drawWorldLabels(nowS: number): void {
+    if (labelType) drawLabels(g, labels, cam, viewport, ratio, labelType, labelAlpha(nowS));
+  }
+  /** The rest labels' fade-in after a zoom lands: LABELS_FADE_S, or at once under reduced motion. */
+  function labelAlpha(nowS: number): number {
+    return view?.reducedMotion ? 1 : Math.max(0, Math.min(1, (nowS - labelsSince) / LABELS_FADE_S));
   }
   function drawPops(): void {
     const n = frame!.scale ?? Math.max(1, Math.round(cam.s / ratio.x)), top = framing?.top ?? 0;
@@ -260,7 +276,7 @@ export function createCanvasRenderer(canvas: HTMLCanvasElement, registry: LevelR
     }
     try { fb.take(next, level(next.focus), form, frame.timeMs, clock.nowS, !zoom.active && !paused); }
     catch (error) { reportRenderError(`${next.focus.level} payoutAnchor`, error); }
-    if (!zoom.active) { drawRest(next.focus, clock.nowS); drawFaults(next.focus); drawWorldLabels(); }
+    if (!zoom.active) { drawRest(next.focus, clock.nowS); drawFaults(next.focus); drawWorldLabels(clock.nowS); }
     if (framing) fb.drawFailure(g, clock.nowS, framing, viewport, ratio);
     if (paused) { g.save(); g.translate(viewport.x * ratio.x, viewport.y * ratio.y); drawVeil(g, viewport.w * ratio.x, viewport.h * ratio.y); g.restore(); }
     effects.update(Math.max(0, clock.nowS - lastNow)); lastNow = clock.nowS;
@@ -309,6 +325,7 @@ export function createCanvasRenderer(canvas: HTMLCanvasElement, registry: LevelR
       return false;
     },
     hold(progress) { held = progress; zoom.hold(progress); },
+    press(target) { pressedId = target ? target.id : null; },
     dispose() { disposed = true; buffers.clear(); effects.clear(); snapshot = null; view = null; canvas.width = 0; canvas.height = 0; },
   };
   return renderer;
