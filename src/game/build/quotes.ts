@@ -1,3 +1,4 @@
+import { meetLines } from './meet';
 import { POWER_SLOTS } from './partAccess';
 import { powerInstallPlans } from './powerParts';
 import type { InfraSlot } from '../types/catalog';
@@ -46,6 +47,7 @@ function quotesFor(state: GameState, r: QuoteRequest): Quote[] {
     case 'tray': return trayQuotes(state, r.at);
     case 'research': return [researchQuote(state, r.project)];
     case 'pipe': return pipeQuotes(state, r.system);
+    case 'meet': return meetLines(state, r.system, r.need).map(({ action, plan }) => toQuote(state, action, plan));
     case 'inbound': return inboundQuotes(state, r.at);
     case 'routerQueue': return routerQueueQuotes(state, r.unit);
     case 'power': return powerQuotes(state, r.unit);

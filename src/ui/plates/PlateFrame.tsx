@@ -17,6 +17,8 @@ export interface PlatePosition {
   pinTop?: boolean;
   /** Desktop: dock in the world's right gutter level with the part (as the callout did), else beside it, so the part stays in view. */
   beside?: boolean;
+  /** A small pointer up to the anchor when the plate sits under it (the task detail under its card). */
+  tip?: boolean;
 }
 
 export interface PlateFrameProps extends PlatePosition {
@@ -38,7 +40,7 @@ export interface PlateFrameProps extends PlatePosition {
 
 /** The plate body: a fixed-width dark slab with a paper rim. It never resizes while open. */
 export function PlateFrame({ title, sub, pips, head, className = '', closeKey = true, as = 'section', onSubmit, initialFocus,
-  onClose, children, readAnchor, bounds, subscribeFrame, pinTop, beside }: PlateFrameProps) {
+  onClose, children, readAnchor, bounds, subscribeFrame, pinTop, beside, tip }: PlateFrameProps) {
   const ref = useRef<HTMLElement>(null);
   useDialogFocus(ref, onClose, initialFocus);
   useLayoutEffect(() => {
@@ -60,6 +62,9 @@ export function PlateFrame({ title, sub, pips, head, className = '', closeKey = 
       root.style.left = `${Math.round(at.x)}px`;
       root.style.top = `${Math.round(at.y)}px`;
       root.dataset.anchored = String(Boolean(a));
+      const under = !!tip && !!a && at.y >= a.y + a.h;
+      root.dataset.tip = under ? 'up' : 'none';
+      if (under) root.style.setProperty('--tip-x', `${Math.round(Math.max(16, Math.min(at.w - 16, a!.x + a!.w / 2 - at.x)))}px`);
       more();
     };
     position();
@@ -68,7 +73,7 @@ export function PlateFrame({ title, sub, pips, head, className = '', closeKey = 
     window.addEventListener('resize', position);
     const stop = subscribeFrame?.(position);
     return () => { stop?.(); observer?.disconnect(); window.removeEventListener('resize', position); root.removeEventListener('scroll', more); };
-  }, [bounds, readAnchor, subscribeFrame, pinTop, beside]);
+  }, [bounds, readAnchor, subscribeFrame, pinTop, beside, tip]);
 
   const body = <>
     <header className="p-head">

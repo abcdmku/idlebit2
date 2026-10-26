@@ -4,7 +4,7 @@ import { FAMILIES } from '../../game';
 import { OffersScope } from '../deck/useOffers';
 import { entry, fakeStore, mount, type Mounted } from '../hooks/testShell';
 import { QueueStrip } from '../QueueStrip';
-import { capableText, keepUnits, needLines, statusLine, TaskDetail, workLine } from './TaskDetail';
+import { capableText, fixLabel, keepUnits, needLines, statusLine, TaskDetail, workLine } from './TaskDetail';
 
 const NB = '\u00a0';
 
@@ -51,9 +51,20 @@ describe('tapping a strip card opens its detail', () => {
     store.set({ feed: { window: [entry(1), entry(2), entry(3)] } });
     mounted = mount(<><QueueStrip /><OffersScope><TaskDetail /></OffersScope></>, store, { width: 390, height: 780 });
     act(() => mounted!.host.querySelectorAll<HTMLElement>('.slot .tag')[1]!.click());
-    expect($('.task-detail.sheet')).not.toBeNull();
+    // right under the tapped card, pointing up at it (user, 26 Oct), on phone too
+    expect($('.task-detail')?.getAttribute('data-tip')).toBe('up');
     expect($('.task-detail')!.textContent).not.toContain('Pickup');
     expect($('[data-testid=td-dismiss]')).toBeNull();
     expect($('[data-testid=td-status]')?.textContent).toBe('Ready when it reaches the front');
+  });
+});
+
+describe('fix lines (user, 26 Oct)', () => {
+  const o = (over: object) => ({ key: 'cache', icon: 'cache', name: 'Cache', slot: 'l1', change: '2 → 16 b', quote: { action: { type: 'upgradePart' } },
+    price: 9, affordable: true, lock: null, where: false, right: { kind: 'price' }, ...over }) as never;
+  it('buy the levels it needs, install a missing part, or research what locks it', () => {
+    expect(fixLabel(o({}))).toBe('Buy Cache 2 → 16 b');
+    expect(fixLabel(o({ name: 'Add RAM', change: '0 → 2 slots', quote: { action: { type: 'addPart' } } }))).toBe('Install RAM 0 → 2 slots');
+    expect(fixLabel(o({ right: { kind: 'research', node: 'kHz fab' } }))).toBe('Research kHz fab');
   });
 });

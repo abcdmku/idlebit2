@@ -2,7 +2,7 @@ import type { HandlerMap } from '../core/actions';
 import { isLadder } from './catalog';
 import { deleteConfig, planApplyConfig, saveConfig } from './configs';
 import { readPart } from './partAccess';
-import { planAdd, planRemove, planReplace, planReplaceCpu, planUpgrade, planUpgradeAll } from './partPlans';
+import { planAdd, planRemove, planReplace, planReplaceCpu, planUpgrade, planUpgradeAll, planUpgradeTo } from './partPlans';
 import { commitPlan } from './plan';
 import { planAddPort, planAddUplink, planReplaceLadder, planSameSpeed, planUpgradePort, planUpgradeUplink } from './ports';
 import { researchHandlers } from './research/actions';
@@ -17,6 +17,7 @@ import { planStartConfig } from './startCtl';
 export const buildHandlers: HandlerMap = {
   installGpu: (s, a) => commitPlan(s, planInstallGpu(s, a.system, a.model, a.index)),
   upgradePart: (s, a) => commitPlan(s, planUpgrade(s, a.part)),
+  upgradePartTo: (s, a) => commitPlan(s, planUpgradeTo(s, a.part, a.level)),
   upgradeAll: (s, a) => commitPlan(s, planUpgradeAll(s, a.system, a.kind, a.gen)),
   replacePart: (s, a) => {
     const part = readPart(s.build, a.part);

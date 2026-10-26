@@ -64,6 +64,29 @@ export function planUpgrade(state: GameState, ref: PartRef): Plan {
 }
 
 /**
+ * Several levels at once (the blocked task's "Buy X" key): every level from the current one up to `level`,
+ * atomically, for the summed price. Rejected at the first locked level; hot like a single upgrade.
+ */
+export function planUpgradeTo(state: GameState, ref: PartRef, level: number): Plan {
+  const part = readPart(state.build, ref);
+  if (!part) return fail('invalid', 'No such part');
+  if (part.id === 'gpu' || part.id === 'core' || isLadder(part.id)) return fail('invalid', 'Upgrade this part one step at a time');
+  if (!Number.isInteger(level) || level <= part.level) return fail('invalid', 'Already at that level');
+  const id = part.id as LeveledPartId;
+  const ecc = eccOf(state, ref);
+  const label = `${partName(id, part.gen)} · L${part.level} → L${level}`;
+  const driven = drivenBy(state, ref);
+  let sum = 0n;
+  for (let l = part.level; l < level; l += 1) {
+    const lock = levelLock(state.research.unlocks, id, part.gen, l + 1, ecc);
+    if (lock) return locked(lock, label, scalePrice(sum * BigInt(cpuCount(state.build, ref)), ecc ? ECC_PRICE_FACTOR : 1));
+    sum += upgradePrice(PARTS[id], part.gen, l, driven);
+  }
+  const price = scalePrice(sum * BigInt(cpuCount(state.build, ref)), ecc ? ECC_PRICE_FACTOR : 1);
+  return planned({ build: writePart(state.build, ref, part.gen, level)!, price }, label);
+}
+
+/**
  * Cold replace with generation g (spec §12.4): L1, or with `preserveCapacity` the lowest native
  * level whose primary capacity holds the current one, priced as install plus the upgrades to it.
  */

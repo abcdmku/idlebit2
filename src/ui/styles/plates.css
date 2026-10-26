@@ -226,7 +226,11 @@
 .v3-plate.task-detail .td-status { margin-top: 8px; font-weight: 700; }
 .v3-plate.task-detail .td-status.warn { color: #ffb03b; }
 .v3-plate.task-detail .td-status.mute { color: #a99be6; }
-.l-phone .v3-plate.task-detail.sheet { width: calc(100% - 16px); }
+.l-phone .v3-plate.task-detail { width: calc(100% - 16px); }
+/* The pointer up to the tapped card (a plate under its anchor). */
+.v3-plate.task-detail[data-tip="up"] { overflow: visible; }
+.v3-plate.task-detail[data-tip="up"]::before { content: ''; position: absolute; top: -10px; left: calc(var(--tip-x, 24px) - 8px); width: 0; height: 0;
+  border: 8px solid transparent; border-top: 0; border-bottom: 8px solid #e8e1ff; pointer-events: none; }
 
 /* Leave dialog: in game, Stay first and focused */
 .leave-veil { position: absolute; inset: 0; z-index: 40; background: #0e0b1c99; pointer-events: auto; display: grid; place-items: center; }

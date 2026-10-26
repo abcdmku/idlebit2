@@ -1,5 +1,5 @@
 // Task detail (user, 26 Oct): tapping any of the five strip cards opens what that task is, what it
-// pays and needs, and whether it can run. Desktop: a plate under the card; phone: a sheet over the
+// pays and needs, and whether it can run. A plate right under the tapped card, with a pointer to it (user, 26 Oct); over the
 // bottom of the world. Back and Escape close it (viewState 'back'). No task numbers (D22).
 import { FAMILIES, formatHertz, formatOps, type QueueEntryView } from '../../game';
 import { typeColor, typeName, typeOf, type Rect } from '../../render/core';
@@ -10,7 +10,6 @@ import { offerAction, useTapOffer } from '../deck/offerUi';
 import { familyName, taskKey, transferText } from '../hooks/feedModel';
 import { wholeText } from '../hooks/format';
 import { blockedText, taskBits } from '../hooks/taskRequirements';
-import type { ShellLayout } from '../layout';
 import { PlateFrame } from '../plates/PlateFrame';
 import { useLayout } from '../shell/geometry';
 import { shallowEqual, useGameSelector, useShell, useViewState } from '../storeHooks';
@@ -56,6 +55,23 @@ export function statusLine(t: QueueEntryView, head: boolean, running: boolean): 
   return { text: head ? 'Ready' : 'Ready when it reaches the front', tone: '' };
 }
 
+/**
+ * What fixes a blocked task, one line per missing component or research (user, 26 Oct). Today the sim
+ * names the first missing requirement only, so this is at most one line from the same rule as the Fix line
+ * (WALL_ROWS, never a dead end); the sim's `meet` quote will return every line, each at its minimal level.
+ */
+export function fixLines(t: QueueEntryView, offers: Offers | null): Offer[] {
+  const one = fixFor(t, offers);
+  return one ? [one] : [];
+}
+
+/** What a fix line says: research it, install it (from nothing), or buy the levels it needs. */
+export function fixLabel(o: Offer): string {
+  if (o.right.kind === 'research') return `Research ${o.right.node}`;
+  const install = /^Add /.test(o.name) || o.quote?.action.type === 'replacePart' || o.quote?.action.type === 'addPart' || o.quote?.action.type === 'installGpu';
+  return install ? `Install ${o.name.replace(/^Add /, '')}${o.change ? ` ${o.change}` : ''}` : `Buy ${o.name}${o.change ? ` ${o.change}` : ''}`;
+}
+
 /** The fix for a blocked task: the same rule as the Fix line and the featured buy (WALL_ROWS, never a dead end). */
 export function fixFor(t: QueueEntryView, offers: Offers | null): Offer | null {
   const keys = t.blockedBy ? WALL_ROWS[t.blockedBy] ?? [] : [];
@@ -80,11 +96,11 @@ function OpenTask({ taskKey: key }: { taskKey: string }) {
   // A task that left the line (taken, met or dismissed) closes its detail.
   if (!f.t) { queueMicrotask(() => { if (shell.view.getState().task === key) shell.view.dispatch({ type: 'back' }); }); return null; }
   const t = f.t, head = f.slot === 0, color = typeColor(typeOf(t.family));
-  const status = statusLine(t, head, f.running), fix = t.blockedBy ? fixFor(t, offers) : null, act = fix ? offerAction(fix) : null;
+  const status = statusLine(t, head, f.running), fixes = t.blockedBy ? fixLines(t, offers) : [];
   const card = f.slot === 0 ? L.headSlot : L.cards[f.slot - 1] ?? L.headSlot;
   const close = () => shell.view.dispatch({ type: 'back' });
   return <PlateFrame title={familyName(t.family)} sub={<span style={{ color }}>{typeName(typeOf(t.family))}</span>}
-    className={`task-detail${L.kind === 'phone' ? ' sheet' : ''}`} bounds={L.view} readAnchor={anchorOf(L, card)} onClose={close}
+    className="task-detail" bounds={L.view} readAnchor={anchorOf(card)} tip onClose={close}
     head={<span className="td-ic"><TaskIcon task={t} n={L.N} /></span>}>
     <p className="p-line muted td-note">{FAMILIES[t.family]?.note ?? ''}</p>
     <dl className="td-facts">
@@ -98,20 +114,17 @@ function OpenTask({ taskKey: key }: { taskKey: string }) {
     <p className={`p-line td-status ${status.tone}`} data-testid="td-status">{status.text}
       {t.blockedBy && <span className="mute" data-testid="td-capable"> · {capableText(t.capableSystems)}</span>}</p>
     {(t.blockedBy || (head && f.running && t.dismissible)) && <div className="keys">
-      {fix && <button type="button" className="key" data-qa-target data-testid="td-fix" disabled={!act} onClick={() => tap(fix)}>
-        {fix.right.kind === 'research' ? <>Research {fix.right.node}</> : <>Buy {fix.name} {fix.change} <span className="pz"><CurrencyIcon kind="credits" n={L.N} />{wholeText(fix.price ?? 0)}</span></>}</button>}
-      {t.blockedBy && !fix && <p className="key-slot">No upgrade here fixes it yet</p>}
+      {/* One line per missing component or research; each buys every level it needs in one tap. */}
+      {fixes.map(o => <button key={o.key} type="button" className="key" data-qa-target data-testid="td-fix" disabled={!offerAction(o)} onClick={() => tap(o)}>
+        {fixLabel(o)}{o.right.kind !== 'research' && o.price !== null && <span className="pz"> <CurrencyIcon kind="credits" n={L.N} />{wholeText(o.price)}</span>}</button>)}
+      {t.blockedBy && !fixes.length && <p className="key-slot">No upgrade here fixes it yet</p>}
       {head && f.running && t.dismissible && <button type="button" className="key quiet" data-qa-target data-testid="td-dismiss"
         onClick={() => { shell.dispatch({ type: 'dismissTask', task: t.task }); close(); }}>Dismiss <span className="mute">· No SLA cost</span></button>}
     </div>}
   </PlateFrame>;
 }
 
-/** Desktop: under the tapped card. Phone: a sheet resting on the bottom of the world. */
-function anchorOf(L: ShellLayout, card: Rect) {
-  return (out: Rect) => {
-    if (L.kind === 'phone') { out.x = L.view.x; out.w = L.view.w; out.y = L.view.y + L.view.h; out.h = 0; }
-    else { out.x = card.x; out.y = card.y; out.w = card.w; out.h = card.h; }
-    return true;
-  };
+/** Right under the tapped card, on phone and desktop alike (it never covers the strip: bounds are the world). */
+function anchorOf(card: Rect) {
+  return (out: Rect) => { out.x = card.x; out.y = card.y; out.w = card.w; out.h = card.h; return true; };
 }

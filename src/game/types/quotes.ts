@@ -35,7 +35,24 @@ export type QuoteRequest =
    * control on the scheduler, site generation): one install per generation while the slot is empty;
    * once installed, the level upgrade then a replace per other generation. Empty for a unit with no such slot.
    */
-  | { readonly kind: 'power'; readonly unit: ScopeRef };
+  | { readonly kind: 'power'; readonly unit: ScopeRef }
+  /**
+   * What a blocked task needs from one system, and the cheapest way to each: per missing component, the
+   * minimal multi-level upgrade (`upgradePartTo`), an add or install, a replace past the generation's top,
+   * or the same quote locked with the research it needs.
+   */
+  | { readonly kind: 'meet'; readonly system: SystemId; readonly need: MeetNeed };
+
+/** A task's gates on one system (spec §6.1, D26.1): cache = L1 + L2 + L3 bits; ram; disk; GPU VRAM and cores; core count; ECC. */
+export interface MeetNeed {
+  readonly cacheBits?: number;
+  readonly ramBits?: number;
+  readonly diskBits?: number;
+  readonly vramBits?: number;
+  readonly gpuCores?: number;
+  readonly cores?: number;
+  readonly ecc?: boolean;
+}
 
 export type Currency = 'credits' | 'data';
 export type LockCode = 'research' | 'ceiling' | 'cap' | 'fit' | 'roundState' | 'occupied';
