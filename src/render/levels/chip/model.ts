@@ -2,7 +2,7 @@
 import type { PartRef, SystemId } from '../../../game';
 import { MAX_CORES } from './layout';
 
-export type TargetId = `core${number}` | `site${number}` | 'cache' | 'queue' | 'clock' | 'pipe';
+export type TargetId = `core${number}` | `site${number}` | 'cores' | 'cache' | 'queue' | 'clock' | 'pipe';
 export const CORE_IDS: readonly TargetId[] = Array.from({ length: MAX_CORES }, (_, i): TargetId => `core${i}`);
 export const SITE_IDS: readonly TargetId[] = Array.from({ length: MAX_CORES }, (_, i): TargetId => `site${i}`);
 

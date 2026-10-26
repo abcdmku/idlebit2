@@ -1,27 +1,27 @@
-// D34: a core's plate sells the next core first (the Cores row's quote), or the clock once cores are at
-// their cap. The same offer the deck and the Buy tile show, so they always agree (A08).
+// D34: the Cores plate sells the next core first (the deck's Cores row, so they always agree, A08):
+// "Add core · 2 → 3" with its price, "Research Multi-core" while locked, "Max" at the cap. A core you
+// can't afford yet says how long the saving takes, so a tap never looks like nothing happened.
 import { useShellOffers } from '../deck/useOffers';
 import type { Offer } from '../deck/offers';
+import { useSavingUp } from '../deck/SavingUp';
 import { QuoteKey } from './widgets';
 import type { PlateCommon } from './types';
 
-/** The row a core sells: the next core, else (cores maxed) the clock. */
-export function coreOffer(rows: readonly Offer[]): Offer | null {
-  const cores = rows.find(r => r.key === 'core'), clock = rows.find(r => r.key === 'clock');
-  return cores && cores.right.kind !== 'max' ? cores : clock ?? null;
-}
+/** The Cores row: the next core. */
+export const coreOffer = (rows: readonly Offer[]): Offer | null => rows.find(r => r.key === 'core') ?? null;
 
 export function CoreKey({ onAction, onResearch, researchName }: Pick<PlateCommon, 'onAction' | 'onResearch' | 'researchName'>) {
   const o = coreOffer(useShellOffers().rows);
+  const saving = useSavingUp(o?.price ?? null, !!o?.affordable);
   if (!o?.quote) return <div className="keys"><p className="key-slot" /></div>;
-  const label = o.key === 'core' ? `Add core${o.change ? ` · ${o.change}` : ''}` : `Clock · ${o.change}`;
-  // Locked behind research: one plain key that opens it ("Research Multi-core").
+  if (o.right.kind === 'max') return <div className="keys"><p className="key-slot">Max · {o.change || 'every core site filled'}</p></div>;
   const lock = o.quote.locked;
   if (lock?.code === 'research' && lock.node && onResearch) {
     const node = lock.node, name = researchName?.(node) ?? lock.text.replace(/^Needs /, '');
     return <div className="keys"><button type="button" className="key locked-action" data-qa-target onClick={() => onResearch(node)}>Research {name}</button></div>;
   }
   return <div className="keys">
-    <QuoteKey quote={o.quote} label={label} onAction={q => onAction(q.action)} onResearch={onResearch} researchName={researchName} />
+    <QuoteKey quote={o.quote} label={`Add core${o.change ? ` · ${o.change}` : ''}`} reason={saving} onAction={q => onAction(q.action)}
+      onResearch={onResearch} researchName={researchName} />
   </div>;
 }

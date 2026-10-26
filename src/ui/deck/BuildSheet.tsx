@@ -6,6 +6,7 @@ import { box, T } from '../shell/geometry';
 import { useShell } from '../storeHooks';
 import type { Offers } from './offers';
 import { offerAction, PriceText, RightText, useTapOffer } from './offerUi';
+import { SavingUp } from './SavingUp';
 
 const HEAD = 64, ROW = 48, KEY_W = 96;
 
@@ -25,7 +26,7 @@ export function BuildSheet({ L, offers }: { L: PhoneLayout; offers: Offers }) {
         <button type="button" className="srow-hit" data-qa-target disabled={!offerAction(o)} onClick={() => tap(o)}
           aria-label={`${o.name}${o.change ? ` ${o.change}` : ''}`} style={{ left: 0, top: 0, width: rw - (buy ? KEY_W + 8 : 0), height: ROW }}>
           <T x={tx} y={8} w={s.w - 2 * pad - KEY_W - 16}><b className={o.lock && !o.where ? 'mute' : ''}>{o.name}</b></T>
-          <T x={tx} y={8 + L.lh} w={s.w - 2 * pad - KEY_W - 16} className={o.where ? 'net' : 'mute'}>{o.change}</T>
+          <T x={tx} y={8 + L.lh} w={s.w - 2 * pad - KEY_W - 16} className={o.where ? 'net' : 'mute'}>{o.change}<SavingUp price={o.price} affordable={o.affordable} /></T>
           {!buy && <T right={8} y={16}><RightText offer={o} n={L.N} /></T>}
         </button>
         {buy && <button type="button" className="skey buy" data-qa-target data-testid={`sheet-buy-${o.key}`}

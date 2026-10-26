@@ -1,7 +1,5 @@
-// The upgrade callout (D15.4, A07): tapping a part in the world opens it. On desktop it docks in the
-// world's right gutter, level with the part; on phone it sits above or below the part. A leader joins
-// it to the part. "x → x", price, Buy; Open drills into a unit; More opens the part's full plate. From the
-// Rack up a unit (sled, rack, room, site) also gets the On market toggle, in and between rounds.
+// The callout (D15.4, A07): what a tapped part with no plate of its own offers (a rack seen from its room, a
+// room on the map): its buy, Open to drill in, and On market. Placed by the plates' rule, never over the part.
 import { useEffect, useRef, useState } from 'react';
 import type { LevelSnapshot } from '../../game';
 import type { HitTarget, Rect } from '../../render/core';
@@ -12,7 +10,8 @@ import { plateRequest } from '../plates/PlateLayer';
 import { marketKey, marketLine, marketOf, targetUnit } from '../plates/market';
 import { box, T, useLayout } from '../shell/geometry';
 import { useGameSelector, useQuote, useShell, useViewState } from '../storeHooks';
-import { calloutModel, dockCallout, leaderRect, placeCallout, placePhone } from './model';
+import { calloutModel } from './model';
+import { placePlate } from '../plates/place';
 
 /** On the CPU the callout sits beside the package (L2): the cache spans the die, 16 art px in from the package, plus its 3 px frame. */
 const PACKAGE_INSET_ART = 19;
@@ -51,7 +50,6 @@ export function Callout() {
 
 function Open({ target: t, focus }: { target: HitTarget; focus: LevelSnapshot }) {
   const L = useLayout(), shell = useShell(), offers = useShellOffers();
-  // The part itself, not the package: the leader points at what was tapped.
   const part = useAnchor(t.id, false, L.N), around = useAnchor(t.id, t.owner.level === 'chip', L.N);
   const request = plateRequest(t, focus);
   const quotes = useQuote(request);
@@ -61,12 +59,10 @@ function Open({ target: t, focus }: { target: HitTarget; focus: LevelSnapshot })
   useEffect(() => () => clearTimeout(timer.current), []);
   if (!part || !around) return null;
   const d = L.kind === 'desktop';
-  // The renderer keeps the right gutter clear on desktop; a part that reaches into it falls back to beside-it placement.
-  const dock = d ? dockCallout(part, L.callout, L.calloutBounds) : null;
-  // Phone: below the part, else above, else docked above the head card; always from the part's own rect.
-  const at = !d ? placePhone(part, L.callout, L.calloutBounds)
-    : dock && dock.x >= part.x + part.w ? dock : placeCallout(around, L.callout, L.calloutBounds, L.lat);
-  const leader = leaderRect(part, at, L.N);
+  // The plates' rule (place.ts): never over the tapped part. Desktop docks in the gutter beside it; phone
+  // sits below, else above. No leader: it would cross other parts' art (user, 26 Oct).
+  const p = placePlate(around, L.callout.w, L.callout.h, L.calloutBounds, { beside: d });
+  const at = { x: Math.round(p.x / 8) * 8, y: Math.round(p.y / 8) * 8, w: L.callout.w, h: L.callout.h };
   const pad = d ? 16 : 8, gap = 8, by = at.h - pad - KEY_H;
   const o = m.offer, act = o ? offerAction(o as Offer) : null;
   const keys: { id: string; label: string; tone: string; disabled?: boolean; pressed?: boolean; run: () => void }[] = [];
@@ -74,7 +70,7 @@ function Open({ target: t, focus }: { target: HitTarget; focus: LevelSnapshot })
     run: () => { shell.dispatch({ type: 'setOnline', unit: market.unit, online: !market.on }); } });
   if (o?.quote && !o.where && (o.price !== null || act)) {
     const research = !!act && 'research' in act;
-    keys.push({ id: 'buy', label: research ? 'Research' : m.keyLabel ?? 'Buy', tone: o.affordable ? 'buy' : act ? 'plain' : 'off', disabled: !act || (!research && !armed),
+    keys.push({ id: 'buy', label: research ? 'Research' : 'Buy', tone: o.affordable ? 'buy' : act ? 'plain' : 'off', disabled: !act || (!research && !armed),
       run: () => {
         if (!act) return;
         if ('research' in act) { shell.view.dispatch({ type: 'openResearch', project: act.research.node }); return; }
@@ -90,13 +86,12 @@ function Open({ target: t, focus }: { target: HitTarget; focus: LevelSnapshot })
   const keyW = (i: number) => market ? (i === 0 ? 96 : 72) : 80;
   const keyRight = (i: number) => pad + Array.from({ length: i }, (_, j) => keyW(j) + gap).reduce((a, b) => a + b, 0);
   return <>
-    {leader && <i className="leader" data-free="art" aria-hidden="true" style={box(leader)} />}
     <aside className="panel callout" style={box(at)} data-k="callout" data-testid="callout" role="dialog" aria-label={m.name}
       onPointerDown={e => e.stopPropagation()}>
       <T x={pad} y={pad} w={at.w - 2 * pad - 96}><b>{m.name}</b></T>
       <T right={pad} y={pad}>{o?.price != null ? <PriceText offer={o as Offer} n={L.N} />
         : o && !m.research && (o as Offer).right ? <RightText offer={o as Offer} n={L.N} /> : null}</T>
-      <T x={pad} y={pad + L.lh} w={at.w - 2 * pad} className={m.research && !m.keyLabel ? 'warn' : 'mute'}>
+      <T x={pad} y={pad + L.lh} w={at.w - 2 * pad} className={m.research ? 'warn' : 'mute'}>
         <span key={bought} className={bought ? 'flash' : undefined}>{m.change || (market ? marketLine(market) : '')}</span></T>
       {keys.map((k, i) => <button key={k.id} type="button" className={`skey ${k.tone}`} data-testid={`callout-${k.id}`} disabled={k.disabled} data-qa-target
         aria-pressed={k.pressed} style={{ right: keyRight(i), top: by, width: keyW(i), height: KEY_H }} onClick={k.run}>{k.label}</button>)}

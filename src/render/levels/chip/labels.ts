@@ -3,19 +3,32 @@
 // arrange their text by the art scale the world rests at (A01): wide at N >= 3, stacked below.
 // Locked sites carry no text (A25): the lock glyph and the callout say it.
 import { formatHertz, formatSize } from '../../../game';
+import { formatCredits } from '../../../game/format';
 import { familyId } from '../../../game';
 import type { ChipSnapshot } from '../../../game';
 import { familyName, whole } from '../../core';
-import type { LabelWriter, WorldFrame, WorldForm } from '../../core';
+import type { LabelWriter, ViewPresentation, WorldFrame, WorldForm } from '../../core';
+import { PHONE_TYPE, typeForScale } from '../../core';
+import { addMarkY } from './sprites';
 import { arrangementOf, coreSites, coreText, floorOf } from './layout';
-import { coreSleep, readySpeedText, speedRange, tileLabelFits } from './speed';
+import { coreSleep, labelFits, readySpeedText, speedRange, tileLabelFits } from './speed';
 import { coreTag } from './tag';
-import { firstLockedSite, isLive, lentCore, queueOpen, siteCount, siteLocked, spilledOut } from './world';
+import { isLive, lentCore, queueOpen, siteCount, spilledOut } from './world';
 
 const LEVEL_NAMES: Readonly<Record<'l1' | 'l2' | 'l3', string>> = { l1: 'L1', l2: 'L2', l3: 'L3' };
 const CORE_NAMES = Array.from({ length: 32 }, (_, i) => `Core ${i + 1}`);
 const LABEL_IDS = Array.from({ length: 32 }, (_, i) => `core${i}`);
-export function chipLabels(chip: ChipSnapshot, frame: WorldFrame, out: LabelWriter, form: WorldForm): void {
+/** The add-core quote among the tray quotes the UI holds: its price text and whether it is affordable now, or null. */
+export function addCorePrice(view: ViewPresentation | null | undefined, chip: ChipSnapshot): { readonly text: string; readonly affordable: boolean } | null {
+  const list = view?.quotes?.quotes;
+  if (!list) return null;
+  for (const q of list) {
+    const a = q.action;
+    if (a.type === 'addPart' && a.system === chip.systemId && a.kind === 'core' && !q.locked) return { text: formatCredits(q.cost), affordable: q.affordable };
+  }
+  return null;
+}
+export function chipLabels(chip: ChipSnapshot, frame: WorldFrame, out: LabelWriter, form: WorldForm, view?: ViewPresentation | null): void {
   const f = floorOf(form), wide = arrangementOf(frame.scale, form) === 'wide', live = isLive(chip, frame), pad = wide ? 8 : 4;
   const sc = chip.scheduler;
   if (sc) {
@@ -39,8 +52,15 @@ export function chipLabels(chip: ChipSnapshot, frame: WorldFrame, out: LabelWrit
   // (One level: the in-use run fits the desktop cache row at either scale; the phone row has no room for it.)
   out.label('clock', f.clock.x + pad, f.clock.y + pad).text('Clock', 'name', true).br().text(formatHertz(chip.clock.hz), 'value');
 
-  const n = siteCount(chip), sites = coreSites(f, n);
+  const n = siteCount(chip), sites = coreSites(f, n), price = addCorePrice(view, chip);
   if (sites.length > 2) {
+    // The add site's price, dim, under its "+" when a line fits there (unaffordable: dim, never blank).
+    const add = sites[chip.cores.length];
+    if (add && price) {
+      const scale = frame.scale ?? (form === 'phone' ? 2 : 3), t = form === 'phone' ? PHONE_TYPE : typeForScale(scale), py = addMarkY(add) + 5;
+      if (labelFits(price.text, { x: add.x, y: py, w: add.w, h: add.y + add.h - py }, scale, t.body, t.line))
+        out.label('addPrice', add.x + add.w / 2, py, 'center').text(price.text, price.affordable ? 'gold' : 'dim');
+    }
     let busy = 0;
     for (const c of chip.cores) if (live && c.busy > 0) busy++;
     // A clean spot (A25): inside the empty block's top-left, off the bus trace; on a full grid, over its first row.
@@ -53,10 +73,10 @@ export function chipLabels(chip: ChipSnapshot, frame: WorldFrame, out: LabelWrit
     }
     // The busy tag (tag.ts): in the widest empty row run, never over an installed core, the Clock or
     // the lock mark; it carries the cores' speed only when their tiles cannot and it fits.
-    const tag = coreTag(chip, sites, firstLockedSite(chip, sites.length), f, frame);
+    const tag = coreTag(chip, sites, f, frame);
     if (tag) {
-      out.label('cores', tag.box.x + 2, tag.box.y + 2, 'left', true).text('Cores', 'name', true).text(`${busy} / ${whole(chip.cores.length)} busy`, 'value');
-      if (tag.speedY !== null) out.label('coresHz', tag.box.x + 2, tag.speedY, 'left', true).text(speedRange(chip), 'mute');
+      out.label('cores', tag.x, tag.y, 'left', true).text('Cores', 'name', true).text(`${busy} / ${whole(chip.cores.length)} busy`, 'value');
+      if (tag.speedY !== null) out.label('coresHz', tag.x, tag.speedY, 'left', true).text(speedRange(chip), 'mute');
       else if (tag.speed) out.text(`· ${speedRange(chip)}`, 'mute');
     }
     return;
@@ -65,7 +85,9 @@ export function chipLabels(chip: ChipSnapshot, frame: WorldFrame, out: LabelWrit
   for (let i = 0; i < sites.length; i++) {
     const r = sites[i]!, core = chip.cores[i], c = coreText(r, wide ? 'wide' : 'stacked'), x = r.x + c.pad;
     if (!core) {
-      if (!siteLocked(chip, i)) out.label(LABEL_IDS[i]!, x, r.y + c.pad, 'left').text(CORE_NAMES[i]!, 'dim').br().text('empty', 'dim');
+      // the add site: what it sells and its price (dim when unaffordable)
+      out.label(LABEL_IDS[i]!, x, r.y + c.pad, 'left').text(`Add ${CORE_NAMES[i]!}`, price?.affordable ? 'name' : 'dim', !!price?.affordable);
+      if (price) out.br().text(price.text, price.affordable ? 'gold' : 'dim');
       continue;
     }
     // A18: "Core 1 · 1 Hz" on one line, or name then Hz on their own lines, never "Core 11 Hz".

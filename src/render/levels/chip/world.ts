@@ -10,12 +10,9 @@ import type { Rect, ViewPresentation, WorldFrame, WorldForm } from '../../core';
 import { MAX_CORES, arrangementOf, coreSites, coreText, floorOf, queueWells } from './layout';
 import type { CoreArrangement } from './layout';
 import { coreColor, drawGridPiece, drawShardGroups, remaining } from './shards';
-import { CLOCK_TRACE, bar, cacheBlock, clockBlock, coreBlock, coreGhost, drawMetal, lockedSite, pad, queueBlock, queueGhost, staticCpu } from './sprites';
+import { CLOCK_TRACE, addSite, bar, cacheBlock, clockBlock, coreBlock, drawMetal, lockedSite, pad, queueBlock, queueGhost, staticCpu } from './sprites';
 import type { Incoming } from './sprites';
-import { blockOf, createBlock, drawBlock } from './block';
-import { coreTag } from './tag';
 import { dimIfAsleep } from './speed';
-import type { Block } from './block';
 
 type G = CanvasRenderingContext2D;
 const cycle = createRateAnimation();
@@ -52,17 +49,13 @@ export function queueOpen(chip: ChipSnapshot): boolean {
 /** D26: bits of running shards that didn't fit cache (0 until the sim sends it). */
 export const spilledOut = (chip: ChipSnapshot): number => chip.cache.spilledOutBits;
 export const lentCore = (c: CoreView): boolean => c.research > 0 && c.busy <= 0;
-/** The first locked core site at or after the installed cores (sites before it are open to buy). */
-export function firstLockedSite(chip: ChipSnapshot, n: number): number {
-  for (let i = chip.cores.length; i < n; i++) if (siteLocked(chip, i)) return i;
-  return n;
-}
-const openBlock = createBlock(), lockBlock = createBlock();
-/** On a grid: the open and the locked empty sites as two blocks (A25). Empty blocks when the sites are big. */
-export function emptyBlocks(chip: ChipSnapshot, sites: readonly Rect[]): { readonly open: Block; readonly locked: Block } {
-  const grid = sites.length > 2, cut = firstLockedSite(chip, sites.length), from = Math.min(chip.cores.length, sites.length);
-  blockOf(sites, from, grid ? cut : from, openBlock); blockOf(sites, grid ? cut : from, grid ? sites.length : from, lockBlock);
-  return { open: openBlock, locked: lockBlock };
+const block: Rect = { x: 0, y: 0, w: 0, h: 0 };
+/** The cores block: the bounding box of every drawn site (the cores and the add site). One target, one bracket. */
+export function coresBlock(sites: readonly Rect[], out: Rect = block): Rect {
+  let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
+  for (const r of sites) { x0 = Math.min(x0, r.x); y0 = Math.min(y0, r.y); x1 = Math.max(x1, r.x + r.w); y1 = Math.max(y1, r.y + r.h); }
+  out.x = x0; out.y = y0; out.w = Math.max(0, x1 - x0); out.h = Math.max(0, y1 - y0);
+  return out;
 }
 
 /**
@@ -124,11 +117,9 @@ export function drawWorld(g: G, chip: ChipSnapshot, frame: WorldFrame, form: Wor
     g.fillStyle = CLOCK_TRACE; g.fillRect(s.x + s.w, s.y + (s.h >> 1), Math.max(0, f.clock.x - s.x - s.w), 1);
   }
   let landing = live && chip.pipe.waiting && chip.pipe.transfer !== null;
-  const grid = sites.length > 2, empty = emptyBlocks(chip, sites);
-  // The lock mark keeps clear of the busy tag's text (no label covers a meaningful mark).
-  if (grid) { drawBlock(g, empty.open, false); drawBlock(g, empty.locked, true, coreTag(chip, sites, firstLockedSite(chip, sites.length), f, frame)?.area ?? null); }
+  const a = chipAfford(view?.quotes ?? null, chip.systemId, afford);
   for (let i = 0; i < sites.length; i++) {
-    if (grid && i >= chip.cores.length) break;
+    if (i >= chip.cores.length) { addSite(g, sites[i]!, a.site); continue; }
     const core = chip.cores[i], idle = !!core && core.busy <= 0 && !lentCore(core);
     drawCore(g, sites[i]!, core, live, chip, frame, i, sites.length, landing && idle, arr);
     if (landing && idle) landing = false;
@@ -136,13 +127,11 @@ export function drawWorld(g: G, chip: ChipSnapshot, frame: WorldFrame, form: Wor
   drawShardGroups(g, sites, chip.cores, live);
   pad(g, f.inp.x, f.inp.y, live && chip.pipe.transfer !== null);
 
-  const a = chipAfford(view?.quotes ?? null, chip.systemId, afford);
   if (a.clock) goldBracket(g, f.clock);
   if (a.cache) goldBracket(g, f.cache);
   if (a.queue && (sc || qOpen)) goldBracket(g, f.queue);
-  // Adding a core: one bracket on the open block (grid), or on the next open big site.
-  if (a.site && grid && empty.open.n) goldBracket(g, empty.open.box);
-  else if (a.site && !grid && chip.cores.length < sites.length && !siteLocked(chip, chip.cores.length)) goldBracket(g, sites[chip.cores.length]!);
+  // Adding a core: one bracket around the whole cores block (one component, D34).
+  if (a.site && sites.length > chip.cores.length) goldBracket(g, coresBlock(sites));
 }
 
 /**
@@ -150,9 +139,9 @@ export function drawWorld(g: G, chip: ChipSnapshot, frame: WorldFrame, form: Wor
  * A busy core shows its piece of the shard (D25): the work it still holds, in the task type's colour,
  * draining as the shard runs.
  */
-function drawCore(g: G, r: Rect, core: CoreView | undefined, live: boolean, chip: ChipSnapshot, frame: WorldFrame, i: number, n: number,
+function drawCore(g: G, r: Rect, core: CoreView | undefined, live: boolean, chip: ChipSnapshot, frame: WorldFrame, _i: number, n: number,
   landing: boolean, arr: CoreArrangement): void {
-  if (!core) { if (siteLocked(chip, i)) lockedSite(g, r); else coreGhost(g, r); return; }
+  if (!core) return;
   const busy = live && core.busy > 0, lent = live && lentCore(core), colour = busy ? coreColor(core) ?? P.op : P.op;
   coreBlock(g, r, busy, lent);
   dimIfAsleep(g, r, core, live);

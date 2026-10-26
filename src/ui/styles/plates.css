@@ -239,3 +239,10 @@
 /* More below: a fade on the scrolling plate's bottom edge, gone once the end is in view */
 .v3-plate[data-more="true"]::after { content: ''; position: sticky; display: block; bottom: -12px; height: 32px; margin: -32px -12px -12px;
   background: linear-gradient(#1b143700, #1b1437); pointer-events: none; }
+
+/* The Cores plate: each core's state, two to a row */
+.v3-plate .core-list { list-style: none; margin: 8px 0 0; padding: 0; display: grid; grid-template-columns: 1fr 1fr; gap: 2px 12px; }
+.v3-plate .core-list li { display: flex; gap: 8px; min-width: 0; color: #a99be6; }
+.v3-plate .core-list li b { width: 24px; flex: none; text-align: right; color: #efeaff; }
+.v3-plate .core-list li span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.v3-plate .core-list li.busy span { color: #8ef5ff; }

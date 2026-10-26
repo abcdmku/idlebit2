@@ -97,7 +97,8 @@ function FixLine({ offer, n }: { offer: Offer | null; n: number }) {
     <ArtCanvas w={8} h={8} n={n} artKey={`fix:${offer.icon}:${offer.affordable}`} draw={g => drawMiniIcon(g, offer.icon, !offer.affordable)} />
     <span className="rp-fix-t"><b>{offer.name}</b> <span className="mute">{offer.change}</span></span>
     <span className="v">{offer.price !== null ? <PriceText offer={offer} n={n} /> : <RightText offer={offer} n={n} />}</span>
-    {act && <button type="button" className={`key${offer.affordable ? '' : ' ghost'}`} data-testid="rp-fix-buy"
+    {/* A quiet secondary key: Return to market is the report's primary (user, 26 Oct). */}
+    {act && <button type="button" className={`key quiet${offer.affordable ? '' : ' ghost'}`} data-testid="rp-fix-buy"
       onClick={() => { if ('action' in act) shell.dispatch(act.action); else shell.view.dispatch({ type: 'openResearch', project: act.research.node }); }}>
       {'action' in act ? 'Buy' : 'Research'}</button>}
   </div>;

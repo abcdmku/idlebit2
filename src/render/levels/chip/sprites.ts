@@ -61,15 +61,19 @@ export function pad(g: G, x: number, y: number, lit: boolean): void {
 }
 export function coreBlock(g: G, r: Rect, busy: boolean, lent: boolean): Rect {
   const top = lent ? mix(P.logic, P.rnd, 0.3) : busy ? P.logicHi : P.logic;
-  const t = prism(g, r.x, r.y + 3, r.w, r.h - 3, 3, { top, front: busy || lent ? P.logic : P.logicLo, sx: 2, sy: 2 });
-  if (r.w >= 16) for (let x = t.x + 3; x < t.x + t.w - 2; x += 4) R(g, x, t.y + t.h + 1, 2, 1, P.pad);
-  return t;
+  return prism(g, r.x, r.y + 3, r.w, r.h - 3, 3, { top, front: busy || lent ? P.logic : P.logicLo, sx: 2, sy: 2 });
 }
-/** An open core site: it can take a core now. */
-export function coreGhost(g: G, r: Rect): void {
+/** The add site's "+" centre row: mid-site (labels.ts puts the price under it). */
+export const addMarkY = (r: Rect): number => r.y + (r.h >> 1);
+/**
+ * The add site (D34): the next core goes here. Always addable-looking: a dim well, a dotted rim and
+ * a "+" in the middle, bright when the core is affordable, dim (never blank) when it isn't.
+ */
+export function addSite(g: G, r: Rect, affordable: boolean): void {
   R(g, r.x, r.y, r.w, r.h, mix(P.wafer, P.ink, 0.25));
-  if (r.w >= 12) dotted(g, r.x, r.y, r.w, r.h, P.silkLo, 0, 1, 2);
-  brackets(g, r.x, r.y, r.w, r.h, P.silk, 3);
+  if (r.w >= 8) dotted(g, r.x, r.y, r.w, r.h, affordable ? P.silk : P.silkLo, 0, 1, 2);
+  const cx = r.x + (r.w >> 1), cy = addMarkY(r), c = affordable ? P.paper : P.silkLo;
+  R(g, cx - 3, cy - 1, 7, 3, P.ink); R(g, cx - 1, cy - 3, 3, 7, P.ink); R(g, cx - 2, cy, 5, 1, c); R(g, cx, cy - 2, 1, 5, c);
 }
 /** A locked site (A25): bare die, one dim outline and the lock glyph, no text; the callout names it. */
 export function lockedSite(g: G, r: Rect): void {

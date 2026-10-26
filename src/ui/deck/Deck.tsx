@@ -13,6 +13,7 @@ import { box, T, useLayout } from '../shell/geometry';
 import { shallowEqual, useGameSelector, useShell, useViewState } from '../storeHooks';
 import { BuildSheet } from './BuildSheet';
 import { etaText, useCreditsPerSec } from './eta';
+import { SavingUp } from './SavingUp';
 import { fits } from '../queue/taskText';
 import { NowCard } from './NowCard';
 import type { Offers } from './offers';
@@ -79,7 +80,7 @@ function BuildRows({ L, offers }: { L: DesktopLayout; offers: Offers }) {
             <ArtCanvas w={8} h={8} n={n} artKey={`${o.icon}:${locked}`} draw={g => drawMiniIcon(g, o.icon, locked)} />
           </span>
           <T x={nameX} y={0} h={h} w={changeX - nameX - 8}><b className={locked ? 'mute' : ''}>{o.name}</b></T>
-          <T x={changeX} y={0} h={h} w={w - changeX - (o.right.kind === 'research' || o.right.kind === 'at' || o.right.kind === 'lock' ? 240 : 104)} className={o.where ? 'net' : 'mute'}>{o.change}</T>
+          <T x={changeX} y={0} h={h} w={w - changeX - (o.right.kind === 'research' || o.right.kind === 'at' || o.right.kind === 'lock' ? 240 : 104)} className={o.where ? 'net' : 'mute'}>{o.change}<SavingUp price={o.price} affordable={o.affordable} /></T>
           <T right={L.lat} y={0} h={h}><RightText offer={o} n={n} /></T>
         </button></li>;
       })}

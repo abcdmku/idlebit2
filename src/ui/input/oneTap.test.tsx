@@ -25,7 +25,8 @@ describe('one tap shows a part\'s whole detail (user, 26 Oct)', () => {
     act(() => activateTarget(mounted!.shell, core));
     expect([v().selectedId, v().plate]).toEqual(['core0', true]);
     // the core's plate leads with the key that sells the next core (or the clock)
-    expect(mounted.host.querySelector('.v3-plate .p-title')?.textContent).toBe('Core 1');
+    expect(mounted.host.querySelector('.v3-plate .p-title')?.textContent).toBe('Cores');
+    expect(mounted.host.querySelector('.v3-plate .core-list')?.textContent).toContain('1');
     expect(mounted.host.querySelector('.v3-plate .keys')).not.toBeNull();
     // locked behind Multi-core: one plain key that opens it (never "Add core · research")
     expect(mounted.host.querySelector('.v3-plate .keys button')?.textContent).toMatch(/^(Research Multi-core|Add core · .+)$/);

@@ -6,13 +6,13 @@ import { P, R, copyRect, partVersionOf, resetHitTarget, setRect, sumVersions } f
 import type { HitTarget, LevelRegistry, LevelRenderer, Rect, WorldForm, WorldFrame } from '../../core';
 import { chipLabels } from './labels';
 import { coreSites, floorOf } from './layout';
-import { CORE_IDS, SITE_IDS, partRef } from './model';
+import { partRef } from './model';
 import type { TargetId } from './model';
 import { drawChipMini } from './mini';
-import { drawWorld, siteCount } from './world';
+import { coresBlock, drawWorld, siteCount } from './world';
 
 const owner = (s: ChipSnapshot) => ({ level: 'chip', id: s.systemId }) as const;
-function part(s: ChipSnapshot, out: HitTarget[], i: number, id: Exclude<TargetId, `site${number}` | 'pipe'>, r: Rect): number {
+function part(s: ChipSnapshot, out: HitTarget[], i: number, id: Exclude<TargetId, `site${number}` | 'pipe' | 'cores'>, r: Rect): number {
   if (i >= out.length) return i;
   const t = resetHitTarget(out[i]!, id, 'part', owner(s));
   t.part = partRef(s.systemId, id); copyRect(r, t.rect);
@@ -34,7 +34,7 @@ export function createChipRenderer(_registry: LevelRegistry): LevelRenderer<'chi
     miniRect: (_s, out, form) => copyRect(floorOf(form).pkg, out),
     entry(_s, out, form) { const f = floorOf(form); out.x = f.inp.x; out.y = f.inp.y; return out; },
     draw(g, s, view, frame) { lastFrame = frame; drawWorld(g, s, frame, frame.form ?? 'desktop', view); },
-    labels: (s, _view, frame, out) => chipLabels(s, frame, out, frame.form ?? 'desktop'),
+    labels: (s, view, frame, out) => chipLabels(s, frame, out, frame.form ?? 'desktop', view),
     drawMini: drawChipMini,
     children: () => 0,
     targets(s, _view, out, from, form: WorldForm = 'desktop') {
@@ -42,9 +42,13 @@ export function createChipRenderer(_registry: LevelRegistry): LevelRenderer<'chi
       let i = part(s, out, from, 'clock', f.clock);
       i = part(s, out, i, 'cache', f.cache);
       i = s.scheduler ? part(s, out, i, 'queue', f.queue) : slot(s, out, i, 'queue', f.queue, 0);
+      // D34: the cores are one component: one 'cores' target over every core and the add site.
+      // part: core 0's ref (the system's cores); slot: the add site's index while a core can be added, else null.
       const sites = coreSites(f, siteCount(s));
-      for (let c = 0; c < sites.length; c++) {
-        i = c < s.cores.length ? part(s, out, i, CORE_IDS[c] as `core${number}`, sites[c]!) : slot(s, out, i, SITE_IDS[c]!, sites[c]!, c);
+      if (i < out.length && sites.length) {
+        const t = resetHitTarget(out[i++]!, 'cores', 'part', owner(s));
+        t.part = partRef(s.systemId, 'core0'); t.unit = { kind: 'system', id: s.systemId };
+        t.slot = sites.length > s.cores.length ? s.cores.length : null; coresBlock(sites, t.rect);
       }
       // The pipe's drop onto the IN pad: its callout says where the link is upgraded (D15.5).
       if (i < out.length) {
@@ -67,7 +71,8 @@ export function createChipRenderer(_registry: LevelRegistry): LevelRenderer<'chi
       if (id === 'clock') return partVersionOf(s.clock);
       if (id === 'cache') return sumVersions(s.cache.levels);
       if (id === 'queue') return partVersionOf(s.scheduler);
-      if (id.startsWith('core')) return partVersionOf(s.cores[Number(id.slice(4))]);
+      // a core added (or a core's part changed) flashes the whole block
+      if (id === 'cores') return s.cores.length * 1000 + sumVersions(s.cores);
       return null;
     },
     faults(s, out) {

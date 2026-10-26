@@ -152,7 +152,6 @@ b, .b { font-weight: 700; }
 .link { position: absolute; color: var(--muted); text-align: center !important; text-decoration: underline; }
 
 /* the callout's leader to its part (A07) and the one-beat flash of a bought "x → y" (A10) */
-.leader { position: absolute; z-index: 9; background: var(--paper); pointer-events: none; }
 .flash { animation: flash-gold 300ms steps(1) 1; }
 @keyframes flash-gold { 0% { color: var(--gold); } }
 

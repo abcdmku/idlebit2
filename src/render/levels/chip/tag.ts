@@ -1,77 +1,73 @@
-// The CPU grid's busy tag: where it sits, whether it carries the cores' speed, and the art-px area
-// its text covers. Shared by the labels (which write it) and the world (whose lock mark avoids it),
-// so no label covers a meaningful mark.
+// The CPU grid's busy tag: whether there is one, where its text starts, whether it carries the
+// cores' speed, and the art-px area it covers. Shared by the labels (which write it) and the world.
+// It only ever sits on bare floor: the grid cells past every drawn site (cores and the add site),
+// 1 art px clear of all of them and of the add site's 2 px gold bracket. No clean spot, no tag.
 import type { ChipSnapshot } from '../../../game';
 import { PHONE_TYPE, typeForScale } from '../../core';
 import type { Rect, WorldFrame } from '../../core';
 import { gridCells } from './layout';
 import type { Floor } from './layout';
-import { spanFits, speedRange, textWidth, tileShowsSpeed } from './speed';
+import { speedRange, textWidth, tileShowsSpeed } from './speed';
 
 export interface CoreTag {
-  /** The spot the tag's top-left sits in (an empty row run, or the cores block on a full grid). */
-  readonly box: Rect;
-  /** The tag carries the cores' speed (their tiles are too small to show it). */
+  /** Art px origin of the first line's text. */
+  readonly x: number;
+  readonly y: number;
+  /** The tag carries the cores' speed (their tiles are too small to show it, and it fits). */
   readonly speed: boolean;
   /** Art y of the speed's own second line when it does not fit beside the count, else null. */
   readonly speedY: number | null;
-  /** The art px the tag's text covers, worst case (every core busy). */
+  /** The art px the tag covers, worst case (every core busy), its backing included. */
   readonly area: Rect;
 }
+/** At 8 cores or fewer the tiles say it all: no tag (user). */
+export const TAG_MIN_CORES = 9;
+/** Art px between the tag and any site: the add site's gold bracket (2) plus 1 clear. */
+export const TAG_CLEAR = 3;
 
 const span: Rect = { x: 0, y: 0, w: 0, h: 0 };
 const area: Rect = { x: 0, y: 0, w: 0, h: 0 };
-const fit: Rect = { x: 0, y: 0, w: 0, h: 0 };
-const tag: { box: Rect; speed: boolean; speedY: number | null; area: Rect } = { box: span, speed: false, speedY: null, area };
-/** Art px kept free at a locked run's far end for the lock mark (7 px wide, 2 px margin each side). */
-export const LOCK_ROOM = 11;
-let spanLast = -1;
+const tag: { x: number; y: number; speed: boolean; speedY: number | null; area: Rect } = { x: 0, y: 0, speed: false, speedY: null, area };
 
-/** The widest run of empty sites (index >= `installed`) within one grid row, or null on a full grid. */
-export function emptySpan(sites: readonly Rect[], installed: number): Rect | null {
+/** The widest run of cells (index >= `from`) within one grid row, or null when there are none. */
+export function emptySpan(cells: readonly Rect[], from: number): Rect | null {
   let found = false;
-  for (let i = installed; i < sites.length;) {
-    const r = sites[i]!; let j = i + 1;
-    while (j < sites.length && sites[j]!.y === r.y) j++;
-    const last = sites[j - 1]!, w = last.x + last.w - r.x;
-    if (!found || w > span.w) { span.x = r.x; span.y = r.y; span.w = w; span.h = r.h; spanLast = j - 1; found = true; }
+  for (let i = from; i < cells.length;) {
+    const r = cells[i]!; let j = i + 1;
+    while (j < cells.length && cells[j]!.y === r.y) j++;
+    const last = cells[j - 1]!, w = last.x + last.w - r.x;
+    if (!found || w > span.w) { span.x = r.x; span.y = r.y; span.w = w; span.h = r.h; found = true; }
     i = j;
   }
   return found ? span : null;
 }
 
 /**
- * The tag goes on the widest run of empty sites in one grid row, off every installed core; a full
- * grid (32 cores) has no free spot and no tag. The speed
- * (the user: cores always show their Hz) goes on a second line when the run is too short for one. When the run ends in locked
- * sites (from `lockedFrom`), its far end stays free for the lock mark. Null on a full grid whose
- * tiles show their own speed, or on the two big sites (no tag).
+ * The busy tag on the widest run of bare cells (past the drawn sites), inset TAG_CLEAR from the
+ * sites before it: "Cores n / m busy", with the cores' speed beside it or on a second line when
+ * their tiles can't show it and it fits. Null at 8 cores or fewer, on a full grid, or when even the
+ * count doesn't fit (the Clock shows the speed; each tile shows its state).
  */
-export function coreTag(chip: ChipSnapshot, sites: readonly Rect[], lockedFrom: number, f: Floor, frame: WorldFrame): CoreTag | null {
-  if (sites.length <= 2) return null;
-  let hidden = false;
-  for (let i = 0; i < Math.min(sites.length, chip.cores.length); i++) if (!tileShowsSpeed(chip.cores[i]!, sites[i]!, frame)) hidden = true;
-  // the span may run on past the add site into the grid's bare cells (D34)
-  const n = chip.cores.length, base = `Cores ${n} / ${n} busy`;
-  let free = emptySpan(gridCells(f, sites.length), n);
-  // A run too short for the count is no spot: the tag then goes only where it must carry the speed.
-  if (free) { fit.x = free.x; fit.y = free.y; fit.w = free.w; fit.h = free.h; if (!spanFits(base, fit, frame)) free = null; }
-  // No free run (a full grid, 32 cores): no tag. It never covers a core; every core runs at the
-  // Clock's speed (no lanes, D34), and each tile shows its own state.
-  const box = free;
-  if (!box) return null;
-  const room = free && lockedFrom < sites.length && spanLast >= lockedFrom ? LOCK_ROOM : 0;
-  fit.x = box.x; fit.y = box.y; fit.w = box.w - room; fit.h = box.h;
-  const speed = hidden && n > 0, one = `${base} · ${speedRange(chip)}`;
-  const split = speed && !spanFits(one, fit, frame);
+export function coreTag(chip: ChipSnapshot, sites: readonly Rect[], f: Floor, frame: WorldFrame): CoreTag | null {
+  const n = chip.cores.length;
+  if (n < TAG_MIN_CORES || sites.length <= 2) return null;
+  const free = emptySpan(gridCells(f, sites.length), sites.length);
+  if (!free) return null;
   const scale = frame.scale ?? (frame.form === 'phone' ? 2 : 3), t = frame.form === 'phone' ? PHONE_TYPE : typeForScale(scale);
-  const line = Math.ceil(t.line / scale), text = speed && !split ? one : base;
-  const wide = Math.max(textWidth(text, t.body), split ? textWidth(speedRange(chip), t.body) : 0);
-  // The label sits at (box.x + 2, box.y + 2) with a few px of backing: 2 art px of slack each way.
-  area.x = box.x; area.y = box.y;
-  area.w = Math.min(fit.w, 4 + Math.ceil(wide / scale) + 2);
-  area.h = split ? 4 + 2 * line : Math.min(box.h, 4 + line);
-  tag.box = box; tag.speed = speed; tag.speedY = split ? box.y + 2 + line : null;
+  const line = Math.ceil(t.line / scale);
+  // The run starts one cell gap (2 art px) past the last site: inset to TAG_CLEAR on that side, 1 elsewhere.
+  const x0 = free.x + (TAG_CLEAR - 2), y0 = free.y + 1, w0 = free.x + free.w - 1 - x0, h0 = free.h - 2;
+  let hidden = false;
+  for (let i = 0; i < Math.min(sites.length, n); i++) if (!tileShowsSpeed(chip.cores[i]!, sites[i]!, frame)) hidden = true;
+  const base = `Cores ${n} / ${n} busy`, sp = speedRange(chip);
+  const wOf = (s: string): number => Math.ceil(textWidth(s, t.body) / scale) + 4;
+  const fits = (w: number, lines: number): boolean => w <= w0 && lines * line + 2 <= h0;
+  let w = wOf(base), lines = 1, speed = false;
+  if (hidden && n > 0 && fits(wOf(`${base} · ${sp}`), 1)) { w = wOf(`${base} · ${sp}`); speed = true; }
+  else if (hidden && n > 0 && fits(Math.max(w, wOf(sp)), 2)) { w = Math.max(w, wOf(sp)); lines = 2; speed = true; }
+  else if (!fits(w, 1)) return null;
+  area.x = x0; area.y = y0; area.w = w; area.h = lines * line + 2;
+  tag.x = x0 + 2; tag.y = y0 + 1; tag.speed = speed; tag.speedY = lines === 2 ? tag.y + line : null;
   return tag;
 }
 

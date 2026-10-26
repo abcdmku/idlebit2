@@ -1,5 +1,6 @@
 import { useLayoutEffect, useRef, type CSSProperties, type ReactNode, type RefObject } from 'react';
 import type { Rect } from '../../render/core/geom';
+import { placePlate } from './place';
 import { useDialogFocus } from '../hooks/useDialogFocus';
 import { Pips } from './widgets';
 import '../styles/plates.css';
@@ -53,24 +54,11 @@ export function PlateFrame({ title, sub, pips, head, className = '', closeKey = 
       const safe = bounds ?? { x: 8, y: 142, w: pw - 16, h: ph - 142 - 160 };
       root.style.setProperty('--plate-safe-width', `${Math.max(0, safe.w)}px`);
       const a = !pinTop && readAnchor?.(target) ? target : null;
-      // Never over the tapped part (phone): when the plate fits neither below nor above it, it takes the
-      // roomier side and scrolls there, so the part stays in view.
-      const below = a ? safe.y + safe.h - (a.y + a.h + 8) : 0, above = a ? a.y - 8 - safe.y : 0;
-      root.style.setProperty('--plate-safe-height', `${Math.max(0, safe.h - 8)}px`);
-      if (a && !beside && !pinTop && root.scrollHeight > below && root.scrollHeight > above && Math.max(below, above) >= 160)
-        root.style.setProperty('--plate-safe-height', `${Math.floor(Math.max(below, above))}px`);
-      const width = root.offsetWidth, height = root.offsetHeight;
-      const clamp = (n: number, lo: number, hi: number) => Math.max(lo, Math.min(n, Math.max(lo, hi)));
-      const dock = safe.x + safe.w - width, right = a ? a.x + a.w + 16 : 0;
-      const side = !!a && !!beside;
-      const x = side ? (a!.x + a!.w + 8 <= dock ? dock : right + width <= safe.x + safe.w ? right : a!.x - width - 16)
-        : a ? a.x + a.w / 2 - width / 2 : safe.x + (safe.w - width) / 2;
-      const y = pinTop ? safe.y + 4
-        : side ? a!.y
-        : a ? (a.y + a.h + 8 + height <= safe.y + safe.h ? a.y + a.h + 8 : a.y - height - 8 >= safe.y ? a.y - height - 8 : below >= above ? a.y + a.h + 8 : a.y - height - 8)
-        : safe.y + (safe.h - height) / 2;
-      root.style.left = `${Math.round(clamp(x, safe.x, safe.x + safe.w - width))}px`;
-      root.style.top = `${Math.round(clamp(y, safe.y, safe.y + safe.h - height))}px`;
+      // Never over the tapped part (place.ts): the height it may take is set first, then the place.
+      const at = placePlate(a, root.offsetWidth, root.scrollHeight, safe, { beside, pinTop });
+      root.style.setProperty('--plate-safe-height', `${Math.max(0, at.room)}px`);
+      root.style.left = `${Math.round(at.x)}px`;
+      root.style.top = `${Math.round(at.y)}px`;
       root.dataset.anchored = String(Boolean(a));
       more();
     };

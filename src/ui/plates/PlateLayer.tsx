@@ -11,8 +11,6 @@ import { LbPlate } from './LbPlate';
 import { MemoryTiers } from './MemoryTiers';
 import { NetworkRackPlate } from './NetworkRackPlate';
 import { PartPlate } from './PartPlate';
-import { PlateFrame } from './PlateFrame';
-import { Lines, Status } from './widgets';
 import { GpuPlate } from './GpuPlate';
 import { partFacts } from './partFacts';
 import { nextDefaultName, SavePrompt } from './SavePrompt';
@@ -20,7 +18,8 @@ import { SupplyPlate } from './SupplyPlate';
 import { PowerCtlPlate } from './PowerCtlPlate';
 import { PowerKeys } from './PowerKeys';
 import { isPowerCtl } from './targets';
-import { CoreKey } from './CoreKey';
+import { CoresPlate } from './CoresPlate';
+import { SitePlate } from './SitePlate';
 import { StartRow } from './StartRow';
 import { GenerationRow } from './GenerationRow';
 import { SwitchPlate } from './SwitchPlate';
@@ -50,7 +49,7 @@ export function configKind(owner: LevelSnapshot['level'], parent: ScopeRef): Con
 export function plateRequest(t: HitTarget, focus: LevelSnapshot): QuoteRequest | null {
   // D31.3: the rack's fifth infrastructure slot, under the cooler.
   if (isPowerCtl(t) && focus.level === 'rack') return { kind: 'power', unit: { kind: 'rack', id: focus.rackId } };
-  if (t.kind === 'part' && t.part?.slot.kind === 'core') return null;
+  if (isCores(t)) return null;
   if (t.kind === 'slot' && t.slot !== null) {
     if (focus.level === 'chip' || focus.level === 'system') return t.part ? { kind: 'part', part: t.part } : { kind: 'tray', at: t.owner };
     return { kind: 'add', parent: t.unit ?? focusUnit(focus), slot: t.slot };
@@ -96,11 +95,15 @@ export function powerScope(t: HitTarget, focus: LevelSnapshot): ScopeRef | null 
  */
 export function hasPlate(t: HitTarget, focus: LevelSnapshot): boolean {
   if (t.part?.slot.kind === 'globalScheduler') return focus.level === 'global' && !!focus.scheduler;
-  if (t.part?.slot.kind === 'core') return focus.level === 'chip';
-  if (t.kind === 'slot' && !t.part && (focus.level === 'chip' || focus.level === 'system')) return gpuPlateSlot(t, focus) !== undefined;
+  if (isCores(t)) return focus.level === 'chip';
+  // An empty CPU or board site opens a compact plate (SitePlate), placed so it never covers the site.
+  if (t.kind === 'slot' && !t.part && (focus.level === 'chip' || focus.level === 'system')) return true;
   if (sledOf(t, focus) !== null) return true;
   return !!plateRequest(t, focus) || t.kind === 'unit';
 }
+
+/** The cores are one component (D34, user 26 Oct): the renderer's one `cores` block (its part is core 0's ref). */
+export const isCores = (t: Pick<HitTarget, 'id' | 'part'>) => t.id === 'cores' || t.part?.slot.kind === 'core';
 
 /** A server sled tapped in its rack: its system (the sled's own plate, D34 user ruling 26 Oct). */
 export function sledOf(t: Pick<HitTarget, 'kind' | 'drill'>, focus: LevelSnapshot): UnitRef | null {
@@ -179,6 +182,9 @@ function TargetPlate({ target: t, focus }: { target: HitTarget; focus: LevelSnap
     const researched = shell.store.getState().research.completed.includes(researchId('powerCtl'));
     return <PowerCtlPlate {...common} quotes={quotes} rack={focus.rackId} view={focus.powerCtl ?? null} research={researched ? null : researchId('powerCtl')} />;
   }
+  if (isCores(t) && focus.level === 'chip') return <CoresPlate {...common} quotes={quotes} focus={focus} />;
+  if (t.kind === 'slot' && !t.part && (focus.level === 'chip' || focus.level === 'system'))
+    return <SitePlate {...common} target={t} focus={focus} quotes={quotes} />;
   if (t.kind === 'save' && t.unit) {
     const unit = t.unit, taken = selectSavedConfigs(shell.store.getState(), unit.kind).names;
     return <SavePrompt unit={unit} bounds={surface.plateBounds} defaultName={nextDefaultName(defaultBase(unit, focus), taken)} taken={taken}
@@ -240,12 +246,6 @@ function TargetPlate({ target: t, focus }: { target: HitTarget; focus: LevelSnap
       {powerKeys(!!focus.start, focus.start?.level ?? 0, 'Start controller', true)}
     </LbPlate>;
     const facts = partFacts(focus, s);
-    // D34: a core's detail and, first, the key that sells the next core (or the clock once cores are maxed).
-    if (facts && s.kind === 'core') return <PlateFrame {...common} title={facts.title} sub={facts.sub} className="part core">
-      <Status text={facts.status} />
-      <Lines lines={facts.lines} slots={2} />
-      <CoreKey onAction={common.onAction} onResearch={common.onResearch} researchName={common.researchName} />
-    </PlateFrame>;
     if (facts) return <PartPlate {...common} quotes={quotes} {...facts} unblocks={unblocks}>
       {s.kind === 'gpu' && focus.level === 'system' && focus.gpu.find(p => p.slot === s.index)?.kind === 'npu'
         && <button type="button" className="key ghost" onClick={() => setReplaceNpu(true)}>Replace with GPU model</button>}

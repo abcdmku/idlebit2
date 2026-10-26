@@ -228,9 +228,9 @@ describe('upgrade callout (D15.4)', () => {
     const c = $('[data-testid=callout]')!;
     expect(c.textContent).toContain('Clock');
     expect(c.textContent).toMatch(/1 → [0-9.]+ Hz/);
-    // docked in the right gutter, level with the part, with a leader to it (A07)
+    // docked in the right gutter, level with the part, never over it; no leader across other parts
     expect([c.style.left, c.style.top, c.style.width, c.style.height]).toEqual(['1104px', '304px', '288px', '144px']);
-    expect($('.leader')!.style.left).toBe('696px');
+    expect($('.leader')).toBeNull();
     expect($('[data-testid=callout-buy]')!.style.height).toBe('48px');
     act(() => mounted!.shell.view.dispatch({ type: 'cancel' }));
     expect($('[data-testid=callout]')).toBeNull();
@@ -242,7 +242,7 @@ describe('upgrade callout (D15.4)', () => {
     expect($('[data-testid=callout]')!.style.height).toBe('104px');
     expect($('[data-testid=callout-buy]')!.style.height).toBe('48px');
   });
-  it('a unit offers Open, which drills in; More opens the full plate instead', () => {
+  it('a unit seen from above offers Open, which drills in', () => {
     const store = fakeStore();
     store.set({ unlocked: { chip: true, system: true, rack: false, room: false, global: false } });
     mounted = mount(<OffersScope><Callout /></OffersScope>, store, DESKTOP);
@@ -250,7 +250,7 @@ describe('upgrade callout (D15.4)', () => {
     const sys = { level: 'system', id: systemId(0) } as const;
     act(() => mounted!.shell.view.dispatch({ type: 'select', target: target({ id: 'sys0', kind: 'child', part: null, drill: sys }) }));
     const c = $('[data-testid=callout]')!;
-    expect(c.style.left).toBe('888px');   // no room on the right: it sits left of the unit
+    expect(c.style.left).toBe('896px');   // no room on the right: it sits left of the unit, clear of it
     expect(c.textContent).toContain('System 1');
     act(() => $('[data-testid=callout-open]')!.click());
     expect(mounted.shell.view.getState().focus).toEqual(sys);
