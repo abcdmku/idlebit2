@@ -16,7 +16,7 @@ import { researchDef } from './tree';
 describe('System arrival sizes the PSU', () => {
   function pushedChipJustBeforeSystem(): GameState {
     const base = createInitialState(42);
-    const done = ['pipelining', 'fifoSched', 'dualCore', 'l2Cache'].map(researchId);
+    const done: ReturnType<typeof researchId>[] = [];
     const research = { ...base.research, completed: done, unlocks: deriveUnlocks(done), active: researchId('systemBoard'), activeProgress: researchDef('systemBoard')!.work - 1 };
     const sys = base.build.systems[0]!;
     const cpu = sys.spec.cpu!;

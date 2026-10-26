@@ -16,11 +16,11 @@ export function LockGlyph({ n }: { n: number }) {
   return <ArtCanvas w={7} h={8} n={n} artKey="lock" className="inl" style={{ verticalAlign: 'middle' }} draw={g => { g.clearRect(0, 0, 7, 8); g.drawImage(SPR.lock, 0, 0); }} />;
 }
 
-/** The right column (A14): the price, "Research: Dual core" with the lock, "Max", or "At the Rack switch". */
+/** The right column (A14): the price, the sim's lock ("Needs System"), "Max", or "At the Rack switch". */
 export function RightText({ offer: o, n }: { offer: Offer; n: number }) {
   switch (o.right.kind) {
     case 'price': return <PriceText offer={o} n={n} />;
-    case 'research': return <span className="dim">Research: {o.right.node} <LockGlyph n={n} /></span>;
+    case 'research': return <span className="dim">Needs {o.right.node} <LockGlyph n={n} /></span>;
     case 'max': return <span className="dim">Max</span>;
     case 'at': return <span className="net">At {o.right.place}</span>;
     case 'lock': return <span className="dim">{o.right.text}</span>;

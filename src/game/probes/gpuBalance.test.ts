@@ -6,7 +6,9 @@ describe('GPU isolated economic comparison', () => {
     const result = gpuGenerationComparison(3);
     expect(result.research).toMatchObject({ credits: '400000000', data: '40000000', work: 2e10 });
     expect(result.hot.map((h) => h.upgrades)).toEqual([0, 1, 2, 3, 4, 5]);
-    expect(result.native).toHaveLength(24);
+    // Only next-generation models strictly better than the installed card are offered as replacements (user, 25 Oct).
+    expect(result.native).toHaveLength(12);
+    expect(result.native.map((r) => r.model)).toContain('4990');
     for (const row of [...result.hot, ...result.native]) {
       expect(amountAdd(row.creditsRemaining, row.additionalCredits)).toBe(result.start.credits);
       expect(Number.isFinite(row.stats.idleW + row.stats.loadW)).toBe(true);

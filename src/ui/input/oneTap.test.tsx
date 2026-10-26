@@ -28,8 +28,8 @@ describe('one tap shows a part\'s whole detail (user, 26 Oct)', () => {
     expect(mounted.host.querySelector('.v3-plate .p-title')?.textContent).toBe('Cores');
     expect(mounted.host.querySelector('.v3-plate .core-list')?.textContent).toContain('1');
     expect(mounted.host.querySelector('.v3-plate .keys')).not.toBeNull();
-    // locked behind Multi-core: one plain key that opens it (never "Add core · research")
-    expect(mounted.host.querySelector('.v3-plate .keys button')?.textContent).toMatch(/^(Research Multi-core|Add core · .+)$/);
+    // D39: cores are never research-locked: one plain "Add core" key
+    expect(mounted.host.querySelector('.v3-plate .keys button')?.textContent).toMatch(/^Add core( · .+)?$/);
     act(() => activateTarget(mounted!.shell, core));
     expect(v().selected).toBeNull();
     act(() => activateTarget(mounted!.shell, clock));

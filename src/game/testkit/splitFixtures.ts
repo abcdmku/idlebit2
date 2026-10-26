@@ -19,12 +19,12 @@ const lvl = (gen: number, level: number): PartLevel => ({ gen, level });
 
 /**
  * A kHz-era general server at the native clock (2 kHz cores: higher clock levels on old cores cost
- * more energy than kHz links can earn), 4 cores, a scheduler, 2 RAM sticks, a drive and an entry GPU
+ * more energy than kHz links can earn), 8 cores (8 threads, D39: no SMT), a scheduler, 2 RAM sticks, a drive and an entry GPU
  * for Accelerated tasks. RAM is sized so a shard queued at a rack always fits its servers.
  */
 const MID_SPEC: SystemSpec = {
   kind: 'server', board: 'general',
-  cpu: { cpu: lvl(1, 1), cores: Array.from({ length: 4 }, () => lvl(1, 1)), clock: lvl(1, 1), l1: lvl(1, 8), l2: lvl(1, 4), l3: null },
+  cpu: { cpu: lvl(1, 1), cores: Array.from({ length: 8 }, () => lvl(1, 1)), clock: lvl(1, 1), l1: lvl(1, 8), l2: lvl(1, 4), l3: null },
   cpuCount: 1,
   scheduler: { gen: 1, level: 4, strategy: 'fifo' },
   ram: [{ gen: 1, level: 8, ecc: false }, { gen: 1, level: 8, ecc: false }],

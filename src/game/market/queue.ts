@@ -7,7 +7,7 @@ import { NO_DETAIL } from '../types/events';
 import type { QueuedTask } from '../types/state';
 import { baseWeight, CURVE, nextIntensity, sizeJitter, taskSize } from './curve';
 import { FAMILIES, payoutAt } from './families';
-import { canRunFleet, detailIndex } from './fleet';
+import { canRunFleet, detailIndex, DETAIL_CODE, isDownGate } from './fleet';
 import { failTasks } from './sla';
 import { researchQueued } from '../exec/researchTask';
 
@@ -200,7 +200,8 @@ export function dismissAt(w: World, i: number): void {
 /** The head fails at its deadline step (spec §5.2): cantRun when no static-capability hardware can run it. */
 function failHead(w: World): void {
   const gate = headGate(w);
-  const cause = gate !== 0 ? 'cantRun' : 'timeout';
+  // A down fleet fails the head for the reason it is down (power, heat, swap), not as a capability.
+  const cause = gate === 0 ? 'timeout' : !isDownGate(gate) ? 'cantRun' : gate <= DETAIL_CODE.grid ? 'power' : gate <= DETAIL_CODE.room ? 'heat' : 'swap';
   const detail = gate !== 0 ? detailIndex(gate) : NO_DETAIL;
   const front = w.hot.g[G.frontHead]!;
   if (front >= 0) {

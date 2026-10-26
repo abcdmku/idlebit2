@@ -120,7 +120,8 @@ function startingState(generation: GpuGeneration): GameState {
 function observation(state: GameState) {
   const card = state.build.systems[0]!.spec.accels[0]!;
   if (card.kind !== 'gpu') throw new Error('Probe needs a GPU');
-  const stats = quote(state, { kind: 'gpuModels', system: systemId(0), index: 0,
+  // The native card's stats, read from the add quote (the replace picker offers only better models).
+  const stats = quote(state, { kind: 'gpuModels', system: systemId(0), index: null,
     generation: gpuModel(card.model)!.generation }).quotes.find((q) => q.action.type === 'installGpu' && q.action.model === card.model)!.gpu!.after;
   // Read the installed paired columns, including hot upgrades, rather than a system-wide maximum.
   const c = state.compiled, s = c.sys;

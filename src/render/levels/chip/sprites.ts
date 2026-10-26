@@ -88,6 +88,16 @@ export function bar(g: G, x: number, y: number, w: number, f: number, c: string)
 }
 export function clockBlock(g: G, r: Rect, tick: boolean): void {
   const top = prism(g, r.x, r.y + 3, r.w, r.h - 3, 3, { top: P.waferHi, front: P.wafer });
+  if (r.w > r.h * 2) {
+    // a Clock row (phone): the crystal can at the right end, its tick lamp just left of it
+    const cx = top.x + top.w - 14, cy = top.y + (top.h >> 1);
+    R(g, cx - 9, cy - 5, 18, 11, P.ink); R(g, cx - 8, cy - 4, 16, 9, P.steel);
+    R(g, cx - 8, cy - 4, 16, 1, P.steelHi); R(g, cx - 8, cy + 4, 16, 1, P.steelLo); R(g, cx - 6, cy - 2, 12, 5, mix(P.steel, P.steelHi, 0.4));
+    const lx = cx - 16, ly = cy - 1;
+    R(g, lx - 1, ly - 1, 4, 4, P.ink); R(g, lx, ly, 2, 2, tick ? P.amber : '#3b2a12');
+    if (tick) { g.globalAlpha = 0.35; R(g, lx - 2, ly - 2, 6, 6, P.amber); g.globalAlpha = 1; }
+    return;
+  }
   const cx = top.x + (top.w >> 1), cy = top.y + top.h - 15;
   R(g, cx - 9, cy - 5, 18, 11, P.ink); R(g, cx - 8, cy - 4, 16, 9, P.steel);
   R(g, cx - 8, cy - 4, 16, 1, P.steelHi); R(g, cx - 8, cy + 4, 16, 1, P.steelLo);

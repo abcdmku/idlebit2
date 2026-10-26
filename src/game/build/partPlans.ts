@@ -100,7 +100,8 @@ export function planReplace(state: GameState, ref: PartRef, g: number, preserveC
   const row = PARTS[id];
   const u = state.research.unlocks;
   const label = partName(id, g);
-  if (g === part.gen || g < 0 || g >= row.base.length) return fail('invalid', 'Same generation', label);
+  // User, 25 Oct: "you shouldnt be given a 'replace with' a lower tier". A replace only moves up.
+  if (g <= part.gen || g >= row.base.length) return fail('invalid', 'Only a newer generation', label);
   const ecc = eccOf(state, ref);
   let level = 1;
   if (preserveCapacity && row.curve !== 'fixed') {

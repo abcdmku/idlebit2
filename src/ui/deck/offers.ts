@@ -1,6 +1,6 @@
 // What the deck can buy: the build rows, the one Buy key and the callouts all read one offer list
 // built from quotes (A08). Prices, locks and effects come from the sim; this file only words them,
-// in one grammar (A14): name · change · a right column (price, "Research: <node>", "Max" or "At <place>").
+// in one grammar (A14): name · change · a right column (price, "Needs <node>", "Max" or "At <place>").
 import type { EffectPreview, FailDetail, LevelId, NodeRef, PartSlotKind, Quote, QuoteRequest, RackId, RoomId } from '../../game';
 import type { PartIconKind } from '../art/deckArt';
 import { measureUnit } from '../plates/format';
@@ -140,7 +140,7 @@ export function offerOf(def: RowDef, q: Quote | undefined, link = def.key === 'l
   // A start controller's upgrade has no capacity effect (D31): its level step, from the quote's "… · L3".
   const step = !e && q.action.type === 'upgradePart' ? /· L([0-9]+)$/.exec(q.label) : null;
   const maxed = q.locked?.code === 'ceiling' || q.locked?.code === 'cap';
-  // D34: the Cores row counts cores ("3 → 4"); before Multi-core it only says which research opens it.
+  // D34: the Cores row counts cores ("3 → 4"). D39: cores are never research-locked; a lock here is the cap.
   if (def.key === 'core' && e && !maxed) {
     const change = q.locked?.code === 'research' ? '' : `${e.capacityBefore} → ${e.capacityAfter}`;
     const credits = q.currency === 'credits', price = q.locked || !credits ? null : whole(q.cost);

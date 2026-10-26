@@ -64,8 +64,9 @@ describe('model GPU builds', () => {
   it('freezes exactly four NPU rows and their own research gates', () => {
     expect(PARTS.npu.base).toEqual([32, 64000, 128000000, 256000000000]);
     expect(PARTS.npu.price).toEqual([3000000, 7500000, 45000000000, 75000000000000]);
-    expect(PARTS.npu.gates).toEqual(['npu', 'gpuGen2', 'tensorCores', 'matrixGpu']);
-    const withoutNpu = deriveUnlocks(RESEARCH.filter((r) => r.id !== 'npu').map((r) => r.id));
+    expect(PARTS.npu.gates).toEqual(['systemBoard', 'gpuGen2', 'tensorCores', 'matrixGpu']);
+    // D39: the legacy NPU comes with the System board; its later rows still need their generation gates.
+    const withoutNpu = deriveUnlocks(RESEARCH.filter((r) => r.id !== 'systemBoard').map((r) => r.id));
     expect(genUnlocked(withoutNpu, 'npu', 1)).toBe(false);
     const withoutTensor = deriveUnlocks(RESEARCH.filter((r) => !['tensorCores', 'matrixGpu'].includes(r.id)).map((r) => r.id));
     expect(genUnlocked(withoutTensor, 'npu', 1)).toBe(true);

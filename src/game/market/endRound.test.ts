@@ -90,7 +90,7 @@ describe('research between rounds', () => {
     let s = between.state;
     for (const a of [
       { type: 'setOnline', unit: { kind: 'system', id: systemId(1) }, online: false },
-      { type: 'startResearch', project: researchId('fifoSched') },
+      { type: 'startResearch', project: researchId('cstateC1') },
     ] as const satisfies readonly GameAction[]) {
       const out = applyAction(s, a);
       if (!out.ok) throw new Error(out.rejection.reason);

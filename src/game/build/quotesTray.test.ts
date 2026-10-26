@@ -61,7 +61,7 @@ describe('tray effects (R42)', () => {
   it('shows counts on adds and capacity on upgrades at boot', () => {
     const boot = FLEETS.boot();
     const chip = quote(boot, { kind: 'tray', at: { level: 'chip', id } }).quotes;
-    expect(chip[0]!.effect).toMatchObject({ capacityBefore: 1, capacityAfter: 2, unit: 'slots' });
+    expect(chip[0]!.effect).toMatchObject({ capacityBefore: 1, capacityAfter: 2, unit: 'cores' });
     expect(chip[2]!.action.type).toBe('upgradePart');
     expect(chip[2]!.effect).toMatchObject({ capacityBefore: 1, capacityAfter: 1.5, unit: 'Hz' });
     const system = quote(boot, { kind: 'tray', at: { level: 'system', id } }).quotes;

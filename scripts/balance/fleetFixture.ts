@@ -11,7 +11,7 @@ import { compileAll } from '../../src/game/core/topology';
 /** A Rack-era server draws about 12% of its all-parts maximum over a round (measured: 2.6e7 of 2.16e8 W); PDU and cooler are sized to that with 20% headroom. */
 const DRAW_SHARE = 0.12;
 const RICH = '1' + '0'.repeat(40);
-const NEEDED = ['s3Sleep', 'meteredPdu', 'powerCtl', 'portExpansion', 'densePorts', 'packageC', 'cstateC3', 'cstateC6', 'lbCapability', 'lbHealth'];
+const NEEDED = ['s3Sleep', 'meteredPdu', 'powerCtl', 'packageC', 'cstateC3', 'cstateC6', 'lbCapability', 'lbHealth'];
 
 export function loadStage(path: string): GameState {
   const loaded = deserializeSave((JSON.parse(readFileSync(path, 'utf8')) as { save: string }).save);

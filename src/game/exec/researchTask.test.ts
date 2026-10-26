@@ -12,7 +12,7 @@ function bootWithTaskRunning(): GameState {
   // A few Credits cover the 10 W research draw (the CSV energy ratio), as a player at 0:10 has.
   const running = advanceGame({ ...s, wallet: { ...s.wallet, data: '10' as never, credits: '20' as never } }, 500).state;
   expect(running.hot.sys.running[0]).toBe(1);
-  const out = applyAction(running, { type: 'startResearch', project: researchId('fifoSched') });
+  const out = applyAction(running, { type: 'startResearch', project: researchId('cstateC1') });
   if (!out.ok) throw new Error(out.rejection.reason);
   return out.state;
 }
@@ -43,9 +43,9 @@ describe('research task (D27)', () => {
     expect(held.hot.g[G.taken]).toBe(taken);
     expect(held.market.window[0]!.taskId).toBe(head);
     // 20 ops on a 1 Hz core: 20 s, plus a tick to apply.
-    expect(researchDef('fifoSched')!.work).toBe(20);
+    expect(researchDef('cstateC1')!.work).toBe(20);
     const done = advanceGame(held, 20_200).state;
-    expect(done.research.completed).toContain('fifoSched');
+    expect(done.research.completed).toContain('cstateC1');
     expect(done.hot.g[G.researchHolders]).toBe(0);
     expect(done.hot.sys.researchThreads[0]).toBe(0);
   });

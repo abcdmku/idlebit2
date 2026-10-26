@@ -162,7 +162,8 @@ export function planReplaceLadder(state: GameState, ref: PartRef, g: number): Pl
   if (!part || !(part.id in LADDERS)) return fail('invalid', 'No such part');
   const row = LADDERS[part.id as keyof typeof LADDERS];
   const label = partName(part.id, g);
-  if (g === part.gen || g < 0 || g >= row.baseK.length) return fail('invalid', 'Same generation', label);
+  // A replace only moves up (user, 25 Oct).
+  if (g <= part.gen || g >= row.baseK.length) return fail('invalid', 'Only a newer generation', label);
   const clamp = (k: number) => Math.min(row.topK[g]!, Math.max(row.baseK[g]!, k));
   let price = ladderInstall(row, g);
   let build: BuildState;

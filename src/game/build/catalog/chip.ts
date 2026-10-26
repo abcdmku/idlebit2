@@ -33,19 +33,19 @@ export const L1: CatalogRow = {
   base: [1, 1024, 2 ** 20, 2 ** 30], watts: idle(), price: [20, 1.25e5, 4.3e8, 1.9e11], upgrade: [3, 1.2e5, 1.5e9, 7.7e12],
 };
 export const L2: CatalogRow = {
-  id: 'l2', scope: 'chip', names: TIERS.map((t) => `${t} L2`), gates: [r('l2Cache'), ...FAB], curve: 'flow',
+  id: 'l2', scope: 'chip', names: TIERS.map((t) => `${t} L2`), gates: FAB, curve: 'flow',
   // The Hz L2 starts at 128 b, the size an L1 has reached when L2 arrives (about L8), so buying it doubles the cache
   // tasks can use; at 8 b it added almost nothing to a pushed L1 (user, 25 Oct).
   base: [128, 8192, 2 ** 23, 2 ** 33], watts: idle(2), price: [4e4, 5e5, 8.6e8, 3.7e11], upgrade: [12, 1.2e5, 1.5e9, 7.7e12],
 };
 /** L3 levels extend by the `l3LevelBonus` ceiling (stacked3d). */
 export const L3: CatalogRow = {
-  id: 'l3', scope: 'chip', names: TIERS.map((t) => `${t} L3`), gates: [r('l3Cache'), ...FAB], curve: 'flow',
+  id: 'l3', scope: 'chip', names: TIERS.map((t) => `${t} L3`), gates: FAB, curve: 'flow',
   base: [64, 65536, 2 ** 26, 2 ** 36], watts: idle(6), price: [2e5, 7e5, 1.7e9, 7.4e11], upgrade: [12, 1.2e5, 1.5e9, 7.7e12],
 };
 /** base = K (concurrency), base2 = Q (queue). Linear, L 1–8 for every g. */
 export const SCHEDULER: CatalogRow = {
-  id: 'scheduler', scope: 'chip', names: ['Run queue', 'Multilevel', 'Work queue', 'Cluster runtime'], gates: [r('fifoSched'), ...FAB],
+  id: 'scheduler', scope: 'chip', names: ['Run queue', 'Multilevel', 'Work queue', 'Cluster runtime'], gates: FAB,
   curve: 'linear', levelMax: 8, base: [1, 2, 3, 4], base2: [2, 4, 6, 8], watts: idle(),
   price: [1000, 3e5, 4.3e8, 1.9e11], upgrade: [100, 1.2e5, 1.5e9, 7.7e12],
 };

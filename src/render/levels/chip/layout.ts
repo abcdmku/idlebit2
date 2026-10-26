@@ -15,13 +15,17 @@ export interface Floor {
   readonly coreW: number; readonly gapX: number;
   /** Grid columns past two sites (fixed per form; rows grow). */
   readonly cols: number;
+  /** The Clock is a row above the cores (phone: the cores take the die's full width), not a block beside them. */
+  readonly clockAbove: boolean;
 }
-interface Spec { pkgW: number; coreW: number; gapX: number; gapY: number; clockW: number; S: number; cw: number; w: number; h: number; top: number; cols: number }
+interface Spec { pkgW: number; coreW: number; gapX: number; gapY: number; clockW: number; S: number; cw: number; w: number; h: number; top: number; cols: number; inset: number; clockAbove: boolean }
 const SPEC: Readonly<Record<WorldForm, Spec>> = {
-  // cols: the most tiles a row that still fit the widest speed label ("1.02 kHz") at the form's rest scale
-  // (the CPU never drops it): 4 × 29 art px at 3× desktop, 2 × 44 at 2× phone.
-  desktop: { pkgW: 192, coreW: 56, gapX: 8, gapY: 8, clockW: 32, S: 56, cw: 24, w: 640, h: 400, top: 120, cols: 4 },
-  phone: { pkgW: 160, coreW: 44, gapX: 4, gapY: 4, clockW: 32, S: 56, cw: 24, w: 320, h: 480, top: 144, cols: 2 },
+  // cols: 4 tiles a row, each wide enough for the widest speed label ("1.46 GHz") at the form's rest scale
+  // (the CPU never drops it): 4 × 29 art px at 3× desktop; 4 × 36 at 2× phone, where the package widens to
+  // the phone's whole free width (168 + its 8 px lip = 176 art = 352 CSS px), the blocks sit 8 art px in
+  // (4 rim + 4 die) and the Clock moves to a row above the cores so they take the die's full width.
+  desktop: { pkgW: 192, coreW: 56, gapX: 8, gapY: 8, clockW: 32, S: 56, cw: 24, w: 640, h: 400, top: 120, cols: 4, inset: 16, clockAbove: false },
+  phone: { pkgW: 168, coreW: 74, gapX: 4, gapY: 4, clockW: 32, S: 56, cw: 24, w: 320, h: 480, top: 144, cols: 4, inset: 8, clockAbove: true },
 };
 const r = (x: number, y: number, w: number, h: number): Rect => ({ x, y, w, h });
 /** A grid tile's least height (art px): its speed label line, then its task icon and progress bar. */
@@ -30,21 +34,24 @@ const TILE_GAP = 2;
 /** Grid rows for `count` sites (0 for the two big sites). */
 const rowsOf = (count: number, cols: number): number => (count <= 2 ? 0 : Math.ceil(Math.min(MAX_CORES, count) / cols));
 function floorplan(s: Spec, rows: number): Floor {
-  const cx = s.w / 2, pkgX = cx - s.pkgW / 2, dieY = s.top + 8;
-  const x0 = pkgX + 16, inner = s.pkgW - 32;
-  const queue = r(x0, dieY + 8, inner, s.cw);
+  const cx = s.w / 2, pkgX = cx - s.pkgW / 2, rim = s.inset / 2, dieY = s.top + rim;
+  const x0 = pkgX + s.inset, inner = s.pkgW - 2 * s.inset;
+  const queue = r(x0, dieY + rim, inner, s.cw);
   const cache = r(x0, queue.y + s.cw + s.gapY, inner, s.cw);
+  // phone: the Clock is a row of its own under the cache, so the cores span the die
+  const clockRow = s.clockAbove ? r(x0, cache.y + s.cw + s.gapY, inner, s.cw) : null;
+  const coresY = (clockRow ?? cache).y + s.cw + s.gapY;
   // The cores area keeps the L2 height and grows downward a row at a time once tiles would be too short.
   const coresH = Math.max(s.S, rows * (TILE_H + TILE_GAP) - TILE_GAP);
-  // the cores area runs to 4 art px short of the Clock (its trace gap)
-  const cores = r(x0, cache.y + s.cw + s.gapY, inner - s.clockW - 4, coresH);
-  const clock = r(x0 + inner - s.clockW, cores.y, s.clockW, s.S);
-  const dieH = cores.y + coresH + 8 - dieY, pkg = r(pkgX, s.top, s.pkgW, dieH + 16);
+  // desktop: the cores area runs to 4 art px short of the Clock beside it (its trace gap)
+  const cores = r(x0, coresY, clockRow ? inner : inner - s.clockW - 4, coresH);
+  const clock = clockRow ?? r(x0 + inner - s.clockW, cores.y, s.clockW, s.S);
+  const dieH = cores.y + coresH + rim - dieY, pkg = r(pkgX, s.top, s.pkgW, dieH + 2 * rim);
   return {
-    world: r(0, 0, s.w, Math.max(s.h, pkg.y + pkg.h + 48)), pkg, die: r(pkgX + 8, dieY, s.pkgW - 16, dieH), queue, cache, cores, clock,
+    world: r(0, 0, s.w, Math.max(s.h, pkg.y + pkg.h + 48)), pkg, die: r(pkgX + rim, dieY, s.pkgW - 2 * rim, dieH), queue, cache, cores, clock,
     // The rest frame: the package, its shadow and its socket lip. The pipe runs in the gutter above.
     focus: r(pkg.x - 4, pkg.y - 8, pkg.w + 8, pkg.h + 16),
-    inp: { x: cx, y: dieY }, coreW: s.coreW, gapX: s.gapX, cols: s.cols,
+    inp: { x: cx, y: dieY }, coreW: s.coreW, gapX: s.gapX, cols: s.cols, clockAbove: s.clockAbove,
   };
 }
 const FLOORS = new Map<string, Floor>();

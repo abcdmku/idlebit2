@@ -11,9 +11,10 @@ import { deriveUnlocks } from './effects';
 import { researchPhase } from './projects';
 import { RESEARCH, researchDef } from './tree';
 
-const gen1 = researchId('gpuGen1'), gen2 = researchId('gpuGen2');
+// D39: the first GPU comes with the System board; gpuGen2 is the first generation gate.
+const gen1 = researchId('gpuGen2'), gen2 = researchId('gpuGen3');
 // D32: every node costs 10 × its Data in Credits.
-const data = 1000000n, fee = 10n * data;
+const data = 2700000n, fee = 10n * data;
 function fixture(credits = fee, balance = data): GameState {
   const base = createInitialState(42);
   const completed = RESEARCH.filter((r) => r.id !== gen1 && r.id !== gen2).map((r) => r.id);
@@ -28,14 +29,15 @@ function ready(credits = fee, balance = data): GameState {
 }
 
 describe('GPU generation research fees', () => {
-  it('publishes nine generations with Credits at 10 × Data (D32), Data and work', () => {
-    for (let generation = 1; generation <= 9; generation += 1) {
+  it('publishes eight generation gates with Credits at 10 × Data (D32), Data and work', () => {
+    expect(researchDef('gpuGen1')).toBeUndefined();
+    for (let generation = 2; generation <= 9; generation += 1) {
       const node = researchDef(`gpuGen${generation}`)!;
       expect(node.creditCost).toBe((BigInt(node.data) * 10n).toString());
       expect(node.effects).toContainEqual({ kind: 'gen', part: 'gpu', gen: generation - 1 });
       expect(node.work).toBeGreaterThan(0);
     }
-    expect([researchDef(gen2)!.data, researchDef(gen2)!.work]).toEqual([1_000_000, 25_000_000]);
+    expect([researchDef(gen2)!.data, researchDef(gen2)!.work]).toEqual([2_700_000, 40_000_000]);
   });
 
   it('quotes and debits both wallets atomically at first actual start', () => {

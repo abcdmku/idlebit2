@@ -13,14 +13,15 @@ import { reseedForRound } from './rng';
 import { MODE } from './timers';
 import { compileAll, syncHotSizes } from './topology';
 
-const START_GENS: readonly PartId[] = ['cpu', 'core', 'clock', 'l1', 'psu'];
+/** D39: L2, L3 and the scheduler are bought from the start; research never unlocks a part type. */
+const START_GENS: readonly PartId[] = ['cpu', 'core', 'clock', 'l1', 'l2', 'l3', 'scheduler', 'psu'];
 
 export function baseUnlocks(): Unlocks {
   const gens = Object.fromEntries(PART_IDS.map((p) => [p, START_GENS.includes(p) ? 1 : 0])) as Record<PartId, number>;
   return {
     levels: { chip: true, system: false, rack: false, room: false, global: false },
     gens, ceilings: CEILINGS_START,
-    queueStrategies: [], routeStrategies: ['firstFit'], filters: [], rules: [], ruleParams: {},
+    queueStrategies: ['fifo'], routeStrategies: ['firstFit'], filters: [], rules: [], ruleParams: {},
     bootTicks: BOOT_TICKS_BASE, autoReturnDelayTicks: AUTO_RETURN_DELAY_TICKS, offlineCapHours: OFFLINE_CAP_HOURS_BASE,
   };
 }

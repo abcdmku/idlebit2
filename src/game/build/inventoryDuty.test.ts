@@ -86,7 +86,8 @@ function cleared(state: GameState, s = 0) {
 
 describe('accelerator inventory edits after billing', () => {
   for (const hotSwap of [false, true]) {
-    for (const [old, model] of [[gpu(), '1530'], [gpu(), '1330'], [gpu('1390', 0), '1390']] as const) {
+    // A replacement is always a strictly better model (user, 25 Oct: no replace with a lower tier).
+    for (const [old, model] of [[gpu(), '1350'], [gpu(), '1990'], [gpu('1390', 0), '1990']] as const) {
       it(`clears billed duty for ${old.model} u${old.upgrades} -> native ${model}, hot-swap ${hotSwap}`, () => {
         const before = billed([old], hotSwap);
         expect(before.hot.sys.accelTaskS[0]).toBe(DT_S);

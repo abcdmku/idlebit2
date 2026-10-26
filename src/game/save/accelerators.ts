@@ -56,7 +56,7 @@ export function validateAccelBuilds(state: GameState, fail: Reject): void {
         if (!Number.isInteger(raw.gen) || (raw.gen as number) < 0 || (raw.gen as number) > 3) fail(`${at}.gen`, 'expected NPU generation 0..3');
         if (!Number.isInteger(raw.level) || (raw.level as number) < 1 || (raw.level as number) > 11 + (raw.gen as number)) fail(`${at}.level`, 'invalid NPU level');
         if (!(unlocks.gens.npu & 1) || !(unlocks.gens.npu & (1 << (raw.gen as number)))) fail(at, 'NPU generation is locked');
-        const required = ['npu', ...(raw.gen === 1 ? ['gpuGen2'] : raw.gen === 2 ? ['tensorCores'] : raw.gen === 3 ? ['matrixGpu'] : [])];
+        const required = ['systemBoard', ...(raw.gen === 1 ? ['gpuGen2'] : raw.gen === 2 ? ['tensorCores'] : raw.gen === 3 ? ['matrixGpu'] : [])];
         if (required.some((id) => !state.research.completed.some((done) => done === id))) fail(at, 'NPU prerequisite is locked');
       } else fail(`${at}.kind`, 'unknown accelerator kind');
     });

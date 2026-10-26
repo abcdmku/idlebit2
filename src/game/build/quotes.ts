@@ -8,7 +8,8 @@ import { amount, amountCompare } from '../amount';
 import { MAX_ACCELS, TICK_MS } from '../core/constants';
 import type { GameAction } from '../types/actions';
 import { FILTER_IDS, ROUTE_STRATEGY_IDS } from '../types/catalog';
-import type { NodeRef, PartRef, PartSlot, ResearchId, ScopeRef, SwitchRef } from '../types/ids';
+import type { NodeRef, PartRef, PartSlot, ResearchId, ScopeRef, SwitchRef, SystemId } from '../types/ids';
+import type { GpuModelId } from '../types/gpu';
 import type { Currency, EffectPreview, Quote, QuoteRequest, QuoteResult } from '../types/quotes';
 import type { GameState } from '../types/state';
 import { genCount, isLadder } from './catalog';
@@ -27,7 +28,7 @@ import { backboneOptions, trayQuotes } from './quotesTray';
 import { planFilter, planRouterQueue, planSetpoint, planStrategy } from './settings';
 import { GPU_MODEL_IDS, gpuModel } from './catalog/gpuModels';
 import { installedGpuStats } from './gpu';
-import { planInstallGpu } from './gpuPlans';
+import { gpuBetter, planInstallGpu } from './gpuPlans';
 import { gpuPowerPreview } from './gpuPower';
 
 /**
@@ -40,7 +41,7 @@ export function quote(state: GameState, request: QuoteRequest): QuoteResult {
 
 function quotesFor(state: GameState, r: QuoteRequest): Quote[] {
   switch (r.kind) {
-    case 'gpuModels': return GPU_MODEL_IDS.filter((model) => gpuModel(model)!.generation === r.generation).map((model) =>
+    case 'gpuModels': return GPU_MODEL_IDS.filter((model) => gpuModel(model)!.generation === r.generation && gpuReplaceable(state, r.system, r.index, model)).map((model) =>
       toQuote(state, { type: 'installGpu', system: r.system, index: r.index, model }, planInstallGpu(state, r.system, model, r.index)));
     case 'part': return partQuotes(state, r.part);
     case 'switch': return switchQuotes(state, r.sw);
@@ -54,6 +55,12 @@ function quotesFor(state: GameState, r: QuoteRequest): Quote[] {
     case 'routerQueue': return routerQueueQuotes(state, r.unit);
     case 'power': return powerQuotes(state, r.unit);
   }
+}
+
+/** The model picker into an occupied slot lists only cards strictly better than the installed one. */
+function gpuReplaceable(state: GameState, system: SystemId, index: number | null, model: GpuModelId): boolean {
+  const card = index === null ? undefined : state.build.systems[system]?.spec.accels[index];
+  return !card || gpuBetter(card, model);
 }
 
 /** D31: the scope's optional power part (Power control, room or global start control, site generation). */
@@ -192,8 +199,8 @@ export function partQuotes(state: GameState, ref: PartRef): Quote[] {
     const up = planUpgrade(state, ref);
     out.push(toQuote(state, { type: 'upgradePart', part: ref }, up, effectOf(state, ref, up)));
   }
-  for (let g = 0; part.id !== 'gpu' && g < genCount(part.id); g += 1) {
-    if (g === part.gen) continue;
+  // Replace only moves up (user, 25 Oct): generations above the installed one, in catalog order.
+  for (let g = part.gen + 1; part.id !== 'gpu' && g < genCount(part.id); g += 1) {
     if (ladder) { out.push(toQuote(state, { type: 'replacePart', part: ref, generation: g, preserveCapacity: false }, planReplaceLadder(state, ref, g))); continue; }
     // A CPU package and the D31 parts have one replace per generation (no capacity-preserving level).
     for (const preserveCapacity of part.id === 'cpu' || POWER_SLOTS.includes(ref.slot.kind) ? [false] : [false, true]) {
@@ -219,8 +226,8 @@ export function switchQuotes(state: GameState, sw: SwitchRef): Quote[] {
   out.push(withEffect(state, { type: 'addUplink', sw }, planAddUplink(state, sw)));
   const slot: PartSlot = { kind: sw.kind === 'rack' ? 'switch' : 'roomSwitch' };
   const ref: PartRef = { unit: sw, slot };
-  for (let g = 0; g < at.row.baseK.length; g += 1) {
-    if (g !== at.sw.gen) out.push(toQuote(state, { type: 'replacePart', part: ref, generation: g, preserveCapacity: false }, planReplaceLadder(state, ref, g)));
+  for (let g = at.sw.gen + 1; g < at.row.baseK.length; g += 1) {
+    out.push(toQuote(state, { type: 'replacePart', part: ref, generation: g, preserveCapacity: false }, planReplaceLadder(state, ref, g)));
   }
   out.push(toQuote(state, { type: 'setSameSpeed', sw, on: !at.sw.sameSpeed }, planSameSpeed(state, sw, !at.sw.sameSpeed)));
   return out;

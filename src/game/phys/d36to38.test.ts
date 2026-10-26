@@ -30,7 +30,7 @@ describe('D36 power scale', () => {
 
 describe('D38 fixed CPU power before System', () => {
   it('draws the fixed power whatever the clock, then the real model at System', () => {
-    let s = at(['fifoSched', 'dualCore', 'l2Cache']);
+    let s = at([]);
     s = advanceGame(s, 2_000).state;
     expect(s.hot.sys.drawW[0]).toBe(PRE_SYSTEM_CPU_W);
     for (let i = 0; i < 8; i += 1) { const o = applyAction(s, { type: 'upgradePart', part: { unit: { kind: 'system', id: sys }, slot: { kind: 'clock', socket: 0 } } }); if (o.ok) s = o.state; }
@@ -41,9 +41,9 @@ describe('D38 fixed CPU power before System', () => {
 
 describe('D37 RAM comes with System', () => {
   it('adds SDRAM right after the System board, with no RAM research', () => {
-    const before = applyAction(at(['fifoSched', 'dualCore', 'l2Cache']), { type: 'addPart', system: sys, kind: 'ram', generation: 0 });
+    const before = applyAction(at([]), { type: 'addPart', system: sys, kind: 'ram', generation: 0 });
     expect(before.ok).toBe(false);
-    const after = applyAction(at(['fifoSched', 'dualCore', 'l2Cache', 'systemBoard']), { type: 'addPart', system: sys, kind: 'ram', generation: 0 });
+    const after = applyAction(at(['systemBoard']), { type: 'addPart', system: sys, kind: 'ram', generation: 0 });
     expect(after.ok).toBe(true);
   });
 });

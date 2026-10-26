@@ -15,12 +15,12 @@ describe('research roots and tabs (concept C)', () => {
     }
     expect(RESEARCH.filter((d) => derivePart(d) === null).map((d) => d.id)).toEqual([]);
     expect(nodes.filter((n) => n.part === 'structure').map((n) => n.id).sort()).toEqual([
-      'dataCenter', 'hallExpansion', 'intercontinental', 'rack', 'regions', 'room', 'systemBoard', 'zoneExpansion',
+      'dataCenter', 'rack', 'regions', 'room', 'systemBoard',
     ]);
   });
 
   it.each([
-    ['smt', 'cores', 'cpu'],
+    ['workStealing', 'cores', 'cpu'],
     ['stacked3d', 'cache', 'cpu'], ['mlfq', 'queue', 'cpu'], ['ddr5', 'ram', 'system'], ['gpuGen9', 'gpu', 'system'],
     ['closedLoop2', 'roomCooling', 'room'], ['bbSubsea', 'backbone', 'global'],
     ['l3Slices', 'cache', 'cpu'], ['edramL3', 'cache', 'cpu'],

@@ -161,13 +161,13 @@ Every site sits in a region. A region sets the site's energy price and outside a
 | `us-east` (home) | Americas | start | 70 | 0.010 |
 | `us-west` | Americas | `regions` | 75 | 0.012 |
 | `eu-west` | Europe | `regions` | 60 | 0.014 |
-| `eu-north` | Europe | `intercontinental` | 45 | 0.009 |
-| `sa-east` | Americas | `intercontinental` | 85 | 0.008 |
-| `af-south` | Africa | `intercontinental` | 90 | 0.007 |
+| `eu-north` | Europe | `regions` | 45 | 0.009 |
+| `sa-east` | Americas | `regions` | 85 | 0.008 |
+| `af-south` | Africa | `regions` | 90 | 0.007 |
 | `ap-southeast` | Asia-Pacific | `regions` | 88 | 0.011 |
-| `ap-northeast` | Asia-Pacific | `intercontinental` | 65 | 0.016 |
+| `ap-northeast` | Asia-Pacific | `regions` | 65 | 0.016 |
 
-The `regions` ceiling (Appendix C) counts open regions, home included: 1, then 4 with `regions`, then 8 with `intercontinental`. Each region holds at most one site. Before Global, the player's hardware is in `us-east`.
+Home is open from the start; `regions` opens all 8 regions, and each site is bought (D39: no `intercontinental` gate). Each region holds at most one site. Before Global, the player's hardware is in `us-east`.
 
 ## 4. Rounds
 
@@ -302,7 +302,7 @@ While a round runs, every online/offline change takes `bootSeconds` (10 s at bas
 |---|---|---|
 | Level upgrade of any part; port speed step; port count step; uplink step | hot | none |
 | Strategy, filter, router queue level (§12.7), setpoint, toggle, C-state limit, DVFS or turbo switch | hot | none (program D1.6) |
-| Replace a part with another generation | cold | the unit that owns it |
+| Replace a part with a newer generation (never the same or a lower one, D39) | cold | the unit that owns it |
 | Add a part into an empty slot (socket, core, RAM module, GPU, NPU, drive, scheduler, L2, L3) | hot | none |
 | Add a second UPS; remove a part | cold | the owning unit |
 | Scrap a system, storage node or rack | cold | that unit; removal is permanent |
@@ -441,7 +441,7 @@ Program D10. The market is an **endless, ordered queue** per round. Nothing arri
 
 | Part | Count | Notes |
 |---|---|---|
-| board | 1 | `general`: up to 4 sockets (`cpuSockets` ceiling), up to 4 RAM modules (`ramSlots` ceiling, at most 4), up to 2 GPUs/NPUs (`gpuSlots` ceiling, at most 2). `accelerator` (needs `accelSystem`): 1–2 sockets, up to 8 RAM modules, up to 8 GPUs/NPUs, no DIMM penalty. Changing board type is a cold change. |
+| board | 1 | `general`: up to 4 sockets (`cpuSockets` ceiling), up to 4 RAM modules (`ramSlots` ceiling, at most 4), up to 2 GPUs/NPUs (`gpuSlots` ceiling, at most 2). `accelerator` (with `systemBoard`, D39): 1–2 sockets, up to 8 RAM modules, up to 8 GPUs/NPUs, no DIMM penalty. Changing board type is a cold change. |
 | CPU package (`cpu`) | 1 per socket | **All CPUs are identical** (program D7.3): an added CPU copies CPU 1's parts, generations and levels, and every CPU action (upgrade, replace, add a core, add L2 or L3) applies to all CPUs at once. |
 | core | 1 to `coreSites` per CPU, at most 32 | Each core has its own generation and level (mirrored across CPUs). |
 | clock | 1 per socket | Shared by that socket's cores. |
@@ -457,7 +457,7 @@ Program D10. The market is an **endless, ordered queue** per round. Nothing arri
 
 | Capability | Formula |
 |---|---|
-| hardware threads | `Σ cores × threadsPerCore` (1, or 2 with `smt`) |
+| hardware threads | `Σ cores` (one thread per core; D39 removes SMT) |
 | core rate | `clockHz × clockFactor × η_cfg × e(T)` ops/s (D34: no lanes; a core runs one task thread at a time). Before System the CPU draws a fixed 10 W of sim power (D38); every view shows watts × `POWER_SCALE` (1e-6, D36). `e(T)` is §10.4 (1 before Rack). `clockFactor` is §9.3's product of DVFS, turbo, thermal throttle and power-cap factors (1 by default). |
 | `η_cfg` | `socketFactor(sockets) × dimmFactor(RAM modules)` (program D7.5). `socketFactor` 1, 2, 3, 4 CPUs → 1.00, 0.92, 0.85, 0.78 **(s)**. `dimmFactor` 0–2 modules → 1.00, 3 → 0.95, 4 → 0.90 **(s)**; an `accelerator` board has `dimmFactor = 1` up to 8. The system plate shows `η_cfg`. |
 | `K` (concurrency) | scheduler `K`; 1 with no scheduler |
@@ -525,8 +525,7 @@ The strategy picks which eligible queued task starts. A task that does not fit i
 **Threads per shard** (D25.3). A starting shard of `u` units wants `want = max(1, floor(u / g))` threads, where `g` is the family grain. This replaces the family's fixed `threads`: a coarse Compute shard runs on one core until it is thousands of units long, while a fine Parallel shard fills every free core.
 
 **Thread assignment** (all strategies except `timeSlice`). A starting shard takes `min(free hardware threads, want)` threads:
-1. one thread on each idle core first, ties socket then core index;
-2. then second threads on busy cores (`smt` only).
+1. one thread on each idle core, ties socket then core index (one thread per core, D39).
 
 With `numaAware`, if its threads fit on one socket's free threads, it takes them all from the socket with the most free threads (ties: socket 1).
 
@@ -781,7 +780,7 @@ They order one choice: which task in the system's queue starts next. The market 
 
 | ID (node) | Order | Testable effect |
 |---|---|---|
-| `fifo` (`fifoSched`) | Earliest take first. | Completion order equals take order for equal tasks. |
+| `fifo` (built into every scheduler, D39) | Earliest take first. | Completion order equals take order for equal tasks. |
 | `sjf` (`sjf`) | Smallest `est` first. | Slots free sooner, so the head is taken sooner in a mixed queue. A large queued task can wait behind later small ones. |
 | `timeSlice` (`timeSlice`) | Earliest take first; `Keff = 2K`; compute shared equally (§6.6); no chaining. | Twice the running slots, so the head is taken sooner; each task finishes later; tasks shorter than a tick lose the rest of it. |
 | `priority` (`priorityQ`) | Highest `payout / est` first. | More Credits per second from the running set; a slow-paying task can wait long in the queue. |
@@ -793,7 +792,6 @@ They order one choice: which task in the system's queue starts next. The market 
 |---|---|---|
 | `workStealing` | Free threads join running shards holding fewer than `floor(units / g)` threads. | §6.5 |
 | `numaAware` | Keep a task on one socket when it fits. | §6.5 |
-| `smt` | Two threads per core at `smtShare` each. | §6.2, §6.5 |
 | `dma` | No thread held during the RAM and disk parts of `mem` stages; `Keff = K`. | §6.5 |
 | `hotPages` | Hot data stays in fast tiers: the disk part touches `M × f_d²` bits (D26). | §6.6 |
 | `unifiedMemory` | VRAM pools with RAM and disk; overflow runs at those tiers' rates (D26.4). | §6.3, §6.6 |
@@ -1183,18 +1181,18 @@ Ceilings come from research (Appendix C). Starting values:
 
 | Ceiling | Start | Limits |
 |---|---|---|
-| `coreSites` | 1 | cores per CPU; at most 32 (program D7.2) |
-| `threadsPerCore` | 1 | hardware threads per core |
-| `cpuSockets` | 1 | CPUs per system: 2 (`dualSocket`), then 4 (`quadSocket`) (program D7.3); an `accelerator` board allows at most 2 |
-| `ramSlots` | 1 | RAM modules on a `general` board, at most 4; an `accelerator` board has 8 |
-| `gpuSlots` | 1 | GPUs and NPUs on a `general` board, at most 2 (`dualGpu`); an `accelerator` board has 8 |
-| `driveSlots` | 1 | drives |
-| `rackPorts` | 4 | rack switch ports |
-| `roomPorts` | 4 | room switch ports |
-| `uplinks` | 1 | uplinks per switch |
-| `roomRows` | 2 | rows per zone |
-| `siteZones` | 2 | zones per site |
-| `regions` | 1 | open regions |
+| `coreSites` | 32 | cores per CPU, each bought (program D7.2, D39) |
+| `threadsPerCore` | 1 | hardware threads per core; fixed at 1 (D39) |
+| `cpuSockets` | 1 | CPUs per system: 4 with `systemBoard` (program D7.3, D39); an `accelerator` board allows at most 2 |
+| `ramSlots` | 1 | RAM modules on a `general` board: 4 with `systemBoard`; an `accelerator` board has 8 |
+| `gpuSlots` | 1 | GPUs and NPUs on a `general` board: 2 with `systemBoard`; an `accelerator` board has 8 |
+| `driveSlots` | 1 | drives: 4 with `systemBoard` |
+| `rackPorts` | 12 | rack switch ports, each bought (D39) |
+| `roomPorts` | 24 | room switch ports, each bought (D39) |
+| `uplinks` | 4 | uplinks per switch, each bought (D39) |
+| `roomRows` | 3 | rows per zone; the third is bought (D39) |
+| `siteZones` | 3 | zones per site; the third is bought (D39) |
+| `regions` | 8 | regions; all open with `regions`, each site bought (D39) |
 | `researchQueue` | 1 | projects active plus queued |
 
 `"archCap"` means the cap in `docs/architecture.md`.
@@ -1228,6 +1226,7 @@ Special prices:
 
 - **Upgrade** keeps the generation and adds one level. It is hot.
 - **Replace** installs the newest researched generation at level 1. It is cold (§4.5). The plate also offers a **capacity-preserving replace**: the lowest native level whose primary capacity is at least the current one, priced as install plus every intervening upgrade.
+- **Replace only moves up** (D39, user bug). A replace offers, and the action accepts, only generations above the installed one, in catalog order; this covers every part, the switch, Power control, the start controllers and site generation (solar, wind, fuel cell, own plant). A replacement GPU must be a strictly better model natively: more ops/s and no less VRAM (hot pushes are not a tier), so a cross-series sidegrade is not offered.
 - **Replace CPU** on the System board replaces, in one cold change, every package, core, clock and cache of the system with the newest researched CPU generation: cores carried over one for one and caches at the lowest level that preserves their bits, the clock at L1. Its price is the sum, with each core at the new generation's core price (D34: no extra-core surcharge on a replace).
 - CPU and RAM quotes preview throughput, full-use electrical draw and normalized energy ratio. RAM replacement preserves capacity bits and shows bandwidth separately. Payback uses the change in net income at the same workload and tariff. If that change is non-positive, show **No payback at this load**. If the part's operating cost exceeds its output, separately show **Costs more to run than it produces**. Neither warning disables an upgrade. Fab research must be affordable on a profitable prior-era fleet before loss-making overclocks are needed. See `hardware-progression.md` §§5–6.
 - A replacement that cannot hold what the part holds is not offered at that level; the plate names the shortfall.
@@ -1316,7 +1315,7 @@ A configuration is a named, serializable description of a unit. It never stores 
 Tapping an empty server slot, the next free rack slot, the Zone item or the Site item opens the add-new plate. Options:
 
 1. **Barebones** (always available).
-   - Accelerator system (with `accelSystem`): as a general barebones system on the `accelerator` board, with one CPU.
+   - Accelerator system (with `systemBoard`, D39): as a general barebones system on the `accelerator` board, with one CPU.
    - System, at any CPU tier `g` whose chip generation is researched: one socket with package g, one core g at L1, clock g L1, L1 g L1, and a PSU: the newest researched PSU generation at the lowest level whose capacity covers the system's full-load watts (its top level if none does). No scheduler, RAM, GPU or storage.
    - Storage node (with `sharedStorage`): chassis, one drive of the newest researched generation at L1, PSU as above.
    - Rack: frame; cooler gen 0 L1; PDU gen 0 L1; load balancer gen 0 L1 on `firstFit` with a 1-slot queue; switch gen 0 with 4 ports and 1 uplink at 1 kHz. No servers.
@@ -1511,13 +1510,13 @@ Rate parts draw by §9.1 with the `wPerUnit` listed; "idle" is for non-rate part
 | `core` | Hz, kHz, MHz, GHz core | start, `fabKhz`, `fabMhz`, `fabGhz` | core | lanes 1, 2, 4, 8 | — | hardware energy ratio §9.1; native 10, 6, 3, 2 | 6000, 1.25e5, 4.3e8, 1.9e11 | 10, 1.2e5, 1.5e9, 7.7e12 |
 | `clock` | Hz, kHz, MHz, GHz oscillator | start, `fabKhz`, `fabMhz`, `fabGhz` | clock, 1.5×; L1–36 every generation | Hz 1, 1e3, 1e6, 1e9 | — | idle 0.1, 100, 1e5, 1e8 (core carries the load) | 20, 2e5, 8.6e8, 3.7e11 | 3, 1.5e4, 9e7, 2.4e11 per lane driven; 1.7× per level |
 | `l1` | L1 by tier | start, `fabKhz`, `fabMhz`, `fabGhz` | flow | bits 1, 1024, 2^20, 2^30 | — | idle 0.1, 100, 1e5, 1e8 | 20, 1.25e5, 4.3e8, 1.9e11 | 3, 1.2e5, 1.5e9, 7.7e12 |
-| `l2` | L2 by tier | `l2Cache`, `fabKhz`, `fabMhz`, `fabGhz` | flow | bits 8, 8192, 2^23, 2^33 | — | idle 2 × `l1` | 4e4, 5e5, 8.6e8, 3.7e11 | 12, 1.2e5, 1.5e9, 7.7e12 |
-| `l3` | L3 by tier; gen 4 Stacked L3 | `l3Cache`, `fabKhz`, `fabMhz`, `fabGhz`, `stacked3d` | flow (+`l3LevelBonus`) | bits 64, 65536, 2^26, 2^36, 2^39 (gen 4: 8× gen 3) | — | idle 6 × `l1` (gen 4: gen 3 watts) | 2e5, 7e5, 1.7e9, 7.4e11, 4e13 | 12, 1.2e5, 1.5e9, 7.7e12, 7.7e12 |
-| `scheduler` | Run queue, Multilevel, Work queue, Cluster runtime | `fifoSched`, `fabKhz`, `fabMhz`, `fabGhz` | linear, L 1–8 for every g | `K` 1, 2, 3, 4 (≤ 32) | `Q` 2, 4, 4, 4 (≤ 32, program D7.2) | idle 0.1, 100, 1e5, 1e8 | 1000, 3e5, 4.3e8, 1.9e11 | 100, 1.2e5, 1.5e9, 7.7e12 |
+| `l2` | L2 by tier | start (D39), `fabKhz`, `fabMhz`, `fabGhz` | flow | bits 8, 8192, 2^23, 2^33 | — | idle 2 × `l1` | 4e4, 5e5, 8.6e8, 3.7e11 | 12, 1.2e5, 1.5e9, 7.7e12 |
+| `l3` | L3 by tier; gen 4 Stacked L3 | start (D39), `fabKhz`, `fabMhz`, `fabGhz`, `stacked3d` | flow (+`l3LevelBonus`) | bits 64, 65536, 2^26, 2^36, 2^39 (gen 4: 8× gen 3) | — | idle 6 × `l1` (gen 4: gen 3 watts) | 2e5, 7e5, 1.7e9, 7.4e11, 4e13 | 12, 1.2e5, 1.5e9, 7.7e12, 7.7e12 |
+| `scheduler` | Run queue, Multilevel, Work queue, Cluster runtime | start (D39), `fabKhz`, `fabMhz`, `fabGhz` | linear, L 1–8 for every g | `K` 1, 2, 3, 4 (≤ 32) | `Q` 2, 4, 4, 4 (≤ 32, program D7.2) | idle 0.1, 100, 1e5, 1e8 | 1000, 3e5, 4.3e8, 1.9e11 | 100, 1.2e5, 1.5e9, 7.7e12 |
 | `ram` | SDRAM, DDR, DDR2, DDR3, DDR4, DDR5 (per module) | `memController`, `ddr`, `ddr2`, `ddr3`, `ddr4`, `ddr5` | RAM ladder §12.1; bandwidth 1.5×; L1–36, registered ECC capacity ×2 | bits 64, 128, 2^20, 2^30, 2^32, 2^38 | bit/s 16, 32, 3.2e4, 6.4e7, 2.56e8, 1.28e11 | hardware energy ratio §9.1; native 10, 10, 6, 3, 3, 2 | 3e5, 4.5e5, 5e6, 3e10, 5e10, 5e13 | 12, 12, 1.2e5, 1.5e9, 1.5e9, 7.7e12; 1.7× per level |
-| `gpu` | 216 GSMT models, displayed generations 1..9 | `gpuGen1` through `gpuGen9` | model + 0..5 hot upgrades | cores × actual clock | model VRAM × hot upgrades × `vramMult` | model coefficient and split idle, §9.1 | exact catalog price, §12.6 | `ceil(P * 3^u / 10)` |
-| `npu` | Four explicit legacy rows, g0..3 | `npu`; plus `gpuGen2` / `tensorCores` / `matrixGpu` for g1/2/3 | flow, L1..11+g | ops/s 32, 64000, 128000000, 256000000000 | VRAM bits 64, 524288, 1073741824, 549755813888, × `vramMult` | 0.125 W per op/s, legacy curve | 3000000, 7500000, 45000000000, 75000000000000 | 12, 120000, 1500000000, 7700000000000 |
-| `storage` | HDD, SSD, NVMe, SCM (per drive): the disk tier (D26) | `storageCtl`, `ssd`, `nvme`, `scm` | flow | bits 2048, 2^24, 2^34, 2^44 | IO bit/s 1, 2,000, 1.6e7, 6.4e10 (D26.2 re-base; were 16, 3.2e4, 6.4e7, 1.28e11) | drive 1 W per bit/s | 2e6, 5e6, 3e10, 5e13 | 12, 1.2e5, 1.5e9, 7.7e12 |
+| `gpu` | 216 GSMT models, displayed generations 1..9 | `systemBoard`, then `gpuGen2` through `gpuGen9` | model + 0..5 hot upgrades | cores × actual clock | model VRAM × hot upgrades × `vramMult` | model coefficient and split idle, §9.1 | exact catalog price, §12.6 | `ceil(P * 3^u / 10)` |
+| `npu` | Four explicit legacy rows, g0..3 | `systemBoard`; plus `gpuGen2` / `tensorCores` / `matrixGpu` for g1/2/3 | flow, L1..11+g | ops/s 32, 64000, 128000000, 256000000000 | VRAM bits 64, 524288, 1073741824, 549755813888, × `vramMult` | 0.125 W per op/s, legacy curve | 3000000, 7500000, 45000000000, 75000000000000 | 12, 120000, 1500000000, 7700000000000 |
+| `storage` | HDD, SSD, NVMe, SCM (per drive): the disk tier (D26) | `systemBoard`, `ssd`, `nvme`, `scm` | flow | bits 2048, 2^24, 2^34, 2^44 | IO bit/s 1, 2,000, 1.6e7, 6.4e10 (D26.2 re-base; were 16, 3.2e4, 6.4e7, 1.28e11) | drive 1 W per bit/s | 2e6, 5e6, 3e10, 5e13 | 12, 1.2e5, 1.5e9, 7.7e12 |
 | `psu` | Bench, 80 Plus, Bronze, Gold, Platinum, Titanium | `systemBoard`, `psu80`, `psuBronze`, `psuGold`, `psuPlatinum`, `psuTitanium` | flow | W 256, 1024, 1e5, 4e5, 2e8, 4e11 | — | supply (loss only) | 1000, 1e5, 1e6, 3e6, 1e10, 1e13 | 12, 12, 1.2e5, 1.2e5, 1.5e9, 7.7e12 |
 
 - GPU tensor technology grants factor 4 to displayed generations 4+ with `tensorCores`, or factor 8 to generations 6+ with `matrixGpu`, replacing 4. NPU tensor factors are its own fixed 1, 1, 4, 8. No new NPU generations or GPU parity follow from the nine-model-generation ladder.
@@ -1736,8 +1735,8 @@ type ResearchEffect =
 |---|---|---|---|
 | `workStealing` | §6.5 | `qos` | §7.4 |
 | `numaAware` | §6.5 | `numaAware` | informational |
-| `smt` | §6.2, §6.5 | `linkScale` | informational; values are in A.3 |
-| `socketSpanPenalty` | §6.6 | `subseaLatency` | §7.2 |
+| — | — | `linkScale` | informational; values are in A.3 |
+| — | — | `subseaLatency` | §7.2 |
 | `dma` | §6.5 | `coreIdle` | §9.3 |
 | `prefetch` | §6.6 | `packageIdle` | §9.3 |
 | `multiChannel` | §6.2 | `s3Sleep` | §9.3 |

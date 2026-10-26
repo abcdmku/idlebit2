@@ -19,7 +19,8 @@ export const SAVE_SCHEMA = 'bitrouge-v3' as const;
 // Pre-live reset: v14 is D33 (stall end): the last met tick in hot.g.
 // Pre-live reset: v15 is D34 (one Multi-core node, no lanes): core levels and lane research are gone.
 // Pre-live reset: v16 binds running records to hardware threads (rec.thread0): cores keep their tasks.
-export const SAVE_VERSION = 16;
+// Pre-live reset: v17 is D39 (research never unlocks a part type or count; 141 nodes).
+export const SAVE_VERSION = 17;
 
 export interface SaveEnvelope {
   readonly schema: typeof SAVE_SCHEMA;

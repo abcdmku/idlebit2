@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { POOL_DOMAIN, selectResearchTree, type Amount, type GpuGeneration, type GpuStats, type PartView, type Quote, type ResearchTreeView, type SystemId, type TaskView } from '../../game';
+import { useMemo, useState } from 'react';
+import { POOL_DOMAIN, selectResearchTree, type Amount, type GpuGeneration, type GpuStats, type PartView, type GpuSeries, type GpuTier, type Quote, type QuoteResult, type QuoteRequest, type ResearchNodeView, type ResearchTreeView, type SystemId, type TaskView } from '../../game';
 import { useGameSelector, useQuote, useShell } from '../storeHooks';
 import { projectKey } from '../research/model';
 import { familyName } from '../hooks/feedModel';
@@ -27,11 +27,19 @@ export function GpuPlate({ system, index, installed, ...props }: GpuPlateProps) 
   const walletKey = useGameSelector(s => `${s.epoch}|${s.hud.credits}|${s.hud.data}|${s.research.active}|${s.research.queued}`, Object.is, 500);
   void walletKey;
   const tree = selectResearchTree(shell.store.getState());
-  const cap = [...GPU_GENERATIONS].reverse().find(g => gpuResearch(tree.nodes, g)?.state === 'done') ?? null;
-  const [selection, setSelection] = useState<GpuSelection>(() => ({
-    generation: installed?.gpu?.generation ?? cap ?? 1,
-    series: installed?.gpu?.series ?? 3, tier: installed?.gpu?.tier ?? 30,
-  }));
+  const cap = [...GPU_GENERATIONS].reverse().find(g => generationResearched(tree.nodes, g)) ?? null;
+  const card = installed?.gpu ?? null;
+  // D39: an occupied slot is only offered strictly better cards. The plate opens on the first one.
+  const first = useMemo(() => card && index !== null ? firstOffer(shell.quote, system, index, card.generation) : null,
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- the installed model and wallet are the inputs
+    [shell, system, index, card?.model, walletKey]);
+  // A pick belongs to the card it was made against; after a replace the plate reopens on the next offer.
+  const [pick, setPick] = useState<{ readonly model: string | undefined; readonly selection: GpuSelection } | null>(null);
+  const picked = pick && pick.model === card?.model ? pick.selection : null;
+  const setSelection = (next: GpuSelection) => setPick({ model: card?.model, selection: next });
+  const selection: GpuSelection = picked ?? first ?? {
+    generation: card?.generation ?? cap ?? 1, series: card?.series ?? 3, tier: card?.tier ?? 30,
+  };
   const models = useQuote({ kind: 'gpuModels', system, index, generation: selection.generation });
   const part = useQuote(index === null ? null : { kind: 'part', part: { unit: { kind: 'system', id: system }, slot: { kind: 'gpu', index } } });
   const code = `${selection.generation}${selection.series}${selection.tier}`;
@@ -39,7 +47,8 @@ export function GpuPlate({ system, index, installed, ...props }: GpuPlateProps) 
   const upgrade = part?.quotes.find(q => q.action.type === 'upgradePart' && q.gpu);
   const credits = shell.store.getSnapshot().hud.credits;
   return <GpuModelPlate {...props} installed={installed} system={system} index={index} selection={selection} onSelect={setSelection}
-    selected={selected} upgrade={upgrade} tree={tree} credits={credits} data={shell.store.getSnapshot().hud.data} cap={cap} />;
+    selected={selected} upgrade={upgrade} tree={tree} credits={credits} data={shell.store.getSnapshot().hud.data} cap={cap}
+    best={!!card && index !== null && first === null} />;
 }
 
 export interface GpuModelPlateProps extends GpuPlateProps {
@@ -51,9 +60,27 @@ export interface GpuModelPlateProps extends GpuPlateProps {
   credits: Amount;
   data: Amount;
   cap: GpuGeneration | null;
+  /** The installed card has no strictly better model on offer. */
+  best?: boolean;
 }
 
-export function GpuModelPlate({ system, index, installed, tasks = [], selection: s, onSelect, selected: q, upgrade, tree, credits, data, cap,
+/** Gen 1 has no project of its own (D39: it needs System); every later generation needs its research. */
+function generationResearched(nodes: readonly ResearchNodeView[], g: GpuGeneration): boolean {
+  const node = gpuResearch(nodes, g);
+  return node ? node.state === 'done' : g === 1;
+}
+
+/** The first model the sim offers for this slot: from the installed generation up, then below; unlocked first. */
+function firstOffer(quote: (r: QuoteRequest) => QuoteResult, system: SystemId, index: number, from: GpuGeneration): GpuSelection | null {
+  const order = [...GPU_GENERATIONS.filter(g => g >= from), ...GPU_GENERATIONS.filter(g => g < from)];
+  const offers = order.flatMap(generation => quote({ kind: 'gpuModels', system, index, generation }).quotes);
+  const q = offers.find(o => !o.locked) ?? offers[0];
+  if (!q || q.action.type !== 'installGpu') return null;
+  const code = q.action.model;
+  return { generation: Number(code[0]) as GpuGeneration, series: Number(code[1]) as GpuSeries, tier: Number(code.slice(2)) as GpuTier };
+}
+
+export function GpuModelPlate({ system, index, installed, tasks = [], selection: s, onSelect, selected: q, upgrade, tree, credits, data, cap, best = false,
   onAction, onResearch, ...frame }: GpuModelPlateProps) {
   const L = useLayout();
   const before = q?.gpu?.before ?? installed?.gpu ?? null, after = q?.gpu?.after;
@@ -66,7 +93,8 @@ export function GpuModelPlate({ system, index, installed, tasks = [], selection:
   const hot = upgrade?.gpu?.after;
   const held = installed?.vramUsedBits ?? 0;
   const assigned = index === null ? [] : tasks.filter(t => t.accelDomain === index || t.accelDomain === POOL_DOMAIN);
-  const note = q?.locked?.text ?? (q && !q.affordable ? 'Needs more Credits' : q?.cold
+  const notOffered = !q && index !== null && !!installed?.gpu;
+  const note = best ? 'Your card is the best available' : notOffered ? 'Not an upgrade' : q?.locked?.text ?? (q && !q.affordable ? 'Needs more Credits' : q?.cold
     ? q.downtimeMs > 0 ? `${span(q.downtimeMs / 1000)} offline. Running work is lost.${index === null ? '' : ' Old card is scrapped.'}`
       : `No downtime between rounds.${index === null ? '' : ' Old card is scrapped.'}`
     : index === null ? 'Installs this preconfigured model.' : 'No downtime. Old card is scrapped.');
@@ -77,7 +105,7 @@ export function GpuModelPlate({ system, index, installed, tasks = [], selection:
         <div className="gpu-configure">
           <label className="gpu-generation"><span>Generation</span><select aria-label="GPU generation" value={s.generation}
             onChange={e => onSelect({ ...s, generation: Number(e.target.value) as GpuGeneration })}>
-            {GPU_GENERATIONS.map(g => <option key={g} value={g}>Gen {g} · {GPU_CLASSES[g - 1]}{gpuResearch(tree.nodes, g)?.state === 'done' ? '' : ' · locked'}</option>)}
+            {GPU_GENERATIONS.map(g => <option key={g} value={g}>Gen {g} · {GPU_CLASSES[g - 1]}{generationResearched(tree.nodes, g) ? '' : ' · locked'}</option>)}
           </select></label>
           <div className="gpu-choice-label">Series</div>
           <div className="gpu-options gpu-series" role="group" aria-label="GPU series">
@@ -97,12 +125,12 @@ export function GpuModelPlate({ system, index, installed, tasks = [], selection:
           <div className="gpu-model"><GpuCard /><div><b>{code} · {SERIES_NAMES[s.series]}</b><span>Gen {s.generation} · {GPU_CLASSES[s.generation - 1]} class</span></div></div>
           <GpuComparison before={before} after={after} code={code} installedLabel={installed?.kind === 'npu' ? `NPU Gen ${installed.generation + 1}` : undefined} />
           <GpuPower power={q?.gpuPower} />
-          <button type="button" className="key gpu-buy" disabled={!q || !!q.locked || !q.affordable} onClick={() => q && onAction(q.action)}>
-            <span>{index === null ? 'Buy' : 'Replace with'} {code}</span><span className="gpu-price">{q ? `${exactAmount(q.cost)} Cr` : 'Loading quote'}</span>
-          </button>
-          <p className={`gpu-note${q?.locked || q && !q.affordable ? ' warn' : ''}`} aria-live="polite">{note}</p>
+          {!best && <button type="button" className="key gpu-buy" disabled={!q || !!q.locked || !q.affordable} onClick={() => q && onAction(q.action)}>
+            <span>{index === null ? 'Buy' : 'Replace with'} {code}</span><span className="gpu-price">{q ? `${exactAmount(q.cost)} Cr` : notOffered ? '' : 'Loading quote'}</span>
+          </button>}
+          <p className={`gpu-note${q?.locked || q && !q.affordable || notOffered && !best ? ' warn' : ''}`} aria-live="polite">{note}</p>
           <button type="button" className="gpu-research-link" disabled={!selectedResearch} onClick={() => selectedResearch && onResearch?.(selectedResearch)}>
-            {selectedResearch ? 'Open required research' : q ? 'Selected generation researched' : 'Waiting for quote'}
+            {selectedResearch ? 'Open required research' : q ? 'Selected generation researched' : best ? 'Nothing better to buy' : notOffered ? 'Pick a better model' : 'Waiting for quote'}
           </button>
         </div>
       </div>

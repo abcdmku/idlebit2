@@ -24,7 +24,7 @@ function seeded(linkResearch = false): GameState {
   const base = buildState({ sites: 1, zonesPerSite: 1, racksPerZone: 1, serversPerRack: 1, round: 'running',
     unlocks: 'max', credits: '1000000000000', data: '1000000000000', system: (id, rack, slot) => {
       const s = barebonesSystem(id, rack, slot);
-      return { ...s, spec: { ...s.spec, board: 'accelerator', cpu: { ...s.spec.cpu!, cores: Array.from({ length: 4 }, () => ({ gen: 0, level: 1 })) },
+      return { ...s, spec: { ...s.spec, board: 'accelerator', cpu: { ...s.spec.cpu!, cores: Array.from({ length: 8 }, () => ({ gen: 0, level: 1 })) }, // 8 threads: one per core (D39, no SMT)
         ram: [{ gen: 0, level: 1, ecc: true }], drives: [{ gen: 0, level: 1 }], scheduler: { gen: 1, level: 3, strategy: 'fifo' },
         psu: { gen: 3, level: 1, capped: false }, accels: [
           { kind: 'gpu', model: '1330', upgrades: 0 }, { kind: 'gpu', model: '1550', upgrades: 0 }, { kind: 'npu', gen: 0, level: 1 },

@@ -43,7 +43,9 @@ export function planPowerPart(state: GameState, ref: PartRef, g: number): Plan {
   const row = PARTS[id];
   const label = partName(id, g);
   if (!Number.isInteger(g) || g < 0 || g >= row.base.length) return fail('invalid', 'No such generation', label);
-  if (readPart(state.build, ref)?.gen === g) return fail('invalid', 'Same generation', label);
+  // An installed part is only replaced by a newer generation (user, 25 Oct); an empty slot takes any.
+  const have = readPart(state.build, ref);
+  if (have && g <= have.gen) return fail('invalid', 'Only a newer generation', label);
   const price = installPrice(row, g);
   const lock = genLock(state.research.unlocks, id, g);
   if (lock) return locked(lock, label, price);

@@ -68,7 +68,7 @@ describe('research tree sync with docs/research.md', () => {
   if (process.env.WRITE_TREE === '1') {
     writeFileSync(DATA_FILE, dataSource);
   }
-  it('finds 164 nodes in the appendix', () => expect(nodeLines.length).toBe(164));
+  it('finds 141 nodes in the appendix', () => expect(nodeLines.length).toBe(141));
   it('has an effect line for every node', () => {
     const ids = nodeLines.map((line) => line.match(/n\("([^"]+)"/)![1]!);
     expect(ids.filter((id) => !effectText.has(id))).toEqual([]);

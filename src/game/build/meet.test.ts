@@ -50,13 +50,13 @@ describe('meet quote', () => {
     expect(up.action).toEqual({ type: 'upgradePartTo', part: l1, level: 4 });
     expect(up.locked).toBeNull();
     expect(up.label).toBe('Hz L1 · L1 → L4');
-    // L2 is the other cache line; before l2Cache it is locked with that research.
+    // L2 is the other cache line, buyable from the start (D39).
     const l2 = lines.find((q) => q.action.type === 'addPart')!;
-    expect(l2.locked).toMatchObject({ code: 'research', node: 'l2Cache' });
+    expect(l2.locked).toBeNull();
   });
 
-  it('a cache gap past the L1 top: a replace that needs the next fab, and L2 once researched', () => {
-    const s = boot('1000000000', ['l2Cache']);
+  it('a cache gap past the L1 top: a replace that needs the next fab, and L2', () => {
+    const s = boot('1000000000');
     const lines = quote(s, { kind: 'meet', system: sys, need: { cacheBits: 1e6 } }).quotes;
     const replace = lines.find((q) => q.action.type === 'replacePart')!;
     expect(replace.locked).toMatchObject({ code: 'research', node: 'fabKhz' });

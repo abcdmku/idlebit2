@@ -20,7 +20,8 @@ export type Continent = 'americas' | 'europe' | 'africa' | 'asiaPacific';
 export interface RegionDef {
   readonly id: RegionId;
   readonly continent: Continent;
-  readonly opensWith: 'start' | 'regions' | 'intercontinental';
+  /** D39: every other region opens with `regions`; each site is then bought. */
+  readonly opensWith: 'start' | 'regions';
   readonly outsideF: number;
   /** Credits per joule, float64 (spec §3.3). */
   readonly energyPrice: number;
@@ -146,8 +147,8 @@ export type CeilingId =
 /** "net" = every network scope the player has opened. */
 export type Scope = 'system' | 'rack' | 'room' | 'site' | 'global' | 'net';
 export const RULE_IDS = [
-  'workStealing', 'numaAware', 'smt', 'socketSpanPenalty', 'dma', 'prefetch', 'multiChannel', 'ecc',
-  'hotPages', 'tensorRate', 'gpuLink', 'npuTensorOnly', 'vramPerLevel', 'vramScale', 'ramWatts', 'ncq',
+  'workStealing', 'numaAware', 'dma', 'prefetch', 'multiChannel', 'ecc',
+  'hotPages', 'tensorRate', 'gpuLink', 'vramPerLevel', 'vramScale', 'ramWatts', 'ncq',
   'sharedStorage', 'cutThrough', 'qos', 'routingCapacity', 'linkScale', 'subseaLatency',
   'coreIdle', 'packageIdle', 's3Sleep', 'dvfs', 'turbo', 'powerCap', 'loadShed', 'lossFraction',
   'supplyCapacity', 'dualFeed', 'upsRideThrough', 'thermalThrottle', 'rackSetpoint', 'rackWater', 'roomLeak',

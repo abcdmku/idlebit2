@@ -27,21 +27,23 @@ const pending = (state: GameState) => selectContextualResearchTree(state).nodes.
 const ids = (state: GameState) => pending(state).map(n => n.id);
 
 describe('contextual research discovery', () => {
-  it('starts with CPU projects and the System frontier, with real prerequisite names', () => {
+  it('starts with CPU improvements and the System frontier; bought hardware reveals its improvements (D39)', () => {
     const state = createInitialState(42), tree = selectContextualResearchTree(state);
-    expect(ids(state)).toEqual(expect.arrayContaining(['fifoSched', 'cstateC1', 'dualCore', 'l2Cache', 'systemBoard']));
+    expect(ids(state)).toEqual(expect.arrayContaining(['cstateC1', 'systemBoard']));
     expect(pending(state).every(n => n.level === 'chip' || n.id === 'systemBoard')).toBe(true);
     expect(pending(state).some(n => ['accel', 'storage', 'network', 'cooling'].includes(n.category))).toBe(false);
-    for (const id of ['rack', 'room', 'dataCenter', 'fabMhz']) expect(ids(state)).not.toContain(id);
-    const next = tree.nodes.find(n => n.id === 'systemBoard')!;
-    expect(next).toMatchObject({ state: 'locked', lockedBy: 'dualCore' });
-    expect(tree.nodes.find(n => n.id === next.lockedBy)?.name).toBe('Multi-core');
+    for (const id of ['rack', 'room', 'dataCenter', 'fabMhz', 'sjf', 'workStealing']) expect(ids(state)).not.toContain(id);
+    expect(tree.nodes.find(n => n.id === 'systemBoard')).toMatchObject({ state: 'available', requires: [] });
+    // A bought scheduler and a second core bring their improvements; no research unlocks either part.
+    const cpu = state.build.systems[0]!.spec.cpu!;
+    const bought = installed(state, { scheduler: { gen: 0, level: 1, strategy: 'fifo' }, cpu: { ...cpu, cores: [...cpu.cores, { gen: 0, level: 1 }] } });
+    expect(ids(bought)).toEqual(expect.arrayContaining(['sjf', 'timeSlice', 'workStealing']));
     for (const node of tree.nodes) for (const id of node.requires) expect(tree.nodes.some(n => n.id === id)).toBe(true);
   });
 
   it('reveals board starter hardware and only the next structural scope', () => {
     const state = completed(createInitialState(42), 'systemBoard');
-    expect(ids(state)).toEqual(expect.arrayContaining(['gpuGen1', 'storageCtl', 'rack']));
+    expect(ids(state)).toEqual(expect.arrayContaining(['rack']));
     expect(ids(state)).not.toContain('gpuGen2');
     expect(ids(state)).not.toContain('ddr');
     expect(ids(state)).not.toContain('ssd');
@@ -57,10 +59,10 @@ describe('contextual research discovery', () => {
   });
 
   it('uses installed RAM, GPU and storage for capabilities and the next generation', () => {
-    let state = completed(createInitialState(42), 'gpuGen1', 'storageCtl');
+    let state = completed(createInitialState(42), 'systemBoard');
     state = installed(state, { ram: [{ gen: 0, level: 1, ecc: false }],
       accels: [{ kind: 'gpu', model: '1330', upgrades: 0 }], drives: [{ gen: 0, level: 1 }] });
-    expect(ids(state)).toEqual(expect.arrayContaining(['ddr', 'dualChannel', 'dma', 'gpuGen2', 'ssd', 'raid0']));
+    expect(ids(state)).toEqual(expect.arrayContaining(['ddr', 'dualChannel', 'dma', 'gpuGen2', 'ssd']));
     for (const id of ['ddr2', 'ddr3', 'gpuGen3', 'gpuGen9', 'tensorCores', 'nvme', 'scm']) expect(ids(state)).not.toContain(id);
     // Researching a generation does not pretend that it is installed.
     const unlocked = completed(state, 'ddr', 'gpuGen2', 'ssd');
@@ -90,6 +92,6 @@ describe('contextual research discovery', () => {
     selectContextualResearchTree(state);
     expect(selectResearchTree(state)).toEqual(before);
     expect(before.nodes.map(n => n.id)).toEqual(RESEARCH.filter(n => n.implemented).map(n => n.id));
-    expect(before.nodes.find(n => n.id === 'gpuGen9')?.requires).toEqual(['gpuGen8', 'intercontinental']);
+    expect(before.nodes.find(n => n.id === 'gpuGen9')?.requires).toEqual(['gpuGen8', 'regions']);
   });
 });

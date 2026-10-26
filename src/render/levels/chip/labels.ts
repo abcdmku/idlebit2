@@ -49,7 +49,8 @@ export function chipLabels(chip: ChipSnapshot, frame: WorldFrame, out: LabelWrit
   // D26: what overflowed out of cache to RAM, as a warning, beside the cache's own numbers.
   if (live && spilledOut(chip) > 0) out.text(`· ${formatSize(spilledOut(chip))} spilled`, 'warn');
   // (One level: the in-use run fits the desktop cache row at either scale; the phone row has no room for it.)
-  out.label('clock', f.clock.x + pad, f.clock.y + pad).text('Clock', 'name', true).br().text(formatHertz(chip.clock.hz), 'value');
+  const clock = out.label('clock', f.clock.x + pad, f.clock.y + (f.clockAbove ? 8 : pad)).text('Clock', 'name', true);
+  (f.clockAbove ? clock : clock.br()).text(formatHertz(chip.clock.hz), 'value');
 
   const n = siteCount(chip), sites = coreSites(f, n), price = addCorePrice(view, chip);
   if (sites.length > 2) {

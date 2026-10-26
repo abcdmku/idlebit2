@@ -75,7 +75,7 @@ describe('GPU save validation', () => {
 
   it.each([[0, null], [1, 'gpuGen2'], [2, 'tensorCores'], [3, 'matrixGpu']] as const)('enforces NPU generation %i AND prerequisites', (gen, prerequisite) => {
     const base = gpuState(), first = base.build.systems[0]!;
-    const completed = [researchId('npu')];
+    const completed = [researchId('systemBoard')]; // D39: the legacy NPU comes with the System board
     let state: GameState = {
       ...base,
       build: { ...base.build, systems: [{ ...first, spec: { ...first.spec, accels: [{ kind: 'npu', gen, level: 1 }] } }] },

@@ -24,7 +24,7 @@ export const RAM: CatalogRow = {
 /** GPU metadata for generation adapters. Model evaluation owns specs and prices. */
 export const GPU: CatalogRow = {
   id: 'gpu', scope: 'system', names: ['1 kHz GPU', '10 kHz GPU', '100 kHz GPU', '1 MHz GPU', '10 MHz GPU', '100 MHz GPU', '1 GHz GPU', '10 GHz GPU', '100 GHz GPU'],
-  gates: Array.from({ length: 9 }, (_, g) => r(`gpuGen${g + 1}`)), curve: 'fixed', levelMax: 6,
+  gates: [r('systemBoard'), ...Array.from({ length: 8 }, (_, g) => r(`gpuGen${g + 2}`))], curve: 'fixed', levelMax: 6,
   base: Array.from({ length: 9 }, (_, g) => 4000 * 20 ** g),
   base2: Array.from({ length: 9 }, (_, g) => 8192 * 16 ** g),
   watts: { kind: 'rate', wPerUnit: 0.5 },
@@ -33,14 +33,14 @@ export const GPU: CatalogRow = {
 /** Frozen legacy NPU catalog. Its four generations do not follow GPU models. */
 export const NPU: CatalogRow = {
   id: 'npu', scope: 'system', names: ['Vector NPU', 'SIMT NPU', 'Tensor NPU', 'Matrix NPU'],
-  gates: [r('npu'), r('gpuGen2'), r('tensorCores'), r('matrixGpu')], curve: 'flow',
+  gates: [r('systemBoard'), r('gpuGen2'), r('tensorCores'), r('matrixGpu')], curve: 'flow',
   base: [32, 6.4e4, 1.28e8, 2.56e11], base2: [64, 2 ** 19, 2 ** 30, 2 ** 39],
   tensorFactor: [1, 1, 4, 8], watts: { kind: 'rate', wPerUnit: 0.125 },
   price: [3e6, 7.5e6, 45e9, 75e12], upgrade: UP,
 };
 /** base = bits, base2 = IO bit/s (the rated rate). */
 export const STORAGE: CatalogRow = {
-  id: 'storage', scope: 'system', names: ['HDD', 'SSD', 'NVMe', 'SCM'], gates: [r('storageCtl'), r('ssd'), r('nvme'), r('scm')],
+  id: 'storage', scope: 'system', names: ['HDD', 'SSD', 'NVMe', 'SCM'], gates: [r('systemBoard'), r('ssd'), r('nvme'), r('scm')],
   // D26.2: IO re-based to 1/16 (HDD, SSD), 1/4 (NVMe) and 1/2 (SCM) of the era's RAM bandwidth, so spill to disk is slow.
   // The HDD is the System-era drive: big and slow, priced like the SDRAM module. Its IO at L1 is about 1/16 of
   // SDRAM at the levels a System-era box holds (L15–L25), so spill slows work 4–16× instead of stalling it.

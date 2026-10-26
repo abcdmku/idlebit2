@@ -26,11 +26,9 @@ const viewLock = (level: 'rack' | 'room' | 'global'): LockReason => {
   const node = researchDef(level === 'global' ? 'dataCenter' : level);
   return { code: 'research', node: node?.id ?? null, text: `Needs ${node?.name ?? level}` };
 };
-/** Open regions: home, then 4 with `regions`, all 8 with `intercontinental` (spec §3.3). */
-export const regionOpen = (u: Unlocks, region: RegionId): boolean => {
-  const opens = REGIONS[REGION_IDS.indexOf(region)]!.opensWith;
-  return opens === 'start' || (opens === 'regions' && u.ceilings.sites >= 4) || (opens === 'intercontinental' && u.ceilings.sites >= 8);
-};
+/** Open regions: home, then all 8 with `regions` (spec §3.3, D39: no `intercontinental` gate; sites are bought). */
+export const regionOpen = (u: Unlocks, region: RegionId): boolean =>
+  REGIONS[REGION_IDS.indexOf(region)]!.opensWith === 'start' || (u.gens.site & 1) !== 0;
 
 /** Resolves a ConfigSource to the child configuration for `parent`, or a failure. */
 function resolve(state: GameState, parent: ScopeRef, source: ConfigSource): { cfg: AnyConfig; label: string } | Plan {

@@ -59,15 +59,15 @@ function relevant(def: ResearchDef, hardware: ReturnType<typeof inventory>): boo
   if (LEVELS.indexOf(def.level) > horizon) return false;
   // Only the first hardware unlock is discoverable before that hardware is installed.
   if (def.category === 'memory' && !has('ram')) return false;
-  if (def.category === 'accel' && !has('gpu') && !has('npu') && def.id !== 'gpuGen1') return false;
-  if (def.category === 'storage' && !has('storage') && def.id !== 'storageCtl') return false;
+  if (def.category === 'accel' && !has('gpu') && !has('npu')) return false;
+  if (def.category === 'storage' && !has('storage')) return false;
   if (['dma', 'prefetch'].includes(def.id) && !has('ram')) return false;
   if (def.id === 'virtualMem' && !has('storage')) return false;
   if (def.id === 'hotPlug' && !has('storage')) return false;
   if (def.id === 'octaChannel' && !has('gpu') && !has('npu')) return false;
   if (def.id === 'workStealing' && cores < 2) return false;
   if (def.id === 'numaAware' && sockets < 2) return false;
-  if (def.effects.some(e => e.kind === 'strategy' && e.scope === 'system') && def.id !== 'fifoSched' && !has('scheduler')) return false;
+  if (def.effects.some(e => e.kind === 'strategy' && e.scope === 'system') && !has('scheduler')) return false;
 
   // A GPU generation can also grant a legacy NPU generation. Its first effect is
   // the hardware being advanced; the secondary effect must not hide GPU research.

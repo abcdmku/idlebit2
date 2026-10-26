@@ -1,6 +1,6 @@
 import { act } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { createInitialState, FAMILIES, quote, researchId, selectResearchTree, systemId, type Amount, type GameState, type PartView, type TaskView } from '../../game';
+import { createInitialState, FAMILIES, quote, researchId, selectResearchTree, systemId, type Amount, type GameState, type GpuModelId, type PartView, type TaskView } from '../../game';
 import { fixtureScope, fixtureState } from '../../game/fixtures';
 import { createGameStore, type RuntimeStore } from '../../platform';
 import type { HitTarget } from '../../render/core';
@@ -24,6 +24,13 @@ function setup(state = fixtureState('systemTop', 'between')) {
     scope: fixtureScope('systemTop') });
   store.setLifecycle({ hydrated: true });
 }
+/** D39: an occupied slot only offers strictly better cards; the fixture's maxed 9990 has none, so most tests start from 1330. */
+function withCard(state: GameState, model = '1330' as GpuModelId): GameState {
+  const system = state.build.systems[0]!;
+  const accels = system.spec.accels.map((card, i) => i === 0 ? { kind: 'gpu' as const, model, upgrades: 0 } : card);
+  return { ...state, build: { ...state.build, revision: state.build.revision + 1, systems: [{ ...system, spec: { ...system.spec, accels } }, ...state.build.systems.slice(1)] } };
+}
+const lowCard = () => withCard(fixtureState('systemTop', 'between'));
 function installed(): PartView | undefined {
   const s = store.getSnapshot().focus;
   return s.level === 'system' ? s.gpu[0] : undefined;
@@ -59,7 +66,7 @@ describe('native GPU model picker', () => {
     expect(row.querySelector<HTMLElement>('.gpu-task-family')!.style.color).toBe('');
   });
   it('keeps nine classes, four series and six tiers; selects one quoted model', () => {
-    setup(); const host = picker();
+    setup(lowCard()); const host = picker();
     expect(host.querySelectorAll('select option')).toHaveLength(9);
     expect(host.querySelectorAll('.gpu-series button')).toHaveLength(4);
     expect(host.querySelectorAll('.gpu-tiers button')).toHaveLength(6);
@@ -78,13 +85,33 @@ describe('native GPU model picker', () => {
   });
 
   it('installs exactly the selected model and debits the public quote, leaving the CPU intact', () => {
-    setup(); const host = picker();
+    setup(lowCard()); const host = picker();
     chooseGeneration(host, 3); click(host.querySelector('[aria-label="Series 3, Cores"]')); click(host.querySelector('[aria-label="Tier 50"]'));
     const before = store.getState(), expected = quote(before, { kind: 'gpuModels', system: sys, index: 0, generation: 3 }).quotes.find(q => q.gpu?.after.model === '3350')!;
     click(host.querySelector('.gpu-buy'));
     expect(store.getState().build.systems[0]!.spec.accels[0]).toEqual({ kind: 'gpu', model: '3350', upgrades: 0 });
     expect(store.getState().wallet.credits).toBe(String(BigInt(before.wallet.credits) - BigInt(expected.cost)));
     expect(store.getState().build.systems[0]!.spec.cpu).toBe(before.build.systems[0]!.spec.cpu);
+  });
+
+  it('opens on the first offered model, and a model that is no better reads "Not an upgrade"', () => {
+    setup(withCard(fixtureState('systemTop', 'between'), '3550' as GpuModelId)); const host = picker();
+    const offered = [1, 2, 3, 4, 5, 6, 7, 8, 9].flatMap(generation => quote(store.getState(), { kind: 'gpuModels', system: sys, index: 0, generation: generation as never }).quotes);
+    expect(offered.some(q => q.gpu?.after.model === '3550')).toBe(false);
+    const first = [3, 4, 5, 6, 7, 8, 9, 1, 2].flatMap(generation => quote(store.getState(), { kind: 'gpuModels', system: sys, index: 0, generation: generation as never }).quotes).find(q => !q.locked)!;
+    expect(host.querySelector('.gpu-model b')?.textContent).toContain(first.gpu!.after.model);
+    expect(host.querySelector<HTMLButtonElement>('.gpu-buy')!.disabled).toBe(false);
+    chooseGeneration(host, 3); click(host.querySelector('[aria-label="Series 5, VRAM"]')); click(host.querySelector('[aria-label="Tier 50"]'));
+    expect(host.querySelector('.gpu-model b')?.textContent).toContain('3550');
+    expect(host.querySelector('.gpu-quote .gpu-note')?.textContent).toBe('Not an upgrade');
+    expect(host.querySelector<HTMLButtonElement>('.gpu-buy')!.disabled).toBe(true);
+  });
+
+  it('says the card is the best available and shows no Replace key when nothing is better', () => {
+    setup(); const host = picker();
+    expect(host.querySelector('.gpu-quote .gpu-note')?.textContent).toBe('Your card is the best available');
+    expect(host.querySelector('.gpu-buy')).toBeNull();
+    expect(host.querySelector('.gpu-comparison thead')?.textContent).toContain(installed()!.gpu!.model);
   });
 
   it('previews locked generations without buying, and opens the real missing research', () => {
@@ -104,7 +131,7 @@ describe('native GPU model picker', () => {
   });
 
   it('shows real cold downtime and applies a hot upgrade at its quoted price', () => {
-    const base = fixtureState('systemTop', 'between');
+    const base = lowCard();
     setup({ ...base, research: { ...base.research, unlocks: { ...base.research.unlocks, rules: base.research.unlocks.rules.filter(r => r !== 'hotSwap') } } });
     store.dispatch({ type: 'returnToMarket' });
     const install = quote(store.getState(), { kind: 'gpuModels', system: sys, index: 0, generation: 3 }).quotes[0]!;
@@ -146,12 +173,13 @@ describe('native GPU model picker', () => {
   });
 
   it('disables a quoted model one exact Credit below its price', () => {
-    setup();
+    setup(lowCard());
     const q = quote(store.getState(), { kind: 'gpuModels', system: sys, index: 0, generation: 9 }).quotes.find(q => q.gpu?.after.model === '9990')!;
     expect(BigInt(q.cost)).toBeGreaterThan(BigInt(Number.MAX_SAFE_INTEGER));
     const state = store.getState();
     store.replaceState({ ...state, wallet: { ...state.wallet, credits: A(String(BigInt(q.cost) - 1n)) } });
     const host = picker(), before = store.getState().wallet.credits;
+    chooseGeneration(host, 9); click(host.querySelector('[aria-label="Series 9, All"]')); click(host.querySelector('[aria-label="Tier 90"]'));
     expect(host.querySelector<HTMLButtonElement>('.gpu-buy')!.disabled).toBe(true);
     expect(host.querySelector('.gpu-quote')?.textContent).toContain('Needs more Credits');
     click(host.querySelector('.gpu-buy'));
@@ -159,9 +187,10 @@ describe('native GPU model picker', () => {
   });
 
   it('refreshes quoted downtime when a round starts without a wallet change', () => {
-    const base = fixtureState('systemTop', 'between');
+    const base = lowCard();
     setup({ ...base, research: { ...base.research, unlocks: { ...base.research.unlocks, rules: base.research.unlocks.rules.filter(r => r !== 'hotSwap') } } });
     const host = picker(), credits = store.getState().wallet.credits;
+    chooseGeneration(host, 9); click(host.querySelector('[aria-label="Series 9, All"]')); click(host.querySelector('[aria-label="Tier 90"]'));
     expect(host.textContent).toContain('No downtime between rounds.');
     act(() => { store.dispatch({ type: 'returnToMarket' }); });
     const q = quote(store.getState(), { kind: 'gpuModels', system: sys, index: 0, generation: 9 }).quotes.find(q => q.gpu?.after.model === '9990')!;

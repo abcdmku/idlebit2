@@ -99,8 +99,10 @@ function systemTray(state: GameState, id: SystemId): Item[] {
   const spec = state.build.systems[id]?.spec;
   const fallback: GameAction = { type: 'replaceCpu', system: id };
   if (!spec) return [0, 1, 2, 3].map(() => ({ action: fallback, plan: fail('invalid', 'No such system') }));
-  const cpu: Option[] = [[{ type: 'addPart', system: id, kind: 'socket', generation: spec.cpu?.cpu.gen ?? 0 }, planAdd(state, id, 'socket', spec.cpu?.cpu.gen ?? 0)],
-    [{ type: 'replaceCpu', system: id }, planReplaceCpu(state, id)]];
+  // D39: sockets are bought from System on, so the CPU item leads with the generation step (Replace CPU) whenever
+  // a newer package is researched; otherwise it offers the next socket.
+  const cpu: Option[] = [[{ type: 'replaceCpu', system: id }, planReplaceCpu(state, id)],
+    [{ type: 'addPart', system: id, kind: 'socket', generation: spec.cpu?.cpu.gen ?? 0 }, planAdd(state, id, 'socket', spec.cpu?.cpu.gen ?? 0)]];
   return [best(cpu, fallback), best(addOrUpgrade(state, id, 'ram', spec.ram), fallback),
     gpuItem(state, id), best(addOrUpgrade(state, id, 'drive', spec.drives), fallback)];
 }

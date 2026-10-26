@@ -14,7 +14,7 @@ import { deriveUnlocks } from './research/effects';
 const sys = systemId(0);
 function chip(cores: number, l2: boolean): GameState {
   const base = createInitialState(42);
-  const done = ['fifoSched', 'dualCore', 'l2Cache'].map(researchId);
+  const done: ReturnType<typeof researchId>[] = []; // D39: cores, L2 and the scheduler are bought, not researched
   const research = { ...base.research, completed: done, unlocks: deriveUnlocks(done) };
   let s: GameState = { ...base, research, compiled: compileAll(base.build, research), wallet: { ...base.wallet, credits: '1000000000' as never } };
   const act = (a: GameAction) => { const o = applyAction(s, a); if (!o.ok) throw new Error(JSON.stringify(o.rejection)); s = o.state; };

@@ -48,11 +48,12 @@ function anchor(out: LabelBuffer, id: string): { x: number; y: number } | null {
 }
 
 describe('CPU floorplan (D17)', () => {
-  it.each(['desktop', 'phone'] as const)('stacks IN, queue, cache, then cores and clock, top to bottom (%s)', form => {
+  it.each(['desktop', 'phone'] as const)('stacks IN, queue, cache, then cores and clock (beside them, or a row above on phone), top to bottom (%s)', form => {
     const f = floorOf(form), level = createChipRenderer(createLevelRegistry()), chip = chipScene('mid');
     expect(f.inp.y).toBe(f.die.y);
     expect(f.queue.y).toBeLessThan(f.cache.y); expect(f.cache.y).toBeLessThan(f.cores.y);
-    expect(f.clock.y).toBe(f.cores.y);
+    if (f.clockAbove) { expect(f.clock.y).toBeLessThan(f.cores.y); expect(f.clock.y).toBeGreaterThan(f.cache.y); expect(f.cores.w).toBe(f.clock.w); }
+    else expect(f.clock.y).toBe(f.cores.y);
     expect(level.entry!(chip, { x: 0, y: 0 }, form)).toEqual(f.inp);
     expect(level.miniRect!(chip, rect(), form)).toEqual(f.pkg);
     const focus = level.focus(chip, rect(), rect(), form);
@@ -286,7 +287,7 @@ describe('CPU incoming queue wells', () => {
 });
 
 describe('CPU core grids (user: always show the clock speed; the die grows)', () => {
-  it.each([['desktop', 4], ['phone', 2]] as const)('keeps a fixed column count and adds rows, the cache, queue and clock in place (%s)', (form, cols) => {
+  it.each([['desktop', 4], ['phone', 4]] as const)('keeps a fixed column count and adds rows, the cache, queue and clock in place (%s)', (form, cols) => {
     const small = floorOf(form, 3);
     for (const n of [3, 6, 12, 33]) {
       const f = floorOf(form, n), cells = gridCells(f, n), rows = Math.ceil(Math.min(32, n) / cols);
@@ -300,6 +301,8 @@ describe('CPU core grids (user: always show the clock speed; the die grows)', ()
       expect(f.focus.y + f.focus.h).toBeLessThanOrEqual(f.world.h);
     }
     expect(floorOf(form, 33).pkg.h).toBeGreaterThan(floorOf(form, 6).pkg.h);
+    // the rest frame fits the free width at the form's scale (phone: 352 CSS px at 2×; desktop 3×)
+    expect(small.focus.w * (form === 'phone' ? 2 : 3)).toBeLessThanOrEqual(form === 'phone' ? 352 : 864);
   });
 });
 

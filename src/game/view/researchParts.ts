@@ -38,10 +38,10 @@ const CEILING: Readonly<Record<string, ResearchPartId>> = {
 };
 /** Rules: the part whose behaviour they change. */
 const RULE: Readonly<Record<string, ResearchPartId>> = {
-  coreIdle: 'clock', smt: 'cores', workStealing: 'cores',
-  packageIdle: 'cpu', dvfs: 'cpu', turbo: 'cpu', socketFactor: 'cpu', socketSpanPenalty: 'cpu', numaAware: 'cpu',
-  dma: 'ram', prefetch: 'ram', multiChannel: 'ram', dimmFactor: 'ram', ramWatts: 'ram', hotPages: 'ram', ecc: 'ram',
-  tensorRate: 'gpu', vramPerLevel: 'gpu', vramScale: 'gpu', unifiedMemory: 'gpu', gpuLink: 'gpu', npuTensorOnly: 'gpu',
+  coreIdle: 'clock', workStealing: 'cores',
+  packageIdle: 'cpu', dvfs: 'cpu', turbo: 'cpu', numaAware: 'cpu',
+  dma: 'ram', prefetch: 'ram', multiChannel: 'ram', ramWatts: 'ram', hotPages: 'ram', ecc: 'ram',
+  tensorRate: 'gpu', vramPerLevel: 'gpu', vramScale: 'gpu', unifiedMemory: 'gpu', gpuLink: 'gpu',
   ncq: 'drive', sharedStorage: 'drive', hotPlug: 'drive',
   powerCap: 'psu', s3Sleep: 'psu',
   accelBoard: 'board', telemetry: 'board', autoReturn: 'board', autoSkip: 'board', offlineCap: 'board', bootSeconds: 'board',

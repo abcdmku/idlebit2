@@ -285,16 +285,16 @@ describe('tiles open in place', () => {
     const layout = shellLayout(390, 780);
     const shell = createShellValue(store, vs, createLevelRegistry(), { renderer: null, layout, plateBounds: layout.calloutBounds,
       frameListeners: new Set(), buildQuotes: null, drawCount: 0 });
-    vs.dispatch({ type: 'openResearch', project: r('fifoSched') });
+    vs.dispatch({ type: 'openResearch', project: r('cstateC1') });
     m.render(<ShellContext.Provider value={shell}><LayoutContext.Provider value={layout}><ResearchScreen /></LayoutContext.Provider></ShellContext.Provider>);
-    expect(selected()).toBe('fifoSched');
+    expect(selected()).toBe('cstateC1');
     act(() => { closeTopmost(shell); });
     expect(openTile()).toBeNull();
     expect(vs.getState().sheet).toBe('research');
     act(() => { closeTopmost(shell); });
     expect(vs.getState().sheet).toBeNull();
-    act(() => { vs.dispatch({ type: 'openResearch', project: r('fifoSched') }); });
-    expect(selected()).toBe('fifoSched');
+    act(() => { vs.dispatch({ type: 'openResearch', project: r('cstateC1') }); });
+    expect(selected()).toBe('cstateC1');
     const esc = () => act(() => { document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })); });
     esc();
     expect(openTile()).toBeNull();
@@ -323,15 +323,15 @@ describe('connected research screen', () => {
     const layout = shellLayout(1440, 900);
     const shell = createShellValue(store, vs, createLevelRegistry(), { renderer: null, layout, plateBounds: layout.calloutBounds,
       frameListeners: new Set(), buildQuotes: null, drawCount: 0 });
-    vs.dispatch({ type: 'openResearch', project: r('gpuGen1') });
+    vs.dispatch({ type: 'openResearch', project: r('gpuGen2') });
     m.render(<ShellContext.Provider value={shell}><LayoutContext.Provider value={layout}><ResearchScreen /></LayoutContext.Provider></ShellContext.Provider>);
     expect(m.host.querySelector<HTMLElement>('[data-testid=research-drawer]')!.style.cssText).toContain(`top: ${layout.lab.y}px`);
     expect(m.host.querySelector('[role=tab][aria-selected=true]')?.textContent).toMatch(/^System/);
     const names = () => [...m.host.querySelectorAll('.lab-tree [data-project] .lr-nm')].map(n => n.textContent);
-    expect(names()).toContain('GPU gen 1, 1 kHz');
+    expect(names()).toContain('GPU gen 2, 10 kHz');
     expect(names()).not.toContain('GPU gen 9, 100 GHz');
     expect(names()).not.toContain('DDR');
-    expect(selected()).toBe('gpuGen1');
+    expect(selected()).toBe('gpuGen2');
     const system = state.build.systems[0]!;
     act(() => store.replaceState({ ...state, build: { ...state.build, revision: state.build.revision + 1,
       systems: [{ ...system, spec: { ...system.spec, ram: [{ gen: 0, level: 1, ecc: false }] } }] } }));

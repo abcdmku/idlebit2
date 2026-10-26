@@ -15,7 +15,7 @@ import { supplyLossW } from '../phys/supplies';
 const id = systemId(0);
 function fixture(psuGen = 0): GameState {
   const base = createInitialState(42);
-  const completed = ['systemBoard', 'gpuGen1', ...(psuGen ? ['psu80'] : [])].map(researchId);
+  const completed = ['systemBoard', ...(psuGen ? ['psu80'] : [])].map(researchId);
   const research = { ...base.research, completed, unlocks: deriveUnlocks(completed) };
   const build = { ...base.build, systems: base.build.systems.map((s) => s && ({ ...s,
     spec: { ...s.spec, psu: { gen: psuGen, level: 1, capped: false } } })) };
@@ -24,8 +24,8 @@ function fixture(psuGen = 0): GameState {
     wallet: { ...base.wallet, credits: amount('1000000000000000000') } };
 }
 
-function modelQuote(state: GameState, index: number | null = null) {
-  return quote(state, { kind: 'gpuModels', system: id, index, generation: 1 }).quotes.find((q) => q.gpu?.after.model === '1530')!;
+function modelQuote(state: GameState, index: number | null = null, model = '1530') {
+  return quote(state, { kind: 'gpuModels', system: id, index, generation: 1 }).quotes.find((q) => q.gpu?.after.model === model)!;
 }
 
 describe('GPU whole-system power quotes', () => {
@@ -53,14 +53,17 @@ describe('GPU whole-system power quotes', () => {
     const compiled = compileAll(build, base.research);
     const state = { ...base, build, compiled, hot: initialHot({ compiled, seed: 42, round: base.round }) };
     const upgrade = quote(state, { kind: 'part', part: { unit: { kind: 'system', id }, slot: { kind: 'gpu', index: 0 } } }).quotes[0]!;
-    const replacement = modelQuote(state, 0);
+    // A replacement is a strictly better model (user, 25 Oct); the system ends as if 1350 were added to an empty board.
+    const replacement = modelQuote(state, 0, '1350'), alone = modelQuote(fixture(1), null, '1350');
+    expect(modelQuote(state, 0)).toBeUndefined();
     expect(upgrade.gpuPower!.before.deliveredW).toBeCloseTo(fullLoadWatts(spec, state.research.unlocks) * POWER_SCALE, 12);
     expect(upgrade.gpuPower!.after.deliveredW).toBeGreaterThan(upgrade.gpuPower!.before.deliveredW);
     expect(upgrade.effect!.wattsBefore).toBe(upgrade.gpu!.before!.idleW);
     expect(upgrade.effect!.wattsAfter).toBe(upgrade.gpu!.after.idleW);
     expect(replacement.gpuPower!.before).toEqual(upgrade.gpuPower!.before);
-    expect(replacement.gpuPower!.after.deliveredW).toBeCloseTo(19810.3 * POWER_SCALE, 12);
-    expect(replacement.gpuPower!.after.inputW).toBeCloseTo(23772.36 * POWER_SCALE, 12);
+    expect(replacement.gpuPower!.after.deliveredW).toBeCloseTo(alone.gpuPower!.after.deliveredW, 12);
+    expect(replacement.gpuPower!.after.inputW).toBeCloseTo(alone.gpuPower!.after.inputW, 12);
+    expect(replacement.gpuPower!.after.deliveredW).toBeGreaterThan(replacement.gpuPower!.before.deliveredW);
   });
 
   it('includes CPU, RAM, all accelerators and drives without changing their component rules', () => {

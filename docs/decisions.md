@@ -1339,6 +1339,80 @@ The user's words:
 
 **Quick balance (seed 42):** `systemBoard` Data 7,500 → 40,000 (System had moved to 0:16 with free pre-System power). D20 passive round 1 unchanged (0:36 / 0:55 / 1:16); System 0:21; Rack 5:36.
 
+**D39, 25 Oct: research gates generations and improves what you own; it never unlocks a part type or a count (user; lead ruling).** Narrowed the same day. The user said "hm i might be okay with generations being research gates maybe".
+
+> i dont like the concept of researching parts for your cpu or system, research should be for things that improve components
+
+Each research node is one of three kinds:
+- a **generation gate**: the next generation or tier of a part, or a structure;
+- an **improvement**: a strategy, filter, efficiency or behaviour;
+- a **part-type or count unlock**, which is deleted and becomes a purchase.
+
+D32 costs stay. The cost of a deleted node folds into the purchase price of what it used to unlock.
+
+**What becomes buyable, and when.**
+
+| Part or count | Was | Now |
+|---|---|---|
+| Cores | `dualCore` | From the start, at the rising extra-core price, up to the CPU maximum of 32 (D34). |
+| L2 and L3 cache | `l2Cache`, `l3Cache` | Buyable add-ons from the start. The higher price folds in the old research. |
+| Scheduler (queue hardware) | `fifoSched` | Buyable from the start. FIFO is its built-in strategy. |
+| CPU sockets | `dualSocket`, `quadSocket` | Bought with the System board up to 4, priced per socket. Socket factor and span penalty are fixed rules. |
+| RAM slots | `dualChannel` cap, `quadChannel` | Every slot on the board can be filled. The DIMM factor is a fixed rule. |
+| ECC modules | `ecc` | A buy option on any RAM module, at its existing price premium. |
+| Drive and drive slots | `storageCtl` (drive gen 0), `raid0` | Available with the System board. |
+| GPU and GPU slots | `gpuGen1` (GPU gen 0), `dualGpu` | Available with the System board. |
+| NPU | `npu` (NPU gen 0) | Available with the System board. |
+| Accelerator board | `accelSystem` | A board choice from the System level. |
+| Switch ports and uplinks | `portExpansion`, `densePorts`, `spineLeaf`, `lag`, `lag4` | Bought up to the switch maximum. |
+| Room rows, zones, sites | `hallExpansion`, `zoneExpansion`, `intercontinental` | Bought up to the structure's maximum. All 8 regions open with `regions`. These were late pacing gates. Their research cost, under 1e11 Credit-equivalent, is negligible next to the units they gated: the third row is about 5e11, a third zone shell 1.3e15, and sites 5–8 cost 1.2e18 and up. So the existing per-unit prices hold the D19 late pacing unchanged (model estimate). |
+| Hardware threads | `smt` | **Deleted** (lead, 25 Oct). The user rejected lanes because "that's what cores are for", and SMT is the same per-core parallelism. One thread per core; parallelism comes only from cores, CPUs and systems. |
+
+**Classification of the 164 nodes, as approved.**
+
+| Kind | Nodes |
+|---|---|
+| **Keep: generation gate** (67) | CPU: `fabKhz`, `fabMhz`, `fabGhz`, `stacked3d`. RAM: `ddr`, `ddr2`, `ddr3`, `ddr4`, `ddr5`. Accelerators: `gpuGen2`–`gpuGen9`, `tensorCores`, `matrixGpu`. Drives: `ssd`, `nvme`, `scm`. Supplies: `psu80`, `psuBronze`, `psuGold`, `psuPlatinum`, `psuTitanium`, `meteredPdu`, `switchedPdu`, `upsOnline`, `upsLithium`, `substation`, `hvIntake`. Network: `sw100k`, `sw1M`, `sw10M`, `sw100M`, `sw1G`, `sw10G`, `dpFiber`, `dpDwdm`, `bbDarkFiber`, `bbDwdm`, `bbSubsea`. Cooling: `rackAir2`, `rackWater`, `rackWater2`, `roomAir2`, `chilledWater`, `chilledWater2`, `closedLoop`, `closedLoop2`. D31: `powerCtl`, `powerCtlLiIon`, `powerCtlLfp`, `roomStart`, `startPredict`, `globalStart`, `solarFarm`, `windFarm`, `fuelCell`, `ownPlant`. Structures: `systemBoard`, `rack`, `room`, `dataCenter`, `regions`. |
+| **Keep: improvement** (73) | `l3Slices`, `edramL3`, `rdimm`, `dma`, `prefetch`, `octaChannel`, `lowVoltRam`, `hotPages`, `gddr6`, `hbm`, `unifiedMemory`, `gpuLink`, `ncq`, `sharedStorage` (a rack storage node plus its sharing rule). All 24 scheduling and LB nodes, from `sjf` to `priceAware`. `cutThrough`, `qos`. All 10 power rules (`cstateC1` to `loadShed`, plus `dualFeed`). Cooling rules: `thermalThrottle`, `rackVarSpeed`, `hotColdAisle`, `containment`, `roomVarSpeed`, `economizer`. All 17 operations nodes. |
+| **Convert** (1) | `dualChannel` becomes "Multi-channel memory": matched modules run at channels × bandwidth. The slot cap is dropped. |
+| **Delete: part type or count** (23) | `smt`, `dualCore`, `l2Cache`, `l3Cache`, `fifoSched`, `dualSocket`, `quadSocket`, `quadChannel`, `ecc`, `storageCtl`, `raid0`, `gpuGen1`, `dualGpu`, `npu`, `accelSystem`, `portExpansion`, `densePorts`, `spineLeaf`, `lag`, `lag4`, `hallExpansion`, `zoneExpansion`, `intercontinental`. |
+
+**As landed.**
+1. **Tree.** The tree drops from 164 to 141 nodes. Prerequisites that pointed at a deleted node re-link to that node's own prerequisites. Three are set by hand: `gpuGen9` needs `gpuGen8` and `regions`; `octaChannel` needs `dualChannel` and `fabMhz`; `lbAffinity` needs `gpuGen2` and `lbCapability`. `systemBoard`, `sjf`, `timeSlice` and `workStealing` become roots. `intercontinental` leaves `MILESTONE_IDS`.
+2. **Start unlocks.** Owned from the start:
+   - L2, L3 and the scheduler (generation 0), with the FIFO strategy;
+   - 32 core sites;
+   - the maximum ports, uplinks, rows, zones and sites. Each still needs its level open.
+3. **`systemBoard` grants the board.** The node now adds:
+   - HDD, gen-1 GPU and legacy NPU (generation 0 each);
+   - 4 CPU sockets, 4 RAM slots, 2 GPU/NPU slots and 4 drive slots;
+   - the `ecc` rule (buy option) and the `accelBoard` rule (board choice).
+
+   Before System, these parts lock with "Needs System". That is a structure gate, not a part unlock.
+4. **Fixed rules.** The socket and DIMM factors are fixed board properties, read from `compile.ts` constants. `threadsPerCore` is capped at 1. The rule ids `smt`, `socketSpanPenalty`, `npuTensorOnly`, `socketFactor` and `dimmFactor` are removed.
+5. **Locks.** Generation locks still name their research node. Count locks no longer name a node; past the cap they read "At the limit" or "Max". `meet` lines for L2, cores and the scheduler come back unlocked.
+6. **Save.** `SAVE_VERSION` goes to 17, a pre-live reset.
+7. **System tray CPU item.** Sockets are now buyable from System on, so the item leads with Replace CPU when a newer package is researched and offers the next socket otherwise. Before this, the cheaper "CPU 2" hid the kHz package, and the bot never saved for it.
+8. **Replace only moves up (user bug, folded in).**
+
+   > you shouldnt be given a "replace with" a lower tier
+
+   - **Quotes and planners.** Part, switch, infra and power quotes offer only generations above the installed one. `planReplace`, `planReplaceLadder` and `planPowerPart` refuse the same or a lower generation with "Only a newer generation". `planReplaceCpu` already refused them. An empty power slot still installs any generation.
+   - **Order.** Tier order is catalog order everywhere, including site generation: solar, wind, fuel cell, own plant. That matches their research order and price.
+   - **GPUs.** A replacement card must be a strictly better model, compared native against native: more ops/s and no less VRAM. Hot pushes are not a tier, and comparing against a pushed card would block almost every replace. Cross-series sidegrades are not offered (1330 → 1530 trades ops for VRAM). The `gpuModels` picker into an occupied slot filters to those cards, and `planInstallGpu` refuses the rest.
+   - **meet.** `meet` lines already replace upward only.
+   - **Test.** `build/replaceUp.test.ts` installs a mid generation in every slot and sweeps part, switch, infra, power, tray, meet and model-picker quotes. It finds no replace at or below the installed part, and it fails when the old loop is restored.
+
+**Bug fix, 26 Oct: a down fleet named the cache gate (sandbox report).** At round 8 every task read "Needs 1 b cache" beside 18.9 Mb of cache, and SLA was 0 %.
+- **Cause.** A 32-core GHz CPU on the board's level-1 power supply drew far more than the supply's capacity. The supply tripped (`dark`), and the rack then overheated (`crashed`). With no system in the static capability set, `canRunFleet` fell back to its first gate code, `cache`. The sandbox wallet refill was not involved: it replaces only the wallet.
+- **Fix.** The fleet check now returns a down code naming why no system takes work:
+  - a dark system gives `psu`, `pdu`, `grid` or `ups`;
+  - a crashed one gives `rack` or `room`;
+  - anything else gives `offline`.
+
+  The head that times out on a down fleet fails as `power`, `heat` or `swap` with that detail, the spec §9 taxonomy, instead of `cantRun · cache`. Auto-skip is unchanged: it still dismisses heads while the fleet is down.
+- **Test.** `market/fleetDown.test.ts` reproduces the report through real actions, with the sandbox refill between advances.
+
 ## 16. Shared rules for agents
 
 - **Shared checkout.** Other agents work in the same checkout at the same time. Edit only the files your brief gives you. Never revert someone else's edits. Run no git command that changes state.

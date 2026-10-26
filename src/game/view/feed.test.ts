@@ -42,7 +42,8 @@ describe('the queue window and transfers (spec §16.2)', () => {
       expect(feed.blockedBy).toBeNull();
       expect(feed.window.every(task => task.blockedBy === null)).toBe(true);
     }
-    expect(feedSnapshot({ ...base, hot }, null, false).blockedBy).toBe('cache');
+    // In a running round no paused system takes work: the head names the fleet as down, never a cache gate.
+    expect(feedSnapshot({ ...base, hot }, null, false).blockedBy).toBe('offline');
   });
 
   it('shows the five next tasks with their work and transfer time, and the head clock', () => {

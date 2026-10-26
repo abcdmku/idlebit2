@@ -86,14 +86,18 @@ export const MAX_ACTIVE_FAMILIES = 15;
 export const MAX_FAMILIES = 64;
 export const MAX_SYSTEMS = MAX_SITES * MAX_ZONES_PER_SITE * RACKS_PER_ROOM * SERVERS_PER_RACK; // 6,912
 
-/** Ceilings at the start (spec §12.2) and at the architecture caps ("archCap"). */
+/**
+ * Ceilings at the start (spec §12.2) and at the architecture caps ("archCap"). D39: research never raises a part
+ * count. Cores, ports, uplinks, rows, zones and sites are bought up to their caps from the start (each still needs
+ * its level open); board sockets and slots come with `systemBoard`. One thread per core: no SMT.
+ */
 export const CEILINGS_START: Readonly<Record<CeilingId, number>> = {
-  coreSites: 1, threadsPerCore: 1, cpuSockets: 1, ramSlots: 1, ramLevelBonus: 0, l3LevelBonus: 0,
-  gpuSlots: 1, driveSlots: 1, rackPorts: 4, roomPorts: 4, uplinks: 1, researchQueue: 1, roomRows: 2, siteZones: 2,
-  sites: 1, regions: 1,
+  coreSites: 32, threadsPerCore: 1, cpuSockets: 1, ramSlots: 1, ramLevelBonus: 0, l3LevelBonus: 0,
+  gpuSlots: 1, driveSlots: 1, rackPorts: MAX_RACK_PORTS, roomPorts: MAX_ROOM_PORTS, uplinks: MAX_UPLINKS, researchQueue: 1,
+  roomRows: MAX_ROWS, siteZones: MAX_ZONES_PER_SITE, sites: MAX_SITES, regions: MAX_SITES,
 };
 export const CEILINGS_MAX: Readonly<Record<CeilingId, number>> = {
-  coreSites: 32, threadsPerCore: 2, cpuSockets: 4, ramSlots: 4, ramLevelBonus: 4, l3LevelBonus: 2,
+  coreSites: 32, threadsPerCore: 1, cpuSockets: 4, ramSlots: 4, ramLevelBonus: 4, l3LevelBonus: 2,
   gpuSlots: 2, driveSlots: 4, rackPorts: MAX_RACK_PORTS, roomPorts: MAX_ROOM_PORTS, uplinks: MAX_UPLINKS, researchQueue: 3,
   roomRows: MAX_ROWS, siteZones: MAX_ZONES_PER_SITE, sites: MAX_SITES, regions: MAX_SITES,
 };
@@ -115,11 +119,11 @@ export const REGIONS: readonly RegionDef[] = [
   { id: 'us-east', continent: 'americas', opensWith: 'start', outsideF: 70, energyPrice: 0.01, sun: 1.0, wind: 1.0 },
   { id: 'us-west', continent: 'americas', opensWith: 'regions', outsideF: 75, energyPrice: 0.012, sun: 1.3, wind: 0.9 },
   { id: 'eu-west', continent: 'europe', opensWith: 'regions', outsideF: 60, energyPrice: 0.014, sun: 0.8, wind: 1.2 },
-  { id: 'eu-north', continent: 'europe', opensWith: 'intercontinental', outsideF: 45, energyPrice: 0.009, sun: 0.5, wind: 1.5 },
-  { id: 'sa-east', continent: 'americas', opensWith: 'intercontinental', outsideF: 85, energyPrice: 0.008, sun: 1.3, wind: 0.8 },
-  { id: 'af-south', continent: 'africa', opensWith: 'intercontinental', outsideF: 90, energyPrice: 0.007, sun: 1.5, wind: 1.0 },
+  { id: 'eu-north', continent: 'europe', opensWith: 'regions', outsideF: 45, energyPrice: 0.009, sun: 0.5, wind: 1.5 },
+  { id: 'sa-east', continent: 'americas', opensWith: 'regions', outsideF: 85, energyPrice: 0.008, sun: 1.3, wind: 0.8 },
+  { id: 'af-south', continent: 'africa', opensWith: 'regions', outsideF: 90, energyPrice: 0.007, sun: 1.5, wind: 1.0 },
   { id: 'ap-southeast', continent: 'asiaPacific', opensWith: 'regions', outsideF: 88, energyPrice: 0.011, sun: 1.2, wind: 0.7 },
-  { id: 'ap-northeast', continent: 'asiaPacific', opensWith: 'intercontinental', outsideF: 65, energyPrice: 0.016, sun: 0.9, wind: 1.0 },
+  { id: 'ap-northeast', continent: 'asiaPacific', opensWith: 'regions', outsideF: 65, energyPrice: 0.016, sun: 0.9, wind: 1.0 },
 ];
 export const DEFAULT_SEED = 0x1d1eb17;
 /**

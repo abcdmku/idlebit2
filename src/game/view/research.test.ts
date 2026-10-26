@@ -22,7 +22,7 @@ describe('research Credit fees', () => {
     const exact = researchTree({ ...state, wallet: { ...state.wallet, credits: def.creditCost! } }).nodes.find((n) => n.id === def.id)!;
     expect(exact.needsCredits).toBe(false);
     // D32: Credits are 10 × Data for every node.
-    expect(researchTree(base).nodes.find((n) => n.id === 'gpuGen1')!.creditCost).toBe(String(10 * RESEARCH.find((d) => d.id === 'gpuGen1')!.data));
+    expect(researchTree(base).nodes.find((n) => n.id === 'gpuGen2')!.creditCost).toBe(String(10 * RESEARCH.find((d) => d.id === 'gpuGen2')!.data));
   });
 
   it('does not mark already paid active, parked or completed projects as needing their fee again', () => {

@@ -114,7 +114,8 @@ export function drawWorld(g: G, chip: ChipSnapshot, frame: WorldFrame, form: Wor
   for (const c of chip.cores) if (c.busy > 0 || c.research > 0) working = true;
   rateAnimation(chip.clock.effectiveHz, frame.timeMs, 2, live && working, cycle);
   clockBlock(g, f.clock, cycle.active && (cycle.saturated || frame.reducedMotion || cycle.phase < 0.5));
-  for (let i = 0; i < used; i++) {
+  // desktop: a clock trace from each core in use to the Clock beside them (the phone's Clock row sits above, no traces)
+  if (!f.clockAbove) for (let i = 0; i < used; i++) {
     const s = sites[i]!;
     g.fillStyle = CLOCK_TRACE; g.fillRect(s.x + s.w, s.y + (s.h >> 1), Math.max(0, f.clock.x - s.x - s.w), 1);
   }

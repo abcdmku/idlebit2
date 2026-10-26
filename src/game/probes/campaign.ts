@@ -108,7 +108,7 @@ export interface CampaignResult {
 }
 
 const seconds = (tick: number) => (tick * TICK_MS) / 1000;
-const MILESTONE_RESEARCH = new Set(['systemBoard', 'fabKhz', 'rack', 'fabMhz', 'room', 'fabGhz', 'dataCenter', 'regions', 'intercontinental']);
+const MILESTONE_RESEARCH = new Set(['systemBoard', 'fabKhz', 'rack', 'fabMhz', 'room', 'fabGhz', 'dataCenter', 'regions']);
 
 function fleetRates(state: GameState): { computeOps: number; pipe: number } {
   const c = state.compiled.sys;

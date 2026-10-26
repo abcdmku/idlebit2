@@ -43,16 +43,16 @@ export const compileUnits = (compiled: CompiledBuffers, build: BuildState, resea
 
 const SETTING_RULES: readonly RuleId[] = ['dvfs', 'turbo', 'coreIdle'];
 
-/** D7.5 starting values; quadSocket / quadChannel rule params may override (s2–s4, d3, d4). */
+/** D7.5 values, fixed properties of the board (D39). */
 const SOCKET_FACTOR = [1, 1, 0.92, 0.85, 0.78];
 const DIMM_FACTOR = [1, 1, 1, 0.95, 0.9];
 
 /** Configuration efficiency η_cfg = socketFactor(CPUs) × dimmFactor(RAM modules); the accelerator board has no DIMM penalty (D7.5, D7.6). */
-export function configEfficiency(spec: SystemSpec, u: Unlocks): number {
+export function configEfficiency(spec: SystemSpec): number {
   const n = Math.min(4, Math.max(1, spec.cpuCount));
   const m = spec.ram.length;
-  const socket = n === 1 ? 1 : ruleParam(u, 'socketFactor' as RuleId, `s${n}`, SOCKET_FACTOR[n]!);
-  const dimm = spec.board === 'accelerator' || m <= 2 ? 1 : ruleParam(u, 'dimmFactor' as RuleId, `d${Math.min(4, m)}`, DIMM_FACTOR[Math.min(4, m)]!);
+  const socket = SOCKET_FACTOR[n]!;
+  const dimm = spec.board === 'accelerator' ? 1 : DIMM_FACTOR[Math.min(4, m)]!;
   return socket * dimm;
 }
 
@@ -79,7 +79,7 @@ export function compileSystem(c: CompiledBuffers, build: SystemBuild, u: Unlocks
   let cores = 0, rateSum = 0, cache = 0, coreIdle = 0, coreLoad = 0, clockIdle = 0, uncoreIdle = 0;
   s.clockHz[i] = 0;
   s.board[i] = sys.board === 'accelerator' ? 1 : 0;
-  s.etaCfg[i] = configEfficiency(sys, u);
+  s.etaCfg[i] = configEfficiency(sys);
   for (let k = 0; k < n; k += 1) {
     const socket = sys.cpu!;
     const hz = capacity(PARTS.clock, socket.clock.gen, socket.clock.level);

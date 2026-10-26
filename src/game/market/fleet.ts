@@ -19,11 +19,16 @@ import { floorShards } from '../net/floor';
  * Gate codes. 0 = can run. Order is the report's "first failing gate" order (tasks.md §6).
  * `detailIndex` maps a code to its FAIL_DETAILS index.
  */
-export const DETAIL = ['ok', 'cache', 'RAM', 'GPU', 'gpuCores', 'VRAM', 'disk', 'ECC', 'members', 'zones', 'region', 'link'] as const;
+export const DETAIL = ['ok', 'cache', 'RAM', 'GPU', 'gpuCores', 'VRAM', 'disk', 'ECC', 'members', 'zones', 'region', 'link',
+  /** No system can take work at all: why the fleet is down (power supply, heat, or switched off). Never a capability. */
+  'psu', 'pdu', 'ups', 'grid', 'rack', 'room', 'offline'] as const;
 export type Detail = (typeof DETAIL)[number];
 const D = Object.fromEntries(DETAIL.map((d, i) => [d, i])) as { readonly [K in Detail]: number };
 export { D as DETAIL_CODE };
-const WORD: readonly (FailDetail | null)[] = [null, 'cache', 'ram', 'gpu', 'gpuCores', 'vram', 'disk', 'ecc', 'members', 'zones', 'region', 'link'];
+const WORD: readonly (FailDetail | null)[] = [null, 'cache', 'ram', 'gpu', 'gpuCores', 'vram', 'disk', 'ecc', 'members', 'zones', 'region', 'link',
+  'psu', 'pdu', 'ups', 'grid', 'rack', 'room', 'offline'];
+/** A down code (D.psu … D.offline): the fleet has no system in the static capability set. */
+export const isDownGate = (code: number): boolean => code >= D.psu;
 export const detailIndex = (code: number): number => {
   const word = WORD[code];
   return word ? FAIL_DETAILS.indexOf(word) : NO_DETAIL;
@@ -92,6 +97,26 @@ function byCapacity(c: CompiledBuffers): readonly CapClass[] {
   return out;
 }
 
+/**
+ * Why no task-running system takes work: the first server held down by power (its PSU rebooting, its
+ * rack's PDU, its zone's grid or UPS), else by heat (rack, then room), else switched off or swapping.
+ */
+function downGate(w: FleetContext): number {
+  const c = w.compiled, s = c.sys, h = w.hot, mode = h.sys.mode;
+  let heat = 0, other = 0;
+  for (let i = 0; i < s.len; i += 1) {
+    if (s.alive[i] !== 1 || s.kind[i] !== 0) continue;
+    if (mode[i] === MODE.dark) {
+      if (h.sys.psuRebootTicks[i]! > 0) return D.psu;
+      if (h.rack.pduFailed[s.rack[i]!] === 1) return D.pdu;
+      return h.site.gridFailed[s.site[i]!] === 1 ? D.grid : D.ups;
+    }
+    if (mode[i] === MODE.crashed && heat === 0) heat = h.rack.crashed[s.rack[i]!] === 1 ? D.rack : D.room;
+    else if (other === 0) other = D.offline;
+  }
+  return heat || other || D.offline;
+}
+
 /** Rooms seen while counting zones, stamped per call. */
 let roomAt = new Int32Array(0);
 let roomStamp = 0;
@@ -113,7 +138,9 @@ export function canRunFleet(w: FleetContext, f: FamilyDef, size: number): number
     const gate = gateOn(c, cls.rep, f, 0);
     if (gate === 0) capable += 1; else if (gate > best) best = gate;
   }
-  if (capable === 0) return best === 0 ? D.cache : best;
+  // No eligible system at all: name why the fleet is down, never a capability gate (sandbox bug, 26 Oct:
+  // a tripped power supply read "Needs 1 b cache" beside 18.9 Mb of cache).
+  if (capable === 0) return best === 0 ? downGate(w) : best;
   const members = Math.max(1, f.members), grain = Math.max(1, f.grain);
   // The split floor (D25.11) caps the shards any router may cut, over the fastest system of the fleet.
   const kCap = Math.min(MAX_SHARDS, Math.max(1, Math.floor(size / grain)), Math.max(members, floorShards(c, 3, 0, f.id, size)));

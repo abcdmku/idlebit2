@@ -34,7 +34,7 @@ export interface BotEvent {
 }
 
 /** Research that opens a level or a structural step comes first (docs/research.md milestones). */
-const MILESTONES = ['systemBoard', 'fabKhz', 'rack', 'fabMhz', 'room', 'fabGhz', 'dataCenter', 'regions', 'intercontinental'];
+const MILESTONES = ['systemBoard', 'fabKhz', 'rack', 'fabMhz', 'room', 'fabGhz', 'dataCenter', 'regions'];
 /** Systems, racks and rooms the bot asks quotes for per decision. */
 const SAMPLE = 4;
 
@@ -566,7 +566,7 @@ function milestonePath(tree: ReturnType<typeof selectResearchTree>): { path: Set
 }
 
 /** Off-path research that unblocks income; a sensible player takes it as soon as the budget allows. */
-const ESSENTIAL = ['fifoSched', 'dualCore', 'psu80', 'gpuGen1', 'storageCtl', 'lbCapability', 'portExpansion', 'sw100k', 'gddr6', 'gpuGen2', 'densePorts', 'meteredPdu'];
+const ESSENTIAL = ['psu80', 'lbCapability', 'sw100k', 'gddr6', 'gpuGen2', 'meteredPdu'];
 /** Off-path research since the last milestone started may spend this share of the next milestone path's Data. */
 const OFF_PATH_SHARE = 0.5;
 
