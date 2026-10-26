@@ -148,3 +148,18 @@ describe('payout pops', () => {
     expect(pops(main)).toEqual([]);
   });
 });
+
+describe('draw order', () => {
+  it('draws the payout pops last, over the level labels', () => {
+    const { renderer, registry, main } = setup();
+    const board = registry.level('system');
+    (board as { labels?: unknown }).labels = (_s: unknown, _v: unknown, _f: unknown, out: { label(id: string, x: number, y: number): { text(t: string): unknown } }) => { out.label('core', 10, 10).text('Core 1'); };
+    const done: Completion = { seq: 1, tick: 9, system: 0, cpu: 0, core: 0, gpu: null, type: 'compute', credits: 42, data: 0, tau: 0.5, rack: null, room: null, site: null, taskId: 1, shards: 1, work: 42 };
+    renderer.draw(fixtureSnapshot(fixtureSystem(), null, { simTimeMs: 1000, completions: [] }), VIEW, { nowS: 0, sincePublishMs: 0 });
+    main.texts.length = 0;
+    renderer.draw(fixtureSnapshot(fixtureSystem(), null, { simTimeMs: 1000, completions: [done] }), VIEW, { nowS: 0.01, sincePublishMs: 0 });
+    const texts = main.texts.map(t => t.text), label = texts.indexOf('Core 1'), pop = texts.indexOf('+42');
+    expect(label).toBeGreaterThanOrEqual(0);
+    expect(pop).toBeGreaterThan(label);
+  });
+});

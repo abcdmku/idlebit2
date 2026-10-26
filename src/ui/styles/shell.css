@@ -109,8 +109,8 @@ b, .b { font-weight: 700; }
 .queue > *, .deck > * { pointer-events: auto; }
 .deck .research, .deck .skey, .deck .rows { z-index: 1; }
 
-/* platform notices: one line at the top of the free world */
-.platform-line { position: absolute; z-index: 7; margin: 0; padding: 0 8px; box-sizing: border-box; background: var(--panel); color: #ffab98;
+/* platform notices: one line in the head card's fourth line (never over the world, where payout pops draw) */
+.platform-line { position: absolute; z-index: 7; margin: 0; padding: 0; box-sizing: border-box; color: #ffab98;
   pointer-events: none; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .platform-line.bad { color: var(--fault-text); } .platform-line.cyan { color: var(--cyan); }
 
@@ -162,4 +162,4 @@ b, .b { font-weight: 700; }
 .round-plate .rp-bottom .v { white-space: nowrap; }
 .round-plate .keys { position: sticky; bottom: -12px; margin-bottom: -12px; padding: 8px 0 12px; background: #1b1437; z-index: 1; }
 /* the new-version banner: the reserved line, taller for its 48 px Reload key */
-.platform-line.version { pointer-events: auto; display: flex; align-items: center; gap: 16px; padding: 0 0 0 8px; color: var(--cyan); overflow: visible; }
+.platform-line.version { background: var(--panel); pointer-events: auto; display: flex; align-items: center; gap: 16px; padding: 0 0 0 8px; color: var(--cyan); overflow: visible; }

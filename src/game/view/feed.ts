@@ -2,7 +2,9 @@ import { G, LOC } from '../core/buffers';
 import { headDeadlineTick, QUEUE_VISIBLE, RECENT_OUTCOMES } from '../core/constants';
 import type { World } from '../core/world';
 import { FAMILIES, familyKey, payoutAt } from '../market/families';
-import { canRunFleet, detailIndex } from '../market/fleet';
+import { canRunFleet, classesOf, detailIndex, gateOn, isEligibleMode } from '../market/fleet';
+import { MODE } from '../core/timers';
+import type { FamilyDef } from '../types/catalog';
 import { FIRST, nextLink } from '../net/paths';
 import { FAIL_CAUSES, FAIL_DETAILS, type EventRing, type FailCounts, type FailDetail } from '../types/events';
 import { familyId } from '../types/ids';
@@ -52,8 +54,33 @@ export function firstLinkSpeed(state: GameState): number {
   return 0;
 }
 
+type CapClass = ReturnType<typeof classesOf>[number];
+/**
+ * Online systems whose fixed hardware can run a task of `def` (QueueEntryView.capableSystems): the
+ * fleet check's size-free gates (fixed working set, GPU and GPU cores, VRAM, ECC, region) on each
+ * capability class, never load. Online: switched on, in a mode that takes work (or paused between
+ * rounds). Each class's online count is counted once per window and shared by its entries.
+ */
+function capableCounter(state: GameState): (def: FamilyDef | undefined) => number {
+  const c = state.compiled, mode = state.hot.sys.mode, intent = c.sys.intent, online = new Map<CapClass, number>();
+  const onlineIn = (cls: CapClass): number => {
+    let n = online.get(cls);
+    if (n !== undefined) return n;
+    n = 0;
+    for (const m of cls.members) if (intent[m] === 1 && (isEligibleMode(mode[m]!) || mode[m] === MODE.paused)) n += 1;
+    online.set(cls, n);
+    return n;
+  };
+  return (def) => {
+    if (!def) return 0;
+    let n = 0;
+    for (const cls of classesOf(c)) if (gateOn(c, cls.rep, def, 0) === 0) n += onlineIn(cls);
+    return n;
+  };
+}
+
 function entry(state: GameState, roundIndex: number, taskId: number, family: number, size: number, committed: boolean, speed: number,
-  deadline: number | null, windowEndTick: number | null): QueueEntryView {
+  deadline: number | null, windowEndTick: number | null, capable: (def: FamilyDef | undefined) => number): QueueEntryView {
   const face = familyFace(family);
   const def = FAMILIES[family];
   const gate = state.round.phase === 'running' && def ? canRunFleet(state, def, size) : 0;
@@ -63,22 +90,22 @@ function entry(state: GameState, roundIndex: number, taskId: number, family: num
     kind: 'task', task: { epoch: state.epoch, roundIndex, taskId }, key: taskId, icons: face.icons,
     committed, dismissible: !committed,
     blockedBy: gate !== 0 ? FAIL_DETAILS[detailIndex(gate)] ?? null : null,
-    work, transferS: speed > 0 ? work / speed : null, windowEndTick,
+    work, transferS: speed > 0 ? work / speed : null, windowEndTick, capableSystems: capable(def),
   };
 }
 
 /** The first QUEUE_VISIBLE queue entries, head first: the front (returned work), then the window tasks. */
 export function queueWindow(state: GameState): QueueEntryView[] {
   const out: QueueEntryView[] = [];
-  const hot = state.hot, m = state.market, speed = firstLinkSpeed(state);
+  const hot = state.hot, m = state.market, speed = firstLinkSpeed(state), capable = capableCounter(state);
   for (let r = hot.g[G.frontHead] ?? -1; r >= 0 && out.length < QUEUE_VISIBLE; r = hot.rec.next[r] ?? -1) {
     const deadline = hot.rec.deadline[r]! >= 0 ? hot.rec.deadline[r]! : null;
     out.push(entry(state, m.roundIndex, hot.rec.taskId[r]!, hot.rec.family[r]!, hot.rec.units[r]!, true, speed,
-      deadline, deadline === null ? null : hot.rec.taken[r]! + deadline - 1));
+      deadline, deadline === null ? null : hot.rec.taken[r]! + deadline - 1, capable));
   }
   for (const t of m.window) {
     if (out.length >= QUEUE_VISIBLE) break;
-    out.push(entry(state, m.roundIndex, t.taskId, t.family, t.size, false, speed, t.deadline, null));
+    out.push(entry(state, m.roundIndex, t.taskId, t.family, t.size, false, speed, t.deadline, null, capable));
   }
   return out;
 }

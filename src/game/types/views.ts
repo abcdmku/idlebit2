@@ -381,6 +381,11 @@ export interface QueueEntryView extends TaskRequirementsView {
   readonly work: number;
   /** Seconds the transfer takes at the current first-link speed (work / speed); null without a link. */
   readonly transferS: number | null;
+  /**
+   * The player's online systems whose fixed hardware can run this task: the router's can-run gates
+   * that don't depend on its size (fixed working set, GPU and GPU cores, VRAM, ECC, region), never load.
+   */
+  readonly capableSystems: number;
   /** D26.5: for taken work returned to the front, the last tick it may be met (takeTick + deadline − 1); null when untaken or the family has none. */
   readonly windowEndTick: number | null;
 }

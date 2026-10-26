@@ -95,6 +95,9 @@ export function PlatformLine({ saveNow }: { saveNow?: () => void } = {}) {
     <button type="button" className="skey" data-qa-target style={{ position: 'relative', width: 96, height: 48 }}
       onClick={() => { saveNow?.(); window.location.reload(); }}>Reload</button>
   </div>;
+  // The notice line sits in the head card's free fourth line, out of the world: payout pops draw on top of
+  // everything in the world, and only menus may cover them (user, 26 Oct).
+  const d = L.kind === 'desktop', tx = d ? L.lat + 16 * L.N + 8 : 48, y = d ? L.lat + 3 * L.lh : 64;
   return <p className={`platform-line${status ? '' : ` ${flash?.tone ?? ''}`}`} role="status" hidden={!text} data-testid="platform-line"
-    style={{ left: L.view.x + L.lat, top: L.view.y + L.view.h - L.lat - L.lh, maxWidth: L.view.w - 2 * L.lat, height: L.lh }}>{text}</p>;
+    style={{ left: L.now.x + tx, top: L.now.y + y, maxWidth: L.now.w - tx - 8, height: L.lh }}>{text}</p>;
 }

@@ -12,6 +12,8 @@ import { Deck } from './deck/Deck';
 import { OffersScope } from './deck/useOffers';
 import { Hud } from './Hud';
 import { useHotkeys } from './hooks/useHotkeys';
+import { closeTopmost, LeaveDialog, useBackGuard } from './shell/backGuard';
+import { TaskDetail } from './queue/TaskDetail';
 import { useMediaQuery } from './hooks/useMediaQuery';
 import { NO_INSETS, shellLayout, type SafeInsets, type ShellLayout } from './layout';
 import { PlateLayer } from './plates';
@@ -122,8 +124,10 @@ export function GameShell({ store, registry, level, view, size, saveNow, childre
     });
   }, [shell, store]);
 
+  const guard = useBackGuard(shell, saveNow);
   useHotkeys({
-    escape: () => shell.view.dispatch({ type: 'cancel' }),
+    // One menu per press, innermost first, as the phone's back does; with nothing open, nothing happens.
+    escape: () => { closeTopmost(shell); },
     '+': () => shell.view.dispatch({ type: 'zoomStep', direction: 'in' }),
     '=': () => shell.view.dispatch({ type: 'zoomStep', direction: 'in' }),
     '-': () => shell.view.dispatch({ type: 'zoomStep', direction: 'out' }),
@@ -147,7 +151,9 @@ export function GameShell({ store, registry, level, view, size, saveNow, childre
             <PlateLayer />
             <ResearchScreen />
             <RoundPlate />
+            <TaskDetail />
           </OffersScope>
+          <LeaveDialog guard={guard} />
           {children}
         </div>
       </main>

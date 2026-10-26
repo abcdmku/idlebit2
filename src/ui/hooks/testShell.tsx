@@ -98,7 +98,7 @@ export function mount(node: ReactNode, store: GameStore, size?: { width: number;
 
 export function entry(key: number, family = 0, committed = false): QueueEntryView {
   return { ...taskFacts(family), kind: 'task', key, task: { epoch: 1, roundIndex: 1, taskId: key },
-    committed, dismissible: !committed, blockedBy: null, icons: ['compute'], work: 1, transferS: 0.001, windowEndTick: null };
+    committed, dismissible: !committed, blockedBy: null, icons: ['compute'], work: 1, transferS: 0.001, windowEndTick: null, capableSystems: 1 };
 }
 
 function taskFacts(family = 0): TaskRequirementsView {

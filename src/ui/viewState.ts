@@ -26,6 +26,8 @@ export interface ViewState {
   readonly plate: boolean;
   readonly sheet: Sheet | null;
   readonly researchProject: ResearchId | null;
+  /** A queue card's task detail is open: its task key (`epoch:round:taskId`, never shown). */
+  readonly task: string | null;
   readonly reducedMotion: boolean;
 }
 
@@ -37,6 +39,9 @@ export type ViewCommand =
   | { readonly type: 'openPlate' }
   | { readonly type: 'openResearch'; readonly project?: ResearchId | null }
   | { readonly type: 'toggleSheet'; readonly sheet: Sheet }
+  | { readonly type: 'openTask'; readonly task: string }
+  /** Phone back, browser Back and Escape: close the topmost menu only (task detail, plate, callout, sheet). */
+  | { readonly type: 'back' }
   | { readonly type: 'cancel' };
 
 export interface ViewStore {
@@ -51,7 +56,7 @@ export interface ViewStore {
   reset(next: ViewState): void;
 }
 
-const CLEAR = { selectedId: null, selected: null, plate: false } as const;
+const CLEAR = { selectedId: null, selected: null, plate: false, task: null } as const;
 const same = (a: NodeRef | null, b: NodeRef | null) => a === b || (!!a && !!b && a.level === b.level && a.id === b.id);
 
 export function initialView(snapshot: RenderSnapshot, level: LevelId = 'chip', reducedMotion = false): ViewState {
@@ -121,8 +126,17 @@ export function createViewStore(read: () => RenderSnapshot, initial: ViewState):
         return state.sheet === command.sheet ? { ...state, sheet: null, researchProject: null }
           : { ...state, ...CLEAR, sheet: command.sheet, researchProject: null };
       case 'cancel':
-        return state.selected || state.sheet
+        return state.selected || state.sheet || state.task
           ? { ...state, ...CLEAR, sheet: null, researchProject: null } : state;
+      case 'openTask':
+        return { ...state, ...CLEAR, sheet: null, researchProject: null, task: command.task };
+      case 'back':
+        // Innermost first: a task detail, then a plate (back to its callout), the callout, then a sheet.
+        if (state.task) return { ...state, task: null };
+        if (state.plate) return { ...state, plate: false };
+        if (state.selected) return { ...state, ...CLEAR };
+        if (state.sheet) return { ...state, sheet: null, researchProject: null };
+        return state;
     }
   };
   return {

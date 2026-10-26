@@ -172,7 +172,7 @@ export function createCanvasRenderer(canvas: HTMLCanvasElement, registry: LevelR
     visible.w = corner.x - visible.x; visible.h = corner.y - visible.y; frame!.visible = visible;
     fill(s.level, 1); blit(s, cam, 1, true);
     const lv = level(s), type = form === 'phone' ? PHONE_TYPE : DESKTOP_TYPE;
-    // The level's labels are written here and drawn after the payout pops (drawWorldLabels, QA-18).
+    // The level's labels are written here and drawn after the world art and fault marks (drawWorldLabels).
     labels.clear(); labelType = null;
     if (lv.labels) {
       const worldType = typeForScale(frame!.scale ?? framing?.scale ?? 3);
@@ -230,7 +230,7 @@ export function createCanvasRenderer(canvas: HTMLCanvasElement, registry: LevelR
     }
     return zoomLayer;
   }
-  /** The rest world's labels, over the payout pops so a rising pop never hides one (QA-18). */
+  /** The rest world's labels, over the world art; the payout pops draw over them (drawFrame). */
   function drawWorldLabels(): void {
     if (labelType) drawLabels(g, labels, cam, viewport, ratio, labelType);
   }
@@ -260,13 +260,16 @@ export function createCanvasRenderer(canvas: HTMLCanvasElement, registry: LevelR
     }
     try { fb.take(next, level(next.focus), form, frame.timeMs, clock.nowS, !zoom.active && !paused); }
     catch (error) { reportRenderError(`${next.focus.level} payoutAnchor`, error); }
-    if (!zoom.active) { drawRest(next.focus, clock.nowS); drawFaults(next.focus); if (!paused) drawPops(); drawWorldLabels(); }
+    if (!zoom.active) { drawRest(next.focus, clock.nowS); drawFaults(next.focus); drawWorldLabels(); }
     if (framing) fb.drawFailure(g, clock.nowS, framing, viewport, ratio);
     if (paused) { g.save(); g.translate(viewport.x * ratio.x, viewport.y * ratio.y); drawVeil(g, viewport.w * ratio.x, viewport.h * ratio.y); g.restore(); }
     effects.update(Math.max(0, clock.nowS - lastNow)); lastNow = clock.nowS;
     g.setTransform(ratio.x, 0, 0, ratio.y, 0, 0);
     if (!zoom.active) effects.draw(g, nextView.reducedMotion);
     g.setTransform(1, 0, 0, 1, 0, 0);
+    // Payout pops go last (user): above the world art, labels, pipe tags, fault marks, the failure
+    // beat and the purchase flash, clipped to the world. Only the DOM menus sit over them.
+    if (!zoom.active && !paused) { drawPops(); g.setTransform(1, 0, 0, 1, 0, 0); }
   }
   const renderer: CanvasRendererDebug = {
     get bufferCount() { return buffers.size; },

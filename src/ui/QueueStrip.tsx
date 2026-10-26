@@ -9,12 +9,12 @@ import { drawFlask } from './art/deckArt';
 import { MIN_VISIBLE_TRANSFER_S, type Rect } from '../render/core';
 import { TaskAccent, taskTypeStyle } from './art/TaskType';
 import { RimClock } from './hooks/headClock';
-import { familyName, payoutShort, payoutText } from './hooks/feedModel';
+import { familyName, payoutShort, payoutText, taskKey } from './hooks/feedModel';
 import type { ShellLayout } from './layout';
 import { headRisk, SLA_WINDOW } from './queue/risk';
 import { fits, HeadClock, InQueue, needShort, shortSeconds, TaskIcon, taskTitle, windowText } from './queue/taskText';
 import { box, T, useLayout } from './shell/geometry';
-import { shallowEqual, useGameSelector } from './storeHooks';
+import { shallowEqual, useGameSelector, useShell } from './storeHooks';
 
 export { TaskIcon } from './queue/taskText';
 
@@ -22,6 +22,7 @@ export { TaskIcon } from './queue/taskText';
 function Tag({ L, t, slot, running, risk, waiting = false, twoLine = false }: { L: ShellLayout; t: QueueEntryView; slot: number; running: boolean; risk: boolean;
   /** QA-22: the four cards share one form; when any name and payout can't share a line, all take two. */ twoLine?: boolean;
   /** D27: research waits at the front, so the market's head waits behind it. */ waiting?: boolean }) {
+  const { view } = useShell();
   const head = slot === 0, d = L.kind === 'desktop', n = L.N, icon = 16 * n;
   const rect: Rect = head ? L.headSlot : L.cards[slot - 1]!;
   const blocked = running && t.blockedBy !== null;
@@ -68,8 +69,12 @@ function Tag({ L, t, slot, running, risk, waiting = false, twoLine = false }: { 
       <T x={8} y={40} w={rect.w - 8} className={!running ? 'dim' : blocked ? 'warn' : 'gold'}>{blocked ? needShort(t, true) : payoutShort(t)}</T>
     </>;
   }
+  // Tapping a card opens its task detail (user, 26 Oct).
+  const open = () => view.dispatch({ type: 'openTask', task: taskKey(t.task) });
   return <div className={`tag${head ? ' is-head' : ''}${blocked ? ' blocked' : ''}`} style={{ left: 0, top: 0, width: rect.w, height: rect.h, ...taskTypeStyle(t.family) }}
-    data-task={`${t.task.epoch}:${t.task.roundIndex}:${t.task.taskId}`} data-k={head ? 'head-task' : `card${slot - 1}`} title={taskTitle(t)}>
+    data-task={taskKey(t.task)} data-k={head ? 'head-task' : `card${slot - 1}`} title={taskTitle(t)}
+    role="button" tabIndex={0} aria-label={`${familyName(t.family)}: details`} data-qa-target={rect.h >= 44 ? '' : undefined}
+    onClick={open} onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); open(); } }}>
     <TaskAccent n={n} />
     {body}
   </div>;

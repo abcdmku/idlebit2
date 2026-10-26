@@ -213,3 +213,25 @@
 .v3-plate .gen-bar b { display: block; height: 100%; background: #7dff9a; }
 .v3-plate .start-step .step { text-align: center; padding: 0; }
 .v3-plate .start-step > span { white-space: nowrap; }
+
+/* Task detail (user, 26 Oct): a plate under the tapped card; on phone a sheet across the world's bottom. */
+.v3-plate.task-detail .td-ic { order: -1; line-height: 0; align-self: center; }
+.v3-plate.task-detail .td-note { margin: 4px 0 0; }
+.v3-plate.task-detail .td-facts { display: grid; grid-template-columns: 64px minmax(0, 1fr); gap: 4px 8px; margin: 8px 0 0; }
+.v3-plate.task-detail .td-facts dt { color: #a99be6; }
+.v3-plate.task-detail .td-facts dd { margin: 0; display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.v3-plate.task-detail .td-facts dd[data-testid="td-pays"] { flex-direction: row; gap: 12px; }
+.v3-plate.task-detail .td-facts dd[data-testid="td-pays"] > span { display: inline-flex; align-items: center; gap: 4px; }
+.v3-plate.task-detail .td-facts .gold { color: var(--gold); } .v3-plate.task-detail .td-facts .data { color: #3ee0a0; }
+.v3-plate.task-detail .td-status { margin-top: 8px; font-weight: 700; }
+.v3-plate.task-detail .td-status.warn { color: #ffb03b; }
+.v3-plate.task-detail .td-status.mute { color: #a99be6; }
+.l-phone .v3-plate.task-detail.sheet { width: calc(100% - 16px); }
+
+/* Leave dialog: in game, Stay first and focused */
+.leave-veil { position: absolute; inset: 0; z-index: 40; background: #0e0b1c99; pointer-events: auto; display: grid; place-items: center; }
+.leave-veil .v3-plate.leave-dialog { position: relative; left: auto; top: auto; width: 288px; }
+.leave-dialog .leave-keys { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+
+/* A quiet key (Leave, Dismiss): plain, never the deck's row class */
+.v3-plate .key.quiet { background: #29234b; color: #efeaff; box-shadow: inset 0 -4px 0 #1b1437, inset 0 2px 0 #5d5296, 0 0 0 2px #0e0b1c; }

@@ -140,7 +140,8 @@ function TargetPlate({ target: t, focus }: { target: HitTarget; focus: LevelSnap
   const common: Omit<PlateCommon, 'quotes'> = {
     readAnchor, subscribeFrame, bounds: surface.plateBounds, bootS: bootMs / 1000,
     onAction: (a: GameAction) => { shell.dispatch(a); },
-    onClose: () => view.dispatch({ type: 'cancel' }),
+    // One level, as Back and Escape do: the plate closes to its callout.
+    onClose: () => view.dispatch({ type: 'back' }),
     onResearch: (project) => view.dispatch({ type: 'openResearch', project }),
     researchName: (id) => researchNames.get(id) ?? String(id),
   };
