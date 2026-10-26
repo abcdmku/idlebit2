@@ -13,6 +13,7 @@ import { OffersScope } from './deck/useOffers';
 import { Hud } from './Hud';
 import { useHotkeys } from './hooks/useHotkeys';
 import { closeTopmost, LeaveDialog, useBackGuard } from './shell/backGuard';
+import { IS_SANDBOX } from './shell/sandbox';
 import { TaskDetail } from './queue/TaskDetail';
 import { useMediaQuery } from './hooks/useMediaQuery';
 import { NO_INSETS, shellLayout, type SafeInsets, type ShellLayout } from './layout';
@@ -138,7 +139,7 @@ export function GameShell({ store, registry, level, view, size, saveNow, childre
     '--head': `${layout.body + 2}px`, '--n': `${layout.N}px` } as CSSProperties;
   return <ShellContext.Provider value={shell}>
     <LayoutContext.Provider value={layout}>
-      <main ref={ref} className={`br-shell scr l-${layout.kind}`} aria-label="idlebit2" data-reduced-motion={reducedMotion}>
+      <main ref={ref} className={`br-shell scr l-${layout.kind}${IS_SANDBOX ? ' sandbox' : ''}`} aria-label="idlebit2" data-reduced-motion={reducedMotion}>
         <div className="stage" style={{ ...box({ x: layout.x, y: layout.y, w: layout.w, h: layout.h }), ...vars }} data-testid="stage"
           data-n={layout.N} data-lat={layout.lat} data-kind={layout.kind}>
           <CanvasWorld />

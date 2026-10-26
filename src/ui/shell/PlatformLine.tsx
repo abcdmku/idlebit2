@@ -9,6 +9,7 @@ import { useGameSelector, usePlatformStatus, useShell } from '../storeHooks';
 import { restartKey, restartOf, restartText } from '../queue/restart';
 import { useLayout } from './geometry';
 import { useNewVersion } from './version';
+import { IS_SANDBOX } from './sandbox';
 
 const FAIL_MS = 3000, ROUND_MS = 2000;
 
@@ -87,7 +88,7 @@ export function PlatformLine({ saveNow }: { saveNow?: () => void } = {}) {
   // The focused system restarting (a cold change, a boot) is said plainly in the world itself.
   const restart = useGameSelector(restartOf, (a, b) => restartKey(a) === restartKey(b), 250);
   const status = p.catchingUp ? `Catching up${p.progress === null ? '' : ` · ${p.progress}%`}` : notice ?? (restart.on ? restartText(restart) : null);
-  const text = status ?? flash?.text ?? null;
+  const text = status ?? flash?.text ?? (IS_SANDBOX ? 'Sandbox · wallet refills' : null);
   // A newer build is deployed: a quiet, stable banner in the same place, with a 48 px Reload that saves first.
   if (newer) return <div className="platform-line version" role="status" data-testid="new-version"
     style={{ left: L.view.x + L.lat, top: L.view.y + L.view.h - L.lat - 48, maxWidth: L.view.w - 2 * L.lat, height: 48 }}>
