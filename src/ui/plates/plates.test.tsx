@@ -9,7 +9,7 @@ import { PartPlate } from './PartPlate';
 import { SupplyPlate } from './SupplyPlate';
 import { SwitchPlate } from './SwitchPlate';
 import { ServerPlate, neighbours } from './UnitPlate';
-import { button, buttons, click, mount, q, researchLock, result, type Mounted } from './testkit';
+import { button, click, mount, q, researchLock, result, type Mounted } from './testkit';
 
 let m: Mounted, acts: GameAction[], onAction: (a: GameAction) => void, onClose: () => void;
 beforeEach(() => { m = mount(); acts = []; onAction = (a) => { acts.push(a); }; onClose = vi.fn(); });
@@ -113,51 +113,37 @@ const sw = (sameSpeed: boolean): SwitchView => ({ generation: 0, topHz: 500_000,
   ports: [port(50_000, 0, true), port(20_000, 1), port(5_000, 2), port(1_000, null)], uplinks: [port(20_000, null)] });
 const rsw = { kind: 'rack', id: rackId(0) } as const;
 
-describe('switch plate: port grid, per-port price, same-speed toggle with the summed price', () => {
+describe('switch plate (D35: the switch has ports, systems don\'t)', () => {
   const perPort = [0, 1, 2, 3].map((i) => q({ type: 'upgradePort', sw: rsw, port: i }, 1000 + i * 1000,
     { effect: { ...effect(1, 1, null), unit: 'bit/s', capacityAfter: [100_000, 50_000, 10_000, 2_000][i] } }));
-  const addPort = q({ type: 'addPorts', sw: rsw }, 30_200);
+  const all = q({ type: 'upgradePort', sw: rsw, port: 'all' }, 10_000, { effect: { ...effect(1, 1, null), unit: 'bit/s', capacityAfter: 100_000 } });
 
-  it('lights active ports, dims unlinked ones, and prices the selected port', () => {
-    m.render(<SwitchPlate sw={rsw} view={sw(false)} units={5} quotes={result([...perPort, addPort])} onAction={onAction} onClose={onClose} />);
-    const cells = m.host.querySelectorAll('.cx-cell');
-    expect(cells).toHaveLength(4);
-    expect(cells[0].querySelector('b')?.textContent).toBe('50 kHz');
-    expect(cells[0].querySelector('i')?.className).toBe('on');
-    expect(cells[3].className).toContain('dim');
-    expect(m.host.textContent).toContain('2 servers have no port, so no tasks');
-    expect(button(m.host, 'Port 1').textContent).toContain('100 kHz');
-    expect(button(m.host, 'Port 1').textContent).toContain('1,000');
-    click(cells[2]);
-    expect(button(m.host, 'Port 3 · 10 kHz').textContent).toContain('3,000');
-    click(button(m.host, 'Port 3'));
-    expect(acts).toEqual([perPort[2].action]);
-    click(button(m.host, 'Add port 5'));
-    expect(acts[1]).toEqual({ type: 'addPorts', sw: rsw });
+  it('All ports leads; Match ports on keeps one speed and shows no per-port rows', () => {
+    m.render(<SwitchPlate sw={rsw} view={sw(true)} units={4} quotes={result([...perPort, all])} onAction={onAction} onClose={onClose} />);
+    const key = button(m.host, /^All ports · .+ → 100 kHz/);
+    expect(key.textContent).toContain('10k');
+    expect(m.host.querySelector('.port-list')).toBeNull();
+    expect(m.host.textContent).not.toMatch(/servers? ha(s|ve) no port/);
+    click(key);
+    expect(acts).toEqual([all.action]);
   });
 
-  it('the toggle sends setSameSpeed; while on, one key raises every port at the summed price', () => {
+  it('Match off lists each port with the system it links, each upgradeable alone; the toggle sends setSameSpeed', () => {
     m.render(<SwitchPlate sw={rsw} view={sw(false)} units={4} quotes={result(perPort)} onAction={onAction} onClose={onClose} />);
     const toggle = m.host.querySelector('[role="switch"]')!;
-    expect(toggle.getAttribute('aria-checked')).toBe('false');
-    expect(toggle.textContent).toContain('Each port upgrades alone');
+    expect(toggle.textContent).toContain('Match ports');
+    expect(m.host.querySelectorAll('.port-list li')).toHaveLength(4);
+    const p3 = button(m.host, /^Port 3 · /);
+    expect(p3.textContent).toContain('→ 10 kHz');
+    click(p3);
+    expect(acts).toEqual([perPort[2]!.action]);
     click(toggle);
-    expect(acts).toEqual([{ type: 'setSameSpeed', sw: rsw, on: true }]);
-
-    const all = q({ type: 'upgradePort', sw: rsw, port: 'all' }, 10_000, { effect: { ...effect(1, 1, null), capacityAfter: 100_000 } });
-    m.render(<SwitchPlate sw={rsw} view={sw(true)} units={4} quotes={result([...perPort, all])} onAction={onAction} onClose={onClose} />);
-    expect(m.host.querySelector('[role="switch"]')?.textContent).toContain('One upgrade raises every port');
-    expect(m.host.querySelectorAll('.cx-cell.sel')).toHaveLength(0);
-    const key = button(m.host, 'All 4 ports · 100 kHz');
-    expect(key.textContent).toContain('10k');
-    expect(buttons(m.host).some((b) => /^Port \d/.test(b.textContent ?? ''))).toBe(false);
-    click(key);
-    expect(acts[1]).toEqual(all.action);
+    expect(acts[1]).toEqual({ type: 'setSameSpeed', sw: rsw, on: true });
   });
 
-  it('a port at the switch top speed says so', () => {
+  it('a port at the top speed says so', () => {
     m.render(<SwitchPlate sw={rsw} view={sw(false)} units={4} quotes={result([])} onAction={onAction} onClose={onClose} />);
-    expect(button(m.host, 'Port 1 · top speed').disabled).toBe(true);
+    expect(m.host.querySelector('.port-list')?.textContent).toContain('top speed');
   });
 });
 
@@ -215,13 +201,11 @@ describe('network rack: uplinks per rack and the room load balancer behind one k
     m.render(<NetworkRackPlate room={room} zone={0} network={{ switch: sw(true), lb: lb({ strategy: 'leastConn' }) }} racks={6}
       quotes={result([q({ type: 'upgradePort', sw: rsw2, port: 'all' }, 108_000_000)])} lbQuotes={result([])} onAction={onAction} onClose={onClose} />);
     expect(m.host.querySelector('.p-title')?.textContent).toBe('Network rack');
-    expect(m.host.querySelector('.cx-cell')?.textContent).toContain('R1');
-    expect(button(m.host, 'All 4 uplinks').textContent).toContain('108M');
-    expect(m.host.textContent).toContain('3 racks have no uplink, so no tasks');
+    expect(button(m.host, /^All ports/).textContent).toContain('108M');
     click(button(m.host, 'Load balancer · LC'));
     expect(m.host.querySelector('.p-title')?.textContent).toBe('Room load balancer');
     expect(m.host.textContent).toContain('Fewest tasks in flight');
-    click(button(m.host, 'Port speeds and count'));
+    click(button(m.host, 'Switch speed'));
     expect(m.host.querySelector('.p-title')?.textContent).toBe('Network rack');
   });
 });
@@ -274,16 +258,15 @@ describe('server plate: previous and next', () => {
     expect(neighbours(servers, 4)).toEqual([2, 0]);
     expect(neighbours([servers[0], ...servers.slice(5)], 0)).toBeNull();
   });
-  it('steps with ‹ › keys and says when a server has no port', () => {
+  it('steps with ‹ › keys; a server says nothing about ports (D35)', () => {
     const onStep = vi.fn(), onGoInside = vi.fn();
     m.render(<ServerPlate slot={2} servers={servers} market={{ unit: { kind: 'system', id: systemId(2) }, on: true, live: 1, total: 1, drains: false, running: true, parentOff: null }} onStep={onStep} onGoInside={onGoInside} onAction={onAction} onClose={onClose} />);
     expect(m.host.querySelector('.p-title')?.textContent).toBe('Server 3');
-    expect(m.host.querySelector('.p-status')?.textContent).toBe('No switch port, so no tasks');
+    expect(m.host.querySelector('.p-status')?.textContent).toBe('Idle');
+    expect(m.host.textContent).not.toMatch(/port/i);
     click(button(m.host, '‹ Server 1'));
     click(button(m.host, 'Server 5 ›'));
-    click(button(m.host, 'Go inside'));
     expect(onStep.mock.calls).toEqual([[0], [4]]);
-    expect(onGoInside).toHaveBeenCalled();
     expect(m.host.querySelector('.p-online')).not.toBeNull();
   });
 });

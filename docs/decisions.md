@@ -1314,6 +1314,19 @@ The user's words:
 7. **Fixes after live play (user: "multi core doesnt work", "l2 cache doesnt seem to do anything").** The running limit was the scheduler's K (1 at Run queue L1, 1 with no scheduler), so extra cores sat idle while tasks queued: `Keff` is now the thread count (every core runs a task). The Hz L2 started at 8 b, next to an L1 that is about 128 b by then: its base is now 128 b, so buying it doubles the cache tasks can use. Seed 42: System 0:20, Rack 5:44; passive round 1 unchanged. Test: `build/multicore.test.ts`.
 6. **Quick balance (time-boxed, seed 42):** the Hz clock's upgrade base is 8 (was 3). D20 passive round 1 unchanged (0:36 / 0:55 / 1:16); System 0:22; Rack 6:56. Tree: 165 nodes. `SAVE_VERSION` 15.
 
+**D35, 25 Oct: ports belong to the switch; a system has no port (user).** Binding. It amends D13 and D15.
+
+> system port shouldnt be needed it should just accept the pipe from the switch, that upgrade implicitly upgrades system port. dont mention system port and dont have it a concept, its too deep for this game.
+
+> well each port ON THE SWITCH can be upgraded or the rack can be upgraded as a whole/toggled to add ports at same speed
+
+1. **A system has no port** in views, quotes or copy. It runs at the speed of the switch port it sits on. Before Rack nothing changes: the fixed default pipe (100 kHz, D29), with no ports shown.
+2. **Switch ports.** Each rack-switch port keeps its own speed and its per-port step (`upgradePort { sw, port: n }`, label "Port n · speed").
+3. **Whole switch.** `upgradePort { sw, port: 'all' }` raises every port to the next step (the highest port's speed, or one step past it when all match) atomically, for the summed per-port steps. It is offered whatever the toggle says.
+4. **Match ports** is the switch's `sameSpeed` setting (action `setSameSpeed { sw, on }`, hot and free, saved), **default on** for every new switch. While on, a single-port step applies to every port (the whole-switch step), and a port added later (port expansion, or a new server's port) arrives at the switch's speed, charged the steps to it. While off, ports step one by one and new ports arrive at the generation's base speed.
+5. **Room.** A network rack's ports follow the same pattern. Uplinks, the data plane and the backbone stay their own link parts.
+6. **Views:** unchanged fields (`SwitchView.sameSpeed` is the match toggle; ports keep `speedHz`). The UI drops the system "Port" box and labels.
+
 ## 16. Shared rules for agents
 
 - **Shared checkout.** Other agents work in the same checkout at the same time. Edit only the files your brief gives you. Never revert someone else's edits. Run no git command that changes state.

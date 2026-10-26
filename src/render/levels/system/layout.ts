@@ -16,11 +16,12 @@ export const BOARD = { x: 8, y: 34, w: 152, h: 186, z: 6 } as const;
 export const FOCUS: Readonly<Rect> = { x: 6, y: 24, w: 156, h: 196 };
 
 /** Integrated network link at the rear edge; its cable comes down from the world's top edge. */
-export const PORT = { x: 16, y: 46, w: 34, h: 10, z: 12 } as const;
+/** D35: the pipe from the switch enters the board at a plain connector on its rear edge (no port). */
 export const CABLE_X = 33;
+export const CONNECTOR = { x: CABLE_X - 3, y: BOARD.y - 2, w: 7, h: 4 } as const;
 /** The board PSU in the rear strip (mockup core/power.js SUPPLIES.system). */
 export const PSU: Readonly<Rect> = { x: 57, y: 47, w: 46, h: 10 };
-/** Reserved spot for the save icon: rear right corner, clear of the PSU and the port. */
+/** Reserved spot for the save icon: rear right corner, clear of the PSU and the pipe's connector. */
 export const SAVE = { x: 138, y: 37 } as const;
 /** The system's online lamp, inline after the board silk. */
 export const LAMP = { x: 77, y: 32, w: 12 } as const;

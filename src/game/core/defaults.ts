@@ -20,9 +20,9 @@ export const baseRouter = (gen = 0): RouterBuild => ({ gen, level: 1, strategy: 
  * room on a gen 0 data-plane port.
  */
 export const rackSwitch = (gen = 0, ports = 4): SwitchBuild =>
-  ({ gen, ports: Array(ports).fill(SWITCH.baseK[gen]!), uplinks: [ROOM_SWITCH.baseK[0]!], sameSpeed: false });
+  ({ gen, ports: Array(ports).fill(SWITCH.baseK[gen]!), uplinks: [ROOM_SWITCH.baseK[0]!], sameSpeed: true });
 export const roomSwitch = (gen = 0, ports = 4): SwitchBuild =>
-  ({ gen, ports: Array(ports).fill(ROOM_SWITCH.baseK[gen]!), uplinks: [DATA_PLANE.baseK[0]!], sameSpeed: false });
+  ({ gen, ports: Array(ports).fill(ROOM_SWITCH.baseK[gen]!), uplinks: [DATA_PLANE.baseK[0]!], sameSpeed: true });
 
 const BAREBONES_SPECS = new Map<string, SystemSpec>();
 

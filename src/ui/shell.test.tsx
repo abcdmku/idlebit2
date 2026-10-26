@@ -226,19 +226,14 @@ describe('upgrade callout (D15.4)', () => {
     expect($('[data-testid=callout]')!.style.height).toBe('104px');
     expect($('[data-testid=callout-buy]')!.style.height).toBe('48px');
   });
-  it('a unit seen from above offers Open, which drills in', () => {
+  it('a part with no plate sits left of it when the right is full, clear of it', () => {
     const store = fakeStore();
-    store.set({ unlocked: { chip: true, system: true, rack: false, room: false, global: false } });
     mounted = mount(<OffersScope><Callout /></OffersScope>, store, DESKTOP);
-    withRenderer(mounted, { x: 1200, y: 300, w: 96, h: 96 }, 'sys0');
-    const sys = { level: 'system', id: systemId(0) } as const;
-    act(() => mounted!.shell.view.dispatch({ type: 'select', target: target({ id: 'sys0', kind: 'child', part: null, drill: sys }) }));
-    const c = $('[data-testid=callout]')!;
-    expect(c.style.left).toBe('896px');   // no room on the right: it sits left of the unit, clear of it
-    expect(c.textContent).toContain('System 1');
-    act(() => $('[data-testid=callout-open]')!.click());
-    expect(mounted.shell.view.getState().focus).toEqual(sys);
+    withRenderer(mounted, { x: 1200, y: 300, w: 96, h: 96 }, 'queue');
+    act(() => mounted!.shell.view.dispatch({ type: 'select', target: target({ id: 'queue', kind: 'slot', part: null, slot: 0 }) }));
+    expect($('[data-testid=callout]')!.style.left).toBe('896px');
   });
+
 });
 
 describe('round plate', () => {

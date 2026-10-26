@@ -5,7 +5,7 @@ import type { SystemSnapshot } from '../../../game';
 import { P, R, copyRect, partVersionOf, resetHitTarget, setRect } from '../../core';
 import type { HitTarget, LevelRegistry, LevelRenderer, Rect } from '../../core';
 import { writeLabels } from './labels';
-import { CABLE_X, FOCUS, PORT, PSU, SAVE, WORLD, packageRect, siteRect, worldRect } from './layout';
+import { CABLE_X, FOCUS, PSU, SAVE, WORLD, packageRect, siteRect, worldRect } from './layout';
 import { boardModel, boardPartRef, slotOf } from './model';
 import { drawSystemMini } from './mini';
 import { drawBoard } from './world';
@@ -28,7 +28,6 @@ function unitTarget(s: SystemSnapshot, out: HitTarget[], i: number, id: string, 
   return i + 1;
 }
 const NAME: Rect = { x: 56, y: 28, w: 36, h: 8 };
-const PORT_RECT: Rect = { x: PORT.x, y: PORT.y - PORT.z, w: PORT.w, h: PORT.h + PORT.z };
 
 export function createSystemRenderer(registry: LevelRegistry): LevelRenderer<'system'> {
   return {
@@ -48,9 +47,8 @@ export function createSystemRenderer(registry: LevelRegistry): LevelRenderer<'sy
     },
     targets(s, _view, out, from) {
       const m = boardModel(s), b = m.b;
-      // The board name and lamp open the system's own plate; the port is the pipe (fixed until the Rack switch).
+      // The board name and lamp open the system's own plate. D35: no port target; the pipe's tag is its speed.
       let i = unitTarget(s, out, from, 'unit', 'unit', NAME);
-      i = unitTarget(s, out, i, 'pipe', 'link', PORT_RECT);
       for (const site of m.sites) {
         if (site.state === 'part' || i >= out.length) continue;
         const v = slotOf(s, site);

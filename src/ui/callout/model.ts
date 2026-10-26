@@ -40,7 +40,7 @@ export function targetName(t: HitTarget, focus: LevelSnapshot): string {
   const site = t.unit?.kind === 'site' && focus.level === 'global' ? focus.sites.find(s => s.siteId === t.unit!.id) : undefined;
   if (site) return regionName(site.region);
   if (t.drill && (t.kind === 'child' || t.kind === 'unit')) return nodeName(t.drill, focus);
-  if (t.kind === 'port') return t.port === -1 ? 'Uplink' : `Port ${(t.port ?? 0) + 1}`;
+  if (t.kind === 'port') return t.port === -1 ? 'Uplink' : 'Switch';
   if (t.kind === 'slot') return slotSite(t, focus).name;
   if (t.kind === 'unit' && t.unit) return t.unit.kind === 'system' ? `System ${t.unit.id + 1}` : t.unit.kind === 'rack' ? `Rack ${rackLetter(t.unit.id)}` : 'Unit';
   if (t.part) {

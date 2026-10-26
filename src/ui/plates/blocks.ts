@@ -9,3 +9,13 @@ export function blockedOn(window: readonly { readonly blockedBy: string | null }
   const clears = part ? PART_BLOCKS[part] : undefined;
   return clears ? window.filter(t => t.blockedBy !== null && clears.includes(t.blockedBy)).length : 0;
 }
+
+/** The first task in the visible line blocked on what `part` supplies, or null. */
+export function firstBlockedFor<T extends { readonly blockedBy: string | null }>(window: readonly T[], part: string | undefined): T | null {
+  const clears = part ? PART_BLOCKS[part] : undefined;
+  return clears ? window.find(t => t.blockedBy !== null && clears.includes(t.blockedBy)) ?? null : null;
+}
+
+/** Two parts supply the same thing (L1 and L2 both hold the working set). */
+export const sameSupply = (a: string | undefined, b: string | undefined): boolean =>
+  !!a && !!b && (a === b || (!!PART_BLOCKS[a] && PART_BLOCKS[a]![0] === PART_BLOCKS[b]?.[0]));

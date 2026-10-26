@@ -6,13 +6,13 @@ import { BG, P, R, darkFx, drawGhost, drawSaveIcon, drawUnitLamp, glowBit, lampS
 import type { GhostState, LevelRegistry, Point, Rect, ViewPresentation, WorldFrame } from '../../core';
 import { boardStatic } from './board';
 import { drawLeaders, firstRow } from './labels';
-import { CABLE_X, LAMP, PORT, POWERED, PSU, SAVE, packageRect, siteCentre, siteRect, worldRect } from './layout';
+import { CABLE_X, CONNECTOR, LAMP, POWERED, PSU, SAVE, packageRect, siteCentre, siteRect, worldRect } from './layout';
 import type { SiteType } from './layout';
 import { boardModel, pickedType } from './model';
 import { drawGpuSpill, drawReadLights, drawTiers } from './memory';
 import type { BoardModel, Site } from './model';
 import { drawGpuPiece, drawInbound, inboundOf } from './shards';
-import { drawCable, drawCpuSocket, drawDrivePart, drawEmptySite, drawGpuPart, drawPackageBody, drawPackageFront, drawPort, drawPsu,
+import { drawCable, drawCpuSocket, drawDrivePart, drawEmptySite, drawGpuPart, drawPackageBody, drawPackageFront, drawConnector, drawPsu,
   drawRamPart, drawSiteLocked } from './sprites';
 
 type G = CanvasRenderingContext2D;
@@ -52,7 +52,7 @@ export function drawBoard(g: G, s: SystemSnapshot, view: ViewPresentation, frame
   R(g, world.x, world.y, world.w, world.h, BG.system);
   g.drawImage(boardStatic(s.board), 0, 0);
   const transfer = live ? inboundOf(s) : null;
-  drawCable(g, CABLE_X, 0, PORT.y - PORT.z + 2, !!transfer);
+  drawCable(g, CABLE_X, 0, CONNECTOR.y + 1, !!transfer);
   const stageOn = activeStages(s, live);
   for (const site of m.sites) {
     if (site.state === 'locked') { drawSiteLocked(g, siteRect(b, site.type, site.index, hit)); continue; }
@@ -67,8 +67,8 @@ export function drawBoard(g: G, s: SystemSnapshot, view: ViewPresentation, frame
     const state = quoteState(view.quotes, pick);
     for (const site of m.sites) if (site.type === pick && site.state === 'open') { siteRect(b, site.type, site.index, hit); drawGhost(g, hit.x, hit.y, hit.w, hit.h, state); }
   }
-  drawPort(g, PORT, !!transfer);
-  // D25: the port's shard rides in at its real progress, in its task type's colour.
+  drawConnector(g, CONNECTOR, !!transfer);
+  // D25: the inbound shard rides in on the pipe at its real progress, in its task type's colour.
   if (transfer) drawInbound(g, transfer, b, frame);
   // D26: each tier fills its parts (spill hatched), and the tier a shard reads from now shows its light.
   drawTiers(g, s, m, live); drawGpuSpill(g, m, live); drawReadLights(g, s, m, frame.timeMs, live);

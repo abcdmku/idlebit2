@@ -66,7 +66,13 @@ function drawReadout(g: G, s: RackSnapshot, quiet: boolean): void {
 
 // ---------- switch ----------
 const SW_BODY = [mix(P.wafer, P.steelLo, 0.35), P.logicLo, mix(P.logicLo, P.ink, 0.25)];
-/** Port jacks with one transfer light each, lit only while that port carries a real transfer. */
+/** D35: the switch's port speeds, slowest and fastest (equal when they all match), 0 with no ports. */
+export function switchSpeeds(s: RackSnapshot, out: { lo: number; hi: number }): { lo: number; hi: number } {
+  out.lo = 0; out.hi = 0;
+  for (const p of s.switch.ports) if (p.speedHz > 0) { out.lo = out.lo ? Math.min(out.lo, p.speedHz) : p.speedHz; out.hi = Math.max(out.hi, p.speedHz); }
+  return out;
+}
+/** Port jacks, each with its transfer light (lit only while that link carries a real transfer) and its own speed tier (D35: ports upgrade one by one). */
 export function drawSwitch(g: G, s: RackSnapshot, quiet: boolean): void {
   const r = SWITCH_RECT, sw = s.switch, gen = Math.max(0, Math.min(2, sw.generation)), bez = SW_BODY[gen];
   const off = s.online === 'dark' || s.pdu.failed;
@@ -80,7 +86,7 @@ export function drawSwitch(g: G, s: RackSnapshot, quiet: boolean): void {
     if (!p) { R(g, jx, r.y + 4, 4, 5, mix(bez, P.ink, 0.25)); continue; }
     R(g, jx, r.y + 4, 4, 5, P.ink); R(g, jx + 1, r.y + 5, 2, 3, p.peer !== null ? P.steel : mix(unitCol(p.speedHz), P.ink, 0.6));
     R(g, jx, r.y + 2, 4, 1, !quiet && !off && p.active ? P.net : OFF);
-    // speed: dots = the 1-2-5 step, brightness = the decade, colour = the unit
+    // the port's speed tier: dots = the 1-2-5 step, brightness = the decade, colour = the unit
     const step = p.rung % 3, dec = Math.floor(p.rung / 3) % 3, col = mix(unitCol(p.speedHz), P.ink, dec === 0 ? 0.55 : dec === 1 ? 0.3 : 0);
     for (let k = 0; k <= step; k++) px(g, jx + k + (step < 2 ? 1 : 0), r.y + 10, off ? OFF : col);
   }

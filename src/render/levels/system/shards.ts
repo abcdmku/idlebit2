@@ -8,17 +8,17 @@ import type { SystemSnapshot, TaskView, TransferView } from '../../../game';
 import { drawFlow, flowColor } from '../../core';
 import type { FlowPhase, WorldFrame } from '../../core';
 import { drawPiece, remaining } from '../chip/shards';
-import { CABLE_X, PORT } from './layout';
+import { BOARD, CABLE_X } from './layout';
 import type { BoardLayout } from './layout';
 import type { BoardModel, Site } from './model';
 
 type G = CanvasRenderingContext2D;
 
-/** The shard on the system's port: its own inbound transfer, else (before Rack) the pipe's. */
+/** The system's inbound shard on the pipe: its own transfer, else (before Rack) the pipe's. */
 export const inboundOf = (s: SystemSnapshot): TransferView | null => s.inbound ?? s.chip.pipe.transfer;
 
-const link: [number, number][] = [[CABLE_X, -2], [CABLE_X, PORT.y - PORT.z], [CABLE_X, 0]];
-/** Draw the port's shard down the cable into CPU 1 (a short one is a landing flash). */
+const link: [number, number][] = [[CABLE_X, -2], [CABLE_X, BOARD.y], [CABLE_X, 0]];
+/** Draw the inbound shard down the pipe, through the edge connector, into CPU 1 (a short one is a landing flash). */
 export function drawInbound(g: G, t: TransferView, b: BoardLayout, frame: WorldFrame): FlowPhase {
   link[2][1] = b.sites.cpu[0]!.y + 4;
   return drawFlow(g, t, link, frame.snapshot, frame.timeMs);

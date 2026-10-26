@@ -9,6 +9,7 @@ import type { LevelRegistry, LevelRenderer, Rect } from '../../core';
 import { createFanBank } from './art';
 import { CAB_RECT, FOCUS, PHONE_TAG_GUTTER, PLINTH, ROW_W, U0, UP_X, WORLD, colX, serverRect } from './layout';
 import { drawRackMini } from './mini';
+import { rackLabels } from './labels';
 import { rackCol, rackRowScroll } from './row';
 import { rackChildren, rackTargets, rackPayoutAnchor, rackShardAnchor } from './targets';
 import { drawRow } from './world';
@@ -49,6 +50,8 @@ export function createRackRenderer(registry: LevelRegistry): LevelRenderer<'rack
     followFocus: () => rackRowScroll.dragging,
     draw: (g, s, view, frame) => drawRow(g, s, view, frame, ctx),
     drawMini: (g, v, rect, frame) => drawRackMini(g, v, rect, frame.paused),
+    /** D35: the switch's one speed. */
+    labels: (s, _view, frame, out) => rackLabels(s, frame, out),
     children: rackChildren,
     targets: (s, _view, out, from) => rackTargets(s, out, from),
     payoutAnchor: rackPayoutAnchor,

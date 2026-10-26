@@ -2,7 +2,7 @@
 // traces and set dressing. Low contrast so parts and tasks read first. Cached per board.
 import type { BoardKind } from '../../../game';
 import { P, R, cached, frame, hash, mix, prism, px, silk } from '../../core';
-import { BOARD, PORT, SAVE, WORLD, boardOf, siteCentre } from './layout';
+import { BOARD, CABLE_X, SAVE, WORLD, boardOf, siteCentre } from './layout';
 import type { BoardLayout, SiteType } from './layout';
 
 type G = CanvasRenderingContext2D;
@@ -45,8 +45,8 @@ export function boardStatic(kind: BoardKind): HTMLCanvasElement {
       const h = hash(x * 3.7 + y * 17.3);
       if (h < 0.03) px(g, x, y, dark); else if (h > 0.988) px(g, x, y, light);
     }
-    // link from the integrated port down into socket 1
-    R(g, PORT.x + (PORT.w >> 1), PORT.y + PORT.h, 1, b.sites.cpu[0]!.y - PORT.y - PORT.h, TRACE);
+    // the trace from the pipe's edge connector down into socket 1
+    R(g, CABLE_X, BOARD.y + 2, 1, b.sites.cpu[0]!.y - BOARD.y - 2, TRACE);
     // socket-to-socket links, then every site wired back to its nearest socket
     const s0 = { x: 0, y: 0 }; siteCentre(b, 'cpu', 0, s0);
     for (let i = 1; i < b.sites.cpu.length; i++) { siteCentre(b, 'cpu', i, c); bundle(g, s0.x, s0.y, c.x, c.y, 3); }

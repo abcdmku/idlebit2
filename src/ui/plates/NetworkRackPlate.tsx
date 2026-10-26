@@ -3,7 +3,8 @@ import type { LbView, Quote, QuoteResult, RoomId, SwitchView } from '../../game'
 import { ROUTE_NAMES, zoneLetter } from './copy';
 import { PlateFrame } from './PlateFrame';
 import { LbBody, lbLines, lbStatus } from './LbPlate';
-import { SwitchBody, switchLines } from './SwitchPlate';
+import { SwitchBody, speedOf } from './SwitchPlate';
+import { hertz } from './format';
 import { Key, Lines, Status } from './widgets';
 import type { PlateCommon } from './types';
 
@@ -22,10 +23,9 @@ export interface NetworkRackPlateProps extends PlateCommon {
 }
 
 /** The room's network rack: rack uplinks and speeds, and the room load balancer behind one key. */
-export function NetworkRackPlate({ room, zone, network, racks, lbQuotes, queueQuote, initialView = 'ports', initialPort,
+export function NetworkRackPlate({ room, zone, network, racks, lbQuotes, queueQuote, initialView = 'ports', initialPort = null,
   quotes, onAction, onResearch, researchName, ...frame }: NetworkRackPlateProps) {
   const [view, setView] = useState(initialView);
-  const [sel, setSel] = useState(initialPort ?? 0);
   const sw = { kind: 'room', id: room } as const, az = `AZ ${zoneLetter(zone)}`;
   if (view === 'lb') {
     const st = lbStatus(network.lb);
@@ -34,13 +34,12 @@ export function NetworkRackPlate({ room, zone, network, racks, lbQuotes, queueQu
       <Lines lines={lbLines(network.lb, 'rack')} slots={2} />
       <LbBody unit={{ kind: 'room', id: room }} view={network.lb} child="rack" quotes={lbQuotes} queueQuote={queueQuote}
         onAction={onAction} onResearch={onResearch} researchName={researchName} />
-      <div className="keys"><Key tone="go" label="Port speeds and count" onPress={() => setView('ports')} /></div>
+      <div className="keys"><Key tone="go" label="Switch speed" onPress={() => setView('ports')} /></div>
     </PlateFrame>;
   }
   return <PlateFrame {...frame} title="Network rack" sub={`${az} · switch and LB`} className="switch netrack">
-    <Status text={`${network.switch.ports.length} ports · ${racks} racks`} />
-    <Lines lines={switchLines(network.switch, racks, true)} slots={1} />
-    <SwitchBody sw={sw} view={network.switch} selected={sel} onSelect={setSel}
+    <Status text={`${hertz(speedOf(network.switch))} to every rack port · ${racks} racks`} />
+    <SwitchBody sw={sw} view={network.switch} selected={initialPort}
       lead={<Key tone="go" label={`Load balancer · ${ROUTE_NAMES[network.lb.strategy].short}`} onPress={() => setView('lb')} />}
       quotes={quotes} onAction={onAction} onResearch={onResearch} researchName={researchName} />
   </PlateFrame>;

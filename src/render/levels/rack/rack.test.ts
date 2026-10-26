@@ -6,6 +6,7 @@ import { createRackRenderer } from '.';
 import { OFF, typeText } from './art';
 import { LCD_IDLE, drawServer, serverLook } from './sprites';
 import { awakeCount, batteryFill, batteryText } from './powerCtl';
+import { speedText } from './labels';
 import { CASES, rackCase } from './fixtures';
 import { CAB_RECT, FOCUS, POWER_CTL_RECT, ROW_PITCH, ROW_W, SWITCH_RECT, UPLINK_JACK, WORLD, colX, portX } from './layout';
 import { NEIGHBOUR_ALPHA } from './neighbour';
@@ -61,7 +62,7 @@ describe('rack row positions', () => {
     expect(kids[0].rect.x).toBe(colX(2) + 13);
     const out: HitTarget[] = Array.from({ length: 128 }, createHitTarget), n = rack.targets(s, view, out, 0), byId = new Map(out.slice(0, n).map(t => [t.id, t]));
     expect(byId.get('switch')?.rect.x).toBe(colX(2) + SWITCH_RECT.x);
-    expect(byId.get('entry')?.rect.x).toBe(colX(2) + 119);
+    expect(byId.has('entry')).toBe(false); // D35: the pipe has no tap target; the rack's network taps are the switch, its ports and the uplink
     expect(byId.get('port3')?.port).toBe(3);
     expect(byId.get('uplink')?.port).toBe(-1);
   });
@@ -258,5 +259,13 @@ describe('D31 power control and sleep', () => {
     // empty slot (not installed): the same target
     const e = CASES.overview!(0), m = rack.targets!(e, view, out, 0);
     expect(out.slice(0, m).find(h => h.id === 'powerCtl')?.part?.slot).toEqual({ kind: 'powerCtl' });
+  });
+});
+
+describe('D35 switch tag', () => {
+  it('reads one speed when the ports match, else the range', () => {
+    expect(speedText(1e5, 1e5)).toBe('100 kHz');
+    expect(speedText(1e5, 2e5)).toBe('100–200 kHz');
+    expect(speedText(5e5, 1e6)).toBe('500 kHz–1 MHz');
   });
 });

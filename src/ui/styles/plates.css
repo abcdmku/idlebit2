@@ -250,3 +250,14 @@
 .v3-plate .core-list li b { width: 24px; flex: none; text-align: right; color: #efeaff; }
 .v3-plate .core-list li span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .v3-plate .core-list li.busy span { color: #8ef5ff; }
+
+/* D35: the switch's ports, one row each when Match ports is off */
+.v3-plate .port-list { list-style: none; margin: 8px 0 0; padding: 0; display: grid; gap: 4px; }
+.v3-plate .port-list li.sel .key { box-shadow: inset 0 0 0 2px #efeaff, 0 0 0 2px #0e0b1c; }
+
+/* The system at a glance: one tappable row per part */
+.v3-plate .sys-summary { list-style: none; margin: 8px 0 0; padding: 0; display: grid; gap: 2px; }
+.v3-plate .sum-row { width: 100%; min-height: 44px; display: flex; justify-content: space-between; align-items: center; gap: 8px; padding: 0 8px;
+  border: 0; font: inherit; color: #efeaff; background: #221b44; cursor: pointer; text-align: left; }
+.v3-plate .sum-row span { color: #a99be6; }
+.v3-plate .sum-row:disabled { cursor: default; color: var(--dim); }

@@ -81,7 +81,6 @@ function Open({ target: t, focus }: { target: HitTarget; focus: LevelSnapshot })
         }
       } });
   }
-  if (m.drill) { const ref = m.drill; keys.push({ id: 'open', label: 'Open', tone: 'plain', run: () => shell.view.dispatch({ type: 'drill', ref }) }); }
   // The market key is wider ("Off market"); the keys beside it narrow so three still fit.
   const keyW = (i: number) => market ? (i === 0 ? 96 : 72) : 80;
   const keyRight = (i: number) => pad + Array.from({ length: i }, (_, j) => keyW(j) + gap).reduce((a, b) => a + b, 0);

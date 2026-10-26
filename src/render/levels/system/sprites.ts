@@ -159,14 +159,11 @@ export function drawEmptySite(g: G, b: BoardLayout, type: 'cpu' | 'ram' | 'gpu' 
   else (b.dimm === 'h' ? drawBayEmpty : drawM2Empty)(g, f);
 }
 
-/** Network port at the board's rear edge: one jack. `on` while a task is on the link. */
-export function drawPort(g: G, f: { x: number; y: number; w: number; h: number; z: number }, on: boolean): void {
-  const t = prism(g, f.x, f.y, f.w, f.h, f.z, { top: P.steelLo, front: '#3d4060' });
-  const fy = t.y + t.h, jx = f.x + 15;
-  R(g, jx, fy + 1, 10, f.z - 2, P.ink); R(g, jx + 1, fy + 2, 8, f.z - 4, '#15122a'); R(g, jx + 2, fy + 2, 6, 1, P.pad);
-  px(g, jx, fy, on ? P.led : P.ledOff); px(g, jx + 9, fy, P.amber);
+/** D35: where the pipe meets the board, a plain edge connector (gold contacts, lit while a task lands). */
+export function drawConnector(g: G, f: Rect, on: boolean): void {
+  R(g, f.x, f.y, f.w, f.h, P.ink); R(g, f.x + 1, f.y + 1, f.w - 2, f.h - 2, on ? P.padHi : P.pad);
 }
-/** Copper cable from the port up to the world's top edge, where the pipe enters. Fades out at the top. */
+/** Copper cable from the board's connector up to the world's top edge, where the pipe enters. Fades out at the top. */
 export function drawCable(g: G, x: number, y0: number, y1: number, lit: boolean): void {
   const a = g.globalAlpha, core = lit ? '#4f8f61' : '#3d3a58', hi = lit ? P.net : '#55517a';
   for (let y = y0; y < y1; y++) {

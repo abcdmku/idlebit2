@@ -89,6 +89,7 @@ function drawActive(g: G, s: RackSnapshot, view: ViewPresentation, frame: WorldF
   }
   const up = s.switch.uplinks[0];
   drawUplink(g, up ? up.speedHz : 1e3, !quiet && !!up && up.active);
+  // each sled's link runs at its own switch port's speed
   const ports = s.switch.ports;
   for (let i = 0; i < ports.length && i < 12; i++) {
     const p = ports[i];

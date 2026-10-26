@@ -77,8 +77,8 @@ export function planUpgradePort(state: GameState, ref: SwitchRef, port: number |
     if (k === undefined) return fail('invalid', 'No such port');
     return locked(structureLock('rack', PIPE_LOCK_TEXT), `Pipe · ${speedLabel(k)}`);
   }
-  if (port === 'all') {
-    if (!sw.sameSpeed) return fail('invalid', 'Same speed is off');
+  // D35: the whole switch steps together whenever asked, and always when its ports are matched (sameSpeed, default on).
+  if (port === 'all' || sw.sameSpeed) {
     const target = sameSpeedTarget(sw.ports);
     const label = `All ports · ${speedLabel(target)}`;
     const price = sw.ports.reduce((sum, k) => sum + networkStepsBetween(row, k, target), 0n);
@@ -88,7 +88,6 @@ export function planUpgradePort(state: GameState, ref: SwitchRef, port: number |
   }
   const k = sw.ports[port];
   if (k === undefined) return fail('invalid', 'No such port');
-  if (sw.sameSpeed) return fail('invalid', 'Same speed is on');
   const label = `Port ${port + 1} · ${speedLabel(k + 1)}`;
   const price = networkStepPrice(row, k);
   const lock = stepLock(at, k + 1);

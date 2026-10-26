@@ -5,7 +5,9 @@
 // Return to market key. Closing it dismisses the report; the head's key then returns.
 import { useContext, useEffect, useRef, type CSSProperties } from 'react';
 import { FAIL_CAUSES, formatOps } from '../game';
-import type { EnergyBreakdown, FailCause, FailDetail, RoundEndedBy, RoundReport, RoundTypeTally } from '../game';
+import type { EnergyBreakdown, FailCause, FailDetail, Quote, RoundEndedBy, RoundReport, RoundTypeTally } from '../game';
+import { useMeet } from './queue/meet';
+import { MeetKey } from './queue/MeetKey';
 import { P, drawCause, typeColor, typeName } from '../render/core';
 import { ArtCanvas } from './art/ArtCanvas';
 import { drawMiniIcon } from './art/deckArt';
@@ -90,8 +92,11 @@ function failedByType(rows: readonly RoundTypeTally[]): { type: RoundTypeTally['
   });
 }
 
-function FixLine({ offer, n }: { offer: Offer | null; n: number }) {
+function FixLine({ offer, n, meet }: { offer: Offer | null; n: number; meet?: Quote | null }) {
   const shell = useShell(), act = offer ? offerAction(offer) : null;
+  // The head waits on the same thing: buy every level it needs in one tap (the sim's meet line).
+  if (meet) return <div className="rp-fix" data-testid="rp-fix"><MeetKey quote={meet} n={n} className="key quiet rp-meet" onAction={a => shell.dispatch(a)}
+    onResearch={id => shell.view.dispatch({ type: 'openResearch', project: id })} /></div>;
   if (!offer) return <div className="rp-fix" data-testid="rp-fix"><span className="dim">Fix: —</span></div>;
   return <div className="rp-fix" data-testid="rp-fix">
     <ArtCanvas w={8} h={8} n={n} artKey={`fix:${offer.icon}:${offer.affordable}`} draw={g => drawMiniIcon(g, offer.icon, !offer.affordable)} />
@@ -118,6 +123,8 @@ export function RoundReportPlate({ report, percent, onReturn, onClose }: {
   const ref = useRef<HTMLElement>(null), L = useLayout(), n = L.N, offers = useContext(OffersContext);
   useDialogFocus(ref, onClose);
   const failed = FAIL_CAUSES.reduce((sum, c) => sum + report.failedByCause[c], 0);
+  const head = useGameSelector(s => s.feed.window[0] ?? null, (a, b) => a?.key === b?.key && a?.blockedBy === b?.blockedBy, 500);
+  const headMeet = useMeet(head && head.blockedBy !== null && head.blockedBy === (report.details[0]?.detail ?? null) ? head : null)[0] ?? null;
   const chips = failedByType(report.byType ?? []);
   const energy = report.energy ?? null, net = report.net ?? null;
   return <section ref={ref} className="v3-plate round-plate has-x" role="dialog" aria-modal="true" aria-label="Round over" tabIndex={-1}
@@ -144,7 +151,7 @@ export function RoundReportPlate({ report, percent, onReturn, onClose }: {
       })}
     </div>
     <p className="rp-detail" data-testid="rp-detail">{detailLine(report)}</p>
-    <FixLine offer={fixOffer(report, offers)} n={n} />
+    <FixLine offer={fixOffer(report, offers)} n={n} meet={headMeet} />
     <p className="rp-spill mute" data-testid="rp-spill">{spillLine(report)}</p>
     <p className="rp-types" data-testid="rp-types"><span className="mute">Failed:</span>
       {chips.length ? chips.map(c => <span key={c.type} className="rp-chip" data-task-type={c.type}>

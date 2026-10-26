@@ -203,8 +203,9 @@ export function switchQuotes(state: GameState, sw: SwitchRef): Quote[] {
   const at = switchAt(state.build, sw);
   if (!at) return [];
   const out: Quote[] = [];
+  // D35: the whole-switch step always; one step per switch port too while its ports aren't matched.
+  out.push(withEffect(state, { type: 'upgradePort', sw, port: 'all' }, planUpgradePort(state, sw, 'all')));
   if (!at.sw.sameSpeed) at.sw.ports.forEach((_, port) => out.push(withEffect(state, { type: 'upgradePort', sw, port }, planUpgradePort(state, sw, port))));
-  else out.push(withEffect(state, { type: 'upgradePort', sw, port: 'all' }, planUpgradePort(state, sw, 'all')));
   out.push(withEffect(state, { type: 'addPorts', sw }, planAddPort(state, sw)));
   at.sw.uplinks.forEach((_, uplink) => out.push(withEffect(state, { type: 'upgradeUplink', sw, uplink }, planUpgradeUplink(state, sw, uplink))));
   out.push(withEffect(state, { type: 'addUplink', sw }, planAddUplink(state, sw)));

@@ -5,12 +5,12 @@ import { formatHertz, formatSize } from '../../../game';
 import type { SystemSnapshot } from '../../../game';
 import { P, R, wattsText, whole } from '../../core';
 import type { LabelWriter, Rect, WorldForm, WorldFrame } from '../../core';
-import { BOARD, PORT, PSU, siteRect } from './layout';
+import { BOARD, PSU, siteRect } from './layout';
 import { boardModel } from './model';
 import { tierOf } from './memory';
 import type { Site } from './model';
 
-export type LabelKey = 'port' | 'cpu' | 'psu' | 'ram' | 'drive' | 'gpu';
+export type LabelKey = 'cpu' | 'psu' | 'ram' | 'drive' | 'gpu';
 export interface PartLabel {
   readonly key: LabelKey;
   readonly name: string;
@@ -56,7 +56,6 @@ function tierNote(s: SystemSnapshot, tier: 'ram' | 'disk'): { used?: string; spi
 function values(s: SystemSnapshot): Omit<PartLabel, 'top' | 'mid' | 'lx' | 'end' | 'tagX' | 'tagY' | 'right'>[] {
   const m = boardModel(s), b = m.b, out: Omit<PartLabel, 'top' | 'mid' | 'lx' | 'end' | 'tagX' | 'tagY' | 'right'>[] = [];
   const cores = s.chip.cores.length;
-  out.push({ key: 'port', name: 'Port', value: formatHertz(s.chip.pipe.speed), side: 'L', r: { x: PORT.x, y: PORT.y - PORT.z, w: PORT.w, h: PORT.h + PORT.z } });
   out.push({ key: 'cpu', name: 'CPU', value: `${formatHertz(s.chip.clock.hz)} · ${whole(cores)} ${cores === 1 ? 'core' : 'cores'}${times(s.cpuCount)}`,
     side: 'L', r: siteRect(b, 'cpu', 0) });
   out.push({ key: 'psu', name: 'PSU', value: wattsText(s.psu.capacityW), side: 'R', r: { ...PSU } });
@@ -96,7 +95,7 @@ function place(list: PartLabel[], form: WorldForm | undefined, first: number): v
       const r = it.r;
       it.right = it.key === 'ram' || it.key === 'drive';
       it.tagX = q4(it.right ? r.x + r.w : r.x);
-      it.tagY = q4(it.key === 'port' || it.key === 'psu' ? top : it.key === 'ram' ? r.y + r.h : it.key === 'gpu' ? r.y - 10 : r.y + r.h + 2);
+      it.tagY = q4(it.key === 'psu' ? top : it.key === 'ram' ? r.y + r.h : it.key === 'gpu' ? r.y - 10 : r.y + r.h + 2);
     }
     return;
   }

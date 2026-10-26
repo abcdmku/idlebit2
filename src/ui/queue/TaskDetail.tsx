@@ -14,6 +14,8 @@ import { PlateFrame } from '../plates/PlateFrame';
 import { useLayout } from '../shell/geometry';
 import { shallowEqual, useGameSelector, useShell, useViewState } from '../storeHooks';
 import { HeadClock, InQueue, TaskIcon } from './taskText';
+import { useMeet } from './meet';
+import { MeetKey } from './MeetKey';
 
 /** Keeps every number with its unit on one line ("100 kHz", "1 ms", "2 b", "4 systems"): a no-break space between them. */
 export const keepUnits = (s: string): string => s.replace(/([0-9][kMGTPEZY]?) (?=[A-Za-z%µ])/g, '$1\u00a0');
@@ -93,10 +95,13 @@ function OpenTask({ taskKey: key }: { taskKey: string }) {
     const i = s.feed.window.findIndex(t => taskKey(t.task) === key);
     return { t: i >= 0 ? s.feed.window[i]! : null, slot: i < 0 ? -1 : research ? i + 1 : i, running: s.feed.timing === 'running' && s.round.state === 'running' };
   }, shallowEqual, 250);
+  // One line per missing component, each at its minimal level (the sim's meet quote).
+  const meet = useMeet(f.t);
   // A task that left the line (taken, met or dismissed) closes its detail.
   if (!f.t) { queueMicrotask(() => { if (shell.view.getState().task === key) shell.view.dispatch({ type: 'back' }); }); return null; }
   const t = f.t, head = f.slot === 0, color = typeColor(typeOf(t.family));
-  const status = statusLine(t, head, f.running), fixes = t.blockedBy ? fixLines(t, offers) : [];
+  // The meet lines; when the sim has none for this gate (a link, zones), the Fix line's own rule.
+  const status = statusLine(t, head, f.running), fixes = t.blockedBy && !meet.length ? fixLines(t, offers) : [];
   const card = f.slot === 0 ? L.headSlot : L.cards[f.slot - 1] ?? L.headSlot;
   const close = () => shell.view.dispatch({ type: 'back' });
   return <PlateFrame title={familyName(t.family)} sub={<span style={{ color }}>{typeName(typeOf(t.family))}</span>}
@@ -115,9 +120,11 @@ function OpenTask({ taskKey: key }: { taskKey: string }) {
       {t.blockedBy && <span className="mute" data-testid="td-capable"> · {capableText(t.capableSystems)}</span>}</p>
     {(t.blockedBy || (head && f.running && t.dismissible)) && <div className="keys">
       {/* One line per missing component or research; each buys every level it needs in one tap. */}
+      {meet.map((q, i) => <MeetKey key={i} quote={q} n={L.N} onAction={a => shell.dispatch(a)}
+        onResearch={id => shell.view.dispatch({ type: 'openResearch', project: id })} />)}
       {fixes.map(o => <button key={o.key} type="button" className="key" data-qa-target data-testid="td-fix" disabled={!offerAction(o)} onClick={() => tap(o)}>
         {fixLabel(o)}{o.right.kind !== 'research' && o.price !== null && <span className="pz"> <CurrencyIcon kind="credits" n={L.N} />{wholeText(o.price)}</span>}</button>)}
-      {t.blockedBy && !fixes.length && <p className="key-slot">No upgrade here fixes it yet</p>}
+      {t.blockedBy && !fixes.length && !meet.length && <p className="key-slot">No upgrade here fixes it yet</p>}
       {head && f.running && t.dismissible && <button type="button" className="key quiet" data-qa-target data-testid="td-dismiss"
         onClick={() => { shell.dispatch({ type: 'dismissTask', task: t.task }); close(); }}>Dismiss <span className="mute">· No SLA cost</span></button>}
     </div>}

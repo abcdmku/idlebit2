@@ -1,6 +1,5 @@
 import type { ReactNode } from 'react';
 import type { ServerSlotView, UnitMode, UnitRef } from '../../game';
-import { hertz } from './format';
 import type { MarketState } from './market';
 import { OnlineRow } from './OnlineRow';
 import { PlateFrame } from './PlateFrame';
@@ -61,13 +60,10 @@ export function ServerPlate({ slot, servers, onGoInside, onStep, ...common }: Se
   const s = servers[slot];
   if (!s || s.systemId === null) return null;
   const nb = neighbours(servers, slot);
-  const status = s.running > 0 ? `Running ${s.running} ${s.running === 1 ? 'task' : 'tasks'}`
-    : s.port === null ? 'No switch port, so no tasks' : 'Idle';
+  const status = s.running > 0 ? `Running ${s.running} ${s.running === 1 ? 'task' : 'tasks'}` : 'Idle';
   return <UnitPlate {...common} bootS={s.timerTotalS ?? common.bootS} className="server" unit={{ kind: 'system', id: s.systemId }} title={`Server ${slot + 1}`}
-    sub={s.kind === 'storageNode' ? 'Storage node' : 'Server'} status={status} statusTone={s.port === null ? 'warn' : ''}
-    lines={[{ text: s.port ? `Port · ${hertz(s.port.speedHz)}` : 'Add a switch port to link it', tone: 'muted' }]}
+    sub={s.kind === 'storageNode' ? 'Storage node' : 'Server'} status={status}
     mode={s.state} timerS={s.timerS}>
-    <Key tone="go" label="Go inside" onPress={onGoInside} />
     <div className="key-pair">
       <Key tone="row" label={`‹ Server ${(nb?.[0] ?? slot) + 1}`} ariaLabel="Previous server" disabled={!nb} onPress={() => nb && onStep(nb[0])} />
       <Key tone="row" label={`Server ${(nb?.[1] ?? slot) + 1} ›`} ariaLabel="Next server" disabled={!nb} onPress={() => nb && onStep(nb[1])} />

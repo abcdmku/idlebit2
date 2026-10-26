@@ -8,7 +8,7 @@ import { CoolerPlate } from './CoolerPlate';
 import { rackLetter, regionName, zoneLetter } from './copy';
 import { fahrenheit, percent } from './format';
 import { LbPlate } from './LbPlate';
-import { MemoryTiers } from './MemoryTiers';
+import { SystemSummary } from './SystemSummary';
 import { NetworkRackPlate } from './NetworkRackPlate';
 import { PartPlate } from './PartPlate';
 import { GpuPlate } from './GpuPlate';
@@ -19,7 +19,8 @@ import { PowerCtlPlate } from './PowerCtlPlate';
 import { PowerKeys } from './PowerKeys';
 import { isPowerCtl } from './targets';
 import { CoresPlate } from './CoresPlate';
-import { blockedOn } from './blocks';
+import { blockedOn, firstBlockedFor, sameSupply } from './blocks';
+import { useMeet } from '../queue/meet';
 import { SitePlate } from './SitePlate';
 import { StartRow } from './StartRow';
 import { GenerationRow } from './GenerationRow';
@@ -71,6 +72,12 @@ export function plateRequest(t: HitTarget, focus: LevelSnapshot): QuoteRequest |
 }
 
 
+/** The part a quote buys, by slot kind. */
+const partKindOf = (q: { action: { type: string } }): string | undefined => {
+  const a = q.action as { part?: { slot: { kind: string } }; kind?: string };
+  return a.part?.slot.kind ?? a.kind;
+};
+
 /** D31: the optional power part a plate also sells: the room start controller on the UPS, the global one on the scheduler, a site's generation. */
 export function powerScope(t: HitTarget, focus: LevelSnapshot): ScopeRef | null {
   const s = t.part?.slot.kind;
@@ -90,17 +97,11 @@ export function hasPlate(t: HitTarget, focus: LevelSnapshot): boolean {
   if (isCores(t)) return focus.level === 'chip';
   // An empty CPU or board site opens a compact plate (SitePlate), placed so it never covers the site.
   if (t.kind === 'slot' && !t.part && (focus.level === 'chip' || focus.level === 'system')) return true;
-  if (sledOf(t, focus) !== null) return true;
   return !!plateRequest(t, focus) || t.kind === 'unit';
 }
 
 /** The cores are one component (D34, user 26 Oct): the renderer's one `cores` block (its part is core 0's ref). */
 export const isCores = (t: Pick<HitTarget, 'id' | 'part'>) => t.id === 'cores' || t.part?.slot.kind === 'core';
-
-/** A server sled tapped in its rack: its system (the sled's own plate, D34 user ruling 26 Oct). */
-export function sledOf(t: Pick<HitTarget, 'kind' | 'drill'>, focus: LevelSnapshot): UnitRef | null {
-  return t.kind === 'child' && focus.level === 'rack' && t.drill?.level === 'system' ? { kind: 'system', id: t.drill.id } as UnitRef : null;
-}
 
 /** The router a target is (D25.7): the rack LB, the room LB in the network rack, or the global scheduler. */
 export function routerOf(t: HitTarget, focus: LevelSnapshot): ScopeRef | null {
@@ -140,6 +141,9 @@ function TargetPlate({ target: t, focus }: { target: HitTarget; focus: LevelSnap
   const quotes = useQuote(plateRequest(t, focus));
   const scope = powerScope(t, focus), power = useQuote(scope ? { kind: 'power', unit: scope } : null);
   const unblocks = useGameSelector(s => blockedOn(s.feed.window, t.part?.slot.kind), Object.is, 500);
+  // The minimal-level buy that lets the first waiting task run, when it is this part (user, 26 Oct).
+  const waiting = useGameSelector(s => firstBlockedFor(s.feed.window, t.part?.slot.kind), (a, b) => a?.key === b?.key && a?.blockedBy === b?.blockedBy, 500);
+  const unblock = useMeet(waiting).find(q => sameSupply(partKindOf(q), t.part?.slot.kind)) ?? null;
   const netRack = focus.level === 'room' && (t.part?.slot.kind === 'roomSwitch' || (t.kind === 'port' && t.sw?.kind === 'room'));
   const roomLb = useQuote(netRack && focus.level === 'room' ? { kind: 'infra', unit: { kind: 'room', id: focus.roomId }, slot: 'lb' } : null);
   // The router queue's next slot (D25.7) for whichever load balancer this plate shows.
@@ -198,12 +202,7 @@ function TargetPlate({ target: t, focus }: { target: HitTarget; focus: LevelSnap
     return null;
   }
   const save = (unit: UnitRef) => view.dispatch({ type: 'select', target: { ...t, id: `${t.id}:save`, kind: 'save', unit, rect: { ...t.rect } } });
-  const sled = sledOf(t, focus);
-  if (sled) return unitPlate(sled, focus, { ...common, onSave: save, market: marketOf(shell.store.getState(), sled), power }, (slot) => {
-    const id = focus.level === 'rack' ? focus.servers[slot]?.systemId : null;
-    if (id !== null && id !== undefined) view.dispatch({ type: 'select', target: { ...t, id: `${t.id}:${slot}`, drill: { level: 'system', id } as never }, plate: true });
-  }, () => { if (t.drill) view.dispatch({ type: 'drill', ref: t.drill }); });
-  if (t.kind === 'unit' && t.unit) return unitPlate(t.unit, focus, { ...common, onSave: save, market: marketOf(shell.store.getState(), t.unit), power }, (slot) => {
+  if (t.kind === 'unit' && t.unit) return unitPlate(t.unit, focus, { ...common, onSave: save, market: marketOf(shell.store.getState(), t.unit), power, select: target => view.dispatch({ type: 'select', target, plate: true }) }, (slot) => {
     const next = { ...t, id: `${t.id.replace(/\d+$/, '')}${slot}`, slot, unit: focus.level === 'rack' && focus.servers[slot].systemId !== null
       ? { kind: 'system', id: focus.servers[slot].systemId! } as UnitRef : t.unit };
     view.dispatch({ type: 'select', target: next });
@@ -238,7 +237,7 @@ function TargetPlate({ target: t, focus }: { target: HitTarget; focus: LevelSnap
       {powerKeys(!!focus.start, focus.start?.level ?? 0, 'Start controller', true)}
     </LbPlate>;
     const facts = partFacts(focus, s);
-    if (facts) return <PartPlate {...common} quotes={quotes} {...facts} unblocks={unblocks}>
+    if (facts) return <PartPlate {...common} quotes={quotes} {...facts} unblocks={unblocks} unblock={unblock}>
       {s.kind === 'gpu' && focus.level === 'system' && focus.gpu.find(p => p.slot === s.index)?.kind === 'npu'
         && <button type="button" className="key ghost" onClick={() => setReplaceNpu(true)}>Replace with GPU model</button>}
     </PartPlate>;
@@ -269,9 +268,9 @@ function defaultBase(unit: UnitRef, focus: LevelSnapshot): string {
   return 'Server';
 }
 
-function unitPlate(unit: UnitRef, focus: LevelSnapshot, all: Omit<PlateCommon, 'quotes'> & { onSave: (u: UnitRef) => void; market: MarketState | null; power: QuoteResult | null },
+function unitPlate(unit: UnitRef, focus: LevelSnapshot, all: Omit<PlateCommon, 'quotes'> & { onSave: (u: UnitRef) => void; market: MarketState | null; power: QuoteResult | null; select: (t: HitTarget) => void },
   step: (slot: number) => void, goInside: () => void) {
-  const { onSave, power, ...common } = all;
+  const { onSave, power, select: _select, ...common } = all;
   const saveKey = (saveable: boolean) => (saveable ? () => onSave(unit) : null);
   if (unit.kind === 'system' && focus.level === 'rack') {
     const slot = focus.servers.findIndex((s) => s.systemId === unit.id);
@@ -282,16 +281,17 @@ function unitPlate(unit: UnitRef, focus: LevelSnapshot, all: Omit<PlateCommon, '
     const total = focus.level === 'system' ? focus.timerTotalS : null;
     return <UnitPlate {...common} unit={unit} title={`System ${unit.id + 1}`} sub={focus.level === 'system' && focus.kind === 'storageNode' ? 'storage node' : 'one server'}
       status={focus.level === 'system' ? `${focus.running.length} running · ${focus.queue.count} queued` : 'Chip'} mode={mode} timerS={timerS} bootS={total ?? common.bootS}
-      onSave={saveKey(focus.level === 'system' && focus.saveable)} saveLabel="Save this server"
-      lines={[{ text: 'Pick a part in the tray, then tap a glowing spot.', tone: 'muted' }]}>
-      {focus.level === 'system' && <MemoryTiers tiers={focus.memory.tiers} />}
+      onSave={saveKey(focus.level === 'system' && focus.saveable)} saveLabel="Save this server">
+      {/* Never an empty plate (user, 26 Oct): what is in the box, each row opening its part, and Open CPU. */}
+      {focus.level === 'system' && <SystemSummary focus={focus}
+        onOpenPart={(part, key) => all.select({ id: `sum-${key}`, kind: 'part', owner: { level: 'system', id: focus.systemId } as never, drill: null, part, unit: null, sw: null, port: null, slot: null, rect: { x: 0, y: 0, w: 0, h: 0 } })} />}
     </UnitPlate>;
   }
   if (unit.kind === 'rack' && focus.level === 'rack') {
-    const linked = focus.servers.filter((s) => s.port !== null && s.systemId !== null).length, n = focus.servers.filter((s) => s.systemId !== null).length;
+    const n = focus.servers.filter((s) => s.systemId !== null).length;
     return <UnitPlate {...common} unit={unit} title={`Rack ${rackLetter(unit.id)}`} sub={`${n} servers`}
       status={`${fahrenheit(focus.tempF)} · PDU ${percent(focus.pdu.usage)}`} mode={focus.online} timerS={focus.timerS}
-      lines={[{ text: `${linked} of ${n} servers have a switch port`, tone: 'muted' }]} onSave={saveKey(focus.saveable)} saveLabel="Save this rack" />;
+      onSave={saveKey(focus.saveable)} saveLabel="Save this rack" />;
   }
   if (unit.kind === 'room' && focus.level === 'room') {
     return <UnitPlate {...common} unit={unit} title={`Room · AZ ${zoneLetter(focus.zone)}`} sub={`${focus.rows} of ${focus.maxRows} rows`}

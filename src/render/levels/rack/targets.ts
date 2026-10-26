@@ -4,7 +4,7 @@ import { copyRect, resetHitTarget, saveIconRect, setRect } from '../../core';
 import type { ChildView, Completion, HitTarget, NodeRef, Rect } from '../../core';
 import type { PartRef, RackId, RackSnapshot, SwitchRef, SystemId, UnitRef } from '../../../game';
 import {
-  CAB_RECT, HEADER_Y, LAMP, LB_RECT, PLINTH, POWER_CTL_RECT, ROOF_RECT, ROW_COLS, SAVE_AT, SERVER_SLOTS, STRIP_RECT, SWITCH_RECT, UPLINK_JACK, UP_X,
+  CAB_RECT, LAMP, LB_RECT, PLINTH, POWER_CTL_RECT, ROOF_RECT, ROW_COLS, SAVE_AT, SERVER_SLOTS, STRIP_RECT, SWITCH_RECT, UPLINK_JACK,
   childRect, colX, portX, serverRect,
 } from './layout';
 import { isNeighbour, rackCol, rowViews } from './row';
@@ -84,18 +84,15 @@ export function rackTargets(s: RackSnapshot, out: HitTarget[], from: number): nu
   t = put('plinth', 'part', PLINTH); if (t) t.part = refs.pdu;
   t = put('lb', 'part', LB_RECT); if (t) t.part = refs.lb;
   t = put('switch', 'part', SWITCH_RECT); if (t) { t.part = refs.swPart; t.sw = refs.sw; }
-  // Port cells span the switch row at the jack pitch, so they win over the switch body.
+  // D35: each switch port is a target (it upgrades on its own), in front of the switch as a whole.
   for (let i = 0; i < Math.min(SERVER_SLOTS, s.switch.ports.length); i++) {
     setRect(scratch, portX(i) - 1, SWITCH_RECT.y, 6, SWITCH_RECT.h);
-    t = put(PORT_IDS[i], 'port', scratch); if (t) { t.sw = refs.sw; t.port = i; t.part = refs.swPart; }
+    t = put(PORT_IDS[i]!, 'port', scratch); if (t) { t.sw = refs.sw; t.port = i; t.part = refs.swPart; }
   }
   if (s.switch.uplinks.length > 0) {
     setRect(scratch, UPLINK_JACK.x - 1, SWITCH_RECT.y, UPLINK_JACK.w + 2, SWITCH_RECT.h);
     t = put('uplink', 'port', scratch); if (t) { t.sw = refs.sw; t.port = -1; t.part = refs.swPart; }
   }
-  // The pipe's entry (L2 D17): the ceiling uplink above the switch. U anchors the pipe on 'entry'.
-  setRect(scratch, UP_X - 1, 0, 3, HEADER_Y);
-  t = put('entry', 'port', scratch); if (t) { t.sw = refs.sw; t.port = -1; t.part = refs.swPart; }
   t = put('online', 'unit', lamp); if (t) t.unit = refs.unit;
   if (s.saveable) { t = put('save', 'save', save); if (t) t.unit = refs.unit; }
   const free = nextFreeServer(s);

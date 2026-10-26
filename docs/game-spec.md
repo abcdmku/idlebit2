@@ -638,7 +638,7 @@ All network transfer happens on **links**. A link has one or more channels. Each
   - a system plugs into a rack-switch port. The switch default is 1 kHz (`k = 0`);
   - a rack's uplink plugs into a room network-rack port, at that switch generation's default speed (A.3);
   - a room (AZ) plugs into the site's data plane and, from Regions on, the backbone, at their default speed (A.3).
-- **Before the upstream device exists**, the unit is already on that device's default port, at a fixed speed (D15). At boot the lone system's pipe is a 1 kHz rack-switch port of switch generation 0. It can't be upgraded until the player has a Rack; then it steps on the rack switch, priced per port as §12.5. Its plate shows the fixed speed and "Upgrade at the Rack switch".
+- **Before the upstream device exists**, the unit is already on that device's default port, at a fixed speed (D15). At boot the lone system's link is the rack switch's default speed. It can't be upgraded until the player has a Rack; then it runs at its rack-switch port's speed, which steps on the switch (D35, §12.5). The player never sees or buys a system port.
 - **Where each link steps (D15).** A link's speed steps only once the structure it plugs into exists:
   - server ports, on the rack switch, from Rack;
   - rack uplinks, on the room network rack, from Room;
@@ -1257,7 +1257,7 @@ portStep(k→k+1) = ceil(m × u / 0.7 × ((x / b)^α − (y / b)^α))
 - `ceil` in exact decimal arithmetic, like every price (§12.3).
 
 - **Per-port upgrades.** Each port and each uplink steps up independently, up to `topK[g]`, once its structure exists (§7.2, D15). A step is also offered by tapping the link in the world, as "x → x" with price and Buy (D15.4).
-- **Same-speed toggle.** When on, the plate offers one action instead of per-port ones. Let `kmax` be the highest port index. If every port is at `kmax`, the target is `kmax + 1`; otherwise it is `kmax`. The action raises every port below the target to the target. Its price is the sum of all the per-port steps it performs. The toggle does not cover uplinks. A port bought while the toggle is on arrives at the common speed, priced with its steps.
+- **Match ports (D35, the same-speed toggle; default on).** Ports belong to the switch; a system has no port of its own. While on, any port step raises every port: let `kmax` be the highest port index; if every port is at `kmax` the target is `kmax + 1`, otherwise `kmax`; every port below the target goes to it, priced as the sum of the per-port steps. That whole-switch step is offered while off too. While off, each port also steps alone. A port added while on arrives at the common speed, priced with its steps; while off, at the base speed. The toggle does not cover uplinks.
 - **Port count.** `ports` lies between `minPorts` and the ceiling (`rackPorts`, `roomPorts`). The `j`th port beyond `minPorts` costs `ceil(portAdd[g] × portAddGrowth^(j−1))`. A new port arrives at `baseK[g]`.
 - **Uplinks.** Up to the `uplinks` ceiling. Extra uplinks cost like a port.
 - **Install and replace.** `installPrice(g)` buys the switch with `minPorts` ports and one uplink at `baseK[g]`. Replacing keeps the port and uplink count (extra ports priced at the new generation) and sets each port to `clamp(k, baseK[g'], topK[g'])`.
@@ -1440,7 +1440,7 @@ The core tray offers only physical `Add core`. Selecting a core shows facts and 
 - **GPU:** model ID, upgrades, VRAM, cores, actual clock, effective rate, perf/W, per-card duty and reservation. Task GPU requirements show only cores and VRAM. Upgrade/replacement quotes show both capacities, clock, rate, actual system watts and exact price. Controls keep stable geometry.
 - **Supply:** delivered W, capacity, usage, loss W, `m`, `tOver` (once nonzero), cap switch and `capFactor`.
 - **Cooler:** `T`, `Teq`, `H / Qc`, duty, setpoint, watts, `tHot`, throttle state.
-- **Switch:** ports with `k`, speed and busy flag; uplinks; toggle; port count; prices per port and for the toggle action.
+- **Switch:** ports with `k`, speed and busy flag; uplinks; the Match ports toggle; port count; prices per port and for the whole-switch step (D35).
 - **Power control** (D31): battery charge and time at current draw; Start with `n` of 12, wake trigger, order; upgrade and replace. The room UPS plate and the global scheduler plate carry the same Start row for racks and sites.
 - **Load balancer:** strategy, filters, available options, queue level `L/32` with its entries (family, units, whether a whole task or a share), the next queue step "Queue L → L+1" with price and Buy (§12.7), takes per second, misroutes this round. No placements and no reserve switch (D25).
 - **Port** (opened from the CPU view's pipe): speed, transfer in progress, share of time the cores waited on it. Before Rack: the fixed 1 kHz and "Upgrade at the Rack switch" (D15). From Rack on: next step price and Buy, as "x → x" (D15.4).

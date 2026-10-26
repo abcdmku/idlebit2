@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { createInitialState, quote, rackId, systemId, type Quote } from '../../game';
+import { createInitialState, quote, systemId, type Quote } from '../../game';
 import { fixtureSnapshot } from '../../game/fixtures';
 import type { HitTarget } from '../../render/core';
 import { buildOffers, changeText } from '../deck/offers';
@@ -49,16 +49,7 @@ describe('callout quote effects', () => {
     expect(model.change).toBe(row.change);
   });
 
-  it('formats the switch port quote effect like the inbound deck row', () => {
-    const state = createInitialState(42), focus = fixtureSnapshot('chipBoot').focus;
-    const sw = { kind: 'rack', id: rackId(0) } as const;
-    const quotes = quote(state, { kind: 'switch', sw });
-    const link = quote(state, { kind: 'inbound', at }).quotes[0]!;
-    const model = calloutModel({ ...target, kind: 'port', part: null, sw, port: 0 }, focus, quotes, null);
-    expect(model.change).toContain('→');
-    expect(model.change).toBe(changeText(link.effect!));
-    expect(model.offer?.quote?.effect).toEqual(link.effect);
-  });
+
 });
 
 describe('empty sites and phone placement (user bug, 25 Oct)', () => {

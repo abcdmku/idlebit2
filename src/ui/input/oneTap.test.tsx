@@ -39,4 +39,15 @@ describe('one tap shows a part\'s whole detail (user, 26 Oct)', () => {
     act(() => activateTarget(mounted!.shell, null));
     expect(v().selected).toBeNull();
   });
+  it('a thing with its own view zooms in on tap: the CPU in the System view goes to the CPU', () => {
+    const store = fakeStore();
+    store.set({ unlocked: { chip: true, system: true, rack: false, room: false, global: false } });
+    mounted = mount(<OffersScope><PlateLayer /></OffersScope>, store, { width: 1440, height: 900 });
+    act(() => { mounted!.shell.view.dispatch({ type: 'drill', ref: { level: 'system', id: systemId(0) } as never }); mounted!.shell.view.settle(false); });
+    const cpu: HitTarget = { ...part('child0', { kind: 'cpu', socket: 0 }), kind: 'child', part: null, owner: { level: 'system', id: systemId(0) } as never,
+      drill: { level: 'chip', id: systemId(0) } as never };
+    act(() => activateTarget(mounted!.shell, cpu));
+    expect(mounted.shell.view.getState().focus).toEqual({ level: 'chip', id: 0 });
+    expect(mounted.shell.view.getState().selected).toBeNull();
+  });
 });

@@ -70,14 +70,14 @@ describe('original system board', () => {
     expect(out[0]!.rect).toEqual(packageRect(BOARDS.general, 0));
     expect(out[0]!.rect).toEqual({ x: 17, y: 63, w: 36, h: 36 });
   });
-  it('lists the board, pipe, slots, every part, the PSU and save as targets', () => {
+  it('lists the board, slots, every part, the PSU and save as targets; no port (D35)', () => {
     const out = Array.from({ length: 32 }, createHitTarget), n = setup().targets(systemScene('system'), VIEW, out, 0);
     const list = out.slice(0, n);
-    expect(list.map(t => t.id).sort()).toEqual(['cpu0', 'drive0', 'gpu0', 'pipe', 'psu', 'ram0', 'ram1', 'save', 'slot-drive1', 'slot-gpu1', 'slot-ram2', 'unit'].sort());
+    expect(list.map(t => t.id).sort()).toEqual(['cpu0', 'drive0', 'gpu0', 'psu', 'ram0', 'ram1', 'save', 'slot-drive1', 'slot-gpu1', 'slot-ram2', 'unit'].sort());
     const cpu = list.find(t => t.id === 'cpu0')!;
     expect(cpu).toMatchObject({ kind: 'part', drill: { level: 'chip', id: 0 }, part: { slot: { kind: 'cpu', socket: 0 } } });
     expect(cpu.rect).toEqual(packageRect(BOARDS.general, 0));
-    expect(list.find(t => t.id === 'pipe')).toMatchObject({ kind: 'link', unit: { kind: 'system', id: 0 } });
+    expect(list.find(t => t.id === 'pipe')).toBeUndefined();
     expect(list.find(t => t.id === 'psu')!.part?.slot).toEqual({ kind: 'psu' });
   });
 });
@@ -88,7 +88,6 @@ describe('system value labels', () => {
   });
   const s = systemScene('system'), gpu = s.gpu[0]!.gpu!;
   const expected = {
-    port: `Port|${formatHertz(s.chip.pipe.speed)}`,
     cpu: `CPU|${formatHertz(s.chip.clock.hz)} · ${whole(s.chip.cores.length)} cores`,
     psu: `PSU|${wattsText(s.psu.capacityW)}`,
     ram: `RAM|${sizes(s.ram.map(p => p.capacityBits!))} · ${formatHertz(Math.min(...s.ram.map(p => p.rateBits!)))}`,
@@ -101,12 +100,12 @@ describe('system value labels', () => {
     expect(list.every(l => l.lines === (form === 'phone' ? 1 : 2) && l.tag === (form === 'phone'))).toBe(true);
   });
   it('skips empty part types', () => {
-    expect(labels(systemScene('boot'), 'desktop').map(l => l.id)).toEqual(['port', 'cpu', 'psu']);
+    expect(labels(systemScene('boot'), 'desktop').map(l => l.id)).toEqual(['cpu', 'psu']);
   });
   it('draws leaders on desktop at rest only, never during a zoom or on phone', () => {
     const silk = (f: Fill[]) => f.filter(x => x.c === P.silk).length;
     const rest = silk(draw(s, 0)), zoom = { path: [], alphas: new Float32Array(2) } as unknown as ZoomState;
-    expect(rest - silk(draw(s, 0, { zoom }))).toBe(12);
+    expect(rest - silk(draw(s, 0, { zoom }))).toBe(10);
     expect(silk(draw(s, 0, { form: 'phone' }))).toBe(silk(draw(s, 0, { zoom })));
   });
 });
