@@ -54,6 +54,11 @@ export function createChipRenderer(_registry: LevelRegistry): LevelRenderer<'chi
         t.part = partRef(s.systemId, 'core0'); t.unit = { kind: 'system', id: s.systemId };
         t.slot = sites.length > s.cores.length ? s.cores.length : null; coresBlock(sites, t.rect);
       }
+      // The "+" add site: tapping it buys the next core (addPart core on this system, at that index).
+      if (i < out.length && sites.length > s.cores.length) {
+        const t = resetHitTarget(out[i++]!, 'add:core', 'add', owner(s));
+        t.unit = { kind: 'system', id: s.systemId }; t.slot = s.cores.length; copyRect(sites[s.cores.length]!, t.rect);
+      }
       // The pipe's drop onto the IN pad: its callout says where the link is upgraded (D15.5).
       if (i < out.length) {
         const t = resetHitTarget(out[i++]!, 'pipe', 'link', owner(s));

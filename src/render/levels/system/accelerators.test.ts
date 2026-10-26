@@ -38,7 +38,7 @@ describe('accelerator board', () => {
   });
   it('offers empty open sites as slot targets', () => {
     const out = Array.from({ length: 64 }, createHitTarget), n = createSystemRenderer(createLevelRegistry()).targets(empty, VIEW, out, 0);
-    expect(out.slice(0, n).filter(t => t.kind === 'slot').map(t => t.slot)).toEqual([0, 1, 2, 3, 4, 5, 6, 7]);
+    expect(out.slice(0, n).filter(t => t.kind === 'slot' || t.kind === 'add').map(t => t.slot)).toEqual([0, 1, 2, 3, 4, 5, 6, 7]);
   });
   it.each([['desktop', DESKTOP_FRAMING, 1440, 900, rect(24, 24, 1392, 648)], ['phone', PHONE_FRAMING, 390, 780, rect(8, 8, 368, 600)]] as const)(
     'gives every GPU a distinct, tappable anchor on %s', (_name, framing: RestFraming, w, h, vp) => {

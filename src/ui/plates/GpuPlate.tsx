@@ -9,7 +9,7 @@ import { bits, hertz, ops, quantity, span, watts } from './format';
 import { PlateFrame } from './PlateFrame';
 import type { PlateCommon } from './types';
 import { exactAmount, GPU_CLASSES, GPU_GENERATIONS, GPU_SERIES, GPU_TIERS, gpuResearch, lacksAmount, SERIES_COPY, SERIES_NAMES, type GpuSelection } from './gpuModel';
-import { Pips } from './widgets';
+import { OverSupplyNote, Pips } from './widgets';
 import { GpuCard } from './GpuCard';
 import { GpuPower } from './GpuPower';
 import '../styles/gpu.css';
@@ -128,6 +128,7 @@ export function GpuModelPlate({ system, index, installed, tasks = [], selection:
           {!best && <button type="button" className="key gpu-buy" disabled={!q || !!q.locked || !q.affordable} onClick={() => q && onAction(q.action)}>
             <span>{index === null ? 'Buy' : 'Replace with'} {code}</span><span className="gpu-price">{q ? `${exactAmount(q.cost)} Cr` : notOffered ? '' : 'Loading quote'}</span>
           </button>}
+          {q && <OverSupplyNote quote={q} onAction={x => onAction(x.action)} />}
           <p className={`gpu-note${q?.locked || q && !q.affordable || notOffered && !best ? ' warn' : ''}`} aria-live="polite">{note}</p>
           <button type="button" className="gpu-research-link" disabled={!selectedResearch} onClick={() => selectedResearch && onResearch?.(selectedResearch)}>
             {selectedResearch ? 'Open required research' : q ? 'Selected generation researched' : best ? 'Nothing better to buy' : notOffered ? 'Pick a better model' : 'Waiting for quote'}

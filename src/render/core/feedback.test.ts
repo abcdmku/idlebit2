@@ -49,4 +49,17 @@ describe('feedback', () => {
     v = 2; fb.parts({ level: 'chip' } as LevelSnapshot, level, [t], 1, 1);
     expect(gold(1.1)).toBe(true); expect(gold(1 + FLASH_S)).toBe(false);
   });
+  it('flashes a new child when it appears (a sled in its rack, a rack in its room), keyed by what it drills into', () => {
+    const fb = new Feedback(), level = {} as LevelRenderer;
+    const child = (id: number, x: number) => { const c = createHitTarget(); c.id = `child${id}`; c.kind = 'child'; c.drill = { level: 'system', id } as never; c.rect = rect(x, 10, 20, 8); return c; };
+    const goldAt = (nowS: number) => { const rec = recordingContext(); fb.drawFlash(rec.g, nowS, Object.assign(camera(), { s: 3 }), VP, R1); return rec.fills.filter(f => f.c === P.gold); };
+    const one = [child(4, 10)], two = [child(4, 10), child(9, 40)];
+    fb.parts({ level: 'rack' } as LevelSnapshot, level, one, 1, 0);
+    expect(goldAt(0)).toEqual([]);
+    fb.parts({ level: 'rack' } as LevelSnapshot, level, two, 2, 1);
+    expect(goldAt(1.1).length).toBeGreaterThan(0);
+    // the same children again (even reordered): nothing new, no flash
+    fb.parts({ level: 'rack' } as LevelSnapshot, level, [two[1]!, two[0]!], 2, 5);
+    expect(goldAt(5.1)).toEqual([]);
+  });
 });

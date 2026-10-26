@@ -191,7 +191,8 @@ export function createCanvasRenderer(canvas: HTMLCanvasElement, registry: LevelR
       try { lv.labels(s, view!, frame!, labels); labelType = form === 'phone' ? PHONE_TYPE : worldType; }
       catch (error) { reportRenderError(`${s.level} labels`, error); }
     }
-    if (lv.partVersion && s !== partsFor) {
+    // the purchase flash: a part's version rising, or a new child (sled, rack, hall) appearing
+    if (s !== partsFor) {
       partsFor = s;
       try { fb.parts(s, lv, targets, fillTargets(s), nowS); } catch (error) { reportRenderError(`${s.level} partVersion`, error); }
     }

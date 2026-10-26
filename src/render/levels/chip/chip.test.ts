@@ -346,3 +346,19 @@ describe('QA-24: a core between rounds', () => {
     expect(readySpeedText({ ...c, sleep: 'C3' }, chip, false)).toBe('C3');
   });
 });
+
+describe('"+" add sites are their own targets (user: tapping + buys it)', () => {
+  it('puts an add:core target on the add site, inside the cores block, and a tap there picks it', () => {
+    const max = chipScene('max'), chip = { ...max, coreSites: 32, cores: max.cores.slice(0, 5), slots: [] } as ChipSnapshot;
+    const level = createChipRenderer(createLevelRegistry()), out = Array.from({ length: 64 }, createHitTarget);
+    const n = level.targets(chip, VIEW, out, 0, 'desktop'), list = out.slice(0, n);
+    const add = list.find(t => t.id === 'add:core')!, block = list.find(t => t.id === 'cores')!;
+    expect(add).toMatchObject({ kind: 'add', slot: 5, unit: { kind: 'system', id: chip.systemId } });
+    const site = coreSites(floorOf('desktop', siteCount(chip)), siteCount(chip))[5]!;
+    expect(add.rect).toEqual(site);
+    expect(add.rect.x).toBeGreaterThanOrEqual(block.rect.x); expect(add.rect.y + add.rect.h).toBeLessThanOrEqual(block.rect.y + block.rect.h);
+    // no add site at 32: no add target
+    const full = level.targets(max, VIEW, out, 0, 'desktop');
+    expect(out.slice(0, full).some(t => t.kind === 'add')).toBe(false);
+  });
+});

@@ -3,8 +3,9 @@
 import type { HitTarget } from '../../render/core';
 import type { ShellContextValue } from '../storeHooks';
 import { hasPlate } from '../plates/PlateLayer';
+import { isAdd, tapAdd } from './addTap';
 
-type Shell = Pick<ShellContextValue, 'view' | 'store'>;
+type Shell = Pick<ShellContextValue, 'view' | 'store' | 'dispatch' | 'quote'>;
 
 /**
  * One tap (user, 26 Oct): a thing with its own view (the CPU in a system, a sled in a rack, a rack in a room,
@@ -14,6 +15,8 @@ type Shell = Pick<ShellContextValue, 'view' | 'store'>;
 export function activateTarget(shell: Shell, hit: HitTarget | null): void {
   if (!hit || shell.view.getState().selectedId === hit.id) { shell.view.dispatch({ type: 'cancel' }); return; }
   if (hit.drill) { shell.view.dispatch({ type: 'drill', ref: hit.drill }); return; }
+  // A "+" buys its component at once when it can (user, 26 Oct); otherwise it opens the slot's detail.
+  if (isAdd(hit)) { tapAdd(shell, hit); return; }
   shell.view.dispatch({ type: 'select', target: hit, plate: hasPlate(hit, shell.store.getSnapshot().focus) });
 }
 

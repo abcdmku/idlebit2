@@ -27,6 +27,14 @@ const lastSeqOf = (list: readonly { readonly seq?: number }[]): number => {
   return m;
 };
 
+const childKeys = new Map<string, string>();
+/** A stable key per child node (cached: no per-frame strings). */
+function childKey(level: string, id: number): string {
+  const k = level + id;
+  let v = childKeys.get(k);
+  if (v === undefined) { v = `child:${level}:${id}`; if (childKeys.size < 4096) childKeys.set(k, v); }
+  return v;
+}
 export class Feedback {
   readonly pops = new PayoutPops();
   /** D25: finished non-final shards, drawn as their piece emptying (no pay). */
@@ -85,19 +93,23 @@ export class Feedback {
    * a world only primes the table. Call at rest once per new focus snapshot.
    */
   parts(s: LevelSnapshot, level: LevelRenderer, targets: readonly HitTarget[], count: number, nowS: number): void {
-    if (!level.partVersion || s === this.versionsFor) return;
+    if (s === this.versionsFor) return;
     this.versionsFor = s;
     for (let i = 0; i < count; i++) {
       const t = targets[i]!;
-      if (t.kind !== 'part') continue;
-      const v = level.partVersion(s as never, t.id);
+      // A part flashes when its version rises; a child (a sled, a rack, a site's hall) when it first
+      // appears, keyed by what it drills into so the key survives the list reordering.
+      let key: string, v: number | null;
+      if (t.kind === 'part') { key = t.id; v = level.partVersion ? level.partVersion(s as never, t.id) : null; }
+      else if (t.kind === 'child' && t.drill) { key = childKey(t.drill.level, t.drill.id); v = 0; }
+      else continue;
       if (v === null) continue;
-      const before = this.versions.get(t.id);
+      const before = this.versions.get(key);
       if (this.primed && (before === undefined || v > before)) {
         this.flashAt = nowS;
         this.flashRect.x = t.rect.x; this.flashRect.y = t.rect.y; this.flashRect.w = t.rect.w; this.flashRect.h = t.rect.h;
       }
-      this.versions.set(t.id, v);
+      this.versions.set(key, v);
     }
     this.primed = true;
   }

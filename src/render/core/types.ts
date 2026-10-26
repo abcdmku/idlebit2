@@ -36,7 +36,8 @@ export interface ChildView {
   world?: Rect | null;
 }
 
-export type HitKind = 'part' | 'child' | 'slot' | 'save' | 'unit' | 'port' | 'link';
+/** 'add': a "+" add site; tapping it buys that component (its `unit`, `slot` and, where the quote names one, `part`). */
+export type HitKind = 'part' | 'child' | 'slot' | 'save' | 'unit' | 'port' | 'link' | 'add';
 /** Reused storage. Levels write fields; the UI turns a returned target into a ViewCommand. */
 export interface HitTarget {
   /** Stable within the focus world for one layout; the selection key. */

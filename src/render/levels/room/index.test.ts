@@ -63,10 +63,10 @@ describe('room targets', () => {
   const out: HitTarget[] = Array.from({ length: 64 }, createHitTarget);
   const kids: ChildView[] = Array.from({ length: 32 }, () => ({ ref: { level: 'rack', id: 0 } as NodeRef, rect: rect() }));
   it('offers exactly one rack build site: the next free slot in FIFO order', () => {
-    const s = CASES.overview(0), n = room.targets(s, view, out, 0), slots = out.slice(0, n).filter(t => t.kind === 'slot');
+    const s = CASES.overview(0), n = room.targets(s, view, out, 0), slots = out.slice(0, n).filter(t => t.kind === 'add');
     expect(slots.map(t => t.slot)).toEqual([4]);
     const full = CASES.full(0), m = room.targets(full, view, out, 0);
-    expect(out.slice(0, m).some(t => t.kind === 'slot')).toBe(false);
+    expect(out.slice(0, m).some(t => t.kind === 'add')).toBe(false);
   });
   it('opens the network rack (room switch) and its load balancer display', () => {
     const s = CASES.overview(0), n = room.targets(s, view, out, 0), byId = new Map(out.slice(0, n).map(t => [t.id, t]));

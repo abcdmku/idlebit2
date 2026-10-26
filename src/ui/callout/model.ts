@@ -27,7 +27,7 @@ export function slotSite(t: HitTarget, focus: LevelSnapshot): { name: string; ro
   if (focus.level === 'chip') {
     if (t.id === 'queue') return { name: 'Add queue', row: 'scheduler' };
   }
-  const board = /^slot-([a-z]+)[0-9]*$/.exec(t.id), part = board ? SITE_PART[board[1]!] : undefined;
+  const board = /^(?:slot-|add:)([a-z]+)[0-9]*$/.exec(t.id), part = board ? SITE_PART[board[1]!] : undefined;
   if (part) return { name: `Add ${part.label}`, row: part.row };
   return { name: focus.level === 'rack' ? 'Add server' : focus.level === 'room' ? 'Add rack' : focus.level === 'global' ? 'Add site' : 'Add part', row: null };
 }

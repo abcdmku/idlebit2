@@ -96,7 +96,10 @@ export function rackTargets(s: RackSnapshot, out: HitTarget[], from: number): nu
   t = put('online', 'unit', lamp); if (t) t.unit = refs.unit;
   if (s.saveable) { t = put('save', 'save', save); if (t) t.unit = refs.unit; }
   const free = nextFreeServer(s);
-  if (free >= 0) { t = put('slot', 'slot', serverRect(free, scratch)); if (t) { t.slot = free; t.unit = refs.unit; } }
+  // the "+" on the next free sled slot: tapping it buys a server there
+  if (free >= 0) { t = put('add:server', 'add', serverRect(free, scratch)); if (t) { t.slot = free; t.unit = refs.unit; } }
+  // Power control's open bay (researched, not installed) shows a "+": tapping it installs it
+  if (!s.powerCtl && s.powerCtlLocked === false) { t = put('add:powerCtl', 'add', POWER_CTL_RECT); if (t) { t.part = refs.powerCtl; t.unit = refs.unit; } }
   return sink.n;
 }
 

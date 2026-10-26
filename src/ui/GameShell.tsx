@@ -26,6 +26,7 @@ import { ShellContext, createShellValue, type ShellContextValue, type ShellSurfa
 import { PlatformLine } from './shell/PlatformLine';
 import { createViewStore, initialView, type ViewStore } from './viewState';
 import { openingLevel, writeLastLevel } from './prefs';
+import { SupplyToast } from './shell/supplyToast';
 import './styles/tokens.css';
 import './styles/shell.css';
 import './styles/plates.css';
@@ -146,6 +147,7 @@ export function GameShell({ store, registry, level, view, size, saveNow, childre
           <Hud />
           <QueueStrip />
           <PlatformLine saveNow={saveNow} />
+          <SupplyToast />
           <OffersScope>
             <Deck />
             <Callout />

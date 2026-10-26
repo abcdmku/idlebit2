@@ -86,6 +86,7 @@ export function roomTargets(s: RoomSnapshot, out: HitTarget[], from: number): nu
     t = put('door', 'unit', DOOR_HIT); if (t) { t.unit = o.unit; t.drill = o.node; }
   }
   const free = nextFreeSlot(s);
-  if (free >= 0) { t = put('slot', 'slot', RACK_RECTS[free]); if (t) { t.slot = free; t.unit = refs.unit; } }
+  // the "+" on the next rack slot: tapping it buys a rack there
+  if (free >= 0) { t = put('add:rack', 'add', RACK_RECTS[free]); if (t) { t.slot = free; t.unit = refs.unit; } }
   return sink.n;
 }

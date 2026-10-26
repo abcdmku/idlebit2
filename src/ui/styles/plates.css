@@ -70,6 +70,7 @@
 .v3-plate .key .action-detail em { display: block; font-style: normal; }
 
 .v3-plate .need { margin: 0; color: #a99be6; text-align: center; }
+.v3-plate .need.warn { color: #ffab98; }
 .v3-plate .key-slot { margin: 0; min-height: 44px; display: flex; align-items: center; justify-content: center; color: var(--dim);
   background: #120d28; box-shadow: inset 2px 2px 0 #07050f, inset -2px -2px 0 #2a2252; }
 .v3-plate .key-pair { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }

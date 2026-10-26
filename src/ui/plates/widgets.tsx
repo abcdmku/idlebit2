@@ -2,6 +2,8 @@ import type { ReactNode } from 'react';
 import type { Amount, Currency, Quote, ResearchId } from '../../game';
 import { CoinIcon, GemIcon, LockIcon } from './icons';
 import { span, wholeText } from './format';
+import { overSupplyText, SUPPLY_NAME, supplyRequest } from './overSupply';
+import { useQuote, useShell } from '../storeHooks';
 
 /* The plate language (mockup core/plate.js): head, status and bar, lines, list, keys, port grid, toggle, choices. */
 
@@ -93,6 +95,24 @@ export function QuoteKey({ quote, label, detail, tone = '', reason, researchName
     <Key tone={tone} label={label} price={lock ? null : { cost: quote.cost, currency: quote.currency }} detail={detail}
       disabled={cantBuy} onPress={() => onAction(quote)} />
     {why && <p className="need">{why}</p>}
+    <OverSupplyNote quote={quote} onAction={onAction} />
+  </>;
+}
+
+/**
+ * A buy that would push a supply past its cap (sim `overSupply`, view watts): "Over the power supply · 64 W → 80 W",
+ * and a key that upgrades that supply. Nothing at all when the quote stays under every supply.
+ */
+export function OverSupplyNote({ quote, onAction }: { quote: Quote; onAction: (q: Quote) => void }) {
+  return quote.overSupply ? <SupplyFix os={quote.overSupply} onAction={onAction} /> : null;
+}
+function SupplyFix({ os, onAction }: { os: NonNullable<Quote['overSupply']>; onAction: (q: Quote) => void }) {
+  const shell = useShell(), r = useQuote(supplyRequest(os, shell.store.getSnapshot()));
+  const supply = r?.quotes.find(q => q.action.type === 'upgradePart' && !q.locked) ?? r?.quotes.find(q => !q.locked) ?? null;
+  return <>
+    <p className="need warn" data-testid="over-supply">{overSupplyText(os)}</p>
+    {supply && <Key tone="ghost" label={`Upgrade ${SUPPLY_NAME[os.part]}`} price={{ cost: supply.cost, currency: supply.currency }}
+      disabled={!supply.affordable} onPress={() => onAction(supply)} />}
   </>;
 }
 

@@ -55,7 +55,8 @@ export function createSystemRenderer(registry: LevelRegistry): LevelRenderer<'sy
         if (site.state === 'part' || i >= out.length) continue;
         const v = slotOf(s, site);
         if (!v) continue;
-        const t = resetHitTarget(out[i++]!, `slot-${site.type}${site.index}`, 'slot', owner(s));
+        const add = site.state === 'open';
+        const t = resetHitTarget(out[i++]!, add ? `add:${site.type}${site.index}` : `slot-${site.type}${site.index}`, add ? 'add' : 'slot', owner(s));
         t.slot = v.index; t.unit = { kind: 'system', id: s.systemId }; siteRect(b, site.type, site.index, t.rect);
       }
       for (const site of m.sites) {

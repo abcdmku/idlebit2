@@ -4,7 +4,7 @@ import type { FailDetail, LevelId, NodeRef, PartRef } from '../../game';
 import type { HitTarget } from '../../render/core';
 import type { ShellContextValue } from '../storeHooks';
 
-export type PointKind = 'psu' | 'rackCooler';
+export type PointKind = 'psu' | 'rackCooler' | 'pdu' | 'ups';
 export interface PointFix { readonly kind: PointKind; readonly name: string }
 
 /** The block details whose fix is a plate. */
@@ -15,7 +15,7 @@ export const POINT_AT: Readonly<Partial<Record<FailDetail, PointFix>>> = {
 export const pointFix = (detail: FailDetail | null | undefined): PointFix | null => (detail ? POINT_AT[detail] ?? null : null);
 
 type Shell = Pick<ShellContextValue, 'view' | 'store'>;
-const LEVEL: Readonly<Record<PointKind, LevelId>> = { psu: 'system', rackCooler: 'rack' };
+const LEVEL: Readonly<Record<PointKind, LevelId>> = { psu: 'system', rackCooler: 'rack', pdu: 'rack', ups: 'room' };
 /** How long a zoom may take before the plate gives up opening (a transition is well under this). */
 const ZOOM_DEADLINE_MS = 4000;
 
@@ -26,8 +26,10 @@ function targetIn(shell: Shell, kind: PointKind): HitTarget | null {
   let id: string, part: PartRef, owner: NodeRef;
   if (kind === 'psu' && (f.level === 'chip' || f.level === 'system')) {
     id = 'psu'; owner = { level: f.level, id: f.systemId }; part = { unit: { kind: 'system', id: f.systemId }, slot: { kind: 'psu' } };
-  } else if (kind === 'rackCooler' && f.level === 'rack') {
-    id = 'cooler'; owner = { level: 'rack', id: f.rackId }; part = { unit: { kind: 'rack', id: f.rackId }, slot: { kind: 'rackCooler' } };
+  } else if ((kind === 'rackCooler' || kind === 'pdu') && f.level === 'rack') {
+    id = kind === 'pdu' ? 'pdu' : 'cooler'; owner = { level: 'rack', id: f.rackId }; part = { unit: { kind: 'rack', id: f.rackId }, slot: { kind } };
+  } else if (kind === 'ups' && f.level === 'room') {
+    id = 'ups0'; owner = { level: 'room', id: f.roomId }; part = { unit: { kind: 'room', id: f.roomId }, slot: { kind: 'ups', index: 0 } };
   } else return null;
   return { id, kind: 'part', owner, part, unit: null, slot: null, drill: null, sw: null, port: null, rect: { x: 0, y: 0, w: 0, h: 0 } };
 }

@@ -184,15 +184,17 @@ describe('system parts as tiles (user: where to click)', () => {
   it('outlines every tappable part on exactly its hit rect, and marks open slots with a "+"', () => {
     const s = systemScene('system'), fills = draw(s, 0), out = Array.from({ length: 32 }, createHitTarget);
     const n = setup().targets(s, VIEW, out, 0);
-    const parts = out.slice(0, n).filter(t => t.kind === 'part' || t.kind === 'slot');
+    const parts = out.slice(0, n).filter(t => t.kind === 'part' || t.kind === 'slot' || t.kind === 'add');
     expect(parts.length).toBeGreaterThan(4);
     for (const t of parts) {
       const r = t.rect;
       expect(fills.some(f => f.x === r.x && f.y === r.y && f.w === r.w && f.h === 1)).toBe(true);
       expect(fills.some(f => f.x === r.x && f.y === r.y + r.h - 1 && f.w === r.w && f.h === 1)).toBe(true);
     }
-    const open = new Set(boardModel(s).sites.filter(x => x.state === 'open').map(x => `slot-${x.type}${x.index}`));
-    for (const t of parts.filter(p => p.kind === 'slot' && open.has(p.id))) {
+    // every open slot is an add target (its own "+")
+    const open = new Set(boardModel(s).sites.filter(x => x.state === 'open').map(x => `add:${x.type}${x.index}`));
+    expect(parts.filter(p => p.kind === 'add').map(p => p.id).sort()).toEqual([...open].sort());
+    for (const t of parts.filter(p => p.kind === 'add')) {
       const cx = t.rect.x + (t.rect.w >> 1), cy = t.rect.y + (t.rect.h >> 1);
       expect(fills.some(f => f.x === cx - 2 && f.y === cy && f.w === 5 && f.h === 1)).toBe(true);
     }

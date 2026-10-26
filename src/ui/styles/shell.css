@@ -161,6 +161,7 @@ b, .b { font-weight: 700; }
 .round-plate .rp-bottom .v { white-space: nowrap; }
 .round-plate .keys { position: sticky; bottom: -12px; margin-bottom: -12px; padding: 8px 0 12px; background: #1b1437; z-index: 1; }
 /* the new-version banner: the reserved line, taller for its 48 px Reload key */
+.platform-line.supply-toast { color: #ffab98; }
 .platform-line.version { background: var(--panel); pointer-events: auto; display: flex; align-items: center; gap: 16px; padding: 0 0 0 8px; color: var(--cyan); overflow: visible; }
 
 .round-plate .rp-fix .key.rp-meet { width: 100%; }

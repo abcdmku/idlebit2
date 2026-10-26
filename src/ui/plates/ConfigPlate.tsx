@@ -5,7 +5,7 @@ import { drawTierIcon, MINI_SIZE, type ConfigKind } from './configArt';
 import { wholeText } from './format';
 import { LockIcon } from './icons';
 import { PlateFrame } from './PlateFrame';
-import { Price } from './widgets';
+import { Price, OverSupplyNote } from './widgets';
 import type { PlateCommon } from './types';
 
 type AddQuote = Quote & { action: { type: 'addUnit'; source: ConfigSource } };
@@ -120,6 +120,7 @@ export function ConfigPlate({ kind, title, sub, credits, landscape, drawCopy, qu
         <span className="kl">{chosen?.locked ? 'Locked' : `Add ${noun}`}</span>
         {chosen && !chosen.locked && <Price cost={chosen.cost} />}
       </button>
+      {chosen && <OverSupplyNote quote={chosen} onAction={q => onAction(q.action)} />}
     </div>
   </PlateFrame>;
 }

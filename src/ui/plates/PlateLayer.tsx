@@ -119,7 +119,7 @@ export function gpuPlateSlot(t: HitTarget, focus: LevelSnapshot): number | null 
     const index = t.part.slot.index;
     return focus.gpu.some(p => p.slot === index) ? index : null;
   }
-  if (t.kind === 'slot' && t.slot !== null && t.id === `slot-gpu${t.slot}`) return null;
+  if (t.kind === 'slot' && t.slot !== null && (t.id === `slot-gpu${t.slot}` || t.id === `add:gpu${t.slot}`)) return null;
   return undefined;
 }
 

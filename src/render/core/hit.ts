@@ -9,14 +9,15 @@ const scratch: Rect = { x: 0, y: 0, w: 0, h: 0 };
  */
 export function arbitrateHit<T extends { readonly rect: Rect }>(targets: readonly T[], count: number, xCss: number, yCss: number,
   cam: Camera, viewport: Rect, ratio: PixelRatio, minimumCss = 44): T | null {
-  let best: T | null = null, bestDistance = Infinity, bestRow = Infinity, bestBottom = -Infinity;
+  let best: T | null = null, bestDistance = Infinity, bestArea = Infinity, bestRow = Infinity, bestBottom = -Infinity;
   for (let i = 0; i < count; i++) {
     const target = targets[i], r = projectRect(cam, viewport, ratio, target.rect, scratch);
     const dx = Math.max(r.x - xCss, 0, xCss - r.x - r.w), dy = Math.max(r.y - yCss, 0, yCss - r.y - r.h);
     if (dx > Math.max(0, (minimumCss - r.w) / 2) || dy > Math.max(0, (minimumCss - r.h) / 2)) continue;
-    const distance = dx * dx + dy * dy, row = Math.abs(yCss - r.y - r.h / 2), bottom = r.y + r.h;
-    if (distance < bestDistance || (distance === bestDistance && (row < bestRow || (row === bestRow && bottom >= bestBottom)))) {
-      best = target; bestDistance = distance; bestRow = row; bestBottom = bottom;
+    // Inside several (a "+" inside its block, a port on its switch): the smallest wins.
+    const distance = dx * dx + dy * dy, area = distance === 0 ? r.w * r.h : Infinity, row = Math.abs(yCss - r.y - r.h / 2), bottom = r.y + r.h;
+    if (distance < bestDistance || (distance === bestDistance && (area < bestArea || (area === bestArea && (row < bestRow || (row === bestRow && bottom >= bestBottom)))))) {
+      best = target; bestDistance = distance; bestArea = area; bestRow = row; bestBottom = bottom;
     }
   }
   return best;
