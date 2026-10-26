@@ -52,10 +52,12 @@ export function CanvasWorld() {
 
     let published: RenderSnapshot | null = null, publishedAt = 0, pausedAt: number | null = null;
     let presentedFor: ViewState | null = null, presentedQuotes = surface.buildQuotes, presentation: ViewPresentation | null = null;
+    // Desktop hover: the target under the mouse gets a faint bracket (user, 26 Oct).
+    let hoverId: string | null = null, presentedHover: string | null = null;
     const present = (v: ViewState): ViewPresentation => {
-      if (v !== presentedFor || surface.buildQuotes !== presentedQuotes || !presentation) {
-        presentedFor = v; presentedQuotes = surface.buildQuotes;
-        presentation = { selectedId: v.selectedId, picked: null, quotes: surface.buildQuotes, reducedMotion: v.reducedMotion, zoomGoal: v.goal };
+      if (v !== presentedFor || surface.buildQuotes !== presentedQuotes || hoverId !== presentedHover || !presentation) {
+        presentedFor = v; presentedQuotes = surface.buildQuotes; presentedHover = hoverId;
+        presentation = { selectedId: v.selectedId, hoverId, picked: null, quotes: surface.buildQuotes, reducedMotion: v.reducedMotion, zoomGoal: v.goal };
       }
       return presentation;
     };
@@ -103,6 +105,7 @@ export function CanvasWorld() {
     const stopInput = bindGestures(canvas, {
       renderer: () => renderer,
       pan,
+      hover: hit => { hoverId = hit?.id ?? null; },
       tap: hit => {
         // A darkened rack in the row becomes active where it stands; the camera does not move.
         if (hit?.drill && hit.drill.level === 'rack' && hit.owner.level === 'rack' && hit.drill.id !== view.getState().focus.id) {

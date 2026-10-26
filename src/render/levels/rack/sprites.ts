@@ -57,6 +57,23 @@ function lcdLine(v: ServerSlotView, look: ServerLook, max: number): string {
   return 'IDLE';
 }
 
+/**
+ * Lit LEDs (0..3) of core column `c` of `cols`: the mean busy of its cores (`coreBusy`, core order),
+ * at least one while any of them works. Without `coreBusy` (older views), the busy count fills
+ * columns from the left as before.
+ */
+export function litLeds(v: ServerSlotView, c: number, cols: number): number {
+  const per = v.coreBusy;
+  if (!per || !per.length) {
+    const n = v.cores > 0 && v.busyCores > 0 ? Math.max(1, Math.round((v.busyCores / v.cores) * cols)) : 0;
+    return c < n ? 3 : 0;
+  }
+  const n = per.length, lo = Math.floor((c * n) / cols), hi = Math.max(lo + 1, Math.floor(((c + 1) * n) / cols));
+  let sum = 0;
+  for (let i = lo; i < hi && i < n; i++) sum += Math.max(0, Math.min(1, per[i]!));
+  const f = sum / (hi - lo);
+  return f > 0 ? Math.max(1, Math.round(f * 3)) : 0;
+}
 /** One server face at (x, y), OPEN.w × U. */
 export function drawServer(g: G, x: number, y: number, w: number, h: number, v: ServerSlotView, look: ServerLook, heat: number, paused: boolean): void {
   const tier = tierOf(v.cores), bez = BEZEL[tier], hi = mix(bez, '#ffffff', 0.16), lo = mix(bez, P.ink, 0.35);
@@ -72,11 +89,14 @@ export function drawServer(g: G, x: number, y: number, w: number, h: number, v: 
   px(g, x + 4, y + 2, live && v.port?.active ? P.net : OFF);
   px(g, x + w - 4, y + 3, look === 'crash' ? P.fault : dark || look === 'offline' || look === 'out' ? OFF : look === 'boot' || look === 'waking' ? P.amber : look === 'asleep' ? SLEEP_LED : P.led);
 
-  // one LED column per core (up to 4), lit for the cores that are busy now
-  const cols = Math.max(1, Math.min(4, v.cores)), busy = v.cores > 0 ? v.busyCores / v.cores : 0;
-  const litCols = live && v.busyCores > 0 ? Math.max(1, Math.round(busy * cols)) : 0, bottom = y + 2 + 9 - 1;
+  // one LED column per core (up to 4; past 4, each column is its share of the cores in core order),
+  // lit from the foot by how busy those very cores are now, so a busy core stays where it really is
+  const cols = Math.max(1, Math.min(4, v.cores)), bottom = y + 2 + 9 - 1;
   let cx = x + 7;
-  for (let c = 0; c < cols; c++, cx += 3) for (let k = 0; k < 3; k++) R(g, cx, bottom - k * 3 - 2, 2, 2, c < litCols ? KIND.compute : OFF);
+  for (let c = 0; c < cols; c++, cx += 3) {
+    const lit = live ? litLeds(v, c, cols) : 0;
+    for (let k = 0; k < 3; k++) R(g, cx, bottom - k * 3 - 2, 2, 2, k < lit ? KIND.compute : OFF);
+  }
   cx += 2;
 
   // status display

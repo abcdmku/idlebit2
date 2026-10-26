@@ -1,3 +1,4 @@
+import { ACCEL_CLOCKS } from '../core/constants';
 import { viewW } from '../core/constants';
 import type { CompiledBuffers, HotBuffers } from '../core/buffers';
 import { HOME_TEMP_F, MAX_ZONES_PER_SITE, RACKS_PER_ROOM, REGIONS, SERVERS_PER_RACK, TICK_MS } from '../core/constants';
@@ -25,12 +26,43 @@ export function systemLoad(state: GameState, s: number): number {
 }
 
 /** Task usage in core equivalents; compiled cores and threads span every CPU. */
-export function systemCoreActivity(state: GameState, s: number): { cores: number; busyCores: number } {
+/**
+ * Busy fraction of each of a system's first `nCores` cores (CPU 1), read from the threads its running records
+ * are bound to (rec.thread0); other busy threads (research holders) fill the lowest free ones. Core i is always core i.
+ */
+export function coreOccupancy(state: GameState, s: number, nCores: number, tpc: number, busyThreads: number): Float64Array {
+  const rec = state.hot.rec, h = state.hot.sys;
+  const total = nCores * tpc;
+  const used = new Uint8Array(Math.max(1, total));
+  const mark = (r: number) => {
+    const t0 = rec.thread0[r] ?? -1;
+    if (t0 < 0) return;
+    const held = (rec.threads[r] ?? 1) * (rec.count[r] ?? 1);
+    for (let t = t0; t < t0 + held && t < total; t += 1) used[t] = 1;
+  };
+  for (let res = 0; res < 4; res += 1) {
+    if (res === 2) { for (let a = 0; a < ACCEL_CLOCKS; a += 1) for (let r = h.accelHead[s * ACCEL_CLOCKS + a] ?? -1; r >= 0; r = rec.next[r] ?? -1) mark(r); continue; }
+    for (let r = h.head[s * 4 + res] ?? -1; r >= 0; r = rec.next[r] ?? -1) mark(r);
+  }
+  // Threads busy without a binding (research holders, hand-built states) take the lowest free ones.
+  let placed = 0;
+  for (let t = 0; t < total; t += 1) placed += used[t]!;
+  let rest = Math.max(0, Math.min(total, busyThreads) - placed);
+  for (let t = 0; t < total && rest > 0; t += 1) if (!used[t]) { used[t] = 1; rest -= 1; }
+  const out = new Float64Array(nCores);
+  for (let i = 0; i < nCores; i += 1) { let n = 0; for (let k = 0; k < tpc; k += 1) n += used[i * tpc + k]!; out[i] = n / tpc; }
+  return out;
+}
+
+export function systemCoreActivity(state: GameState, s: number): { cores: number; busyCores: number; coreBusy: number[] } {
   const c = state.compiled.sys;
   const cores = c.kind[s] === 1 ? 0 : (c.cores[s] ?? 0);
   const threads = c.threads[s] ?? 0;
-  const load = threads > 0 ? Math.max(0, Math.min(1, (state.hot.sys.busyThreads[s] ?? 0) / threads)) : 0;
-  return { cores, busyCores: cores * load };
+  const busyThreads = state.hot.sys.busyThreads[s] ?? 0;
+  const load = threads > 0 ? Math.max(0, Math.min(1, busyThreads / threads)) : 0;
+  // Per core, in core order (a task keeps its core): the rack sled minis draw from this, not from a count.
+  const coreBusy = cores > 0 ? Array.from(coreOccupancy(state, s, cores, Math.max(1, Math.round(threads / cores)), busyThreads)) : [];
+  return { cores, busyCores: cores * load, coreBusy };
 }
 
 /** Modes whose `timer` counts down a boot-time transition (spec §4.3). */

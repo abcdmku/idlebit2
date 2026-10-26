@@ -1,3 +1,4 @@
+import { ACCEL_CLOCKS } from '../core/constants';
 import { G, LOC } from '../core/buffers';
 import { accelNeed, chooseAccel, type AccelChoice } from '../core/accelerators';
 import { splitRecord } from '../core/pool';
@@ -90,9 +91,42 @@ export function startRecord(w: World, s: number, r: number, tau: number, span: S
   h.busyThreads[s] = h.busyThreads[s]! + threads;
   w.hot.g[G.busyThreads] = w.hot.g[G.busyThreads]! + threads;
   noteAdmit(w, s, before);
+  bindThreads(w, s, r, threads);
   placeRecord(w, s, r, selected.held);
   rec.part[r] = firstPart(w, r, shape, rec.stage[r]!, 0);
   enterStage(w, s, r, tau, span, -1, NaN);
+}
+
+/**
+ * Binds a starting record to hardware threads: the lowest block of `n` free threads on system s (else the
+ * lowest free thread), read from the threads its running records already hold. It keeps them until it ends,
+ * so a task never moves to another core when an earlier one finishes. Exact, and O(running on s).
+ */
+const occupied: Uint8Array = new Uint8Array(512);
+function bindThreads(w: World, s: number, r: number, n: number): void {
+  const rec = w.hot.rec, h = w.hot.sys;
+  const total = Math.min(occupied.length, Math.max(1, w.compiled.sys.threads[s]!));
+  occupied.fill(0, 0, total);
+  const mark = (x: number) => {
+    const t0 = rec.thread0[x]!;
+    if (t0 < 0) return;
+    const held = rec.count[x]! * rec.threads[x]!;
+    for (let t = t0; t < t0 + held && t < total; t += 1) occupied[t] = 1;
+  };
+  for (let res = 0; res < NRES; res += 1) {
+    if (res === GPU) continue;
+    for (let x = h.head[s * NRES + res]!; x >= 0; x = rec.next[x]!) if (x !== r) mark(x);
+  }
+  for (let a = 0; a < ACCEL_CLOCKS; a += 1) {
+    for (let x = h.accelHead[s * ACCEL_CLOCKS + a]!; x >= 0; x = rec.next[x]!) if (x !== r) mark(x);
+  }
+  let first = -1, run = 0;
+  for (let t = 0; t < total; t += 1) {
+    run = occupied[t] ? 0 : run + 1;
+    if (run >= n) { first = t - n + 1; break; }
+  }
+  if (first < 0) for (let t = 0; t < total; t += 1) if (!occupied[t]) { first = t; break; }
+  rec.thread0[r] = Math.max(0, first);
 }
 
 /** Takes record r out of its run list, giving back an IO hold. Returns the clock it was on. */

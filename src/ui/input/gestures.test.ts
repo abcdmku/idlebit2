@@ -81,12 +81,17 @@ describe('the cursor says what you can tap (user, 26 Oct)', () => {
     const canvas = document.createElement('canvas');
     let over = true;
     const renderer = { transition: null, hit: () => (over ? { id: 'cache' } : null) } as never;
-    const dispose = bindGestures(canvas, { renderer: () => renderer, tap: vi.fn(), zoom: vi.fn() });
+    const seen: (string | null)[] = [];
+    const dispose = bindGestures(canvas, { renderer: () => renderer, tap: vi.fn(), zoom: vi.fn(), hover: h => seen.push(h ? h.id : null) });
     const hover = () => { const e = new Event('pointermove'); Object.assign(e, { pointerId: 1, clientX: 10, clientY: 10, pointerType: 'mouse' }); canvas.dispatchEvent(e); };
     hover();
     expect(canvas.style.cursor).toBe('pointer');
     over = false; hover();
     expect(canvas.style.cursor).toBe('');
+    over = true; hover();
+    canvas.dispatchEvent(new Event('pointerleave'));
+    // the hovered target goes to the renderer (its faint bracket), and leaving the world clears it
+    expect(seen).toEqual(['cache', null, 'cache', null]);
     dispose();
   });
 });

@@ -18,7 +18,8 @@ export const SAVE_SCHEMA = 'bitrouge-v3' as const;
 // Pre-live reset: v13 adds the D31 runtime's back-to-standby clock (offSinceTick).
 // Pre-live reset: v14 is D33 (stall end): the last met tick in hot.g.
 // Pre-live reset: v15 is D34 (one Multi-core node, no lanes): core levels and lane research are gone.
-export const SAVE_VERSION = 15;
+// Pre-live reset: v16 binds running records to hardware threads (rec.thread0): cores keep their tasks.
+export const SAVE_VERSION = 16;
 
 export interface SaveEnvelope {
   readonly schema: typeof SAVE_SCHEMA;

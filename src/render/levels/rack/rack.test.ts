@@ -4,7 +4,7 @@ import type { ChildView, HitTarget, NodeRef, ViewPresentation, WorldFrame, ZoomS
 import { RACK, RACK_RECTS } from '../room/layout';
 import { createRackRenderer } from '.';
 import { OFF, typeText } from './art';
-import { LCD_IDLE, drawServer, serverLook } from './sprites';
+import { LCD_IDLE, drawServer, litLeds, serverLook } from './sprites';
 import { awakeCount, batteryFill, batteryText } from './powerCtl';
 import { speedText } from './labels';
 import { CASES, rackCase } from './fixtures';
@@ -267,5 +267,17 @@ describe('D35 switch tag', () => {
     expect(speedText(1e5, 1e5)).toBe('100 kHz');
     expect(speedText(1e5, 2e5)).toBe('100–200 kHz');
     expect(speedText(5e5, 1e6)).toBe('500 kHz–1 MHz');
+  });
+});
+
+describe('sled core LEDs follow the real cores (coreBusy)', () => {
+  it('lights the column of each busy core where it is, not the busy count from the left', () => {
+    const base = CASES.overview!(0).servers[1]!, v = { ...base, cores: 4, busyCores: 1, coreBusy: [0, 0, 1, 0] };
+    expect([0, 1, 2, 3].map(c => litLeds(v, c, 4))).toEqual([0, 0, 3, 0]);
+    // 8 cores in 4 columns: each column is two cores in order, lit by their mean busy
+    const eight = { ...base, cores: 8, busyCores: 3, coreBusy: [0, 0, 1, 1, 0, 0.5, 0, 0] };
+    expect([0, 1, 2, 3].map(c => litLeds(eight, c, 4))).toEqual([0, 3, 1, 0]);
+    // older views without coreBusy: the count from the left, as before
+    expect([0, 1, 2, 3].map(c => litLeds({ ...base, cores: 4, busyCores: 2, coreBusy: undefined }, c, 4))).toEqual([3, 3, 0, 0]);
   });
 });

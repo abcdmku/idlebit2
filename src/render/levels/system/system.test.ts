@@ -9,7 +9,7 @@ import { createFixtureLevels } from '../../core/fixtureLevels';
 import type { Fill } from '../../core/testCanvas';
 import { recordingContext } from '../../core/testCanvas';
 import { createSystemRenderer } from '.';
-import { BOARD, BOARDS, CABLE_X, FOCUS, PSU, WORLD, packageRect, siteRect } from './layout';
+import { BOARD, BOARDS, CABLE_X, CONNECTOR, FOCUS, PSU, WORLD, packageRect, siteRect } from './layout';
 import { boardModel } from './model';
 import { sizes } from './labels';
 import { chipScene, sceneInbound, systemScene } from './scenes';
@@ -56,7 +56,8 @@ describe('original system board', () => {
     expect(level.miniRect!(s, r)).toEqual(WORLD);
     expect(level.focus(s, r, r)).toEqual(FOCUS);
     expect([FOCUS.y <= BOARD.y - BOARD.z, FOCUS.y + FOCUS.h >= BOARD.y + BOARD.h, FOCUS.x <= BOARD.x, FOCUS.x + FOCUS.w >= BOARD.x + BOARD.w]).toEqual([true, true, true, true]);
-    expect(level.entry!(s, { x: 0, y: 0 })).toEqual({ x: 33, y: 0 });
+    // the pipe ends exactly on the board's gold edge connector (no stem)
+    expect(level.entry!(s, { x: 0, y: 0 })).toEqual({ x: CONNECTOR.x + (CONNECTOR.w >> 1), y: CONNECTOR.y - 2 });
   });
   it('puts every part in its own fixed site', () => {
     const m = boardModel(systemScene('system'));

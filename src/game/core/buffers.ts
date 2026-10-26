@@ -185,6 +185,11 @@ export const RECORD = {
   /** D26.5: completion window in ticks from take (-1 none), frozen at the draw; with `taken` it is the task's clock. */
   deadline: neg1,
   /**
+   * The first hardware thread this running record holds on its system: the lowest free block at start, kept
+   * until it ends (user, 25 Oct: "cores should not order by completion"). Views place tasks on their real cores.
+   */
+  thread0: neg1,
+  /**
    * D26.1 placement per task, bits, written at start (exec/memory) and released once: cache, RAM, disk (memN
    * of it on the rack storage node). trafR/trafD: frozen traffic fractions of its mem stages (D26.2).
    * vramR/vramD (vramN on the node): unified-memory VRAM overflow (D26.4). `part`: the current stage part.

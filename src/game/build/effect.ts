@@ -9,6 +9,8 @@ import type { CapacityUnit, EffectPreview } from '../types/quotes';
 import type { GameState, Unlocks } from '../types/state';
 import { capacity, isLeveled, partWatts, PARTS, type LeveledPartId } from './catalog';
 import { compileSystem } from './compile';
+import { lossFraction } from './catalog/curves';
+import { supplyLossW } from '../phys/supplies';
 import { POWER_SLOTS, readPart } from './partAccess';
 import { installedGpuStats } from './gpu';
 import type { AccelBuild } from '../types/gpu';
@@ -100,6 +102,18 @@ export function preview(before: number, after: number, unit: CapacityUnit, wBefo
   };
 }
 
+/**
+ * A power supply change: capacity in W, its loss before and after (percent at typical load), and
+ * the system's input power at its current draw (delivered + loss), so the energy delta is the
+ * saving and payback is price / saving.
+ */
+function psuEffect(state: GameState, id: number, a: SystemSpec, b: SystemSpec, capA: number, capB: number, price: number, cost: bigint): EffectPreview {
+  const lossA = lossFraction(PARTS.psu, a.psu.gen, a.psu.level), lossB = lossFraction(PARTS.psu, b.psu.gen, b.psu.level);
+  const draw = state.hot.sys.drawW[id] ?? 0;
+  const wa = draw + supplyLossW(draw, capA, lossA), wb = draw + supplyLossW(draw, capB, lossB);
+  return { ...preview(capA, capB, 'W', wa, wb, price, cost, 0), lossPctBefore: lossA * 100, lossPctAfter: lossB * 100 };
+}
+
 /** Preview of a part change already applied in `after` (same system or infra unit). */
 export function partEffect(state: GameState, ref: PartRef, after: BuildState, cost: bigint): EffectPreview | null {
   const u = state.research.unlocks;
@@ -120,6 +134,7 @@ export function partEffect(state: GameState, ref: PartRef, after: BuildState, co
     const cores = Math.max(1, state.compiled.sys.cores[id] ?? 1);
     const use = Math.min(1, Math.max(0, (state.hot.sys.busy[id] ?? 0) / cores));
     const fa = figures(a, u), fb = figures(b, u);
+    if (ref.slot.kind === 'psu') return psuEffect(state, id, a, b, fa.psu, fb.psu, price, cost);
     const [field, unit, isRate] = key;
     const wa = fa.idle + fa.load * use, wb = fb.idle + fb.load * use;
     const gain = isRate ? (fb[field] - fa[field]) * use : null;

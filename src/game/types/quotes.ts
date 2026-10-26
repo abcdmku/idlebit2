@@ -75,6 +75,14 @@ export interface EffectPreview {
   readonly energyPerMinuteDelta: Amount;
   /** price / net gain per second at current load; null = "No payback at this load". */
   readonly paybackS: number | null;
+  /**
+   * A power supply change only: its loss before and after, in percent of delivered watts at
+   * typical load (×1 up to 90% usage; exact, the UI rounds). wattsBefore/After are then the
+   * system's input power at its current draw (delivered + loss), so the energy delta and payback
+   * are the saving.
+   */
+  readonly lossPctBefore?: number;
+  readonly lossPctAfter?: number;
 }
 /** Full-load system power at the current research and environment. */
 export interface GpuPowerPoint {

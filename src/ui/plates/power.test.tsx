@@ -103,3 +103,12 @@ describe('D31 power keys', () => {
     expect([wakeS(1), wakeS(4), wakeS(9)]).toEqual([2, 0.5, 0.25]);
   });
 });
+
+describe('power supply keys (loss and saving)', () => {
+  it('read the loss in whole percents and the watts it saves', async () => {
+    const { effectText } = await import('./PartKeys');
+    const e = { capacityBefore: 64, capacityAfter: 128, unit: 'W', wattsBefore: 1.5e-3, wattsAfter: 1.2e-3, energyPerMinuteDelta: '-1', paybackS: null, lossPctBefore: 38.4, lossPctAfter: 19.6 } as never;
+    expect(effectText(e)).toBe('Loss 38% → 20% · saves ~300 µW');
+    expect(effectText({ ...(e as object), wattsAfter: 1.5e-3 } as never)).toBe('Loss 38% → 20%');
+  });
+});

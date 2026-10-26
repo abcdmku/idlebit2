@@ -12,6 +12,7 @@ import type { BuildSlotView } from '../types/views';
 import { modeName, psuView, systemTimerS } from './common';
 import { inboundTransfer, shardOf } from './flows';
 import { forEachRunning, stageProgress } from './tasks';
+import { coreOccupancy } from './common';
 import { spilledOutOfCache } from './memory';
 
 const CSTATES = [0, 1, 3, 6] as const;
@@ -78,27 +79,33 @@ export function chipSnapshot(state: GameState, id: SystemId, parent: NodeRef | n
   const tpc = nCores > 0 ? Math.max(1, Math.round(threads / (nCores * Math.max(1, cpus)))) : 1;
   const share = researchShare(state, id);
 
-  // Oldest CPU-stage records fill cores first; each takes rec.threads × count threads.
+  // Each running record sits on the threads it was bound to at start (rec.thread0): core i shows the task on
+  // core i, so a finished task never shifts the others (user, 25 Oct). CPU-stage records show their task.
   const rec = state.hot.rec;
   const oldestFirst = (a: number, b: number): number => rec.taken[a]! - rec.taken[b]! || rec.taskId[a]! - rec.taskId[b]!;
-  const running: number[] = [];
-  forEachRunning(state, id, (r, res) => { if (res === 0) running.push(r); });
-  running.sort(oldestFirst);
+  const occ = coreOccupancy(state, id, nCores, tpc, busyThreads);
   const fam = new Int32Array(nCores).fill(-1);
   const taskIds: (number | null)[] = Array(nCores).fill(null);
   const prog = new Float64Array(nCores);
   const shardIx = new Int32Array(nCores).fill(-1), group = new Int32Array(nCores);
   const rack = c.rack[id] ?? 0;
-  let core = 0;
-  for (const r of running) {
-    if (core >= nCores) break;
+  const show = (r: number, core: number, held: number) => {
+    fam[core] = rec.family[r] ?? 0; taskIds[core] = rec.taskId[r]!; prog[core] = stageProgress(state.hot, state.clock.tick, r, rack, id, 0);
+    shardIx[core] = shardOf(state.hot, r).shard; group[core] = held;
+  };
+  const unbound: number[] = [];
+  forEachRunning(state, id, (r, res) => {
+    if (res !== 0) return;
+    const held = (rec.threads[r] ?? 1) * (rec.count[r] ?? 1), t0 = rec.thread0[r] ?? -1;
+    if (t0 < 0) { unbound.push(r); return; }
+    for (let core = Math.floor(t0 / tpc); core < Math.ceil((t0 + held) / tpc) && core < nCores; core += 1) if (taskIds[core] === null) show(r, core, held);
+  });
+  // Records without a binding (hand-built states) fill the lowest free cores, oldest taken first.
+  unbound.sort(oldestFirst);
+  for (const r of unbound) {
     const held = (rec.threads[r] ?? 1) * (rec.count[r] ?? 1);
-    const take = Math.max(1, Math.ceil(held / tpc));
-    const p = stageProgress(state.hot, state.clock.tick, r, rack, id, 0);
-    const shard = shardOf(state.hot, r).shard;
-    for (let k = 0; k < take && core < nCores; k += 1, core += 1) {
-      fam[core] = rec.family[r] ?? 0; taskIds[core] = rec.taskId[r]!; prog[core] = p; shardIx[core] = shard; group[core] = held;
-    }
+    let need = Math.max(1, Math.ceil(held / tpc));
+    for (let core = 0; core < nCores && need > 0; core += 1) if (taskIds[core] === null) { show(r, core, held); need -= 1; }
   }
 
   const cstate = cstateOf(h.cstate[id]);
@@ -110,7 +117,7 @@ export function chipSnapshot(state: GameState, id: SystemId, parent: NodeRef | n
   const paused = h.mode[id] === MODE.paused;
   const liveHz = paused ? hz : draw === DRAW_NONE || draw === DRAW_SLEEP ? 0 : hz * (h.clockFactor[id] ?? 1);
   const cores: CoreView[] = parts.map((part, i) => {
-    const busy = Math.max(0, Math.min(tpc, busyThreads - i * tpc)) / tpc;
+    const busy = occ[i]!;
     const sleep: CoreSleep | null = paused ? null : draw === DRAW_SLEEP ? 'S3' : draw !== DRAW_NONE && busy === 0 && cstate > 0 ? `C${cstate as 1 | 3 | 6}` : null;
     return {
       socket: 0, rate: hz, generation: part.gen, level: part.level, busy,

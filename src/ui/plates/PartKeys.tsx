@@ -8,6 +8,11 @@ const amountOf = (n: number, unit: EffectPreview['unit']) => measureUnit(n, unit
 /** "8 kops/s → 16 kops/s · +3 W". At most 3 significant figures. */
 export function effectText(e: EffectPreview | null): string {
   if (!e) return '';
+  // A power supply change says what it saves: its loss, and the input watts that saves at this draw.
+  if (e.lossPctBefore !== undefined && e.lossPctAfter !== undefined) {
+    const saves = e.wattsBefore - e.wattsAfter;
+    return `Loss ${Math.round(e.lossPctBefore)}% → ${Math.round(e.lossPctAfter)}%${saves > 1e-12 ? ` · saves ~${watts(saves)}` : ''}`;
+  }
   const dw = e.wattsAfter - e.wattsBefore;
   const w = Math.abs(dw) < 1e-9 ? '' : ` · ${dw > 0 ? '+' : '−'}${watts(Math.abs(dw))}`;
   return `${amountOf(e.capacityBefore, e.unit)} → ${amountOf(e.capacityAfter, e.unit)}${w}`;

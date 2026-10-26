@@ -5,6 +5,8 @@ export interface GestureHandlers {
   zoom(direction: 'in' | 'out', hit: HitTarget | null): void;
   /** A pan of the resting view (the rack row, D17.2; a level larger than the view, A05/A09/A20), when it has one. */
   pan?: PanHandler;
+  /** Desktop hover: the target under the mouse, or null (the renderer brackets it faintly). */
+  hover?(hit: HitTarget | null): void;
 }
 export interface PanHandler {
   /** True while the resting level pans. */
@@ -39,13 +41,16 @@ export function bindGestures(canvas: HTMLCanvasElement, handlers: GestureHandler
     pointers.set(event.pointerId, { x: event.clientX, y: event.clientY, startX: event.clientX, startY: event.clientY });
     canvas.setPointerCapture?.(event.pointerId);
     // Phone: the renderer flashes the pressed part, when it draws presses.
-    if (event.pointerType !== 'mouse') (handlers.renderer() as { press?: (t: unknown) => void } | null)?.press?.(hit(event.clientX, event.clientY));
+    if (event.pointerType !== 'mouse') handlers.renderer()?.press?.(hit(event.clientX, event.clientY));
     if (pointers.size === 2) { const [a, b] = [...pointers.values()]; baseline = Math.hypot(a.x - b.x, a.y - b.y); pinched = true; }
     event.preventDefault();
   };
   const move = (event: PointerEvent) => {
     // Desktop: the pointer cursor only over something you can tap (user, 26 Oct).
-    if (event.pointerType === 'mouse' && pointers.size === 0) { canvas.style.cursor = hit(event.clientX, event.clientY) ? 'pointer' : ''; return; }
+    if (event.pointerType === 'mouse' && pointers.size === 0) {
+      const over = hit(event.clientX, event.clientY);
+      canvas.style.cursor = over ? 'pointer' : ''; handlers.hover?.(over); return;
+    }
     const pointer = pointers.get(event.pointerId); if (!pointer) return;
     pointer.x = event.clientX; pointer.y = event.clientY;
     const pan = handlers.pan;
@@ -68,7 +73,9 @@ export function bindGestures(canvas: HTMLCanvasElement, handlers: GestureHandler
     }
     event.preventDefault();
   };
+  const leave = () => { canvas.style.cursor = ''; handlers.hover?.(null); };
   const end = (event: PointerEvent) => {
+    handlers.renderer()?.press?.(null);
     const pointer = pointers.get(event.pointerId);
     if (event.type === 'pointerup' && pointer && !pinched && !panning
       && Math.hypot(event.clientX - pointer.startX, event.clientY - pointer.startY) < 8
@@ -90,12 +97,12 @@ export function bindGestures(canvas: HTMLCanvasElement, handlers: GestureHandler
     while (steps-- > 0) { handlers.zoom(direction, hit(event.clientX, event.clientY)); wheel += direction === 'in' ? 120 : -120; }
     if (Math.abs(wheel) >= 120) wheel = 0;
   };
-  canvas.addEventListener('pointerdown', down); canvas.addEventListener('pointermove', move);
+  canvas.addEventListener('pointerdown', down); canvas.addEventListener('pointermove', move); canvas.addEventListener('pointerleave', leave);
   canvas.addEventListener('pointerup', end); canvas.addEventListener('pointercancel', end);
   canvas.addEventListener('lostpointercapture', end); canvas.addEventListener('wheel', onWheel, { passive: false });
   return () => {
     for (const id of pointers.keys()) if (canvas.hasPointerCapture?.(id)) canvas.releasePointerCapture(id);
-    pointers.clear(); canvas.removeEventListener('pointerdown', down); canvas.removeEventListener('pointermove', move);
+    pointers.clear(); canvas.removeEventListener('pointerdown', down); canvas.removeEventListener('pointermove', move); canvas.removeEventListener('pointerleave', leave);
     canvas.removeEventListener('pointerup', end); canvas.removeEventListener('pointercancel', end);
     canvas.removeEventListener('lostpointercapture', end); canvas.removeEventListener('wheel', onWheel);
   };

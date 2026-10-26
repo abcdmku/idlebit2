@@ -5,7 +5,7 @@ import type { SystemSnapshot } from '../../../game';
 import { P, R, copyRect, partVersionOf, resetHitTarget, setRect } from '../../core';
 import type { HitTarget, LevelRegistry, LevelRenderer, Rect } from '../../core';
 import { writeLabels } from './labels';
-import { CABLE_X, FOCUS, PSU, PSU_TILE, SAVE, WORLD, packageRect, siteRect, worldRect } from './layout';
+import { CABLE_X, CONNECTOR, FOCUS, PSU, PSU_TILE, SAVE, WORLD, packageRect, siteRect, worldRect } from './layout';
 import { boardModel, boardPartRef, slotOf } from './model';
 import { drawSystemMini } from './mini';
 import { drawBoard } from './world';
@@ -37,7 +37,9 @@ export function createSystemRenderer(registry: LevelRegistry): LevelRenderer<'sy
     size: (_s, out, form) => worldRect(form, out),
     focus: (_s, _vp, out) => copyRect(FOCUS, out),
     miniRect: (_s, out) => copyRect(WORLD, out),
-    entry: (_s, out) => { out.x = CABLE_X; out.y = 0; return out; },
+    /** The pipe runs all the way down onto the board's gold edge connector (D35: no port, no stem). */
+    // the pipe's 2 px ink cap lands on the pad's top edge, so its gold stays in view under the pipe's end
+    entry: (_s, out) => { out.x = CABLE_X; out.y = CONNECTOR.y - 2; return out; },
     draw: (g, s, view, frame) => drawBoard(g, s, view, frame, registry),
     drawMini: drawSystemMini,
     children(s, out) {

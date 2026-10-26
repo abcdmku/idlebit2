@@ -1,4 +1,5 @@
 import { capacity2, partName, PARTS } from '../build/catalog';
+import { lossFraction } from '../build/catalog/curves';
 import { RESEARCH } from '../build/research/tree';
 import { newestGen } from '../build/research/unlocks';
 import { TICK_MS } from '../core/constants';
@@ -37,9 +38,21 @@ function genChange(state: GameState, e: Extract<ResearchEffect, { kind: 'gen' }>
   const row = PARTS[e.part as keyof typeof PARTS];
   const have = row ? newestGen(u, e.part, row.base.length) : -1;
   if (e.part === 'scheduler') return change('Queue', queueText(have), queueText(e.gen));
+  if (e.part === 'psu') return psuChange(state, have, e.gen);
   const label = GEN_LABEL[e.part];
   if (!label) return null;
   return change(label, have < 0 ? NOT_YET : partName(e.part, have), partName(e.part, e.gen));
+}
+
+/**
+ * A power supply generation: its loss at typical load (×1 up to 90% usage). Before: the installed
+ * supply of the player's first system (its level adds loss), else the best researched generation
+ * at L1. After: the new generation at L1, as a replace installs it.
+ */
+function psuChange(state: GameState, have: number, gen: number): ResearchChangeView {
+  const psu = state.build.systems.find((s) => s !== null)?.spec.psu ?? null;
+  const before = psu ? percent(lossFraction(PARTS.psu, psu.gen, psu.level)) : have >= 0 ? percent(lossFraction(PARTS.psu, have, 1)) : NOT_YET;
+  return change('Power supply loss', before, percent(lossFraction(PARTS.psu, gen, 1)));
 }
 
 /** Idle power of a sleeping core: the deepest researched C-state's factor, or full power. */

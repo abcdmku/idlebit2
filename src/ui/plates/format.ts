@@ -82,7 +82,15 @@ export function quantity(n: number, unit: string): string {
   return `${num} ${prefix}${unit}`;
 }
 
-export const watts = (w: number) => quantity(w, 'W');
+/** Watts, down to the early game's milli-, micro- and nanowatts ("300 µW"), never "0 W" for a real draw. */
+export function watts(w: number): string {
+  const a = Math.abs(w);
+  if (a > 0 && a < 1) {
+    const [scale, prefix] = a >= 1e-3 ? [1e3, 'm'] : a >= 1e-6 ? [1e6, 'µ'] : [1e9, 'n'];
+    return quantity(w * scale, `${prefix}W`);
+  }
+  return quantity(w, 'W');
+}
 /** Speeds, sizes and work print through the shared formatters, so one quantity reads the same everywhere. */
 export const hertz = (hz: number) => formatHertz(hz);
 export const bits = (b: number) => formatSize(b);

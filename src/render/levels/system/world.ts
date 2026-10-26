@@ -6,13 +6,13 @@ import { BG, P, R, darkFx, drawGhost, drawSaveIcon, drawUnitLamp, glowBit, lampS
 import type { GhostState, LevelRegistry, Point, Rect, ViewPresentation, WorldFrame } from '../../core';
 import { boardStatic } from './board';
 import { drawLeaders, firstRow } from './labels';
-import { CABLE_X, CONNECTOR, LAMP, POWERED, PSU, PSU_TILE, SAVE, packageRect, siteCentre, siteRect, worldRect } from './layout';
+import { CONNECTOR, LAMP, POWERED, PSU, PSU_TILE, SAVE, packageRect, siteCentre, siteRect, worldRect } from './layout';
 import type { SiteType } from './layout';
 import { boardModel, pickedType, slotOf } from './model';
 import { drawGpuSpill, drawReadLights, drawTiers } from './memory';
 import type { BoardModel, Site } from './model';
 import { drawGpuPiece, drawInbound, inboundOf } from './shards';
-import { drawCable, drawCpuSocket, drawDrivePart, drawEmptySite, drawGpuPart, drawPackageBody, drawPackageFront, drawConnector, drawPsu,
+import { drawCpuSocket, drawDrivePart, drawEmptySite, drawGpuPart, drawPackageBody, drawPackageFront, drawConnector, drawPsu,
   drawRamPart, drawSiteLocked } from './sprites';
 
 type G = CanvasRenderingContext2D;
@@ -52,7 +52,6 @@ export function drawBoard(g: G, s: SystemSnapshot, view: ViewPresentation, frame
   R(g, world.x, world.y, world.w, world.h, BG.system);
   g.drawImage(boardStatic(s.board), 0, 0);
   const transfer = live ? inboundOf(s) : null;
-  drawCable(g, CABLE_X, 0, CONNECTOR.y + 1, !!transfer);
   const stageOn = activeStages(s, live);
   for (const site of m.sites) {
     if (site.state === 'locked') { drawSiteLocked(g, siteRect(b, site.type, site.index, hit)); continue; }

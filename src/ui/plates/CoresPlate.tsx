@@ -21,6 +21,7 @@ export function CoresPlate({ focus, quotes: _q, onAction, onResearch, researchNa
     <Status text={`${hertz(focus.clock.effectiveHz)} each · ${busy} of ${n} busy`} />
     <CoreKey onAction={onAction} onResearch={onResearch} researchName={researchName} />
     <ol className="core-list" aria-label="Each core">
+      {/* Fixed core order, never sorted by progress (user, 26 Oct). */}
       {focus.cores.map((c, i) => <li key={i} className={c.family !== null ? 'busy' : ''}><b>{i + 1}</b><span>{coreState(c)}</span></li>)}
     </ol>
   </PlateFrame>;

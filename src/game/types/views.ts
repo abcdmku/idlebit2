@@ -239,6 +239,8 @@ export interface ServerSlotView {
   readonly cores: number;
   /** Cores busy with tasks this tick, 0..cores. */
   readonly busyCores: number;
+  /** Busy fraction of each core in core order (a task keeps the core it started on). Optional until fixtures add it. */
+  readonly coreBusy?: readonly number[];
   readonly port: PortView | null;
   /** D31: ms left while an asleep system is waking (its wake countdown), else null. Optional only until hand-built fixtures add it. */
   readonly wakeMs?: number | null;

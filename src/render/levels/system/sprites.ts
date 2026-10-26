@@ -163,15 +163,6 @@ export function drawEmptySite(g: G, b: BoardLayout, type: 'cpu' | 'ram' | 'gpu' 
 export function drawConnector(g: G, f: Rect, on: boolean): void {
   R(g, f.x, f.y, f.w, f.h, P.ink); R(g, f.x + 1, f.y + 1, f.w - 2, f.h - 2, on ? P.padHi : P.pad);
 }
-/** Copper cable from the board's connector up to the world's top edge, where the pipe enters. Fades out at the top. */
-export function drawCable(g: G, x: number, y0: number, y1: number, lit: boolean): void {
-  const a = g.globalAlpha, core = lit ? '#4f8f61' : '#3d3a58', hi = lit ? P.net : '#55517a';
-  for (let y = y0; y < y1; y++) {
-    g.globalAlpha = a * Math.min(1, (y - y0 + 1) / 14);
-    R(g, x - 2, y, 5, 1, P.ink); R(g, x - 1, y, 3, 1, core); px(g, x - 1, y, hi);
-  }
-  g.globalAlpha = a;
-}
 /** Board PSU: vents and a usage meter (one LED per step of delivered / capacity). Amber while it warns. */
 export function drawPsu(g: G, r: Rect, usage: number, warning: boolean): void {
   const t = prism0(g, r.x, r.y, r.w, r.h, 5, { top: P.steelLo, front: P.substrate, hi: P.steelHi }, top0);
