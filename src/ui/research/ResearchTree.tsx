@@ -45,8 +45,9 @@ export function ResearchTile({ n, detail, open, onToggle }: TreeProps & { n: Res
         {n.state === 'done' ? <span className="lr-pc" /> : <span className="lr-pc"><PriceTag price={priceOf(n)} short={short} /></span>}
         <span className="lr-ax">{statusAside(n, s, ctx.line)}</span>
       </button>
-      {locked && <button type="button" className="lr-link" data-qa-target data-needs={s.needs} onClick={() => detail.onJump(s.needs)}>
-        <span>Needs <b>{needs?.name ?? s.needs}</b></span></button>}
+      {/* Only the underlined name is the link; "Needs" and the space around it belong to the header. */}
+      {locked && <span className="lr-needs">Needs <button type="button" className="rlink lr-link" data-needs={s.needs}
+        onClick={() => detail.onJump(s.needs)}>{needs?.name ?? s.needs}</button></span>}
     </div>
     <Expander open={isOpen} id={body}>{() => <TileDetail n={n} s={s} p={detail} />}</Expander>
   </div></li>;

@@ -62,12 +62,12 @@ describe('research income (round-time, for ETAs)', () => {
   });
 
   it('goes negative over the last 30 s when energy outruns pay', () => {
-    // A rack of kHz servers with their clocks driven to L8 and a GPU each: the energy bill outruns pay.
+    // A rack of kHz servers with their clocks driven to L20 and a GPU each: the energy bill outruns pay.
     const spec = barebonesSpec(1), cpu = spec.cpu!;
     let s = buildState({
       seed: 42, sites: 1, zonesPerSite: 1, racksPerZone: 1, serversPerRack: 8, unlocks: 'max', credits: '100000000000',
       system: (id, rack, slot) => ({ id, rack, slot, online: true, spec: {
-        ...spec, cpu: { ...cpu, cores: Array(4).fill({ gen: 1, level: 4 }), clock: { gen: 1, level: 8 } },
+        ...spec, cpu: { ...cpu, cores: Array(4).fill({ gen: 1, level: 1 }), clock: { gen: 1, level: 20 } },
         accels: [{ kind: 'gpu', model: '1330', upgrades: 0 }],
       } }),
     });

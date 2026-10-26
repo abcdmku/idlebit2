@@ -112,9 +112,8 @@ export function ResearchView(p: ResearchViewProps) {
   const inLine = line.id ? byId.get(line.id) : undefined;
   const lineWord = line.stopped ? 'stopped: no Credits' : line.running ? `running ${Math.floor(line.progress * 100)}%` : 'next in line';
   const title = <div className="lab-title"><b>Research</b>
-    {inLine ? <button type="button" className="lab-line" data-qa-target data-goto={inLine.id} onClick={() => jump(inLine.id)}>
-      <span className="nm">{inLine.name}</span><span>{lineWord}</span>
-      {p.between && cpm > 0 && <span className="gold">−{wholeText(cpm)}/min</span>}</button>
+    {inLine ? <span className="lab-line"><button type="button" className="rlink nm" data-goto={inLine.id} onClick={() => jump(inLine.id)}>{inLine.name}</button>
+      <span>{lineWord}</span>{p.between && cpm > 0 && <span className="gold">−{wholeText(cpm)}/min</span>}</span>
       : <span className="lab-line idle">Nothing in line</span>}</div>;
 
   const tiles = { detail: { tree, board, ctx, onAction, onJump: jump }, open, onToggle: toggle };

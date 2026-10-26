@@ -37,12 +37,10 @@
 .lab-title > b { font-size: var(--head); font-weight: 700; color: var(--print-text); white-space: nowrap; }
 .lab-line { min-height: 48px; display: flex; align-items: center; gap: 8px; min-width: 0; white-space: nowrap; color: var(--muted); }
 .lab-line > span { flex: none; }
-.lab-line > .nm { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; color: #efeaff; font-weight: 600; }
-button.lab-line:hover .nm { text-decoration: underline; }
+.lab-line > .nm { flex: 0 1 auto; }
 .lab-line.idle { color: var(--muted); }
 .lab.phone .lab-title { flex-direction: column; align-items: flex-start; gap: 0; }
 .lab.phone .lab-line { min-height: 24px; max-width: 100%; }
-.lab.phone button.lab-line { min-height: 44px; margin-top: -12px; padding-top: 12px; }
 .lab-back { flex: none; height: 48px; min-width: 96px; padding: 0 16px; text-align: center; margin-left: auto; font-weight: 600;
   background: var(--lo); box-shadow: inset 0 -3px var(--well), inset 0 2px var(--rail); }
 
@@ -117,15 +115,20 @@ button.lp-done:hover { color: #efeaff; }
 .rw.done .lr-nm { font-weight: 500; }
 .lab.phone .rw.locked .lr { padding: 0 6px; }
 
-/* a locked row's "Needs X": its own key over the right of the header (same grid cell), jumping to X */
+/* research links: the underlined name is the whole hit area across; vertical padding (not drawn) makes it
+   44 px tall. Hover and focus mark the name only. */
+.rlink { min-width: 0; padding: 14px 0; margin: -14px 0; color: var(--link); font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  text-decoration: underline; text-underline-offset: 3px; text-decoration-thickness: 2px; }
+.rlink:hover { color: #efeaff; }
+.lab .rlink:focus-visible { outline: none; color: #efeaff; background: #2f4672; background-clip: content-box; }
+/* a locked row's "Needs X" sits over line 1 of the header (same grid cell); taps beside the name fall through to the header */
 .tile-head { display: grid; }
-.tile-head > .lr, .tile-head > .lr-link { grid-area: 1 / 1; }
-.lr-link { position: relative; z-index: 1; justify-self: end; width: 55%; padding: 0 12px; display: grid; align-content: center; justify-items: end;
-  grid-template-rows: var(--lh, 16px) var(--lh, 16px); row-gap: var(--rg); color: var(--muted); }
-.lr-link > span { max-width: 100%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.lr-link b { color: var(--link); font-weight: 600; text-decoration: underline; text-underline-offset: 3px; text-decoration-thickness: 2px; }
-.lab.phone .lr-link { padding: 0 8px; }
-.lr-link:hover b { color: #efeaff; }
+.tile-head > .lr, .tile-head > .lr-needs { grid-area: 1 / 1; }
+.lr-needs { position: relative; z-index: 1; justify-self: end; align-self: start; max-width: 55%; height: var(--lh, 16px);
+  margin: calc((var(--row) - 2 * var(--lh, 16px) - var(--rg)) / 2) 12px 0 0; display: flex; align-items: center; gap: 4px;
+  white-space: nowrap; color: var(--muted); pointer-events: none; }
+.lr-needs > .rlink { pointer-events: auto; }
+.lab.phone .lr-needs { margin-right: 8px; }
 
 /* prices: Data and Credits as the project costs them */
 .pt { display: inline-flex; align-items: center; gap: 12px; white-space: nowrap; }
@@ -148,21 +151,16 @@ button.lp-done:hover { color: #efeaff; }
 .ld-body { display: flex; flex-direction: column; gap: 16px; padding: 16px 12px 12px; background: #241e48; box-shadow: inset 0 -3px #0e0b1c; }
 .lab.phone .ld-body { padding: 12px 8px 8px; gap: 12px; }
 .lab.phone .ld-facts { grid-template-columns: 64px minmax(0, 1fr); column-gap: 8px; }
-.lab.phone .ld-link { padding: 0 8px; }
 .ld-effect { margin: 0; }
 .ld-change { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 8px; padding: 8px 12px; background: var(--well); }
 .ld-change > span { color: var(--muted); margin-right: 4px; }
 .ld-change b { font-weight: 600; } .ld-change b.after { color: var(--data); } .ld-change i { font-style: normal; color: var(--muted); }
 .ld-facts { display: grid; grid-template-columns: 80px minmax(0, 1fr); gap: 8px 12px; align-items: start; }
 .ld-facts dt { color: var(--muted); min-height: var(--lh); }
-.ld-facts dd { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 12px; min-width: 0; }
+.ld-facts dd { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 16px; min-width: 0; }
 .ld-facts dd.col { flex-direction: column; align-items: flex-start; gap: 4px; }
-.ld-facts dt:has(+ dd .ld-link) { padding-top: 14px; }
 .ld-facts .need { color: #efeaff; }
 .ld-met { color: var(--muted); }
-.ld-link { min-height: 44px; padding: 0 12px; display: inline-flex; align-items: center; background: var(--well); color: var(--link); font-weight: 600;
-  box-shadow: inset 0 0 0 2px #2c2650; text-decoration: underline; text-underline-offset: 3px; text-decoration-thickness: 2px; }
-.ld-link:hover { color: #efeaff; }
 .ld-note { color: var(--muted); padding-left: 12px; box-shadow: inset 2px 0 var(--gold); }
 
 .ld-keys { display: grid; grid-template-columns: minmax(0, 1fr); gap: 8px; flex: none; }

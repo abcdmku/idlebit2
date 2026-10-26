@@ -15,7 +15,7 @@ import { hasRule, ruleParam } from './research/unlocks';
  *   threads      Σ cores × threadsPerCore             cores, sockets   counts
  *   threadRate   mean core rate at clockFactor 1, e = 1: Σ(clockHz of its socket) / cores (D34: no lanes)
  *   clockHz      socket 1's clock                     K, Q             scheduler (1, 0 without one)
- *   keff         timeSlice 2K; dma K; else min(K, threads)            slots = keff + Q
+ *   keff         threads (every core runs a task); timeSlice 2×max(K, threads); dma max(K, threads); slots = keff + Q
  *   cacheBits    Σ sockets L1 + L2 + L3               ramCap           Σ RAM modules
  *   memCap       the hierarchy (D26.1): cache + RAM + drives + the rack storage node's drives (diskNode)
  *   ramBw        channels × bw when every module matches (multiChannel), else the lowest module
@@ -112,7 +112,9 @@ export function compileSystem(c: CompiledBuffers, build: SystemBuild, u: Unlocks
   const K = !server ? 0 : sched ? Math.min(MAX_SCHED_K, capacity(PARTS.scheduler, sched.gen, sched.level)) : 1;
   const Q = sched ? Math.min(MAX_SCHED_Q, capacity2(PARTS.scheduler, sched.gen, sched.level)) : 0;
   const strategy = sched?.strategy ?? 'fifo';
-  const keff = !server ? 0 : strategy === 'timeSlice' && sched ? 2 * K : hasRule(u, 'dma') ? K : Math.min(K, threads);
+  // Every core runs a task (D34: cores are the parallel upgrade; the scheduler's K no longer caps them below the
+  // core count). timeSlice doubles it; with dma a big scheduler may hold more than the threads.
+  const keff = !server ? 0 : strategy === 'timeSlice' && sched ? 2 * Math.max(K, threads) : hasRule(u, 'dma') ? Math.max(K, threads) : Math.max(1, threads);
   s.K[i] = K; s.Q[i] = server ? Q : 0; s.keff[i] = keff; s.slots[i] = server ? keff + Q : 0;
   s.strategy[i] = QUEUE_STRATEGY_IDS.indexOf(strategy);
   if (sched) {

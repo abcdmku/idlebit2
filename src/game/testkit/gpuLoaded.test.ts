@@ -8,7 +8,8 @@ describe('powered GPU stress fixture preparation', () => {
     const s = gpuLoadedState(), c = s.compiled.sys;
     expect(c.gpuLinked[0]).toBe(0);
     expect(s.hot.sys.queueLen[0]).toBe(MAX_ACCELS);
-    expect(c.keff[0]).toBe(MAX_ACCELS);
+    // D34: every core (thread) runs a task, so the running limit is the thread count.
+    expect(c.keff[0]).toBe(c.threads[0]);
     expect(s.build.systems[0]!.spec.accels).toEqual(Array.from({ length: 8 }, () => ({ kind: 'gpu', model: '1530', upgrades: 5 })));
     const family = FAMILIES.find((f) => f.key === 'rayTrace')!, need = accelNeed(family, 2 ** 23);
     const choice = chooseAccel(s.compiled, null, 0, need, 8)!;

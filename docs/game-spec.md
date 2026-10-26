@@ -462,7 +462,7 @@ Program D10. The market is an **endless, ordered queue** per round. Nothing arri
 | `η_cfg` | `socketFactor(sockets) × dimmFactor(RAM modules)` (program D7.5). `socketFactor` 1, 2, 3, 4 CPUs → 1.00, 0.92, 0.85, 0.78 **(s)**. `dimmFactor` 0–2 modules → 1.00, 3 → 0.95, 4 → 0.90 **(s)**; an `accelerator` board has `dimmFactor = 1` up to 8. The system plate shows `η_cfg`. |
 | `K` (concurrency) | scheduler `K`; 1 with no scheduler |
 | `Q` (queue) | scheduler `Q`; 0 with no scheduler |
-| `Keff` | `timeSlice`: `min(32, 2 × K)`. With `dma`: `K`. Otherwise `min(K, hardware threads)`. Never above 32 (program D7.2). |
+| `Keff` | Every core runs a task (D34 fix, 25 Oct): hardware threads. `timeSlice`: `2 × max(K, threads)`. With `dma`: `max(K, threads)`. The scheduler's `K` no longer caps running tasks below the core count; its levels raise `Q`. |
 | `slots` | `Keff + Q` |
 | cache | `Σ` over sockets of L1 + L2 + L3 capacity: the cache tier. Cache-resident traffic costs no time (it runs inside compute). |
 | RAM | `Σ` module capacity: the RAM tier |

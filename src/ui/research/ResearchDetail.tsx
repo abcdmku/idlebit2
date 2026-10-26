@@ -23,9 +23,9 @@ export interface DetailContext {
 
 const isPaid = (s: NodeStatus) => ['done', 'running', 'next', 'stopped', 'paused'].includes(s.kind);
 
-/** A project link: jumps to it, switching tab when needed, and opens it. */
+/** A project link, the underlined name only: jumps to it, switching tab when needed, and opens it. */
 function Link({ n, onJump }: { n: ResearchNodeView; onJump: (id: ResearchId) => void }) {
-  return <button type="button" className="ld-link" data-qa-target data-goto={n.id} onClick={() => onJump(n.id)}>{n.name}</button>;
+  return <button type="button" className="rlink" data-goto={n.id} onClick={() => onJump(n.id)}>{n.name}</button>;
 }
 
 /** "Cores per CPU 1 → 2". */

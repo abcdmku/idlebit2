@@ -1311,6 +1311,7 @@ The user's words:
 3. **No lanes.** A core runs one task thread at its socket's clock: core rate = `clockHz × clockFactor × η_cfg × e(T)`. `pipelining`, `superscalar`, `outOfOrder`, `simd`, `wideVector`, `branchPredict`, `fma`, `dualVector` and `matrixTiles` are gone; `fabKhz` now needs only `systemBoard`, and `l2Cache` is a root. The `lanesPerCore` ceiling is gone. A core has no levels or upgrade of its own: the clock is the speed upgrade, more cores the parallel one. Clock upgrades are priced × the cores they drive (was × lanes).
 4. **No hidden gate.** After Multi-core, adding a core needs no other research.
 5. **Views.** `CoreView.lanes` is removed; the CPU part heading reads "4 cores"; the research change label "Lanes per core" is gone. The chip tray no longer quotes per-core upgrades.
+7. **Fixes after live play (user: "multi core doesnt work", "l2 cache doesnt seem to do anything").** The running limit was the scheduler's K (1 at Run queue L1, 1 with no scheduler), so extra cores sat idle while tasks queued: `Keff` is now the thread count (every core runs a task). The Hz L2 started at 8 b, next to an L1 that is about 128 b by then: its base is now 128 b, so buying it doubles the cache tasks can use. Seed 42: System 0:20, Rack 5:44; passive round 1 unchanged. Test: `build/multicore.test.ts`.
 6. **Quick balance (time-boxed, seed 42):** the Hz clock's upgrade base is 8 (was 3). D20 passive round 1 unchanged (0:36 / 0:55 / 1:16); System 0:22; Rack 6:56. Tree: 165 nodes. `SAVE_VERSION` 15.
 
 ## 16. Shared rules for agents

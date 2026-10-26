@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { applyAction, createInitialState, rackId, systemId, type GameState, type UnitRef } from '../../game';
 import { fixtureState } from '../../game/fixtures';
+import { blockedOn } from './blocks';
 import { marketKey, marketLine, marketOf, targetUnit } from './market';
 
 const set = (s: GameState, unit: UnitRef, online: boolean) => applyAction(s, { type: 'setOnline', unit, online }).state;
@@ -36,8 +37,7 @@ describe('On market toggle', () => {
 });
 
 describe('a part plate names the tasks it unblocks (QA-21)', () => {
-  it('counts the line waiting on what the part supplies', async () => {
-    const { blockedOn } = await import('./PlateLayer');
+  it('counts the line waiting on what the part supplies', () => {
     const line = [{ blockedBy: 'cache' }, { blockedBy: null }, { blockedBy: 'cache' }, { blockedBy: 'ram' }];
     expect([blockedOn(line, 'l1'), blockedOn(line, 'ram'), blockedOn(line, 'clock'), blockedOn(line, undefined)]).toEqual([2, 1, 0, 0]);
   });

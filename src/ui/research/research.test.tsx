@@ -65,7 +65,7 @@ describe('truthful states', () => {
     view(early(), { wallet: { data: '267' as Amount, credits: '1000000' as Amount } });
     expect(rowText('dualCore')).toBe('Need 2,233 Data / in ~37 min');
     expect(rowText('cstateC3')).toBe('');
-    expect(row('cstateC3')!.closest('li')!.querySelector('[data-needs]')!.textContent).toBe('Needs Dual core');
+    expect(row('cstateC3')!.closest('li')!.querySelector('.lr-needs')!.textContent).toBe('Needs Dual core');
     // No part header claims "Nothing to start" over a startable row, and no dangling "N more later".
     expect(m.host.textContent).not.toMatch(/Nothing to start|more later/);
     expect([...m.host.querySelectorAll('.lp-done')].map(e => e.textContent)).toEqual(['0 of 2 done', '1 of 3 done', '0 of 1 done', '1 of 1 done']);
@@ -108,6 +108,19 @@ describe('truthful states', () => {
 });
 
 describe('prerequisites are links', () => {
+  it('only the underlined name is the link; "Needs" and the rest of the header open the tile', () => {
+    view(early());
+    const needs = row('cstateC3')!.closest('li')!.querySelector('.lr-needs')!;
+    const link = needs.querySelector<HTMLButtonElement>('button')!;
+    expect(link.textContent).toBe('Dual core');
+    expect(needs.querySelectorAll('button')).toHaveLength(1);
+    expect(link.classList.contains('rlink')).toBe(true);
+    click(row('cstateC3'));
+    expect(selected()).toBe('cstateC3');
+    // The details' links are names too, with nothing else inside them.
+    expect([...detail().querySelectorAll<HTMLButtonElement>('.ld-facts button')].map(x => [x.className, x.textContent])).toEqual([['rlink', 'Dual core']]);
+  });
+
   it('a locked row jumps to what it needs, opening its tile', () => {
     view(early());
     click(row('l2Cache')!.closest('li')!.querySelector('[data-needs]'));

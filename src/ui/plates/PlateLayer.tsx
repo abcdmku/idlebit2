@@ -19,6 +19,7 @@ import { PowerCtlPlate } from './PowerCtlPlate';
 import { PowerKeys } from './PowerKeys';
 import { isPowerCtl } from './targets';
 import { CoresPlate } from './CoresPlate';
+import { blockedOn } from './blocks';
 import { SitePlate } from './SitePlate';
 import { StartRow } from './StartRow';
 import { GenerationRow } from './GenerationRow';
@@ -69,15 +70,6 @@ export function plateRequest(t: HitTarget, focus: LevelSnapshot): QuoteRequest |
   return null;
 }
 
-/** What each board part supplies, as the blocks it clears (QA-21). */
-const PART_BLOCKS: Readonly<Partial<Record<string, readonly string[]>>> = {
-  l1: ['cache'], l2: ['cache'], l3: ['cache'], ram: ['ram'], drive: ['disk'], gpu: ['gpu', 'vram', 'gpuCores'],
-};
-/** Tasks in the visible line waiting on what `part` supplies. */
-export function blockedOn(window: readonly { readonly blockedBy: string | null }[], part: string | undefined): number {
-  const clears = part ? PART_BLOCKS[part] : undefined;
-  return clears ? window.filter(t => t.blockedBy !== null && clears.includes(t.blockedBy)).length : 0;
-}
 
 /** D31: the optional power part a plate also sells: the room start controller on the UPS, the global one on the scheduler, a site's generation. */
 export function powerScope(t: HitTarget, focus: LevelSnapshot): ScopeRef | null {

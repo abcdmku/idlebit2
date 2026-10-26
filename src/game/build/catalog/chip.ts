@@ -34,7 +34,9 @@ export const L1: CatalogRow = {
 };
 export const L2: CatalogRow = {
   id: 'l2', scope: 'chip', names: TIERS.map((t) => `${t} L2`), gates: [r('l2Cache'), ...FAB], curve: 'flow',
-  base: [8, 8192, 2 ** 23, 2 ** 33], watts: idle(2), price: [4e4, 5e5, 8.6e8, 3.7e11], upgrade: [12, 1.2e5, 1.5e9, 7.7e12],
+  // The Hz L2 starts at 128 b, the size an L1 has reached when L2 arrives (about L8), so buying it doubles the cache
+  // tasks can use; at 8 b it added almost nothing to a pushed L1 (user, 25 Oct).
+  base: [128, 8192, 2 ** 23, 2 ** 33], watts: idle(2), price: [4e4, 5e5, 8.6e8, 3.7e11], upgrade: [12, 1.2e5, 1.5e9, 7.7e12],
 };
 /** L3 levels extend by the `l3LevelBonus` ceiling (stacked3d). */
 export const L3: CatalogRow = {
