@@ -1,4 +1,4 @@
-﻿import type { QueueEntryView, TaskRequirementsView } from '../../game';
+﻿import type { FailDetail, QueueEntryView, TaskRequirementsView } from '../../game';
 import { formatOps, formatSize } from '../../game';
 
 /** Sizes print through the shared formatter: "2 b", "21.4 kb" (one string everywhere). */
@@ -29,6 +29,15 @@ export function requirementText(task: TaskRequirementsView): string {
   return facts.join(' · ');
 }
 
+/**
+ * No system can take work because something upstream is down (lead, 26 Oct). One label per detail, in the
+ * task status, the head card, the report and the platform line alike.
+ */
+export const OUTAGE_TEXT: Readonly<Partial<Record<FailDetail, string>>> = {
+  psu: 'Power supply down', pdu: 'Rack PDU down', ups: 'UPS down', grid: 'Grid down',
+  rack: 'Rack overheated', room: 'Room overheated', offline: 'No system online',
+};
+
 export function blockedText(task: QueueEntryView): string | null {
   switch (task.blockedBy) {
     case null: return null;
@@ -43,6 +52,6 @@ export function blockedText(task: QueueEntryView): string | null {
     case 'zones': return `Needs ${task.minZones} zones`;
     case 'region': return `Needs region ${task.region}`;
     case 'ecc': return 'Needs ECC';
-    default: return `Needs ${task.blockedBy}`;
+    default: return OUTAGE_TEXT[task.blockedBy] ?? `Needs ${task.blockedBy}`;
   }
 }

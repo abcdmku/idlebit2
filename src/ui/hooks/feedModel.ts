@@ -3,7 +3,7 @@
 import { FAMILIES, formatOps, TICK_MS } from '../../game';
 import type { FailCause, FailDetail, FamilyId, QueueEntryView, RenderSnapshot, TaskRef, TransferView } from '../../game';
 import { wholeText } from './format';
-import { taskBits } from './taskRequirements';
+import { OUTAGE_TEXT, taskBits } from './taskRequirements';
 
 export const CAUSE_NAME: Readonly<Record<FailCause, string>> = {
   timeout: 'Timed out', cantRun: "Can't run", misroute: 'Misrouted', power: 'Power', heat: 'Heat', swap: 'Swap', late: 'Late',
@@ -13,6 +13,8 @@ const DETAIL_WORD: Readonly<Partial<Record<FailDetail, string>>> = {
 };
 export const detailName = (d: FailDetail): string => DETAIL_WORD[d] ?? d[0]!.toUpperCase() + d.slice(1);
 export function causeText(cause: FailCause, detail: FailDetail | null): string {
+  const outage = detail ? OUTAGE_TEXT[detail] : undefined;
+  if (outage) return outage;
   return detail ? `${CAUSE_NAME[cause]} · ${detailName(detail)}` : CAUSE_NAME[cause];
 }
 export function familyName(family: FamilyId): string { return FAMILIES[family]?.name ?? 'Task'; }
@@ -70,6 +72,9 @@ export function feedView(snapshot: RenderSnapshot): FeedView {
 /** "Can't run · cache", "Can't run · RAM": the cause with its detail word in running text (A02, A11). */
 export function causeLine(cause: FailCause, detail: FailDetail | null): string {
   if (!detail) return CAUSE_NAME[cause];
+  // An outage reads as what is down ("Power supply down ×3"), the same words as the task's status.
+  const outage = OUTAGE_TEXT[detail];
+  if (outage) return outage;
   const word = detailName(detail);
   return `${CAUSE_NAME[cause]} · ${/^[A-Z][a-z]/.test(word) ? word.toLowerCase() : word}`;
 }

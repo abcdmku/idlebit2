@@ -10,6 +10,7 @@ import { offerAction, useTapOffer } from '../deck/offerUi';
 import { familyName, taskKey, transferText } from '../hooks/feedModel';
 import { wholeText } from '../hooks/format';
 import { blockedText, taskBits } from '../hooks/taskRequirements';
+import { pointAt, pointFix } from '../input/pointAt';
 import { PlateFrame } from '../plates/PlateFrame';
 import { useLayout } from '../shell/geometry';
 import { shallowEqual, useGameSelector, useShell, useViewState } from '../storeHooks';
@@ -49,10 +50,13 @@ export const dataOf = (t: QueueEntryView): number => {
 export const capableText = (n: number): string =>
   n === 0 ? 'none of your systems can run it' : `${n} of your systems can run it`;
 
+/** "Needs …" → "needs …", "Power supply down" → "power supply down"; "UPS down" keeps its capitals. */
+const lowerFirst = (s: string) => (/^[A-Z][a-z]/.test(s) ? s[0]!.toLowerCase() + s.slice(1) : s);
+
 /** Status in plain words. */
 export function statusLine(t: QueueEntryView, head: boolean, running: boolean): { text: string; tone: '' | 'warn' | 'mute' } {
   if (!running) return { text: 'Starts after Return', tone: 'mute' };
-  if (t.blockedBy) return { text: keepUnits(`Blocked: ${(blockedText(t) ?? '').replace(/^Needs/, 'needs')}`), tone: 'warn' };
+  if (t.blockedBy) return { text: keepUnits(`Blocked: ${lowerFirst(blockedText(t) ?? '')}`), tone: 'warn' };
   if (t.committed) return { text: 'Waiting for a free system', tone: '' };
   return { text: head ? 'Ready' : 'Ready when it reaches the front', tone: '' };
 }
@@ -101,7 +105,9 @@ function OpenTask({ taskKey: key }: { taskKey: string }) {
   if (!f.t) { queueMicrotask(() => { if (shell.view.getState().task === key) shell.view.dispatch({ type: 'back' }); }); return null; }
   const t = f.t, head = f.slot === 0, color = typeColor(typeOf(t.family));
   // The meet lines; when the sim has none for this gate (a link, zones), the Fix line's own rule.
-  const status = statusLine(t, head, f.running), fixes = t.blockedBy && !meet.length ? fixLines(t, offers) : [];
+  // A down power supply or a hot rack is a part to look at: its plate, not a row to buy (lead, 26 Oct).
+  const point = pointFix(t.blockedBy);
+  const status = statusLine(t, head, f.running), fixes = t.blockedBy && !meet.length && !point ? fixLines(t, offers) : [];
   const card = f.slot === 0 ? L.headSlot : L.cards[f.slot - 1] ?? L.headSlot;
   const close = () => shell.view.dispatch({ type: 'back' });
   return <PlateFrame title={familyName(t.family)} sub={<span style={{ color }}>{typeName(typeOf(t.family))}</span>}
@@ -124,7 +130,8 @@ function OpenTask({ taskKey: key }: { taskKey: string }) {
         onResearch={id => shell.view.dispatch({ type: 'openResearch', project: id })} />)}
       {fixes.map(o => <button key={o.key} type="button" className="key" data-qa-target data-testid="td-fix" disabled={!offerAction(o)} onClick={() => tap(o)}>
         {fixLabel(o)}{o.right.kind !== 'research' && o.price !== null && <span className="pz"> <CurrencyIcon kind="credits" n={L.N} />{wholeText(o.price)}</span>}</button>)}
-      {t.blockedBy && !fixes.length && !meet.length && <p className="key-slot">No upgrade here fixes it yet</p>}
+      {point && !meet.length && <button type="button" className="key" data-qa-target data-testid="td-point" onClick={() => pointAt(shell, point.kind)}>Open {point.name}</button>}
+      {t.blockedBy && !fixes.length && !meet.length && !point && <p className="key-slot">No upgrade here fixes it yet</p>}
       {head && f.running && t.dismissible && <button type="button" className="key quiet" data-qa-target data-testid="td-dismiss"
         onClick={() => { shell.dispatch({ type: 'dismissTask', task: t.task }); close(); }}>Dismiss <span className="mute">· No SLA cost</span></button>}
     </div>}

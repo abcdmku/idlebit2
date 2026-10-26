@@ -1,0 +1,53 @@
+// A fix that is a part to look at, not a row to buy (lead, 26 Oct): a down power supply opens the Power
+// supply plate, an overheated rack its cooler. Where the part isn't in view, the camera zooms there first.
+import type { FailDetail, LevelId, NodeRef, PartRef } from '../../game';
+import type { HitTarget } from '../../render/core';
+import type { ShellContextValue } from '../storeHooks';
+
+export type PointKind = 'psu' | 'rackCooler';
+export interface PointFix { readonly kind: PointKind; readonly name: string }
+
+/** The block details whose fix is a plate. */
+export const POINT_AT: Readonly<Partial<Record<FailDetail, PointFix>>> = {
+  psu: { kind: 'psu', name: 'Power supply' },
+  rack: { kind: 'rackCooler', name: 'Rack cooler' },
+};
+export const pointFix = (detail: FailDetail | null | undefined): PointFix | null => (detail ? POINT_AT[detail] ?? null : null);
+
+type Shell = Pick<ShellContextValue, 'view' | 'store'>;
+const LEVEL: Readonly<Record<PointKind, LevelId>> = { psu: 'system', rackCooler: 'rack' };
+/** How long a zoom may take before the plate gives up opening (a transition is well under this). */
+const ZOOM_DEADLINE_MS = 4000;
+
+/** The plate's target in the current focus, or null when the part isn't in this view. */
+function targetIn(shell: Shell, kind: PointKind): HitTarget | null {
+  // The owner is the world the snapshot shows, which is what the plate layer matches against.
+  const f = shell.store.getSnapshot().focus;
+  let id: string, part: PartRef, owner: NodeRef;
+  if (kind === 'psu' && (f.level === 'chip' || f.level === 'system')) {
+    id = 'psu'; owner = { level: f.level, id: f.systemId }; part = { unit: { kind: 'system', id: f.systemId }, slot: { kind: 'psu' } };
+  } else if (kind === 'rackCooler' && f.level === 'rack') {
+    id = 'cooler'; owner = { level: 'rack', id: f.rackId }; part = { unit: { kind: 'rack', id: f.rackId }, slot: { kind: 'rackCooler' } };
+  } else return null;
+  return { id, kind: 'part', owner, part, unit: null, slot: null, drill: null, sw: null, port: null, rect: { x: 0, y: 0, w: 0, h: 0 } };
+}
+
+/** Opens the part's plate; from another level, zooms to it and opens the plate when the camera lands. */
+export function pointAt(shell: Shell, kind: PointKind): void {
+  const now = targetIn(shell, kind);
+  if (now) { shell.view.dispatch({ type: 'select', target: now, plate: true }); return; }
+  shell.view.dispatch({ type: 'zoomTo', level: LEVEL[kind] });
+  // The camera and the snapshot both have to land; watch either, until the plate opens or the player moves on.
+  const check = () => {
+    const v = shell.view.getState();
+    if (v.selected || v.sheet || v.task) { stop(); return; }
+    if (v.partner || v.goal || v.focus.level !== LEVEL[kind]) return;
+    const t = targetIn(shell, kind);
+    if (!t) return;
+    stop();
+    shell.view.dispatch({ type: 'select', target: t, plate: true });
+  };
+  const offView = shell.view.subscribe(check), offStore = shell.store.subscribe(check);
+  const stop = () => { clearTimeout(timer); offView(); offStore(); };
+  const timer = setTimeout(stop, ZOOM_DEADLINE_MS);
+}

@@ -30,6 +30,7 @@ import { GPU_MODEL_IDS, gpuModel } from './catalog/gpuModels';
 import { installedGpuStats } from './gpu';
 import { gpuBetter, planInstallGpu } from './gpuPlans';
 import { gpuPowerPreview } from './gpuPower';
+import { overSupply } from './overSupply';
 
 /**
  * Lazy quotes (architecture §3.3). Every quote comes from the same planner its action runs, so the
@@ -141,8 +142,15 @@ export function toQuote(state: GameState, action: GameAction, plan: Plan, effect
     action, label: plan.label, cost, currency, affordable: amountCompare(wallet, cost) >= 0,
     locked: plan.ok ? null : plan.lock ?? { code: plan.code === 'occupied' ? 'occupied' : plan.code === 'roundState' ? 'roundState' : 'fit', node: null, text: plan.reason },
     cold, downtimeMs: cold && state.round.phase === 'running' ? state.research.unlocks.bootTicks * TICK_MS : 0,
-    effect: effect ?? gpuEffect, workOps: null, ...gpuMetadata(state, action, plan),
+    effect: effect ?? gpuEffect, workOps: null, ...gpuMetadata(state, action, plan), ...supplyWarning(state, plan),
   };
+}
+
+/** The supply warning (overSupply.ts) on any plan that changes or adds a system. */
+function supplyWarning(state: GameState, plan: Plan): Pick<Quote, 'overSupply'> {
+  if (!plan.ok) return {};
+  const over = overSupply(state, plan.change.build);
+  return over ? { overSupply: over } : {};
 }
 
 /** D36: GPU watts and ops per joule at the view scale. */

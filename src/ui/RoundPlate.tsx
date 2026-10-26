@@ -3,6 +3,7 @@
 // never moves), the top failure details (D5.3), the fix for the top one with an inline Buy (A02,
 // D20.3), failures by task type, Credits and Data earned, energy and net (spec §4.7), and one
 // Return to market key. Closing it dismisses the report; the head's key then returns.
+import { pointAt, pointFix, type PointFix } from './input/pointAt';
 import { useContext, useEffect, useRef, type CSSProperties } from 'react';
 import { FAIL_CAUSES, formatOps } from '../game';
 import type { EnergyBreakdown, FailCause, FailDetail, Quote, RoundEndedBy, RoundReport, RoundTypeTally } from '../game';
@@ -92,8 +93,11 @@ function failedByType(rows: readonly RoundTypeTally[]): { type: RoundTypeTally['
   });
 }
 
-function FixLine({ offer, n, meet }: { offer: Offer | null; n: number; meet?: Quote | null }) {
+function FixLine({ offer, n, meet, point, onClose }: { offer: Offer | null; n: number; meet?: Quote | null; point?: PointFix | null; onClose?: () => void }) {
   const shell = useShell(), act = offer ? offerAction(offer) : null;
+  // A down power supply or a hot rack: open the part's plate (lead, 26 Oct). The report closes to show it.
+  if (point) return <div className="rp-fix" data-testid="rp-fix"><span className="rp-fix-t"><b>{point.name}</b></span>
+    <button type="button" className="key quiet" data-testid="rp-point" onClick={() => { onClose?.(); pointAt(shell, point.kind); }}>Open</button></div>;
   // The head waits on the same thing: buy every level it needs in one tap (the sim's meet line).
   if (meet) return <div className="rp-fix" data-testid="rp-fix"><MeetKey quote={meet} n={n} className="key quiet rp-meet" onAction={a => shell.dispatch(a)}
     onResearch={id => shell.view.dispatch({ type: 'openResearch', project: id })} /></div>;
@@ -151,7 +155,7 @@ export function RoundReportPlate({ report, percent, onReturn, onClose }: {
       })}
     </div>
     <p className="rp-detail" data-testid="rp-detail">{detailLine(report)}</p>
-    <FixLine offer={fixOffer(report, offers)} n={n} meet={headMeet} />
+    <FixLine offer={fixOffer(report, offers)} n={n} meet={headMeet} point={pointFix(report.details[0]?.detail)} onClose={onClose} />
     <p className="rp-spill mute" data-testid="rp-spill">{spillLine(report)}</p>
     <p className="rp-types" data-testid="rp-types"><span className="mute">Failed:</span>
       {chips.length ? chips.map(c => <span key={c.type} className="rp-chip" data-task-type={c.type}>

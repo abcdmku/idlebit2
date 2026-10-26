@@ -97,7 +97,15 @@ export interface GpuPowerPreview {
   readonly before: GpuPowerPoint;
   readonly after: GpuPowerPoint;
 }
+/**
+ * A buy whose full-load draw would exceed a supply (user, 26 Oct): the first one over, innermost first
+ * (the system's power supply, its rack PDU, its room UPS). View watts (D36). A warning: the buy still runs.
+ */
+export interface OverSupply { readonly part: 'psu' | 'pdu' | 'ups'; readonly capW: number; readonly afterW: number }
+
 export interface Quote {
+  /** Set when the plan's full-load draw would exceed a supply; absent otherwise. */
+  readonly overSupply?: OverSupply;
   readonly gpuPower?: GpuPowerPreview;
   readonly gpu?: { readonly before: GpuStats | null; readonly after: GpuStats };
   /** Additional Credit fee when the primary currency is Data. */
