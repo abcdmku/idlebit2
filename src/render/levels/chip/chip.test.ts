@@ -5,12 +5,11 @@ import { familyId, systemId } from '../../../game';
 import type { WorldForm, WorldFrame } from '../../core';
 import { recordingContext } from '../../core/testCanvas';
 import { createChipRenderer } from '.';
-import { arrangementOf, coreSites, coreText, floorOf, queueWells } from './layout';
+import { arrangementOf, coreSites, coreText, floorOf, gridCells, queueWells } from './layout';
 import { chipScene } from './scenes';
-import { readySpeedText } from './speed';
+import { readySpeedText, tileLabelFits } from './speed';
 import { formatHertz } from '../../../game';
-import { chipAfford, createChipAfford, drawWorld, emptyBlocks, firstLockedSite, siteCount } from './world';
-import { lockSpot } from './block';
+import { chipAfford, createChipAfford, drawWorld, firstLockedSite, siteCount } from './world';
 import { coreTag, overlaps } from './tag';
 
 const VIEW = { selectedId: null, picked: null, quotes: null, reducedMotion: false };
@@ -114,10 +113,11 @@ describe('CPU labels', () => {
   });
   it('gives every grid core its own speed when a label fits, else the tag carries it; the tag stays in the cores block', () => {
     const max = chipScene('max'), full = labels(max), fl = floorOf('desktop');
-    // 32 tiles are too small for a body-size label, so the tag (over the full grid) carries the speed.
-    expect(full.cores).toBe('Cores 21 / 32 busy · 4 GHz');
+    // 32 tiles fill the grid: no tag over the cores (each runs at the Clock's speed).
+    expect(full).not.toHaveProperty('cores');
     expect(Object.keys(full).filter(k => /^core\d+$/.test(k))).toEqual([]);
-    const four = { ...max, coreSites: 4, cores: max.cores.slice(0, 1), slots: [] };
+    // D34: two cores and the add site take the 2 × 2 grid; the tag sits in its free row
+    const four = { ...max, coreSites: 32, cores: max.cores.slice(0, 2), slots: [] };
     const out = labelBuffer(four, 'desktop', false, 2), tag = out.find('cores')!;
     expect(tag).not.toBeNull(); expect(tag.x).toBeGreaterThanOrEqual(fl.cores.x); expect(tag.x).toBeLessThan(fl.clock.x);
     expect(labels(four, 'desktop', false, 3).core0).toBe('4 GHz');
@@ -175,7 +175,8 @@ describe('CPU targets', () => {
   it('offers every block, empty sites as slots, and the pipe as a link', () => {
     const level = createChipRenderer(createLevelRegistry()), out = Array.from({ length: 64 }, createHitTarget);
     const n = level.targets(chipScene('landing'), VIEW, out, 0, 'desktop');
-    expect(out.slice(0, n).map(t => `${t.kind}:${t.id}`)).toEqual(['part:clock', 'part:cache', 'slot:queue', 'part:core0', 'slot:site1', 'link:pipe']);
+    // D34: no add site before Multi-core (the next core slot is locked)
+    expect(out.slice(0, n).map(t => `${t.kind}:${t.id}`)).toEqual(['part:clock', 'part:cache', 'slot:queue', 'part:core0', 'link:pipe']);
     expect(out[0]!.part).toEqual({ unit: { kind: 'system', id: 0 }, slot: { kind: 'clock', socket: 0 } });
     const again = Array.from({ length: 64 }, createHitTarget);
     level.targets(chipScene('landing'), VIEW, again, 0, 'desktop');
@@ -209,10 +210,11 @@ describe('CPU affordable brackets and locked sites (A25)', () => {
     const a = chipAfford(result(up({ kind: 'clock', socket: 0 })), sys, createChipAfford());
     expect([a.clock, a.cache, a.queue, a.site]).toEqual([true, false, false, false]);
     const b = chipAfford(result(up({ kind: 'l1', socket: 0 }), add('core'), add('scheduler'), up({ kind: 'core', socket: 0, index: 1 })), sys, createChipAfford());
-    expect([b.clock, b.cache, b.queue, b.site, b.core[0], b.core[1]]).toEqual([false, true, true, true, false, true]);
+    // an installed core's own upgrade quote (lanes, gone in D34) is never a buy on the chip
+    expect([b.clock, b.cache, b.queue, b.site]).toEqual([false, true, true, true]);
     const none = chipAfford(result(up({ kind: 'clock', socket: 0 }, false), q({ type: 'upgradePart', part: { unit: { kind: 'system', id: systemId(1) }, slot: { kind: 'l1', socket: 0 } } }),
       q(add('core').action, true, { code: 'research', node: null, text: 'Needs research' })), sys, b);
-    expect([none.clock, none.cache, none.queue, none.site, none.core[1]]).toEqual([false, false, false, false, false]);
+    expect([none.clock, none.cache, none.queue, none.site]).toEqual([false, false, false, false]);
     expect(chipAfford(null, sys, createChipAfford()).clock).toBe(false);
   });
   it('draws a 1 art px gold bracket just outside each affordable part', () => {
@@ -241,13 +243,12 @@ describe('CPU affordable brackets and locked sites (A25)', () => {
     expect(gold.some(r => r.x === sites[0]!.x - 2 && r.y >= sites[0]!.y - 2)).toBe(false);
     expect(gold.some(r => r.y === floorOf('desktop').queue.y - 2)).toBe(true);
   });
-  it('draws a locked site as bare die, one dim outline and the lock glyph: no dotted ghost', () => {
-    const boot = chipScene('landing'), r = coreSites(floorOf('desktop'), 2)[1]!, rec = recordingContext();
+  it('draws no site at all where a core cannot be added yet (D34: no locked sites)', () => {
+    const boot = chipScene('landing'), r = gridCells(floorOf('desktop'), 2)[1]!, rec = recordingContext();
+    expect(siteCount(boot)).toBe(1);
     drawWorld(rec.g, boot, frameAt(boot, 2000), 'desktop');
-    const inside = rec.fills.filter(q => q.x > r.x && q.y > r.y && q.x + q.w < r.x + r.w && q.y + q.h < r.y + r.h);
-    expect(inside).toEqual([]);
-    expect(rec.fills.filter(q => q.x === r.x && q.y === r.y && q.w === r.w && q.h === r.h).map(q => q.c)).toEqual([P.wafer]);
-    expect(rec.fills.filter(q => q.c === P.silkLo && q.x === r.x && q.y === r.y)).toHaveLength(2);
+    expect(rec.fills.filter(q => q.x === r.x && q.y === r.y && q.w === r.w && q.h === r.h)).toEqual([]);
+    expect(rec.fills.filter(q => q.c === P.silkLo && q.x === r.x && q.y === r.y)).toHaveLength(0);
   });
 });
 
@@ -284,32 +285,40 @@ describe('CPU incoming queue wells', () => {
   });
 });
 
-describe('CPU research core grids', () => {
-  it.each(['desktop', 'phone'] as const)('draws 12 sites as 4 × 3 and 24 as 6 × 4 on the art grid (%s)', form => {
+describe('CPU core grids', () => {
+  it.each(['desktop', 'phone'] as const)('lays 12 cells as 4 × 3 and 24 as 6 × 4 on the art grid (%s)', form => {
     const f = floorOf(form);
     for (const [n, cols, rows] of [[12, 4, 3], [24, 6, 4]] as const) {
-      const s = coreSites(f, n);
+      const s = gridCells(f, n);
       expect(s).toHaveLength(n);
       expect(new Set(s.map(r => r.x)).size).toBe(cols); expect(new Set(s.map(r => r.y)).size).toBe(rows);
       for (const r of s) { expect(Number.isInteger(r.x) && Number.isInteger(r.w)).toBe(true); expect(r.x + r.w).toBeLessThanOrEqual(f.cores.x + f.cores.w); expect(r.y + r.h).toBeLessThanOrEqual(f.cores.y + f.cores.h); }
     }
-    expect(coreSites(f, 10)).toHaveLength(12); expect(coreSites(f, 20)).toHaveLength(24); expect(coreSites(f, 3)).toHaveLength(4);
+    expect(gridCells(f, 10)).toHaveLength(12); expect(gridCells(f, 20)).toHaveLength(24); expect(gridCells(f, 3)).toHaveLength(4);
+    // the drawn sites are only the first `count` cells, so core i keeps cell i as the grid grows
+    expect(coreSites(f, 10)).toHaveLength(10); expect(coreSites(f, 10)[3]).toEqual(gridCells(f, 12)[3]);
   });
 });
 
-describe('CPU grid lock mark and busy tag', () => {
-  it.each([['desktop', 3], ['phone', 2]] as const)('the lock mark stays clear of the tag text (%s)', (form, scale) => {
-    for (const scene of ['ring', 'mesh'] as const) {
-      const chip = chipScene(scene), f = floorOf(form), sites = coreSites(f, siteCount(chip));
-      const tag = coreTag(chip, sites, firstLockedSite(chip, sites.length), f, frameAt(chip, 2000, { form, scale }));
-      expect(tag).not.toBeNull();
-      const lock = lockSpot(emptyBlocks(chip, sites).locked, tag!.area);
-      expect(lock).not.toBeNull();
-      expect(overlaps(lock!, tag!.area)).toBe(false);
-      // Cores always show their Hz: these tiles are too small, so the tag carries it (a second line if need be).
-      expect(tag!.speed).toBe(true);
-      for (let i = 0; i < chip.cores.length; i++) expect(overlaps(sites[i]!, tag!.area)).toBe(false);
+describe('D34: installed cores plus one add site', () => {
+  const at = (n: number): ChipSnapshot => { const max = chipScene('max'); return { ...max, coreSites: 32, cores: max.cores.slice(0, n), slots: [] }; };
+  it.each([['desktop', 3], ['phone', 2]] as const)('draws n + 1 sites up to 32, the tag off every installed core, the speed always shown (%s)', (form, scale) => {
+    for (const n of [2, 3, 5, 9, 17, 32]) {
+      const chip = at(n), f = floorOf(form), sites = coreSites(f, siteCount(chip)), frame = frameAt(chip, 2000, { form, scale });
+      expect(sites).toHaveLength(n < 32 ? n + 1 : 32);
+      const tag = coreTag(chip, sites, firstLockedSite(chip, sites.length), f, frame);
+      let hidden = false;
+      for (let i = 0; i < n; i++) if (!tileLabelFits(chip.cores[i]!, sites[i]!, frame)) hidden = true;
+      // tiles too small for their Hz: the tag carries it where it has a free run; a full grid (32) has no tag
+      if (n === 32) expect(tag).toBeNull();
+      else if (hidden) { expect(tag).not.toBeNull(); expect(tag!.speed).toBe(true); }
+      if (tag) for (let i = 0; i < n; i++) expect(overlaps(sites[i]!, tag.area)).toBe(false);
+      if (tag) { expect(tag.area.x + tag.area.w).toBeLessThanOrEqual(f.cores.x + f.cores.w); expect(tag.area.x).toBeGreaterThanOrEqual(f.cores.x); }
     }
+  });
+  it('draws no add site before Multi-core', () => {
+    const one = { ...at(1), coreSites: 1 }, locked = { ...at(4), slots: [{ kind: 'core' as const, index: 4, locked: true }] };
+    expect(siteCount(one)).toBe(1); expect(siteCount(locked)).toBe(4); expect(siteCount(at(4))).toBe(5);
   });
 });
 

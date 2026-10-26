@@ -52,13 +52,14 @@ describe('callout quote effects', () => {
     part: { unit: { kind: 'system', id: systemId(0) }, slot: { kind: 'core', socket: 0, index: 0 } },
     unit: null, sw: null, port: null, slot: null, rect: { x: 0, y: 0, w: 8, h: 8 } };
 
-  it('an installed core reads its own upgrade; an empty core site offers the next core', () => {
+  it('D34: an installed core shows what it runs and sells the next core; an empty core site offers the next core', () => {
     const state = createInitialState(42), focus = fixtureSnapshot('chipBoot').focus;
     const tray = quote(state, { kind: 'tray', at }).quotes;
     const offers = buildOffers('chip', tray, null);
     const own = calloutModel(target, focus, null, offers);
-    expect([own.name, own.offer]).toEqual(['Core 1', offers.cores[0]]);
-    expect(own.change).toBe(`More lanes: needs ${tray[4]!.locked!.text.replace(/^Needs /, '')}`);
+    expect([own.name, own.offer, own.keyLabel]).toEqual(['Core 1', offers.rows[0], 'Add core']);
+    expect(own.change).toMatch(/^(Idle|.+ [0-9]+%) · [0-9.]+ [kMG]?Hz$/);
+    expect(own.change).not.toMatch(/lane/i);
     // Core 2 needs research: the callout names what you get, and its key opens the research (A07)
     const site = calloutModel({ ...target, part: { ...target.part!, slot: { kind: 'core', socket: 0, index: 1 } } }, focus, null, offers);
     expect([site.name, site.change, site.offer]).toEqual(['Add Core 2', `Needs research: ${tray[0]!.locked!.text.replace(/^Needs /, '')}`, offers.rows[0]]);

@@ -28,7 +28,7 @@ export function partFacts(focus: LevelSnapshot, slot: PartSlot): PartFacts | nul
     }
     if (slot.kind === 'clock') {
       const k = focus.clock;
-      return { title: 'Clock', sub: hertz(k.hz), level: k.level, status: 'Drives every lane on the die',
+      return { title: 'Clock', sub: hertz(k.hz), level: k.level, status: 'Sets the speed of every core',
         lines: k.effectiveHz !== k.hz ? [{ text: `Running at ${hertz(k.effectiveHz)}`, tone: 'warn' }] : [] };
     }
     if (slot.kind === 'l1' || slot.kind === 'l2' || slot.kind === 'l3') {

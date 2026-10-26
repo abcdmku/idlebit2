@@ -8,20 +8,23 @@ import type { ChipSnapshot, CoreView, FamilyDef, GpuStats, PartRef, PartView, Qu
 
 const ID = systemId(0), PARENT = { level: 'system', id: ID } as const;
 interface Run { readonly taskId: number; readonly family: number; readonly shard: number; readonly threads: number }
-const core = (lanes: number, busy: boolean, progress: number, research = 0, run: Run | null = null): CoreView => ({
-  socket: 0, lanes, generation: 0, level: lanes, busy: busy ? 1 : 0, family: busy ? run?.family ?? 0 : null, taskId: busy ? run?.taskId ?? 380 + lanes : null,
-  progress, threads: 1, research, cstate: 0, shard: busy ? run?.shard ?? 0 : null, shardThreads: busy ? run?.threads ?? 1 : 0, rate: lanes * 1024, hz: 1024, sleep: null,
+// D34: no lanes; a core's speed is the clock (1024 Hz here). `lanes` stays 1 until the sim drops the field.
+let coreN = 0;
+const core = (busy: boolean, progress: number, research = 0, run: Run | null = null): CoreView => ({
+  socket: 0, generation: 0, level: 1, busy: busy ? 1 : 0, family: busy ? run?.family ?? 0 : null, taskId: busy ? run?.taskId ?? 380 + (coreN++ % 4) : null,
+  progress, threads: 1, research, cstate: 0, shard: busy ? run?.shard ?? 0 : null, shardThreads: busy ? run?.threads ?? 1 : 0, rate: 1024, hz: 1024, sleep: null,
 });
 const PARALLEL: Run = { taskId: 700, family: 13, shard: 1, threads: 2 }, ACCEL: Run = { taskId: 701, family: 22, shard: 0, threads: 1 };
 export function chipScene(stage: 'boot' | 'chip' | 'system' | 'shard', online: ChipSnapshot['online'] = 'onMarket'): ChipSnapshot {
+  coreN = 0;
   if (stage === 'boot') return {
     level: 'chip', parent: null, systemId: ID, cpuCount: 1, online, tier: 0, psu: psu(0.65), clock: { hz: 1, effectiveHz: 1, generation: 0, level: 1 }, coreSites: 1,
-    cores: [core(1, false, 0, 0.36)], cache: { levels: [{ kind: 'l1', bits: 1, generation: 0, level: 1 }], usedBits: 0, capacityBits: 1, spilledOutBits: 0 },
+    cores: [core(false, 0, 0.36)], cache: { levels: [{ kind: 'l1', bits: 1, generation: 0, level: 1 }], usedBits: 0, capacityBits: 1, spilledOutBits: 0 },
     scheduler: null, queue: [], researchShare: 0.36, pipe: { speed: 1000, transfer: null, waiting: false }, slots: [{ kind: 'core', index: 1, locked: true }, { kind: 'scheduler', index: 0, locked: true }],
   };
   const sys = stage !== 'chip', shard = stage === 'shard';
-  const cores = shard ? [core(3, true, 0.3, 0, PARALLEL), core(3, true, 0.3, 0, PARALLEL), core(2, false, 0, 0.4), core(2, true, 0.6, 0, ACCEL)]
-    : sys ? [core(3, true, 0.3), core(3, true, 0.6), core(2, false, 0, 0.4), core(2, true, 0.2)] : [core(2, false, 0, 0.51), core(1, false, 0, 0.51)];
+  const cores = shard ? [core(true, 0.3, 0, PARALLEL), core(true, 0.3, 0, PARALLEL), core(false, 0, 0.4), core(true, 0.6, 0, ACCEL)]
+    : sys ? [core(true, 0.3), core(true, 0.6), core(false, 0, 0.4), core(true, 0.2)] : [core(false, 0, 0.51), core(false, 0, 0.51)];
   return {
     level: 'chip', parent: sys ? PARENT : null, systemId: ID, cpuCount: 1, online, tier: 0, psu: psu(5.5),
     clock: { hz: sys ? 8 : 4, effectiveHz: sys ? 8 : 4, generation: 0, level: sys ? 4 : 3 }, coreSites: sys ? 4 : 2, cores,

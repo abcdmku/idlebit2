@@ -36,19 +36,17 @@ export function maxLevel(u: Unlocks, part: LeveledPartId, g: number, ecc = false
   const row = PARTS[part];
   const bonus = part === 'ram' && ecc ? u.ceilings.ramLevelBonus : part === 'l3' ? u.ceilings.l3LevelBonus : 0;
   let top = levelMax(row, g, bonus);
-  if (part === 'core') top = Math.min(top, Math.floor(u.ceilings.lanesPerCore / row.base[g]!));
   if (part === 'scheduler') top = Math.min(top, Math.floor(32 / row.base[g]!), Math.floor(32 / (row.base2?.[g] ?? 1)));
   return top;
 }
 
-/** The lock that stops level `level` of a part: a ceiling (lanes) or the end of the range. */
+/** The lock that stops level `level` of a part: a ceiling or the end of the range. */
 export function levelLock(u: Unlocks, part: PartId, g: number, level: number, ecc = false): LockReason | null {
   if (isLadder(part)) return level <= LADDERS[part].topK[g]! ? null : { code: 'ceiling', node: null, text: 'Max' };
   if (!(part in PARTS)) return { code: 'ceiling', node: null, text: 'Max' };
   const id = part as LeveledPartId;
   if (level <= maxLevel(u, id, g, ecc)) return null;
   const row = PARTS[id];
-  if (id === 'core' && level <= levelMax(row, g)) return ceilingLock(u, 'lanesPerCore', row.base[g]! * level);
   if (id === 'ram' && ecc && level <= levelMax(row, g, 4)) return ceilingLock(u, 'ramLevelBonus', level - levelMax(row, g));
   if (id === 'l3' && level <= levelMax(row, g, 2)) return ceilingLock(u, 'l3LevelBonus', level - levelMax(row, g));
   return { code: 'ceiling', node: null, text: 'Max' };

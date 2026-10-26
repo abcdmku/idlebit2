@@ -29,7 +29,7 @@ const task: TaskView = { ...taskRequirements(familyId(0), 1), taskId: 1, shard: 
 const CHIP: ChipSnapshot = {
     level: 'chip', parent: { level: 'system', id: systemId(0) }, systemId: systemId(0), online: 'onMarket', tier: 0, cpuCount: 1,
     clock: { hz: 1, effectiveHz: 1, generation: 0, level: 1 }, coreSites: 1,
-    cores: [{ socket: 0, lanes: 1, generation: 0, level: 1, busy: 1, taskId: 1, family: 0, progress: 0.25, threads: 1, shard: 0, shardThreads: 1, research: 0, cstate: 0, hz: 1, sleep: null, rate: 1 }],
+    cores: [{ socket: 0, generation: 0, level: 1, busy: 1, taskId: 1, family: 0, progress: 0.25, threads: 1, shard: 0, shardThreads: 1, research: 0, cstate: 0, hz: 1, sleep: null, rate: 1 }],
     cache: { levels: [{ kind: 'l1', bits: 1, generation: 0, level: 1 }], usedBits: 1, capacityBits: 1, spilledOutBits: 0 },
     scheduler: null, queue: [], researchShare: 0, pipe: { speed: 1000, transfer: null, waiting: false }, psu: supply('psu', 4, 0.4), slots: [{ kind: 'core', index: 1, locked: true }],
 };

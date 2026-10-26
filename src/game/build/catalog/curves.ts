@@ -11,7 +11,7 @@ import { linkWatts, networkStepPrice as rawStepPrice, type NetworkLadderDef } fr
 export const LEVEL_PRICE_EXP = 1.2;
 /** Extra-unit growth (spec §12.3, Appendix B). */
 export const EXTRA_UNIT_GROWTH = 1.25;
-export const EXTRA_CORE_GROWTH = 1.65;
+export const EXTRA_CORE_GROWTH = 2.2;
 export const ECC_PRICE_FACTOR = 1.25;
 /** Rate parts idle at this share of their native rated draw (§9.1). */
 export const IDLE_SHARE = 0.1;
@@ -70,7 +70,7 @@ export function ratioWatts(era: number, native: number, rate: number, decay: rea
   return { idle, load: fullW - idle };
 }
 
-/** Idle and full-use load watts of one part at (g, L). Cores pass their own rate (lanes × clock) and native. */
+/** Idle and full-use load watts of one part at (g, L). Cores pass their own rate (the clock) and native. */
 export function partWatts(row: CatalogRow, g: number, level: number, rate?: { rate: number; native: number }): Watts {
   const w = row.watts;
   const x = levelFactor(row.curve, level);
@@ -103,9 +103,9 @@ export const ceilCredits = (value: number): bigint => {
 };
 
 export const installPrice = (row: CatalogRow, g: number): bigint => ceilCredits(row.price[g] ?? 0);
-/** Price of L → L + 1 within generation g. `lanes` = lanes driven, for a clock (spec §12.3). */
-export const upgradePrice = (row: CatalogRow, g: number, level: number, lanes = 1): bigint => {
-  const drive = row.upgradeDrive === 'lanes' ? lanes : 1;
+/** Price of L → L + 1 within generation g. `driven` = cores a clock drives (spec §12.3, D34). */
+export const upgradePrice = (row: CatalogRow, g: number, level: number, driven = 1): bigint => {
+  const drive = row.upgradeDrive === 'cores' ? driven : 1;
   if (row.curve === 'step') return stepPrice(row.upgrade[g] ?? 0, level, drive);
   return ceilCredits((row.upgrade[g] ?? 0) * levelFactor(row.curve, level) ** LEVEL_PRICE_EXP * drive);
 };

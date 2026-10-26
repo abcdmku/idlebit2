@@ -39,7 +39,7 @@ These limits replace the generic `2^(L-1)` clock curve and `11 + g` clock cap. E
 
 Turbo still multiplies the effective clock by 1.25 under its existing conditions. It grants no levels or new era. THz/PHz in a displayed overclock is a unit prefix, not a new fabrication tier. Caches keep their existing capacity curves. No cache limit is inferred from the clock limit.
 
-Core counts, lanes, sockets and threads still come from their existing research. CPU fab research grants availability. The player must buy and install the new hardware to gain its native efficiency.
+**D34 (25 Oct):** there are no lanes. A core runs one thread at its clock; one research node (Multi-core) opens all 32 core sites, and each added core costs `EXTRA_CORE_GROWTH` (2.2) times the last. Sockets and threads still come from their research. CPU fab research grants availability. The player must buy and install the new hardware to gain its native efficiency.
 
 ## 3. Efficiency and watts
 

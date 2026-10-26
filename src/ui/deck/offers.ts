@@ -90,7 +90,7 @@ export function extraRequest(at: NodeRef, def: RowDef): QuoteRequest | null {
   return null;
 }
 
-const COUNTS: ReadonlySet<string> = new Set(['lanes', 'slots', 'cores', 'ports']);
+const COUNTS: ReadonlySet<string> = new Set(['slots', 'cores', 'ports']);
 
 /** One measurement through the shared formatters: "1 b", "21.4 kb", "1.5 kHz", "4 slots". */
 export const measure = (n: number, unit: EffectPreview['unit']): string => measureUnit(n, unit);
@@ -140,6 +140,12 @@ export function offerOf(def: RowDef, q: Quote | undefined, link = def.key === 'l
   // A start controller's upgrade has no capacity effect (D31): its level step, from the quote's "… · L3".
   const step = !e && q.action.type === 'upgradePart' ? /· L([0-9]+)$/.exec(q.label) : null;
   const maxed = q.locked?.code === 'ceiling' || q.locked?.code === 'cap';
+  // D34: the Cores row counts cores ("3 → 4"); before Multi-core it only says which research opens it.
+  if (def.key === 'core' && e && !maxed) {
+    const change = q.locked?.code === 'research' ? '' : `${e.capacityBefore} → ${e.capacityAfter}`;
+    const credits = q.currency === 'credits', price = q.locked || !credits ? null : whole(q.cost);
+    return { ...def, change, quote: q, price, affordable: !q.locked && credits && q.affordable, lock: q.locked?.text ?? null, where: false, right: rightOf(q, price, false) };
+  }
   // At Max a row says only where it stands (QA-08): never a next level beside "Max".
   const change = maxed ? (e ? measure(e.capacityBefore, e.unit) : '')
     : step ? `L${Number(step[1]) - 1} → L${step[1]}` : !e ? q.label : e.capacityBefore === e.capacityAfter ? measure(e.capacityBefore, e.unit) : changeText(e);

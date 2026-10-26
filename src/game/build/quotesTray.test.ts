@@ -1,5 +1,4 @@
 import { amount } from '../amount';
-import { applyAction } from '../core/actions';
 import { compileAll } from '../core/topology';
 import { buildState } from '../testkit/builders';
 import { FLEETS } from '../testkit/fleets';
@@ -52,35 +51,11 @@ describe('tray GPU item (R44)', () => {
 });
 
 describe('tray effects (R42)', () => {
-  it('quotes every installed core with current affordability and mirrored CPU pricing', () => {
-    const base = gpuState([]), system = base.build.systems[id]!;
-    const make = (cpuCount: number): GameState => {
-      const build = { ...base.build, systems: base.build.systems.map(s => s && ({ ...s,
-        spec: { ...s.spec, cpuCount, cpu: { ...system.spec.cpu!, cores: [{ gen: 0, level: 1 }, { gen: 0, level: 2 }] } },
-      })) };
-      return { ...base, build, compiled: compileAll(build, base.research) };
-    };
-    const single = make(1), mirrored = make(2), at = { level: 'chip', id } as const;
-    const tray = quote(mirrored, { kind: 'tray', at }).quotes;
-    expect(tray).toHaveLength(6);
-    const upgrades = tray.slice(4);
-    for (const [index, q] of upgrades.entries()) {
-      const part = { unit: { kind: 'system', id }, slot: { kind: 'core', socket: 0, index } } as const;
-      expect(q.action).toEqual({ type: 'upgradePart', part });
-      expect(q.locked).toBeNull();
-      expect(q.affordable).toBe(true);
-      expect(q.cost).toBe(quote(mirrored, { kind: 'part', part }).quotes[0]!.cost);
-      expect(BigInt(q.cost)).toBe(2n * BigInt(quote(single, { kind: 'part', part }).quotes[0]!.cost));
-    }
-    const q = upgrades[0]!, short = { ...mirrored, wallet: { ...mirrored.wallet, credits: amount((BigInt(q.cost) - 1n).toString()) } };
-    expect(quote(short, { kind: 'tray', at }).quotes[4]!.affordable).toBe(false);
-    const funded = { ...mirrored, wallet: { ...mirrored.wallet, credits: q.cost } };
-    expect(quote(funded, { kind: 'tray', at }).quotes[4]!.affordable).toBe(true);
-    const bought = applyAction(funded, q.action);
-    expect(bought.ok).toBe(true);
-    expect(bought.state.wallet.credits).toBe('0');
-    expect(bought.state.build.systems[id]!.spec.cpuCount).toBe(2);
-    expect(bought.state.build.systems[id]!.spec.cpu!.cores.map(c => c.level)).toEqual([2, 2]);
+  it('D34: the chip tray has its four items and no per-core upgrade', () => {
+    const at = { level: 'chip', id } as const;
+    const tray = quote(gpuState([]), { kind: 'tray', at }).quotes;
+    expect(tray).toHaveLength(4);
+    expect(tray.some((q) => q.action.type === 'upgradePart' && q.action.part.slot.kind === 'core')).toBe(false);
   });
 
   it('shows counts on adds and capacity on upgrades at boot', () => {

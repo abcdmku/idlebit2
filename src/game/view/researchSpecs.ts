@@ -46,7 +46,6 @@ export function researchPartSpecs(state: GameState, at: NodeRef | null = null): 
   const room = rack ? b.rooms[rack.room] ?? null : null, openRoom = room?.opened ? room : null;
   const site = room ? b.sites[room.site] ?? null : null, openSite = site?.opened ? site : null;
 
-  const lanes = cpu?.cores[0] ? capacity(PARTS.core, cpu.cores[0].gen, cpu.cores[0].level) : 0;
   const cacheBits = cpu ? capacity(PARTS.l1, cpu.l1.gen, cpu.l1.level) + (cpu.l2 ? capacity(PARTS.l2, cpu.l2.gen, cpu.l2.level) : 0)
     + (cpu.l3 ? capacity(PARTS.l3, cpu.l3.gen, cpu.l3.level) : 0) : 0;
   const gpus = spec?.accels.filter((a) => a.kind === 'gpu') ?? [], npus = spec?.accels.filter((a) => a.kind === 'npu') ?? [];
@@ -56,7 +55,7 @@ export function researchPartSpecs(state: GameState, at: NodeRef | null = null): 
   const line = (spec: string): ResearchPartView => ({ spec });
 
   return {
-    cores: line(cpu ? `${plural(cpu.cores.length, 'core')} · ${plural(lanes, 'lane')}` : NONE),
+    cores: line(cpu ? plural(cpu.cores.length, 'core') : NONE),
     clock: line(cpu ? formatHertz(capacity(PARTS.clock, cpu.clock.gen, cpu.clock.level)) : NONE),
     cache: line(cpu ? formatSize(cacheBits) : NONE),
     queue: line(spec?.scheduler && s >= 0 ? plural(c.sys.Q[s] ?? 0, 'slot') : NONE),

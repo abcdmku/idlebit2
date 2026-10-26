@@ -29,13 +29,13 @@ const ids = (state: GameState) => pending(state).map(n => n.id);
 describe('contextual research discovery', () => {
   it('starts with CPU projects and the System frontier, with real prerequisite names', () => {
     const state = createInitialState(42), tree = selectContextualResearchTree(state);
-    expect(ids(state)).toEqual(expect.arrayContaining(['pipelining', 'fifoSched', 'cstateC1', 'dualCore', 'l2Cache', 'systemBoard']));
+    expect(ids(state)).toEqual(expect.arrayContaining(['fifoSched', 'cstateC1', 'dualCore', 'l2Cache', 'systemBoard']));
     expect(pending(state).every(n => n.level === 'chip' || n.id === 'systemBoard')).toBe(true);
     expect(pending(state).some(n => ['accel', 'storage', 'network', 'cooling'].includes(n.category))).toBe(false);
     for (const id of ['rack', 'room', 'dataCenter', 'fabMhz']) expect(ids(state)).not.toContain(id);
     const next = tree.nodes.find(n => n.id === 'systemBoard')!;
     expect(next).toMatchObject({ state: 'locked', lockedBy: 'dualCore' });
-    expect(tree.nodes.find(n => n.id === next.lockedBy)?.name).toBe('Dual core');
+    expect(tree.nodes.find(n => n.id === next.lockedBy)?.name).toBe('Multi-core');
     for (const node of tree.nodes) for (const id of node.requires) expect(tree.nodes.some(n => n.id === id)).toBe(true);
   });
 

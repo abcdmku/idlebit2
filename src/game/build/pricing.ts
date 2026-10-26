@@ -1,6 +1,6 @@
 import type { CpuBuild, PartLevel, RackConfig, RoomConfig, SiteConfig, SwitchBuild, SystemSpec } from '../types/build';
 import {
-  capacity, ECC_PRICE_FACTOR, EXTRA_CORE_GROWTH, EXTRA_UNIT_GROWTH, installPrice, ladderInstall, LADDERS, portAddPrice, networkStepsBetween,
+  ECC_PRICE_FACTOR, EXTRA_CORE_GROWTH, EXTRA_UNIT_GROWTH, installPrice, ladderInstall, LADDERS, portAddPrice, networkStepsBetween,
   PARTS, scalePrice, SHELLS, upgradePrice, upgradesBetween, type CatalogRow, type LadderDef,
 } from './catalog';
 import { gpuInstallPrice, gpuNativePrice, gpuPriceToLevel } from './catalog/gpuModels';
@@ -12,17 +12,21 @@ import { lbQueueStepsTo } from './catalog/network';
  */
 export const extraFactor = (n: number, growth = EXTRA_UNIT_GROWTH): number => (n >= 1 ? growth ** (n - 1) : 1);
 
-/** Lanes a CPU's clock drives: Σ lanes of its cores (spec §12.3 `drive`). */
-export const cpuLanes = (cpu: CpuBuild): number => cpu.cores.reduce((sum, c) => sum + capacity(PARTS.core, c.gen, c.level), 0);
+/** Cores a CPU's clock drives (spec §12.3 `drive`, D34). */
+export const cpuCores = (cpu: CpuBuild): number => cpu.cores.length;
 
-export const partFromNothing = (row: CatalogRow, p: PartLevel, nth = 0, growth = EXTRA_UNIT_GROWTH, lanes = 1): bigint =>
-  scalePrice(installPrice(row, p.gen), extraFactor(nth, growth)) + upgradesBetween(row, p.gen, 1, p.level, lanes);
+export const partFromNothing = (row: CatalogRow, p: PartLevel, nth = 0, growth = EXTRA_UNIT_GROWTH, driven = 1): bigint =>
+  scalePrice(installPrice(row, p.gen), extraFactor(nth, growth)) + upgradesBetween(row, p.gen, 1, p.level, driven);
 
-/** One CPU: package, cores (extra-core growth), clock (priced per lane driven), caches. */
-export function cpuPrice(cpu: CpuBuild): bigint {
+/**
+ * One CPU: package, cores (extra-core growth), clock (priced per core driven), caches. D34: Replace CPU passes
+ * coreGrowth 1, since each core's growth surcharge was paid when it was added; moving cores to a new generation
+ * costs that generation's core price per core.
+ */
+export function cpuPrice(cpu: CpuBuild, coreGrowth = EXTRA_CORE_GROWTH): bigint {
   let total = partFromNothing(PARTS.cpu, cpu.cpu);
-  cpu.cores.forEach((core, n) => { total += partFromNothing(PARTS.core, core, n, EXTRA_CORE_GROWTH); });
-  total += partFromNothing(PARTS.clock, cpu.clock, 0, EXTRA_UNIT_GROWTH, cpuLanes(cpu));
+  cpu.cores.forEach((core, n) => { total += partFromNothing(PARTS.core, core, n, coreGrowth); });
+  total += partFromNothing(PARTS.clock, cpu.clock, 0, EXTRA_UNIT_GROWTH, cpuCores(cpu));
   total += partFromNothing(PARTS.l1, cpu.l1);
   if (cpu.l2) total += partFromNothing(PARTS.l2, cpu.l2);
   if (cpu.l3) total += partFromNothing(PARTS.l3, cpu.l3);

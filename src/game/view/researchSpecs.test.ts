@@ -20,7 +20,7 @@ describe('research part specs (the root headings)', () => {
       cores: parts.cores.spec, clock: parts.clock.spec, queue: parts.queue.spec, ram: parts.ram.spec,
       gpu: parts.gpu.spec, switch: parts.switch.spec, lb: parts.lb.spec, netRack: parts.netRack.spec,
     }).toEqual({
-      cores: '4 cores · 2 lanes', clock: '1 kHz', queue: 'none', ram: 'SDRAM · 2 sticks',
+      cores: '4 cores', clock: '1 kHz', queue: 'none', ram: 'SDRAM · 2 sticks',
       gpu: 'none', switch: '100 kHz · 4 ports', lb: 'FIFO · queue 1', netRack: 'none',
     });
   });

@@ -15,7 +15,6 @@ const chip = (s: GameState): ChipSnapshot => system(s).chip;
 /** The number the board prints on each part. */
 const BOARD: readonly [string, PartRef['slot'], (s: GameState) => number][] = [
   ['clock', { kind: 'clock', socket: 0 }, (s) => chip(s).clock.hz],
-  ['core', { kind: 'core', socket: 0, index: 0 }, (s) => chip(s).cores[0]!.rate],
   ['L1', { kind: 'l1', socket: 0 }, (s) => chip(s).cache.levels.find((l) => l.kind === 'l1')!.bits],
   ['L2', { kind: 'l2', socket: 0 }, (s) => chip(s).cache.levels.find((l) => l.kind === 'l2')!.bits],
   ['RAM stick', { kind: 'ram', index: 0 }, (s) => system(s).ram[0]!.capacityBits!],
@@ -23,12 +22,12 @@ const BOARD: readonly [string, PartRef['slot'], (s: GameState) => number][] = [
 ];
 
 describe('part quote effects', () => {
-  // Four multi-lane cores, two RAM sticks: system totals are far from any one part's value.
+  // Four cores, two RAM sticks: system totals are far from any one part's value (D34: cores have no upgrade).
   const spec = barebonesSpec(1), cpu = spec.cpu!;
   const state = buildState({
     seed: 42, sites: 1, zonesPerSite: 1, racksPerZone: 1, serversPerRack: 1, unlocks: 'max', credits: '100000000000000000000',
     system: (sid, rack, slot) => ({ id: sid, rack, slot, online: true, spec: {
-      ...spec, cpu: { ...cpu, cores: Array(4).fill({ gen: 1, level: 8 }), l2: { gen: 1, level: 2 } },
+      ...spec, cpu: { ...cpu, cores: Array(4).fill({ gen: 1, level: 1 }), l2: { gen: 1, level: 2 } },
       ram: [{ gen: 1, level: 2, ecc: false }, { gen: 1, level: 2, ecc: false }], drives: [{ gen: 1, level: 2 }],
     } }),
   });

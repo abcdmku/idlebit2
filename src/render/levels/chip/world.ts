@@ -26,10 +26,19 @@ const incoming: Incoming = { count: 0, family: null, progress: 0 };
 export function isLive(chip: ChipSnapshot, frame: WorldFrame): boolean {
   return !frame.paused && (chip.online === 'onMarket' || chip.online === 'draining');
 }
+/**
+ * D34: the sites drawn are the installed cores plus one add site, while another core can be added
+ * (Multi-core researched, under the ceiling, the next slot not locked). No add site before
+ * Multi-core or at 32; never a run of empty or locked sites from the ceiling.
+ */
 export function siteCount(chip: ChipSnapshot): number {
-  let locked = 0;
-  for (const s of chip.slots) if (s.kind === 'core' && s.locked) locked = Math.max(locked, s.index + 1);
-  return Math.max(chip.coreSites, chip.cores.length, locked);
+  return Math.max(1, Math.min(MAX_CORES, chip.cores.length + (canAddCore(chip) ? 1 : 0)));
+}
+export function canAddCore(chip: ChipSnapshot): boolean {
+  const n = chip.cores.length;
+  if (n >= MAX_CORES || n >= chip.coreSites) return false;
+  for (const s of chip.slots) if (s.kind === 'core' && s.index === n) return !s.locked;
+  return true;
 }
 export function siteLocked(chip: ChipSnapshot, i: number): boolean {
   for (const s of chip.slots) if (s.kind === 'core' && s.index === i) return s.locked;
@@ -58,13 +67,13 @@ export function emptyBlocks(chip: ChipSnapshot, sites: readonly Rect[]): { reado
 
 /**
  * Which CPU parts have an affordable, unlocked buy among the tray quotes the UI holds (A25):
- * clock, cache (any level), queue (scheduler upgrade or add), the next core site (add core), and
- * each installed core (its own upgrade, when a quote for it is present).
+ * clock, cache (any level), queue (scheduler upgrade or add) and the add site (the next core).
+ * An installed core has no buy of its own (no lanes, D34): its speed is the clock.
  */
-export interface ChipAfford { clock: boolean; cache: boolean; queue: boolean; site: boolean; readonly core: boolean[] }
-export const createChipAfford = (): ChipAfford => ({ clock: false, cache: false, queue: false, site: false, core: Array<boolean>(MAX_CORES).fill(false) });
+export interface ChipAfford { clock: boolean; cache: boolean; queue: boolean; site: boolean }
+export const createChipAfford = (): ChipAfford => ({ clock: false, cache: false, queue: false, site: false });
 export function chipAfford(quotes: QuoteResult | null, system: SystemId, out: ChipAfford): ChipAfford {
-  out.clock = out.cache = out.queue = out.site = false; out.core.fill(false);
+  out.clock = out.cache = out.queue = out.site = false;
   const list = quotes?.quotes;
   if (!list) return out;
   for (let i = 0; i < list.length; i++) {
@@ -77,7 +86,6 @@ export function chipAfford(quotes: QuoteResult | null, system: SystemId, out: Ch
       if (slot.kind === 'clock') out.clock = true;
       else if (slot.kind === 'l1' || slot.kind === 'l2' || slot.kind === 'l3') out.cache = true;
       else if (slot.kind === 'scheduler') out.queue = true;
-      else if (slot.kind === 'core' && slot.index < out.core.length) out.core[slot.index] = true;
     }
   }
   return out;
@@ -132,7 +140,6 @@ export function drawWorld(g: G, chip: ChipSnapshot, frame: WorldFrame, form: Wor
   if (a.clock) goldBracket(g, f.clock);
   if (a.cache) goldBracket(g, f.cache);
   if (a.queue && (sc || qOpen)) goldBracket(g, f.queue);
-  for (let i = 0; i < Math.min(sites.length, chip.cores.length); i++) if (a.core[i]) goldBracket(g, sites[i]!);
   // Adding a core: one bracket on the open block (grid), or on the next open big site.
   if (a.site && grid && empty.open.n) goldBracket(g, empty.open.box);
   else if (a.site && !grid && chip.cores.length < sites.length && !siteLocked(chip, chip.cores.length)) goldBracket(g, sites[chip.cores.length]!);

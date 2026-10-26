@@ -177,7 +177,8 @@ export function partQuotes(state: GameState, ref: PartRef): Quote[] {
   }
   const out: Quote[] = [];
   const ladder = isLadder(part.id);
-  if (!(part.id === 'switch' || part.id === 'roomSwitch')) {
+  // D34: a core has no upgrade of its own.
+  if (!(part.id === 'switch' || part.id === 'roomSwitch' || part.id === 'core')) {
     const up = planUpgrade(state, ref);
     out.push(toQuote(state, { type: 'upgradePart', part: ref }, up, effectOf(state, ref, up)));
   }

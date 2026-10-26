@@ -17,7 +17,8 @@ export const SAVE_SCHEMA = 'bitrouge-v3' as const;
 // Pre-live reset: v12 is D31 (start controllers, rack batteries, site generation): build parts, start hot state, the standby mode.
 // Pre-live reset: v13 adds the D31 runtime's back-to-standby clock (offSinceTick).
 // Pre-live reset: v14 is D33 (stall end): the last met tick in hot.g.
-export const SAVE_VERSION = 14;
+// Pre-live reset: v15 is D34 (one Multi-core node, no lanes): core levels and lane research are gone.
+export const SAVE_VERSION = 15;
 
 export interface SaveEnvelope {
   readonly schema: typeof SAVE_SCHEMA;

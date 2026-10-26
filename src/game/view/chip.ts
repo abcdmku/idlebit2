@@ -24,8 +24,6 @@ export function researchShare(state: GameState, s: number): number {
   return threads > 0 ? Math.min(1, held / threads) : 0;
 }
 
-/** Lanes of a core. TODO(S5): base[g] × L from the core catalog row; base[g] = 1 assumed. */
-const coreLanes = (state: GameState, core: PartLevel): number => Math.min(core.level, state.research.unlocks.ceilings.lanesPerCore);
 
 /** Cache levels of one CPU, each at its own catalog size (compile sums the same values). */
 function cacheLevels(cpu: CpuBuild | null): CacheLevelView[] {
@@ -115,7 +113,7 @@ export function chipSnapshot(state: GameState, id: SystemId, parent: NodeRef | n
     const busy = Math.max(0, Math.min(tpc, busyThreads - i * tpc)) / tpc;
     const sleep: CoreSleep | null = paused ? null : draw === DRAW_SLEEP ? 'S3' : draw !== DRAW_NONE && busy === 0 && cstate > 0 ? `C${cstate as 1 | 3 | 6}` : null;
     return {
-      socket: 0, lanes: coreLanes(state, part), rate: capacity(PARTS.core, part.gen, part.level) * hz, generation: part.gen, level: part.level, busy,
+      socket: 0, rate: hz, generation: part.gen, level: part.level, busy,
       hz: sleep === null ? liveHz : 0, sleep,
       taskId: taskIds[i]!, family: fam[i]! >= 0 ? familyId(fam[i]!) : null, progress: prog[i]!, threads: tpc,
       shard: shardIx[i]! >= 0 ? shardIx[i]! : null, shardThreads: group[i]!,

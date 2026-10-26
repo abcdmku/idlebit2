@@ -1,6 +1,6 @@
 // Click to upgrade (D15.4): what a tapped world target offers, and where its callout sits.
 // Desktop docks it in the right gutter with a leader to the part; phone sits it above or below (A07).
-import { formatHertz, LEVEL_NAMES, type LevelSnapshot, type NodeRef, type PartSlotKind, type Quote, type QuoteResult } from '../../game';
+import { FAMILIES, formatHertz, LEVEL_NAMES, type LevelSnapshot, type NodeRef, type PartSlotKind, type Quote, type QuoteResult } from '../../game';
 import type { HitTarget, Rect } from '../../render/core';
 import { rackLetter, regionName, SLOT_TITLE, zoneLetter } from '../plates/copy';
 import { changeText, type Offer, type Offers } from '../deck/offers';
@@ -54,6 +54,14 @@ export function slotSite(t: HitTarget, focus: LevelSnapshot): { name: string; ro
   return { name: focus.level === 'rack' ? 'Add server' : focus.level === 'room' ? 'Add rack' : focus.level === 'global' ? 'Add site' : 'Add part', row: null };
 }
 
+/** An installed core in a word: its task and progress (or idle, or asleep) and its live clock (D34). */
+export function coreInfo(focus: Extract<LevelSnapshot, { level: 'chip' }>, index: number): string {
+  const c = focus.cores[index];
+  if (!c) return '';
+  const doing = c.family !== null ? `${FAMILIES[c.family]?.name ?? 'Task'} ${Math.floor(c.progress * 100)}%` : c.sleep ? `Asleep (${c.sleep})` : 'Idle';
+  return `${doing} · ${formatHertz(c.hz)}`;
+}
+
 /** The board's own labels where they differ from the plate titles (A07). */
 const BOARD_NAME: Partial<Record<PartSlotKind, string>> = { l1: 'Cache', scheduler: 'Queue' };
 
@@ -96,6 +104,8 @@ export interface CalloutModel {
   readonly research: string | null;
   /** Open: drill into this unit. */
   readonly drill: NodeRef | null;
+  /** The buy key's word when it isn't "Buy": an installed core sells the next core ("Add core") or the clock (D34). */
+  readonly keyLabel?: string;
 }
 
 /**
@@ -105,9 +115,12 @@ export interface CalloutModel {
 export function calloutModel(t: HitTarget, focus: LevelSnapshot, quotes: QuoteResult | null, offers: Offers | null): CalloutModel {
   const kind = t.part?.slot.kind, drill = t.drill;
   let name = targetName(t, focus), change = '', offer: CalloutModel['offer'] = null;
-  // A core: an installed one reads its own upgrade and rate; an empty core site offers the next core.
+  // D34 (no lanes): an installed core shows what it is doing; its key sells the next core, or the clock once
+  // cores are at their cap. An empty core site sells the next core (its deck row, below).
   const core = t.part?.slot.kind === 'core' ? t.part.slot : null;
-  const own = core && offers ? offers.cores[core.index] ?? null : null;
+  const coresRow = offers?.rows.find(r => r.key === 'core') ?? null, clockRow = offers?.rows.find(r => r.key === 'clock') ?? null;
+  const installed = !!core && focus.level === 'chip' && !!focus.cores[core.index];
+  const own = installed ? (coresRow && coresRow.right.kind !== 'max' ? coresRow : clockRow) : null;
   // An empty site reads as what you'd add there ("Add queue", "Add Core 2", "Add RAM") and its deck row's offer.
   const site = t.kind === 'slot' ? slotSite(t, focus) : null;
   const siteRow = site?.row && offers ? offers.rows.find(r => r.key === site.row && r.quote) ?? null : null;
@@ -119,8 +132,8 @@ export function calloutModel(t: HitTarget, focus: LevelSnapshot, quotes: QuoteRe
     offer = siteRow; change = siteRow.quote?.effect ? changeText(siteRow.quote.effect) : siteRow.change;
   } else if (row) {
     offer = row; change = row.change;
-    if (own) { if (!own.quote?.effect && focus.level === 'chip') change = formatHertz(focus.clock.effectiveHz); }
-    else if (core) name = `Add Core ${(offers?.cores.length ?? 0) + 1}`;
+    if (own) change = focus.level === 'chip' && core ? coreInfo(focus, core.index) : change;
+    else if (core) name = `Add Core ${core.index + 1}`;
     else name = row.name.replace(/^Add /, '');
   } else {
     const q = quotes ? primaryQuote(t, quotes.quotes) : null;
@@ -134,12 +147,11 @@ export function calloutModel(t: HitTarget, focus: LevelSnapshot, quotes: QuoteRe
   const lock = offer?.quote?.locked;
   // "Upgrade at the Rack switch" is a structure lock (D15.5), not research the player can start.
   const research = lock?.code === 'research' && !offer!.where && !/^Upgrade at /.test(lock.text) ? lock.text.replace(/^Needs /, '') : null;
-  if (research) {
-    // Locked grammar (A07): the title is what you get, line 2 what it needs, the key opens it.
-    // An installed core upgrades its own lanes; the Cores row adds cores. Say which, so the two never read as a contradiction (QA-23).
-    change = own ? `More lanes: needs ${research}` : `Needs research: ${research}`;
-  }
-  return { name, change, offer, research, drill };
+  // Locked grammar (A07): the title is what you get, line 2 what it needs, the key opens it. An installed core
+  // keeps its own line (what it runs); its key still opens the research.
+  if (research && !own) change = `Needs research: ${research}`;
+  const keyLabel = own && own === coresRow ? 'Add core' : own ? 'Buy clock' : undefined;
+  return { name, change, offer, research, drill, keyLabel };
 }
 
 /**

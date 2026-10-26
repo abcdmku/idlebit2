@@ -13,7 +13,7 @@ import { hasRule, ruleParam } from './research/unlocks';
  * build → compiled (architecture §1.3). core/topology writes the structural columns first; this
  * fills every other column. Column meanings, per system (spec §6.2, §9.1):
  *   threads      Σ cores × threadsPerCore             cores, sockets   counts
- *   threadRate   mean core rate at clockFactor 1, e = 1: Σ(lanes × clockHz of its socket) / cores
+ *   threadRate   mean core rate at clockFactor 1, e = 1: Σ(clockHz of its socket) / cores (D34: no lanes)
  *   clockHz      socket 1's clock                     K, Q             scheduler (1, 0 without one)
  *   keff         timeSlice 2K; dma K; else min(K, threads)            slots = keff + Q
  *   cacheBits    Σ sockets L1 + L2 + L3               ramCap           Σ RAM modules
@@ -25,7 +25,7 @@ import { hasRule, ruleParam } from './research/unlocks';
  *   diskNode     with sharedStorage, the rack's first storage node (its drives extend every server's disk tier), else -1
  *   idleW/loadW  per resource at full use (§9.1 post-D5), rule factors applied (ecc, ramWatts, HBM watts);
  *                [cpu] is the uncore only: package, caches, scheduler (idle only). coreIdleW/coreLoadW are
- *                the cores (rate parts: lanes × clock); clocks are idle-only, so clockLoadW is 0.
+ *                the cores (rate parts: the clock); clocks are idle-only, so clockLoadW is 0.
  *   psuLoss      final loss fraction (lossPerLevel folded in);  psuCapSwitch = capped and powerCap
  *   rules        bit i = RULE_IDS[i] (i < 32) granted; dvfs and turbo also need the system switch,
  *                coreIdle needs a C-state limit above 0.
@@ -88,9 +88,10 @@ export function compileSystem(c: CompiledBuffers, build: SystemBuild, u: Unlocks
     uncoreIdle += partWatts(PARTS.cpu, socket.cpu.gen, 1).idle;
     for (const core of socket.cores) {
       cores += 1;
-      const rate = capacity(PARTS.core, core.gen, core.level) * hz;
+      // D34: one thread per core at its socket's clock; no lanes.
+      const rate = hz;
       rateSum += rate;
-      const w = partWatts(PARTS.core, core.gen, core.level, { rate, native: PARTS.core.base[core.gen]! * PARTS.clock.base[core.gen]! });
+      const w = partWatts(PARTS.core, core.gen, 1, { rate, native: PARTS.clock.base[core.gen]! });
       coreIdle += w.idle;
       coreLoad += w.load;
     }

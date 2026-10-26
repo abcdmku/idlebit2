@@ -25,8 +25,8 @@ export interface CatalogRow {
   readonly watts: WattsRule;
   /** Whole Credits per generation. */
   readonly price: readonly number[]; readonly upgrade: readonly number[];
-  /** Clock: upgrades cost × lanes on the socket (an oscillator retunes every lane it drives). */
-  readonly upgradeDrive?: 'lanes';
+  /** Clock: upgrades cost × cores on the socket (an oscillator retunes every core it drives, D34). */
+  readonly upgradeDrive?: 'cores';
   readonly tech?: readonly CoolTech[]; readonly tau?: readonly number[];
   readonly tensorFactor?: readonly number[];
 }

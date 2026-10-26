@@ -4,14 +4,14 @@
 import { familyId, systemId } from '../../../game';
 import type { ChipSnapshot, CoreView, TransferView } from '../../../game';
 
-export type CpuScene = 'boot' | 'landing' | 'mid' | 'shard' | 'max' | 'paused' | 'ring' | 'mesh';
-export const CPU_SCENES: readonly CpuScene[] = ['boot', 'landing', 'mid', 'shard', 'max', 'paused', 'ring', 'mesh'];
+export type CpuScene = 'boot' | 'landing' | 'mid' | 'shard' | 'max' | 'paused' | 'ring' | 'mesh' | 'c2' | 'c3' | 'c5' | 'c9' | 'c17';
+export const CPU_SCENES: readonly CpuScene[] = ['boot', 'landing', 'mid', 'shard', 'max', 'paused', 'ring', 'mesh', 'c2', 'c3', 'c5', 'c9', 'c17'];
 let next = 383;
 interface Run { readonly taskId: number; readonly family: number; readonly shard: number; readonly threads: number }
 const core = (busy: boolean, progress: number, research = 0, run: Run | null = null): CoreView => {
   const taskId = busy ? run?.taskId ?? next++ : null;
   return {
-    socket: 0, lanes: 1, generation: 0, level: 1, busy: busy ? 1 : 0, family: busy ? run?.family ?? 2 : null, taskId,
+    socket: 0, generation: 0, level: 1, busy: busy ? 1 : 0, family: busy ? run?.family ?? 2 : null, taskId,
     progress, threads: 1, research, cstate: 0, shard: busy ? run?.shard ?? 0 : null, shardThreads: busy ? run?.threads ?? 1 : 0, rate: 0, hz: 0, sleep: null,
   };
 };
@@ -36,17 +36,19 @@ export function chipScene(scene: CpuScene, simTimeMs = 2000): ChipSnapshot {
   const split: Run = { taskId: 500, family: 13, shard: 2, threads: 2 };
   // 'ring': ringBus, 12 sites with 9 cores; 'mesh': meshCores, 24 sites with 18 cores and the rest locked.
   const ring = scene === 'ring', mesh = scene === 'mesh', grid = ring ? 12 : mesh ? 24 : 0;
-  const cores = boot ? [core(false, 0)] : max ? maxCores() : grid ? Array.from({ length: ring ? 9 : 18 }, (_, i) => core(i % 3 !== 2, (i * 0.13) % 1))
+  // 'c<n>' (D34): Multi-core researched, n cores installed, the add site after them.
+  const multi = /^c[0-9]+$/.test(scene) ? Number(scene.slice(1)) : 0;
+  const cores = boot ? [core(false, 0)] : max ? maxCores() : multi ? maxCores().slice(0, multi) : grid ? Array.from({ length: ring ? 9 : 18 }, (_, i) => core(i % 3 !== 2, (i * 0.13) % 1))
     : scene === 'shard' ? [core(true, 0.4, 0, split), core(true, 0.4, 0, split)]
       : [core(true, 0.62), core(scene !== 'paused', 0.25)];
   const hz = max ? 4e9 : 1024, bits = max ? 2 ** 28 : 64;
-  // A core's own rate is the sim's (lanes × socket clock); a scene sets it the same way.
-  for (let i = 0; i < cores.length; i++) cores[i] = { ...cores[i]!, rate: cores[i]!.lanes * hz, hz };
+  // A core's speed is the socket clock (D34: no lanes); a scene sets its rate the same way.
+  for (let i = 0; i < cores.length; i++) cores[i] = { ...cores[i]!, rate: hz, hz };
   void simTimeMs;
   return {
     level: 'chip', parent: { level: 'system', id: systemId(0) }, systemId: systemId(0), cpuCount: 1, online: 'onMarket', tier: 0,
     clock: { hz, effectiveHz: hz, generation: max ? 3 : 1, level: 1 },
-    coreSites: max ? 32 : ring ? 10 : mesh ? 20 : boot ? 1 : 2, cores, researchShare: 0.1,
+    coreSites: max || multi ? 32 : ring ? 10 : mesh ? 20 : boot ? 1 : 2, cores, researchShare: 0.1,
     pipe: { speed: 1000, transfer, waiting: scene === 'landing' },
     cache: { capacityBits: bits, usedBits: boot ? 0 : max ? 2 ** 26 : 48, spilledOutBits: 0, levels: [{ kind: 'l1', bits, generation: 0, level: 1 }] },
     queue: boot ? [] : Array.from({ length: max ? 20 : 2 }, (_, i) => ({ taskId: 400 + i, family: familyId([4, 0, 1, 3][i % 4]!) })),

@@ -81,7 +81,7 @@ function Open({ target: t, focus }: { target: HitTarget; focus: LevelSnapshot })
     run: () => { shell.dispatch({ type: 'setOnline', unit: market.unit, online: !market.on }); } });
   if (o?.quote && !o.where && (o.price !== null || act)) {
     const research = !!act && 'research' in act;
-    keys.push({ id: 'buy', label: research ? 'Research' : 'Buy', tone: o.affordable ? 'buy' : act ? 'plain' : 'off', disabled: !act || (!research && !armed),
+    keys.push({ id: 'buy', label: research ? 'Research' : m.keyLabel ?? 'Buy', tone: o.affordable ? 'buy' : act ? 'plain' : 'off', disabled: !act || (!research && !armed),
       run: () => {
         if (!act) return;
         if ('research' in act) { shell.view.dispatch({ type: 'openResearch', project: act.research.node }); return; }
@@ -104,7 +104,7 @@ function Open({ target: t, focus }: { target: HitTarget; focus: LevelSnapshot })
       <T x={pad} y={pad} w={at.w - 2 * pad - 96}><b>{m.name}</b></T>
       <T right={pad} y={pad}>{o?.price != null ? <PriceText offer={o as Offer} n={L.N} />
         : o && !m.research && (o as Offer).right ? <RightText offer={o as Offer} n={L.N} /> : null}</T>
-      <T x={pad} y={pad + L.lh} w={at.w - 2 * pad} className={m.research ? 'warn' : 'mute'}>
+      <T x={pad} y={pad + L.lh} w={at.w - 2 * pad} className={m.research && !m.keyLabel ? 'warn' : 'mute'}>
         <span key={bought} className={bought ? 'flash' : undefined}>{m.change || (market ? marketLine(market) : '')}</span></T>
       {keys.map((k, i) => <button key={k.id} type="button" className={`skey ${k.tone}`} data-testid={`callout-${k.id}`} disabled={k.disabled} data-qa-target
         aria-pressed={k.pressed} style={{ right: keyRight(i), top: by, width: keyW(i), height: KEY_H }} onClick={k.run}>{k.label}</button>)}

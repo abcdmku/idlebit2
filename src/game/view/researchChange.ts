@@ -14,7 +14,7 @@ import type { ResearchChangeView } from '../types/views';
  */
 
 const CEILING_LABEL: Partial<Record<CeilingId, string>> = {
-  coreSites: 'Cores per CPU', lanesPerCore: 'Lanes per core', threadsPerCore: 'Threads per core', cpuSockets: 'CPUs per board',
+  coreSites: 'Cores per CPU', threadsPerCore: 'Threads per core', cpuSockets: 'CPUs per board',
   ramSlots: 'RAM slots', gpuSlots: 'GPU slots', driveSlots: 'Drive slots', rackPorts: 'Rack ports', roomPorts: 'Room ports',
   uplinks: 'Uplinks', researchQueue: 'Research queue', roomRows: 'Room rows', siteZones: 'Zones per site', sites: 'Sites', regions: 'Regions',
 };

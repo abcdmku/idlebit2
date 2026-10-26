@@ -47,7 +47,7 @@ export interface LockReason {
   readonly text: string;
 }
 /** 'J': energy (a Power control battery's capacity). */
-export type CapacityUnit = 'ops/s' | 'bits' | 'bit/s' | 'Hz' | 'W' | 'J' | 'tasks/s' | 'lanes' | 'slots' | 'cores' | 'ports' | 'ops';
+export type CapacityUnit = 'ops/s' | 'bits' | 'bit/s' | 'Hz' | 'W' | 'J' | 'tasks/s' | 'slots' | 'cores' | 'ports' | 'ops';
 export interface EffectPreview {
   readonly capacityBefore: number;
   readonly capacityAfter: number;

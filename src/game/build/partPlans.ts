@@ -11,15 +11,16 @@ import {
 import { ceilingLock, genLock, levelLock, maxLevel, ruleLock } from './locks';
 import { coldScope, cpuCount, readPart, withSpec, writePart, POWER_SLOTS } from './partAccess';
 import { coldScopes, fail, locked, planned, type Plan } from './plan';
-import { cpuLanes, cpuPrice, extraFactor } from './pricing';
+import { cpuCores, cpuPrice, extraFactor } from './pricing';
 import { newestGen } from './research/unlocks';
 import { planGpuUpgrade } from './gpuPlans';
 
 const specOf = (state: GameState, id: SystemId): SystemSpec | null => state.build.systems[id]?.spec ?? null;
 const eccOf = (state: GameState, ref: PartRef): boolean =>
   ref.unit.kind === 'system' && ref.slot.kind === 'ram' ? specOf(state, ref.unit.id)?.ram[ref.slot.index]?.ecc ?? false : false;
-const lanesFor = (state: GameState, ref: PartRef): number =>
-  ref.unit.kind === 'system' && ref.slot.kind === 'clock' ? cpuLanes(specOf(state, ref.unit.id)?.cpu ?? { cores: [] } as unknown as CpuBuild) : 1;
+/** D34: a clock's upgrades cost × the cores it drives. */
+const drivenBy = (state: GameState, ref: PartRef): number =>
+  ref.unit.kind === 'system' && ref.slot.kind === 'clock' ? cpuCores(specOf(state, ref.unit.id)?.cpu ?? { cores: [] } as unknown as CpuBuild) : 1;
 /** Data plane steps cost × zones in the site (spec §12.5). */
 const zonesOf = (state: GameState, ref: PartRef): number =>
   ref.unit.kind === 'site' ? Math.max(1, state.build.sites[ref.unit.id]?.zones.filter((z) => z !== null).length ?? 1) : 1;
@@ -56,7 +57,7 @@ export function planUpgrade(state: GameState, ref: PartRef): Plan {
   const ecc = eccOf(state, ref);
   const level = part.level + 1;
   const label = `${partName(id, part.gen)} · L${level}`;
-  const price = scalePrice(upgradePrice(PARTS[id], part.gen, part.level, lanesFor(state, ref)) * BigInt(cpuCount(state.build, ref)), ecc ? ECC_PRICE_FACTOR : 1);
+  const price = scalePrice(upgradePrice(PARTS[id], part.gen, part.level, drivenBy(state, ref)) * BigInt(cpuCount(state.build, ref)), ecc ? ECC_PRICE_FACTOR : 1);
   const lock = levelLock(u, id, part.gen, level, ecc);
   if (lock) return locked(lock, label, price);
   return planned({ build: writePart(state.build, ref, part.gen, level)!, price }, label);
@@ -85,8 +86,8 @@ export function planReplace(state: GameState, ref: PartRef, g: number, preserveC
     while (level <= top && capacity(row, g, level) < need) level += 1;
     if (level > top) return fail('cap', `Can't hold ${need} at ${label}`, label);
   }
-  const lanes = lanesFor(state, ref);
-  const price = scalePrice((installPrice(row, g) + upgradesBetween(row, g, 1, level, lanes)) * BigInt(cpuCount(state.build, ref)), ecc ? ECC_PRICE_FACTOR : 1);
+  const driven = drivenBy(state, ref);
+  const price = scalePrice((installPrice(row, g) + upgradesBetween(row, g, 1, level, driven)) * BigInt(cpuCount(state.build, ref)), ecc ? ECC_PRICE_FACTOR : 1);
   const lock = genLock(u, id, g);
   if (lock) return locked(lock, label, price);
   const build = writePart(state.build, ref, g, level)!;
@@ -211,7 +212,7 @@ export function planReplaceCpu(state: GameState, system: SystemId): Plan {
   const l3 = cpu.l3 ? keep('l3', cpu.l3) : null;
   if (cores.some((c) => !c) || !l1 || (cpu.l2 && !l2) || (cpu.l3 && !l3)) return fail('cap', 'A part would lose capacity', label);
   const next: CpuBuild = { cpu: { gen: g, level: 1 }, cores: cores as PartLevel[], clock: { gen: g, level: 1 }, l1, l2, l3 };
-  const price = cpuPrice(next) * BigInt(spec.cpuCount);
+  const price = cpuPrice(next, 1) * BigInt(spec.cpuCount);
   return planned({ build: withSpec(state.build, system, { ...spec, cpu: next }), price, cold: coldScopes(state, { kind: 'system', id: system }) }, label);
 }
 

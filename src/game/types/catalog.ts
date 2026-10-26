@@ -71,8 +71,8 @@ export interface PartRow {
   readonly base: readonly number[]; readonly base2?: readonly number[];
   readonly watts: WattsRule;
   readonly price: readonly number[]; readonly upgrade: readonly number[];
-  /** clock: upgrade price × lanes on the socket. */
-  readonly upgradeDrive?: 'lanes';
+  /** clock: upgrade price × cores on the socket (D34). */
+  readonly upgradeDrive?: 'cores';
   readonly tech?: readonly CoolTech[]; readonly tau?: readonly number[];
   readonly tensorFactor?: readonly number[];
 }
@@ -139,7 +139,7 @@ export type ResearchCategory = 'compute' | 'memory' | 'accel' | 'storage' | 'sch
 export type Era = 'hz' | 'khz' | 'mhz' | 'ghz';
 export type WorkTier = 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12 | 13 | 14 | 15;
 export type CeilingId =
-  | 'coreSites' | 'lanesPerCore' | 'threadsPerCore' | 'cpuSockets'
+  | 'coreSites' | 'threadsPerCore' | 'cpuSockets'
   | 'ramSlots' | 'ramLevelBonus' | 'l3LevelBonus' | 'gpuSlots' | 'driveSlots'
   | 'rackPorts' | 'roomPorts' | 'uplinks' | 'researchQueue'
   | 'roomRows' | 'siteZones' | 'sites' | 'regions';

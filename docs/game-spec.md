@@ -458,7 +458,7 @@ Program D10. The market is an **endless, ordered queue** per round. Nothing arri
 | Capability | Formula |
 |---|---|
 | hardware threads | `Σ cores × threadsPerCore` (1, or 2 with `smt`) |
-| core rate | `lanes × clockHz × clockFactor × η_cfg × e(T)` ops/s. `e(T)` is §10.4 (1 before Rack). `clockFactor` is §9.3's product of DVFS, turbo, thermal throttle and power-cap factors (1 by default). |
+| core rate | `clockHz × clockFactor × η_cfg × e(T)` ops/s (D34: no lanes; a core runs one task thread at a time). `e(T)` is §10.4 (1 before Rack). `clockFactor` is §9.3's product of DVFS, turbo, thermal throttle and power-cap factors (1 by default). |
 | `η_cfg` | `socketFactor(sockets) × dimmFactor(RAM modules)` (program D7.5). `socketFactor` 1, 2, 3, 4 CPUs → 1.00, 0.92, 0.85, 0.78 **(s)**. `dimmFactor` 0–2 modules → 1.00, 3 → 0.95, 4 → 0.90 **(s)**; an `accelerator` board has `dimmFactor = 1` up to 8. The system plate shows `η_cfg`. |
 | `K` (concurrency) | scheduler `K`; 1 with no scheduler |
 | `Q` (queue) | scheduler `Q`; 0 with no scheduler |
@@ -525,7 +525,7 @@ The strategy picks which eligible queued task starts. A task that does not fit i
 **Threads per shard** (D25.3). A starting shard of `u` units wants `want = max(1, floor(u / g))` threads, where `g` is the family grain. This replaces the family's fixed `threads`: a coarse Compute shard runs on one core until it is thousands of units long, while a fine Parallel shard fills every free core.
 
 **Thread assignment** (all strategies except `timeSlice`). A starting shard takes `min(free hardware threads, want)` threads:
-1. one thread on each idle core first, largest lanes first, ties socket then core index;
+1. one thread on each idle core first, ties socket then core index;
 2. then second threads on busy cores (`smt` only).
 
 With `numaAware`, if its threads fit on one socket's free threads, it takes them all from the socket with the most free threads (ties: socket 1).
@@ -731,7 +731,7 @@ reserve(tree):  // atomic: every reservation in the tree, or none
 
 1. **Candidates.** The children of `R` that have room for `e` now. A system has room to take (§6.4), first-link room included. A child router has room if a system below it does or its queue has a free slot (§7.1); minimum-split shares count systems only. Children must be connected by a port. Nothing else is checked: not gates, not load, not speed. For a rack load balancer, children are its systems (storage nodes excluded).
 2. **Filters.** Apply the router's switched-on filters in the order of §8.4. A filter that would remove every candidate is skipped for this decision.
-3. **Count.** `n = max(1, min(|candidates|, floor(u / ĝ), floor(W_u / (r × 1 s))))`, where `W_u = u × Σ perUnit` is the entry's work. `r` is the target's nominal rate: a system's compute rate (lanes × clock × cores, at `e = 1` and factor 1), or its GPU domain's ordinary rate for families with GPU stages. For a child router, `r` is the fastest system rate in its subtree, read from the D24 summaries.
+3. **Count.** `n = max(1, min(|candidates|, floor(u / ĝ), floor(W_u / (r × 1 s))))`, where `W_u = u × Σ perUnit` is the entry's work. `r` is the target's nominal rate: a system's compute rate (clock × cores, at `e = 1` and factor 1), or its GPU domain's ordinary rate for families with GPU stages. For a child router, `r` is the fastest system rate in its subtree, read from the D24 summaries.
    - **Split floor** (D25.11): every shard carries at least 1 s of work at its target's nominal rate. So only tasks that are big for the machine split, and every shard lasts at least 10 ticks.
    - The floor never cuts below the minimum split (§7.8), or below the shards needed to fit the memory hierarchy and VRAM (§6.3).
    - It also never cuts below `nNoDisk = ceil(wsPerUnit × u / ((cache + RAM) / Keff − wsFixed))`, the split that keeps every shard off disk (D25.11 item 2, D26.6), as far as the grain and 256 caps allow. For a child router, cache + RAM and `Keff` are the subtree's smallest, from the same memo as `r`.
@@ -806,7 +806,7 @@ Every strategy works on the candidates that have room now (§7.7), so no strateg
 Definitions for a candidate `c`:
 - `conns(c)`: admitted + reserved shards over the `onMarket`/`asleep` systems in `c`;
 - `free(c)`: free slots (`slots − admitted − reserved`) over its systems, plus its router queue's free slots;
-- `rated(c)`: `Σ` rated compute ops/s of `c`'s systems that have room (lanes × clock, at `e = 1` and factor 1);
+- `rated(c)`: `Σ` rated compute ops/s of `c`'s systems that have room (clock × cores, at `e = 1` and factor 1);
 - `link(c)`: the speed of `c`'s top link (a system's port, a rack's uplinks summed, a zone's uplinks summed);
 - `finish(c, u)`: for a system, `Σ est` of its admitted and reserved shards divided by `Keff`, plus the transfer time of `u` units over the remaining path at current link speeds, plus `est` of `u` units; for an aggregate, the minimum over its systems;
 - `latency(site)`: its backbone link latency (0 for the gateway) plus the entry's payload time over that link.
@@ -861,7 +861,7 @@ Every powered part draws:
 **Watts follow work.** Payout is 1 Credit per op or bit (program D2). Rate parts draw in proportion to their rated rate, and pushing them above their generation's native rate costs more per unit. CPU cores and RAM use the hardware energy ratios in `hardware-progression.md` §3 instead of the generic push exponent:
 
 ```text
-CPU: native = baseLanes[g_core] × clockBase[g_core]; rate = lanes × installedRatedClock
+CPU: native = clockBase[g_core]; rate = installedRatedClock (D34: one thread per core)
 RAM: native = bandwidthBase[g_ram]; rate = native × 1.5^(L - 1)
 push = max(1, rate / native)
 a = -ln(decay[g]) / ln(1.5)
@@ -887,7 +887,7 @@ other parts (clock, caches, package, scheduler, row, frame): idleW = idle[g] × 
 actualW = idleW × idleFactor + loadW × u × loadFactor
 ```
 
-- A core's `rate` is `lanes × clockHz`. Its clock's levels therefore raise the core's watts, not the clock's.
+- A core's `rate` is its socket's `clockHz` (D34). Its clock's levels therefore raise the core's watts, not the clock's.
 - Generic `wPerUnit` (W per unit/s) **(s)**: GPU 0.5; NPU 0.125; drive IO 1; links 0.01 at 1 kHz under the D18.5 rule (A.3), subject to GPU catalog overrides. CPU/RAM use `E` above. A native core's full-use electrical share is 10%, 16.67%, 33.33% or 50% of potential gross by era, before supply loss and cooling (§9.2, §10.5). Pushed levels increase that share. Actual net income depends on completed tasks, utilization and all supporting hardware.
 - Watts are game watts and span W to TW; the HUD uses SI prefixes.
 - `x` is the level factor of the part's curve (§12.1).
@@ -1169,7 +1169,7 @@ Each part type has generations `g = 0, 1, …` and levels `L >= 1`. A generation
 | `flow` | `2^(L−1)` | `1 … 11 + g` | `base[g] × x` |
 | CPU `clock` | `1.5^(L−1)` | `1 … 36` for every generation | `clockBase[g] × x` Hz |
 | RAM | capacity ladder below; bandwidth `1.5^(L−1)` | `1 … 36` for every generation, including ECC/registered | capacity base × ladder × registered factor; bandwidth base × bandwidth factor |
-| `core` | `L` | `1 … 8 + 2g`, and `base[g] × L <= lanesPerCore` | `base[g] × L` lanes |
+| `core` | — | none (D34: a core has no levels; the clock is the speed upgrade, more cores the parallel one) | one thread |
 | `linear` | `L` | `1 … 8 + g` | `base[g] × L` |
 | `fixed` | 1 | 1 | — |
 
@@ -1184,7 +1184,6 @@ Ceilings come from research (Appendix C). Starting values:
 | Ceiling | Start | Limits |
 |---|---|---|
 | `coreSites` | 1 | cores per CPU; at most 32 (program D7.2) |
-| `lanesPerCore` | 1 | core level (§12.1) |
 | `threadsPerCore` | 1 | hardware threads per core |
 | `cpuSockets` | 1 | CPUs per system: 2 (`dualSocket`), then 4 (`quadSocket`) (program D7.3); an `accelerator` board allows at most 2 |
 | `ramSlots` | 1 | RAM modules on a `general` board, at most 4; an `accelerator` board has 8 |
@@ -1209,7 +1208,7 @@ clock or RAM upgrade  = ceil(upgrade[g] × 1.7^(L−1) × drive)
 ```
 
 - `x(L)^1.2` makes each generic flow level cost about 2.3× the last (program D5.6). Clock/RAM instead use 1.7× step prices against 1.5× throughput and declining efficiency, per the later CPU/RAM ruling. Their starting per-generation bases remain in A.1 pending campaign calibration.
-- `drive` is the number of lanes on the CPU for a clock (an oscillator retunes every lane it drives), and 1 for every other part. CPU parts are then × CPU count (§12.3 Special prices).
+- `drive` is the number of cores on the CPU for a clock (an oscillator retunes every core it drives, D34), and 1 for every other part. CPU parts are then × CPU count (§12.3 Special prices).
 
 - `price[g]` and `upgrade[g]` are per-generation values (Appendix A), calibrated to `scripts/market-model.ts`: a generation's L1→L2 upgrade costs about a quarter of the model's level bundle in that era (3 s of a boot chip's output; 15 s of a kHz system's; 90 s of an MHz system's; 240 s of a GHz system's), and installs track the model's rung costs.
 - `ceil` rounds up to a whole Credit, in exact decimal arithmetic. All prices are whole Credits (program D2).
@@ -1229,7 +1228,7 @@ Special prices:
 
 - **Upgrade** keeps the generation and adds one level. It is hot.
 - **Replace** installs the newest researched generation at level 1. It is cold (§4.5). The plate also offers a **capacity-preserving replace**: the lowest native level whose primary capacity is at least the current one, priced as install plus every intervening upgrade.
-- **Replace CPU** on the System board replaces, in one cold change, every package, core, clock and cache of the system with the newest researched CPU generation: cores and caches at the lowest level that preserves their capacity (lanes, bits), the clock at L1. Its price is the sum.
+- **Replace CPU** on the System board replaces, in one cold change, every package, core, clock and cache of the system with the newest researched CPU generation: cores carried over one for one and caches at the lowest level that preserves their bits, the clock at L1. Its price is the sum, with each core at the new generation's core price (D34: no extra-core surcharge on a replace).
 - CPU and RAM quotes preview throughput, full-use electrical draw and normalized energy ratio. RAM replacement preserves capacity bits and shows bandwidth separately. Payback uses the change in net income at the same workload and tariff. If that change is non-positive, show **No payback at this load**. If the part's operating cost exceeds its output, separately show **Costs more to run than it produces**. Neither warning disables an upgrade. Fab research must be affordable on a profitable prior-era fleet before loss-making overclocks are needed. See `hardware-progression.md` §§5–6.
 - A replacement that cannot hold what the part holds is not offered at that level; the plate names the shortfall.
 - Within a generation, capacity grows as `x` while load watts grow as `x^1.3` (§9.1), so energy per unit of work rises as you push old parts. A native generation starts back at `push = 1` and opens a higher level ceiling. Replace wins over a horizon; upgrade wins short.
@@ -1455,7 +1454,7 @@ The core tray offers only physical `Add core`. Selecting a core shows facts and 
 
 | Level | Data per element |
 |---|---|
-| CPU | Exactly four parts (program D7.1): clock, cache (one block, total bits; L1, L2, L3 on its plate), scheduler, cores. Per core: lanes, busy fraction this tick, the shard on each thread (task ID, shard index, family, progress fraction, and how many threads that shard holds, so cores running one shard draw as one group), research share, C-state. Effective clock. Cache bits used / capacity per level, and the running shards' bits that spilled past cache (D26.7). Scheduler: queue entries, reserved count, running count, `K`, `Q`, strategy. Empty core sites up to `coreSites`. The inbound pipe (D10.4) is the incoming connector, not a fifth part: its speed, the task in transfer with bits sent / total, and whether the core is waiting on it. Tapping it opens the port plate (§16.3): before Rack the fixed 1 kHz and "Upgrade at the Rack switch"; from Rack on, the next step as "x → x". |
+| CPU | Exactly four parts (program D7.1): clock, cache (one block, total bits; L1, L2, L3 on its plate), scheduler, cores. Per core: busy fraction this tick, the shard on each thread (task ID, shard index, family, progress fraction, and how many threads that shard holds, so cores running one shard draw as one group), research share, C-state. Effective clock. Cache bits used / capacity per level, and the running shards' bits that spilled past cache (D26.7). Scheduler: queue entries, reserved count, running count, `K`, `Q`, strategy. Empty core sites up to `coreSites`. The inbound pipe (D10.4) is the incoming connector, not a fifth part: its speed, the task in transfer with bits sent / total, and whether the core is waiting on it. Tapping it opens the port plate (§16.3): before Rack the fixed 1 kHz and "Upgrade at the Rack switch"; from Rack on, the next step as "x → x". |
 | System | Board type, CPU count, `η_cfg`. The memory tiers filling (D26.7): cache, RAM and disk capacity, used bits, spilled bits (bits that didn't fit a faster tier) and rate. The shard arriving on the system's port and each running shard (task ID, shard index of count, units, threads held, GPU domain), so a shard is drawn splitting between the CPU and the GPU card. PSU usage, `tOver`, loss W. RAM used / capacity and bandwidth use per module. Per-card GPU/NPU duty, VRAM holds and assigned tasks; GPU model ID, upgrades, cores, clock and effective rate. Drive IO use and holds. Mode. |
 | Rack | Power control (under the cooler): battery charge, battery time at current draw, awake count of total, next wake. Per server slot: mode, busy fraction, admitted and reserved shard counts. Every shard transfer on the uplinks and ports (task ID, shard index of count, target slot, bits sent of total), so a task is drawn arriving on the uplink and fanning out to the servers. LB queue entries.
  Per port and uplink: busy flag and speed. Load balancer routes per second. Cooler `T` and duty. PDU usage and `tOver`. `tHot`. |

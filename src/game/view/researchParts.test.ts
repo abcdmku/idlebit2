@@ -20,11 +20,10 @@ describe('research roots and tabs (concept C)', () => {
   });
 
   it.each([
-    ['outOfOrder', 'clock', 'cpu'], ['simd', 'clock', 'cpu'], ['wideVector', 'clock', 'cpu'], ['smt', 'cores', 'cpu'],
+    ['smt', 'cores', 'cpu'],
     ['stacked3d', 'cache', 'cpu'], ['mlfq', 'queue', 'cpu'], ['ddr5', 'ram', 'system'], ['gpuGen9', 'gpu', 'system'],
     ['closedLoop2', 'roomCooling', 'room'], ['bbSubsea', 'backbone', 'global'],
-    ['branchPredict', 'clock', 'cpu'], ['fma', 'clock', 'cpu'], ['dualVector', 'clock', 'cpu'], ['matrixTiles', 'clock', 'cpu'],
-    ['ringBus', 'cores', 'cpu'], ['meshCores', 'cores', 'cpu'], ['l3Slices', 'cache', 'cpu'], ['edramL3', 'cache', 'cpu'],
+    ['l3Slices', 'cache', 'cpu'], ['edramL3', 'cache', 'cpu'],
     ['fabKhz', 'fab', 'cpu'], ['fabMhz', 'fab', 'cpu'], ['fabGhz', 'fab', 'cpu'], ['rack', 'structure', 'rack'], ['dataCenter', 'structure', 'global'],
   ] as const)('%s grows from %s on the %s tab, whatever era it unlocks in', (id, part, tab) => {
     expect(byId.get(id)).toMatchObject({ part, tab });

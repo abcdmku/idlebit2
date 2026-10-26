@@ -31,7 +31,7 @@ const GEN: Readonly<Record<string, ResearchPartId>> = {
 };
 /** Ceilings: the part whose slots or levels they raise. */
 const CEILING: Readonly<Record<string, ResearchPartId>> = {
-  lanesPerCore: 'clock', coreSites: 'cores', threadsPerCore: 'cores', cpuSockets: 'cpu',
+  coreSites: 'cores', threadsPerCore: 'cores', cpuSockets: 'cpu',
   l3LevelBonus: 'cache', ramSlots: 'ram', ramLevelBonus: 'ram', gpuSlots: 'gpu', driveSlots: 'drive',
   rackPorts: 'switch', roomPorts: 'netRack', uplinks: 'switch', researchQueue: 'board',
   roomRows: 'structure', siteZones: 'structure', sites: 'structure',

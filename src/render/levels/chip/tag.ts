@@ -4,6 +4,7 @@
 import type { ChipSnapshot } from '../../../game';
 import { PHONE_TYPE, typeForScale } from '../../core';
 import type { Rect, WorldFrame } from '../../core';
+import { gridCells } from './layout';
 import type { Floor } from './layout';
 import { spanFits, speedRange, textWidth, tileShowsSpeed } from './speed';
 
@@ -41,7 +42,7 @@ export function emptySpan(sites: readonly Rect[], installed: number): Rect | nul
 
 /**
  * The tag goes on the widest run of empty sites in one grid row, off every installed core; a full
- * grid has no free spot, so it sits over the first row only when it must carry the speed. The speed
+ * grid (32 cores) has no free spot and no tag. The speed
  * (the user: cores always show their Hz) goes on a second line when the run is too short for one. When the run ends in locked
  * sites (from `lockedFrom`), its far end stays free for the lock mark. Null on a full grid whose
  * tiles show their own speed, or on the two big sites (no tag).
@@ -50,12 +51,17 @@ export function coreTag(chip: ChipSnapshot, sites: readonly Rect[], lockedFrom: 
   if (sites.length <= 2) return null;
   let hidden = false;
   for (let i = 0; i < Math.min(sites.length, chip.cores.length); i++) if (!tileShowsSpeed(chip.cores[i]!, sites[i]!, frame)) hidden = true;
-  const free = emptySpan(sites, chip.cores.length);
-  const box = free ?? (hidden ? f.cores : null);
-  if (!box) return null;
-  const room = free && spanLast >= lockedFrom ? LOCK_ROOM : 0;
-  fit.x = box.x; fit.y = box.y; fit.w = box.w - room; fit.h = box.h;
+  // the span may run on past the add site into the grid's bare cells (D34)
   const n = chip.cores.length, base = `Cores ${n} / ${n} busy`;
+  let free = emptySpan(gridCells(f, sites.length), n);
+  // A run too short for the count is no spot: the tag then goes only where it must carry the speed.
+  if (free) { fit.x = free.x; fit.y = free.y; fit.w = free.w; fit.h = free.h; if (!spanFits(base, fit, frame)) free = null; }
+  // No free run (a full grid, 32 cores): no tag. It never covers a core; every core runs at the
+  // Clock's speed (no lanes, D34), and each tile shows its own state.
+  const box = free;
+  if (!box) return null;
+  const room = free && lockedFrom < sites.length && spanLast >= lockedFrom ? LOCK_ROOM : 0;
+  fit.x = box.x; fit.y = box.y; fit.w = box.w - room; fit.h = box.h;
   const speed = hidden && n > 0, one = `${base} · ${speedRange(chip)}`;
   const split = speed && !spanFits(one, fit, frame);
   const scale = frame.scale ?? (frame.form === 'phone' ? 2 : 3), t = frame.form === 'phone' ? PHONE_TYPE : typeForScale(scale);

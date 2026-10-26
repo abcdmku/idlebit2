@@ -43,7 +43,9 @@ describe('deck quote contracts R42/R43', () => {
       offer(effect('Hz', 1000, 2000)), offer(effect('slots', 2, 4))];
     tray[0] = { ...tray[0]!, locked: { code: 'research', node: null, text: 'Needs Dual core' } };
     const rows = buildOffers('chip', tray, null).rows;
-    expect(rows.slice(0, 4).map(r => r.change)).toEqual(['3 → 4 slots', '8 → 16 b', '1 → 2 kHz', '2 → 4 slots']);
+    // D34: the Cores row counts cores, and says nothing more than its research while locked
+    expect(rows.slice(0, 4).map(r => r.change)).toEqual(['', '8 → 16 b', '1 → 2 kHz', '2 → 4 slots']);
+    expect(buildOffers('chip', [offer(effect('slots', 3, 4)), ...tray.slice(1)], null).rows[0]!.change).toBe('3 → 4');
     expect(rows[0].price).toBeNull();
     expect(rows[0].lock).toBe('Needs Dual core');
     expect(rows[1].quote).toBe(tray[1]);
@@ -55,6 +57,7 @@ describe('deck quote contracts R42/R43', () => {
     const rows = buildOffers(at.level, tray, null).rows;
     for (const [i, q] of tray.slice(0, 3).entries()) {
       expect(q.effect).not.toBeNull();
+      if (i === 0) continue; // the Cores row counts cores (D34)
       expect(rows[i]!.change).toBe(changeText(q.effect!));
     }
     // The absent, research-locked scheduler has no preview yet.

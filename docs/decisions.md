@@ -1300,6 +1300,19 @@ The user's words:
 3. **Report.** `RoundReport.endedBy` is `'stall'`; the report reads "Stalled · nothing completed for 2 min".
 4. **Tests.** `market/endRound.test.ts`: the round ends at exactly 120 s without a met task, not a tick sooner. `SAVE_VERSION` 14.
 
+**D34, 25 Oct: one Multi-core research, cores priced by count, and no lanes (user).** Binding.
+
+> multi core should only need one research not multiple research. it doesnt have a good feel after you do the research to find out you need another research to unlock it, then another to keep upgrading cores. cores should just get more expensive as you add them.
+
+> I dont like the concept of lanes thats what cores are for
+
+1. **One node.** `dualCore`, renamed **Multi-core** (same tier and price), opens all 32 core sites per CPU. `quadCore`, `octaCore`, `cores16`, `chiplets`, `ringBus` and `meshCores` are gone. Dependents were re-linked: `workStealing` and `dualSocket` need `dualCore`; `smt` needs `fabKhz`; `stacked3d` needs `fabGhz`.
+2. **Cores cost more as you add them.** The add-core price is the generation's core price × `EXTRA_CORE_GROWTH^(n−1)` for the n-th core, now **2.2** (was 1.65). Nothing but the price paces core count. Replace CPU moves cores to the new generation at its plain core price each (the growth surcharge was paid when they were added).
+3. **No lanes.** A core runs one task thread at its socket's clock: core rate = `clockHz × clockFactor × η_cfg × e(T)`. `pipelining`, `superscalar`, `outOfOrder`, `simd`, `wideVector`, `branchPredict`, `fma`, `dualVector` and `matrixTiles` are gone; `fabKhz` now needs only `systemBoard`, and `l2Cache` is a root. The `lanesPerCore` ceiling is gone. A core has no levels or upgrade of its own: the clock is the speed upgrade, more cores the parallel one. Clock upgrades are priced × the cores they drive (was × lanes).
+4. **No hidden gate.** After Multi-core, adding a core needs no other research.
+5. **Views.** `CoreView.lanes` is removed; the CPU part heading reads "4 cores"; the research change label "Lanes per core" is gone. The chip tray no longer quotes per-core upgrades.
+6. **Quick balance (time-boxed, seed 42):** the Hz clock's upgrade base is 8 (was 3). D20 passive round 1 unchanged (0:36 / 0:55 / 1:16); System 0:22; Rack 6:56. Tree: 165 nodes. `SAVE_VERSION` 15.
+
 ## 16. Shared rules for agents
 
 - **Shared checkout.** Other agents work in the same checkout at the same time. Edit only the files your brief gives you. Never revert someone else's edits. Run no git command that changes state.

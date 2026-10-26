@@ -561,7 +561,7 @@ function milestonePath(tree: ReturnType<typeof selectResearchTree>): { path: Set
 }
 
 /** Off-path research that unblocks income; a sensible player takes it as soon as the budget allows. */
-const ESSENTIAL = ['fifoSched', 'dualCore', 'memController', 'psu80', 'gpuGen1', 'storageCtl', 'octaCore', 'outOfOrder', 'lbCapability', 'portExpansion', 'sw100k', 'gddr6', 'gpuGen2', 'densePorts', 'meteredPdu'];
+const ESSENTIAL = ['fifoSched', 'dualCore', 'memController', 'psu80', 'gpuGen1', 'storageCtl', 'lbCapability', 'portExpansion', 'sw100k', 'gddr6', 'gpuGen2', 'densePorts', 'meteredPdu'];
 /** Off-path research since the last milestone started may spend this share of the next milestone path's Data. */
 const OFF_PATH_SHARE = 0.5;
 

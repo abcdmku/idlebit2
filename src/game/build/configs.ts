@@ -8,7 +8,7 @@ import { ECC_PRICE_FACTOR, LADDERS, PARTS, networkStepsBetween, scalePrice, upgr
 import { rackConfig, rackLock, roomConfig, siteConfig, systemConfig, systemLock } from './configModel';
 import { withSpec } from './partAccess';
 import { coldScopes, fail, locked, planned, type Plan } from './plan';
-import { cpuLanes, cpuPrice, partFromNothing } from './pricing';
+import { cpuCores, cpuPrice, partFromNothing } from './pricing';
 import { ruleLock, genLock } from './locks';
 import { findSaved } from './units';
 import { mergeAccels } from './configAccels';
@@ -54,15 +54,15 @@ interface Merge { price: bigint; cold: boolean }
  * One part: same generation → upgrade to the configured level, paying the missing levels (hot), or
  * keep a higher level; another generation or missing → install (cold); present but unconfigured → remove (cold).
  */
-function mergePart<T extends PartLevel>(row: CatalogRow, have: T | null | undefined, want: T | null | undefined, m: Merge, factor = 1, lanes = 1): T | null {
+function mergePart<T extends PartLevel>(row: CatalogRow, have: T | null | undefined, want: T | null | undefined, m: Merge, factor = 1, driven = 1): T | null {
   if (!want) { if (have) m.cold = true; return null; }
   if (have && have.gen === want.gen) {
     if (have.level >= want.level) return have.level === want.level ? want : have;
-    m.price += scalePrice(upgradesBetween(row, have.gen, have.level, want.level, lanes), factor);
+    m.price += scalePrice(upgradesBetween(row, have.gen, have.level, want.level, driven), factor);
     return want;
   }
   m.cold = true;
-  m.price += scalePrice(partFromNothing(row, want, 0, 1, lanes), factor);
+  m.price += scalePrice(partFromNothing(row, want, 0, 1, driven), factor);
   return want;
 }
 const mergeList = <T extends PartLevel>(row: (t: T) => CatalogRow, have: readonly T[], want: readonly T[], m: Merge, factor: (t: T) => number = () => 1): T[] => {
@@ -86,7 +86,7 @@ export function mergeSpec(have: SystemSpec, want: SystemSpec): { spec: SystemSpe
     if (c && have.cpuCount > 0) {
       cpu = {
         cpu: mergePart(PARTS.cpu, c.cpu, want.cpu.cpu, per)!, cores: mergeList(() => PARTS.core, c.cores, want.cpu.cores, per),
-        clock: mergePart(PARTS.clock, c.clock, want.cpu.clock, per, 1, cpuLanes(want.cpu))!, l1: mergePart(PARTS.l1, c.l1, want.cpu.l1, per)!,
+        clock: mergePart(PARTS.clock, c.clock, want.cpu.clock, per, 1, cpuCores(want.cpu))!, l1: mergePart(PARTS.l1, c.l1, want.cpu.l1, per)!,
         l2: mergePart(PARTS.l2, c.l2, want.cpu.l2, per), l3: mergePart(PARTS.l3, c.l3, want.cpu.l3, per),
       };
       m.price += per.price * BigInt(Math.min(have.cpuCount, want.cpuCount));

@@ -89,10 +89,10 @@ const tree = (phase: 'running' | 'between') => ({
 });
 const supplyPdu = { ...LEVEL_FIXTURES.rack.pdu, level: 2, capacityW: 4096, deliveredW: 4710, usage: 1.15, overloadS: 6.2, lossW: 520, loss: 0.11 };
 const scenes: Record<string, { level: LevelId; plate: ReactNode }> = {
-  part: { level: 'system', plate: <PartPlate {...common} title="Clock" sub="1 kHz" level={2} pips={[2, 4]} status="Drives every lane on the die" lines={[]}
+  part: { level: 'system', plate: <PartPlate {...common} title="Clock" sub="1 kHz" level={2} pips={[2, 4]} status="Sets the speed of every core" lines={[]}
     quotes={R([q({ type: 'upgradePart', part: clockPart }, 360, { effect: eff(1000, 2000, 'ops/s', 250) }),
       q({ type: 'replacePart', part: clockPart, generation: 1, preserveCapacity: true }, 2_400, { label: 'kHz clock', cold: true, downtimeMs: 10_000, effect: eff(1000, 16_000, 'ops/s', 7_500, 2, 6) })])} /> },
-  'part-locked': { level: 'system', plate: <PartPlate {...common} title="Clock" sub="1 kHz" level={4} pips={[4, 4]} status="Drives every lane on the die"
+  'part-locked': { level: 'system', plate: <PartPlate {...common} title="Clock" sub="1 kHz" level={4} pips={[4, 4]} status="Sets the speed of every core"
     quotes={R([q({ type: 'replacePart', part: clockPart, generation: 1, preserveCapacity: true }, 2_400, { label: 'kHz clock', cold: true, downtimeMs: 10_000, locked: lockR('fabKhz', 'Needs kHz fab research') })])} /> },
   psu: { level: 'system', plate: <SupplyPlate {...common} supply={{ ...LEVEL_FIXTURES.system.psu, capacityW: 64, deliveredW: 5.5, usage: 0.086, lossW: 1.65 }} maxLevel={4}
     quotes={R([q({ type: 'upgradePart', part: { unit: { kind: 'system', id: sys }, slot: { kind: 'psu' } } }, 180, { effect: eff(64, 128, 'W', null) })])} /> },

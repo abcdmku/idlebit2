@@ -217,32 +217,17 @@ Columns: id, short name, prerequisites, the zoom level where it first matters, e
 
 | id | Name | Requires | Level | Era / tier | Effect | Short | Answers |
 |---|---|---|---|---|---|---|---|
-| `pipelining` | Pipelining | | CPU | Hz W3 | Lane ceiling per core 1→2. The Core plate can now buy lane levels. | Cores run 2 ops a cycle | `bits`, `pickup` |
-| `superscalar` | Superscalar | pipelining | CPU | Hz W4 | Lane ceiling 2→4. | Cores run 4 ops a cycle | `ints` |
-| `outOfOrder` | Out-of-order | superscalar, fabKhz | CPU | kHz W7 | Lane ceiling 4→8. | Cores run 8 ops a cycle | `ints`, `threads` |
-| `simd` | SIMD | outOfOrder, fabMhz | CPU | MHz W10 | Lane ceiling to 16. | Cores run 16 ops a cycle | `threads`, `rackDist` |
-| `wideVector` | Wide vectors | simd, fabGhz | CPU | GHz W12 | Lane ceiling to 32. | Cores run 32 ops a cycle | `roomDist` member specs |
-| `branchPredict` | Branch prediction | outOfOrder, rack | CPU | kHz W8 | Lane ceiling 8→12: a kHz core (2 base lanes) reaches L6 of its 10 levels. Lanes past native push the core's energy ratio down (`hardware-progression.md` §3). | Cores run 12 ops a cycle | `threads`, `pickup` |
-| `fma` | Fused multiply-add | simd, room | CPU | MHz W11 | Lane ceiling 16→24: an MHz core (4 base lanes) reaches L6 of 12. | Cores run 24 ops a cycle | `rackDist`, `roomDist` |
-| `dualVector` | Dual vector units | wideVector, dataCenter | CPU | GHz W13 | Lane ceiling 32→64: a GHz core (8 base lanes) reaches L8 of 14 and an MHz core its L12 top. | Cores run 64 ops a cycle | `multiAz`, `density` |
-| `matrixTiles` | Matrix tiles | dualVector, regions | CPU | GHz W14 | Lane ceiling 64→112: a GHz core reaches its L14 top (8 × 14 lanes). From here every core generation is limited only by its catalog range (spec §12.1, `8 + 2g`). | Cores run 112 ops a cycle | `region`, `density` |
-| `dualCore` | Dual core | fifoSched | CPU | Hz W3 | Core sites 1→2. The Core tray item is enabled. | Up to 2 cores per CPU | `pickup`, `bits` |
-| `quadCore` | Quad core | dualCore, l2Cache | CPU | Hz W4 | Core sites 2→4. | Up to 4 cores per CPU | `threads` |
-| `octaCore` | 8 cores | quadCore, fabKhz | CPU | kHz W7 | Core sites 4→8. | Up to 8 cores per CPU | `threads`, `density` |
-| `cores16` | 16 cores | octaCore, fabMhz | CPU | MHz W10 | Core sites to 16. | Up to 16 cores per CPU | `rackDist`, `density` |
-| `chiplets` | Chiplets | cores16, fabGhz | CPU | GHz W12 | Core sites to 32, the cap per CPU (D7.2). | Up to 32 cores per CPU | `roomDist`, `density` |
-| `stacked3d` | Stacked cache | chiplets, dataCenter | CPU | GHz W13 | Cores stay capped at 32 (D7.2), so this is cache. L3 gen 4 (stacked SRAM): 8× L3 capacity per level at gen 3's watts, so big per-member working sets fit in cache. | Stacked L3: 8× cache per level | `region` member specs, `density` |
-| `ringBus` | Ring bus | octaCore, rack | CPU | kHz W8 | Core sites 8→12. | Up to 12 cores per CPU | `threads`, `density` |
-| `meshCores` | Mesh interconnect | cores16, room | CPU | MHz W11 | Core sites 16→24; `chiplets` takes them to the 32 cap. | Up to 24 cores per CPU | `roomDist`, `density` |
+| `dualCore` | Multi-core | fifoSched | CPU | Hz W3 | Core sites 1→32, the cap per CPU (D7.2, D34). The Core tray item is enabled; each added core costs more than the last. | Add cores to any CPU | `pickup`, `bits` |
+| `stacked3d` | Stacked cache | fabGhz, dataCenter | CPU | GHz W13 | Cores stay capped at 32 (D7.2), so this is cache. L3 gen 4 (stacked SRAM): 8× L3 capacity per level at gen 3's watts, so big per-member working sets fit in cache. | Stacked L3: 8× cache per level | `region` member specs, `density` |
 | `l3Slices` | L3 slices | l3Cache, fabMhz | CPU | MHz W10 | `l3LevelBonus` 0→1: every L3 generation gets one level past its `11 + g` top, 2× the top capacity, on the usual flow price and watt curves. | L3 cache gets 1 more level | `ram`, `rackDist` |
 | `edramL3` | eDRAM L3 | l3Slices, fabGhz | CPU | GHz W12 | `l3LevelBonus` 1→2: two levels past the `11 + g` top, 4× the normal top capacity. | L3 cache gets 2 more levels | `ram`, `roomDist` |
-| `fabKhz` | kHz fab | systemBoard, pipelining | System | kHz W4 | Gen 1 of core (2 base lanes), clock (1 kHz base), L1, L2, L3, scheduler and CPU package. Opens Barebones kHz. | Opens kHz chips and Barebones kHz | all bands, `energy` |
+| `fabKhz` | kHz fab | systemBoard | System | kHz W4 | Gen 1 of core (2 base lanes), clock (1 kHz base), L1, L2, L3, scheduler and CPU package. Opens Barebones kHz. | Opens kHz chips and Barebones kHz | all bands, `energy` |
 | `fabMhz` | MHz fab | fabKhz, rack | Rack | MHz W9 | Gen 2 of every chip part. Opens Barebones MHz. | Opens MHz chips and Barebones MHz | all bands, `energy` |
 | `fabGhz` | GHz fab | fabMhz, room | Room | GHz W11 | Gen 3 of every chip part. Opens Barebones GHz. | Opens GHz chips and Barebones GHz | all bands, `energy` |
-| `l2Cache` | L2 cache | pipelining | CPU | Hz W3 | New chip part L2, shared by all cores. Capacity 8× an L1 of the same level, for 2× the watts. Adds to the cache tier (D26): bits that fit cache cost no memory time, so bigger cache speeds RAM-heavy work and delays spill. | Adds shared L2 cache, 8× L1 size | `ints`, `gate` |
+| `l2Cache` | L2 cache | — | CPU | Hz W3 | New chip part L2, shared by all cores. Capacity 8× an L1 of the same level, for 2× the watts. Adds to the cache tier (D26): bits that fit cache cost no memory time, so bigger cache speeds RAM-heavy work and delays spill. | Adds shared L2 cache, 8× L1 size | `ints`, `gate` |
 | `l3Cache` | L3 cache | l2Cache, systemBoard | System | Hz W5 | New chip part L3, shared. Capacity 64× an L1 of the same level, for 6× the watts. | Adds shared L3 cache, 64× L1 size | `ints`, `ram` before RAM |
-| `smt` | SMT | timeSlice, octaCore | CPU | kHz W7 | Each core holds 2 running tasks. Scheduler K may reach 2× cores, still at most 32. Two tasks on one core each run at 0.6× the core's rate (1.2× combined). | Each core runs 2 tasks at once | `pickup` |
-| `dualSocket` | Dual socket | octaCore, rack | System | kHz W8 | CPU sockets 1→2. Every CPU in a system is identical: CPU 2 copies CPU 1's generation and levels, and an upgrade applies to all, priced × CPU count. All cores pool under one scheduler (D7.3). Socket factor 0.92 in `η_cfg` (D7.5). A task whose threads span sockets runs its RAM stream stages at 0.5× bandwidth. | Up to 2 CPUs per system | `density`, `threads` |
+| `smt` | SMT | timeSlice, fabKhz | CPU | kHz W7 | Each core holds 2 running tasks. Scheduler K may reach 2× cores, still at most 32. Two tasks on one core each run at 0.6× the core's rate (1.2× combined). | Each core runs 2 tasks at once | `pickup` |
+| `dualSocket` | Dual socket | dualCore, rack | System | kHz W8 | CPU sockets 1→2. Every CPU in a system is identical: CPU 2 copies CPU 1's generation and levels, and an upgrade applies to all, priced × CPU count. All cores pool under one scheduler (D7.3). Socket factor 0.92 in `η_cfg` (D7.5). A task whose threads span sockets runs its RAM stream stages at 0.5× bandwidth. | Up to 2 CPUs per system | `density`, `threads` |
 | `quadSocket` | 4 sockets | dualSocket | System | kHz W9 | CPU sockets 2→4 (3 and 4). Socket factors 0.85 and 0.78. Denser per rack slot and switch port, less efficient than several small boxes. | Up to 4 CPUs per system | `density`, `rackDist` member specs |
 | `dma` | DMA engine | memController | System | Hz W5 | While a shard is in the RAM or disk part of a memory stage (D26), its core is free for another shard. The shard keeps its scheduler K slot. | Cores free up during RAM and disk. | `ram`, `storage` |
 | `prefetch` | Prefetcher | dma, l3Cache | System | kHz W6 | The shard at the front of the system queue is placed in the memory hierarchy early, and its first RAM part runs with RAM bandwidth no running shard is using (D26). | Queued shards preload from RAM | `ram` |
@@ -317,7 +302,7 @@ System scope (the scheduler chip part):
 | `timeSlice` | Time slicing | fifoSched | CPU | Hz W2 | Strategy time slicing: admits up to 2× K tasks; running tasks share cores in 100 ms slices, so n tasks on c cores each progress at c/n. Pickup stays fast; completion slows. | Scheduler: time slicing, 2× tasks | `pickup` |
 | `priorityQ` | Priority | sjf | CPU | Hz W3 | Strategy priority: highest payout per unit work first. Trades task count for Credits. | Scheduler: best pay first | `energy`, late-round earnings |
 | `mlfq` | Aging (MLFQ) | sjf, timeSlice | CPU | Hz W3 | Strategy MLFQ: SJF, but a queued task that has waited 3 s or more starts first. No queued task starves. | Scheduler: SJF that never starves | `pickup` |
-| `workStealing` | Work stealing | quadCore | CPU | Hz W4 | Rule (D25.3): an idle thread joins a running shard that holds fewer threads than `floor(units / grain)`, mid-shard. | Idle cores join running shards | `threads` |
+| `workStealing` | Work stealing | dualCore | CPU | Hz W4 | Rule (D25.3): an idle thread joins a running shard that holds fewer threads than `floor(units / grain)`, mid-shard. | Idle cores join running shards | `threads` |
 | `numaAware` | NUMA-aware | dualSocket | System | kHz W8 | Rule: a task stays on one socket when its threads fit there; it spans sockets only when they don't. | Tasks stay on one socket if they fit | `ram`, `rackDist` |
 
 Network scopes (rack load balancer, then room, site and backbone):
@@ -509,7 +494,7 @@ Sources: `content/research.ts` (legacy research), `content/dispatcherJobs.ts` (d
 | Cache Mapping | Adapted | Cache exists from the start; the next cache step is `l2Cache`, then `l3Cache`. |
 | Cache / Cache Speed upgrades | Adapted | Cache levels stay ungated. Cache speed dropped: v3 cache is a capacity gate. |
 | Benchmark Harness, benchmark compute tasks | Dropped | Payback inspection is UI work, and benchmark tasks don't exist in v3. |
-| Multi-Core Control, Add Core | Adopted | `dualCore`, `quadCore`, `octaCore`, `ringBus`, `cores16`, `meshCores`, `chiplets` (32-core cap, D7.2). |
+| Multi-Core Control, Add Core | Adopted | `dualCore` ("Multi-core"): one node opens all 32 core sites (D34); the add-core price curve paces core count. |
 | Local Scheduler, CPU Queue Slot | Adopted | `fifoSched`; queue slots become scheduler Q levels. |
 | System Scheduler, System Queue Slot, scheduler SKUs (2/4/6/12/24 slot) | Adapted | Scheduler levels (Q, K) and scheduler generations through the fab nodes. |
 | Scheduler Watchdog, Deadlock Cooldown | Dropped | v3 has no deadlock; misroutes fail at once. The safety-net idea lives on in `powerCap` and `thermalThrottle`. |
@@ -622,7 +607,7 @@ export type PartId =
   | "powerCtl" | "roomStart" | "globalStart" | "generation";
 
 export type CeilingId =
-  | "coreSites" | "lanesPerCore" | "threadsPerCore" | "cpuSockets"
+  | "coreSites" | "threadsPerCore" | "cpuSockets"
   | "ramSlots" | "gpuSlots" | "driveSlots"
   | "rackPorts" | "roomPorts" | "uplinks" | "researchQueue"
   | "roomRows" | "siteZones" | "sites";
@@ -694,32 +679,17 @@ const n = (
 
 export const RESEARCH_V3: readonly ResearchNode[] = [
   // Compute
-  n("pipelining", "Pipelining", "compute", [], "cpu", "hz", 3, 2_500, [cap("lanesPerCore", 2)], ["bits", "pickup"]),
-  n("superscalar", "Superscalar", "compute", ["pipelining"], "cpu", "hz", 6, 50_000, [cap("lanesPerCore", 4)], ["ints"]),
-  n("outOfOrder", "Out-of-order", "compute", ["superscalar", "fabKhz"], "cpu", "khz", 7, 1_000_000, [cap("lanesPerCore", 8)], ["ints", "threads"]),
-  n("simd", "SIMD", "compute", ["outOfOrder", "fabMhz"], "cpu", "mhz", 10, 4e7, [cap("lanesPerCore", 16)], ["threads", "rackDist"]),
-  n("wideVector", "Wide vectors", "compute", ["simd", "fabGhz"], "cpu", "ghz", 12, 2e8, [cap("lanesPerCore", 32)], ["roomDist"]),
-  n("branchPredict", "Branch prediction", "compute", ["outOfOrder", "rack"], "cpu", "khz", 8, 2.7e6, [cap("lanesPerCore", 12)], ["threads", "pickup"]),
-  n("fma", "Fused multiply-add", "compute", ["simd", "room"], "cpu", "mhz", 11, 6e7, [cap("lanesPerCore", 24)], ["rackDist", "roomDist"]),
-  n("dualVector", "Dual vector units", "compute", ["wideVector", "dataCenter"], "cpu", "ghz", 13, 4e8, [cap("lanesPerCore", 64)], ["multiAz", "density"]),
-  n("matrixTiles", "Matrix tiles", "compute", ["dualVector", "regions"], "cpu", "ghz", 14, 3e9, [cap("lanesPerCore", 112)], ["region", "density"]),
-  n("dualCore", "Dual core", "compute", ["fifoSched"], "cpu", "hz", 3, 2_500, [cap("coreSites", 2)], ["pickup", "bits"]),
-  n("quadCore", "Quad core", "compute", ["dualCore", "l2Cache"], "cpu", "hz", 6, 50_000, [cap("coreSites", 4)], ["threads"]),
-  n("octaCore", "8 cores", "compute", ["quadCore", "fabKhz"], "cpu", "khz", 7, 1_000_000, [cap("coreSites", 8)], ["threads", "density"]),
-  n("cores16", "16 cores", "compute", ["octaCore", "fabMhz"], "cpu", "mhz", 10, 4e7, [cap("coreSites", 16)], ["rackDist", "density"]),
-  n("chiplets", "Chiplets", "compute", ["cores16", "fabGhz"], "cpu", "ghz", 12, 2e8, [cap("coreSites", 32)], ["roomDist", "density"]),
-  n("stacked3d", "Stacked cache", "compute", ["chiplets", "dataCenter"], "cpu", "ghz", 13, 4e8, [gen("l3", 4)], ["region", "density"]),
-  n("ringBus", "Ring bus", "compute", ["octaCore", "rack"], "cpu", "khz", 8, 2.7e6, [cap("coreSites", 12)], ["threads", "density"]),
-  n("meshCores", "Mesh interconnect", "compute", ["cores16", "room"], "cpu", "mhz", 11, 6e7, [cap("coreSites", 24)], ["roomDist", "density"]),
+  n("dualCore", "Multi-core", "compute", ["fifoSched"], "cpu", "hz", 3, 2_500, [cap("coreSites", 32)], ["pickup", "bits", "threads", "density"]),
+  n("stacked3d", "Stacked cache", "compute", ["fabGhz", "dataCenter"], "cpu", "ghz", 13, 4e8, [gen("l3", 4)], ["region", "density"]),
   n("l3Slices", "L3 slices", "compute", ["l3Cache", "fabMhz"], "cpu", "mhz", 10, 4e7, [cap("l3LevelBonus", 1)], ["ram", "rackDist"]),
   n("edramL3", "eDRAM L3", "compute", ["l3Slices", "fabGhz"], "cpu", "ghz", 12, 2e8, [cap("l3LevelBonus", 2)], ["ram", "roomDist"]),
-  n("fabKhz", "kHz fab", "compute", ["systemBoard", "pipelining"], "system", "khz", 4, 27_000, chipGen(1), ["bits", "ints", "threads", "energy"]),
+  n("fabKhz", "kHz fab", "compute", ["systemBoard"], "system", "khz", 4, 27_000, chipGen(1), ["bits", "ints", "threads", "energy"]),
   n("fabMhz", "MHz fab", "compute", ["fabKhz", "rack"], "rack", "mhz", 9, 4.5e7, chipGen(2), ["ram", "rackDist", "energy"]),
   n("fabGhz", "GHz fab", "compute", ["fabMhz", "room"], "room", "ghz", 11, 1.8e8, chipGen(3), ["roomDist", "energy"]),
-  n("l2Cache", "L2 cache", "compute", ["pipelining"], "cpu", "hz", 3, 2_500, [gen("l2", 0)], ["ints", "gate"]),
+  n("l2Cache", "L2 cache", "compute", [], "cpu", "hz", 3, 2_500, [gen("l2", 0)], ["ints", "gate"]),
   n("l3Cache", "L3 cache", "compute", ["l2Cache", "systemBoard"], "system", "hz", 5, 8_000, [gen("l3", 0)], ["ints", "ram"]),
-  n("smt", "SMT", "compute", ["timeSlice", "octaCore"], "cpu", "khz", 7, 1_000_000, [cap("threadsPerCore", 2), rule("smt", { shareRate: 0.6 })], ["pickup"]),
-  n("dualSocket", "Dual socket", "compute", ["octaCore", "rack"], "system", "khz", 8, 2.7e6, [cap("cpuSockets", 2), rule("socketFactor", { s2: 0.92 }), rule("socketSpanPenalty", { ramBandwidth: 0.5 })], ["density", "threads"]),
+  n("smt", "SMT", "compute", ["timeSlice", "fabKhz"], "cpu", "khz", 7, 1_000_000, [cap("threadsPerCore", 2), rule("smt", { shareRate: 0.6 })], ["pickup"]),
+  n("dualSocket", "Dual socket", "compute", ["dualCore", "rack"], "system", "khz", 8, 2.7e6, [cap("cpuSockets", 2), rule("socketFactor", { s2: 0.92 }), rule("socketSpanPenalty", { ramBandwidth: 0.5 })], ["density", "threads"]),
   n("quadSocket", "4 sockets", "compute", ["dualSocket"], "system", "khz", 9, 1.5e7, [cap("cpuSockets", 4), rule("socketFactor", { s3: 0.85, s4: 0.78 })], ["density", "rackDist"]),
   n("dma", "DMA engine", "compute", ["memController"], "system", "hz", 5, 8_000, [rule("dma")], ["ram", "storage"]), // D26: RAM and disk parts
   n("prefetch", "Prefetcher", "compute", ["dma", "l3Cache"], "system", "khz", 6, 50_000, [rule("prefetch")], ["ram"]),
@@ -774,7 +744,7 @@ export const RESEARCH_V3: readonly ResearchNode[] = [
   n("timeSlice", "Time slicing", "scheduling", ["fifoSched"], "cpu", "hz", 2, 100, [strat("system", "timeSlice")], ["pickup"]),
   n("priorityQ", "Priority", "scheduling", ["sjf"], "cpu", "hz", 3, 2_500, [strat("system", "priority")], ["energy"]),
   n("mlfq", "Aging (MLFQ)", "scheduling", ["sjf", "timeSlice"], "cpu", "hz", 3, 2_500, [strat("system", "mlfq")], ["pickup"]),
-  n("workStealing", "Work stealing", "scheduling", ["quadCore"], "cpu", "hz", 6, 50_000, [rule("workStealing")], ["threads"]),
+  n("workStealing", "Work stealing", "scheduling", ["dualCore"], "cpu", "hz", 6, 50_000, [rule("workStealing")], ["threads"]),
   n("numaAware", "NUMA-aware", "scheduling", ["dualSocket"], "system", "khz", 8, 2.7e6, [rule("numaAware")], ["ram", "rackDist"]),
   // Scheduling: network scopes
   n("lbCapability", "Capability-aware", "scheduling", ["rack"], "rack", "khz", 8, 2.7e6, [filt("net", "capability")], ["misroute"]),
@@ -948,7 +918,7 @@ The research screen tabs nodes by the part they grow from (`src/game/view/resear
 | Part | kHz | MHz | GHz |
 |---|---|---|---|
 | Clock (lanes) | `branchPredict` 12 | `fma` 24 | `dualVector` 64, `matrixTiles` 112 |
-| Cores | `ringBus` 12 | `meshCores` 24 | — (32 is the D7.2 cap) |
+| Cores | — (D34: Multi-core opens all 32) | — | — (32 is the D7.2 cap) |
 | Cache | — | `l3Slices` +1 L3 level | `edramL3` +2 L3 levels |
 | Queue | — | — | — (see below) |
 

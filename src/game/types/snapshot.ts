@@ -135,8 +135,7 @@ export type LevelSnapshot = ChipSnapshot | SystemSnapshot | RackSnapshot | RoomS
 export type CoreSleep = 'C1' | 'C3' | 'C6' | 'S3';
 export interface CoreView {
   readonly socket: number;
-  readonly lanes: number;
-  /** This core's own rate in ops/s: its lanes × its socket's clock, as compile runs it (the core's upgrade quote shows it). */
+  /** This core's own rate in ops/s: its socket's clock (D34: one thread per core, no lanes). */
   readonly rate: number;
   /**
    * The core's live clock in Hz: the socket clock × its active modifiers (spec §9.3: DVFS or turbo,

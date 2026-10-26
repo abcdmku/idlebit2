@@ -78,15 +78,12 @@ describe('CPU shards (D25)', () => {
 });
 
 describe('A25 per-core gold bracket', () => {
-  it('brackets each installed core whose tray upgrade quote is affordable', () => {
+  it('never brackets an installed core: a core has no upgrade of its own (D34, no lanes)', () => {
     const chip = chipScene('mid'), [a, b] = coreSites(floorOf('desktop'), 2), rec = recordingContext();
     const quote = (index: number, affordable: boolean): Quote => ({ action: { type: 'upgradePart', part: { unit: { kind: 'system', id: chip.systemId }, slot: { kind: 'core', socket: 0, index } } },
       label: 'Upgrade', cost: '10' as Quote['cost'], currency: 'credits', affordable, locked: null, cold: false, downtimeMs: 0, effect: null, workOps: null });
     drawWorld(rec.g, chip, frameAt(chip, 2000), 'desktop', { ...VIEW, quotes: { configRevision: 1, quotes: [quote(0, false), quote(1, true)] } });
     const gold = rec.fills.filter(q => q.c === P.gold);
-    expect(gold).toHaveLength(8);
-    for (const q of gold) { expect(q.x).toBeGreaterThanOrEqual(b!.x - 2); expect(q.x + q.w).toBeLessThanOrEqual(b!.x + b!.w + 2); }
-    expect(gold.some(q => q.x === b!.x - 2 && q.y === b!.y - 2)).toBe(true);
-    expect(gold.some(q => q.x < a!.x + a!.w + 2)).toBe(false);
+    expect(gold.filter(q => q.x >= a!.x - 2 && q.x <= b!.x + b!.w + 2 && q.y >= a!.y - 2 && q.y <= a!.y + a!.h + 2)).toEqual([]);
   });
 });

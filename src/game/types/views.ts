@@ -465,7 +465,7 @@ export type ResearchPartId =
   | 'netRack' | 'roomCooling' | 'ups'
   | 'dataPlane' | 'backbone' | 'site' | 'globalScheduler'
   | 'structure';
-/** A research root's current spec, as a heading line ("4 cores · 2 lanes", "657 Hz"; "none" when not owned). */
+/** A research root's current spec, as a heading line ("4 cores", "657 Hz"; "none" when not owned). */
 export interface ResearchPartView { readonly spec: string }
 /** The hardware level a part belongs to: the research tab, whatever era the node unlocks in. */
 export type ResearchTabId = 'cpu' | 'system' | 'rack' | 'room' | 'global';

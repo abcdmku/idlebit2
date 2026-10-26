@@ -37,23 +37,34 @@ const FLOORS: Readonly<Record<WorldForm, Floor>> = { desktop: floorplan(SPEC.des
 export const floorOf = (form: WorldForm = 'desktop'): Floor => FLOORS[form];
 
 export const MAX_CORES = 32;
-/** Core grids by site count (cols × rows), including the research steps 12 (`ringBus`) and 24 (`meshCores`). */
+/** Core grids by cell count (cols × rows). Any site count up to 32 takes the next shape up (D34). */
 const GRIDS: Readonly<Record<number, readonly [number, number]>> = { 2: [2, 1], 4: [2, 2], 8: [4, 2], 12: [4, 3], 16: [4, 4], 24: [6, 4], 32: [8, 4] };
 const GRID_SIZES = [2, 4, 8, 12, 16, 24, 32] as const;
 /** The grid that holds `count` sites: the actual count when it is a grid size, else the next one up. */
 export const gridSize = (count: number): number => GRID_SIZES.find(n => n >= count) ?? MAX_CORES;
-const sites = new Map<string, readonly Rect[]>();
-/** Core sites: two big sites (L2), or a grid of the actual site count once research opens more. Installing a core never moves its peers. */
+const cells = new Map<string, readonly Rect[]>(), sites = new Map<string, readonly Rect[]>();
+/**
+ * D34: the drawn core sites, `count` of them (the installed cores plus the one add site), in the
+ * first cells of the grid shape for that count (gridCells). Core i is always cell i, row-major.
+ */
 export function coreSites(f: Floor, count: number): readonly Rect[] {
+  const c = Math.min(MAX_CORES, Math.max(1, count)), key = `${f.pkg.w}:${c}`, found = sites.get(key);
+  if (found) return found;
+  const out = gridCells(f, c).slice(0, c);
+  sites.set(key, out);
+  return out;
+}
+/** Every cell of the grid that holds `count` sites: two big sites (L2), or the next grid shape up. Cells past the sites are bare floor. */
+export function gridCells(f: Floor, count: number): readonly Rect[] {
   const n = gridSize(Math.min(MAX_CORES, Math.max(2, count)));
-  const key = `${f.pkg.w}:${n}`, found = sites.get(key);
+  const key = `${f.pkg.w}:${n}`, found = cells.get(key);
   if (found) return found;
   const [cols, rows] = GRIDS[n]!, z = f.cores, big = n === 2;
   const gx = big ? f.gapX : 2, gy = 2;
   const w = big ? f.coreW : Math.floor((z.w - gx * (cols - 1)) / cols);
   const h = big ? z.h : Math.floor((z.h - gy * (rows - 1)) / rows);
   const out = Array.from({ length: n }, (_, i) => r(z.x + (i % cols) * (w + gx), z.y + Math.floor(i / cols) * (h + gy), w, h));
-  sites.set(key, out);
+  cells.set(key, out);
   return out;
 }
 /** Wide enough for per-core labels (the two big sites). */

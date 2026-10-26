@@ -34,8 +34,8 @@ export function drawChipMini(g: CanvasRenderingContext2D, system: SystemSnapshot
   if (cap > 0 && used > 0) R(g, cache.x, cache.y, Math.max(1, Math.round(cache.w * used / cap)), cache.h, P.cacheOn);
   box(f.clock, P.waferHi);
   const sites = coreSites(f, siteCount(chip));
-  // D25: each core is a thread lane. A lane running a shard lights in its task type's colour, filled
-  // to the work its piece still holds, so the lane empties from the top as the shard finishes.
+  // D25: each core is one thread. A core running a shard lights in its task type's colour, filled
+  // to the work its piece still holds, so it empties from the top as the shard finishes.
   for (let i = 0; i < sites.length; i++) {
     const c = chip.cores[i], busy = live && !!c && c.busy > 0;
     const r = box(sites[i]!, !c ? mix(P.wafer, P.ink, 0.25) : busy ? P.logicLo : live && c.research > 0 ? mix(P.logic, P.rnd, 0.3) : P.logic);

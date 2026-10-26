@@ -88,12 +88,12 @@ export const MAX_SYSTEMS = MAX_SITES * MAX_ZONES_PER_SITE * RACKS_PER_ROOM * SER
 
 /** Ceilings at the start (spec §12.2) and at the architecture caps ("archCap"). */
 export const CEILINGS_START: Readonly<Record<CeilingId, number>> = {
-  coreSites: 1, lanesPerCore: 1, threadsPerCore: 1, cpuSockets: 1, ramSlots: 1, ramLevelBonus: 0, l3LevelBonus: 0,
+  coreSites: 1, threadsPerCore: 1, cpuSockets: 1, ramSlots: 1, ramLevelBonus: 0, l3LevelBonus: 0,
   gpuSlots: 1, driveSlots: 1, rackPorts: 4, roomPorts: 4, uplinks: 1, researchQueue: 1, roomRows: 2, siteZones: 2,
   sites: 1, regions: 1,
 };
 export const CEILINGS_MAX: Readonly<Record<CeilingId, number>> = {
-  coreSites: 32, lanesPerCore: 32, threadsPerCore: 2, cpuSockets: 4, ramSlots: 4, ramLevelBonus: 4, l3LevelBonus: 2,
+  coreSites: 32, threadsPerCore: 2, cpuSockets: 4, ramSlots: 4, ramLevelBonus: 4, l3LevelBonus: 2,
   gpuSlots: 2, driveSlots: 4, rackPorts: MAX_RACK_PORTS, roomPorts: MAX_ROOM_PORTS, uplinks: MAX_UPLINKS, researchQueue: 3,
   roomRows: MAX_ROWS, siteZones: MAX_ZONES_PER_SITE, sites: MAX_SITES, regions: MAX_SITES,
 };
