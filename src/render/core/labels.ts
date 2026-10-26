@@ -32,7 +32,7 @@ export interface LabelWriter {
 }
 interface Run { text: string; tone: LabelTone; bold: boolean; line: number }
 interface Label { id: string; x: number; y: number; align: LabelAlign; tag: boolean; first: number; end: number; lines: number; lead: boolean; lx: number; ly: number }
-export const MAX_LABELS = 32, MAX_RUNS = 128;
+export const MAX_LABELS = 64, MAX_RUNS = 192;
 
 /** A reusable label list. Never allocates after warm-up except the strings levels pass in. */
 export class LabelBuffer implements LabelWriter {

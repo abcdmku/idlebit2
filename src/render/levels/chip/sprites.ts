@@ -41,7 +41,7 @@ export const PKG = '#1d3a2e', PKG_HI = '#2c5440';
 
 /** The board, the package and the die's bus metal: IN down to the queue, cache, then each core. */
 export function staticCpu(f: Floor, form: WorldForm): HTMLCanvasElement {
-  return cached(`v3-cpu:${form}`, f.world.w, f.world.h, g => {
+  return cached(`v3-cpu:${form}:${f.pkg.h}`, f.world.w, f.world.h, g => {
     board(g, f.world); cpuPackage(g, f.pkg, f.die);
     const cx = f.inp.x;
     R(g, cx - 1, f.die.y, 2, f.cores.y - f.die.y - 4, METAL);

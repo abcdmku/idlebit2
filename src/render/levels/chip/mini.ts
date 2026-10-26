@@ -3,10 +3,10 @@
 import type { ChipSnapshot, SystemSnapshot } from '../../../game';
 import { P, R, containMap, contain, frame as outline, mix } from '../../core';
 import type { Rect, WorldFrame } from '../../core';
-import { coreSites, floorOf } from './layout';
+import { coreSites } from './layout';
 import { coreColor, remaining } from './shards';
 import { PKG, PKG_HI } from './sprites';
-import { isLive, siteCount } from './world';
+import { chipFloor, isLive, siteCount } from './world';
 
 const m = contain();
 /** The live chip for a system: the focus or partner when it is on screen, else the system's copy. */
@@ -17,7 +17,7 @@ export function liveChip(frame: WorldFrame, system: SystemSnapshot): ChipSnapsho
   return system.chip;
 }
 export function drawChipMini(g: CanvasRenderingContext2D, system: SystemSnapshot, rect: Rect, frame: WorldFrame): void {
-  const chip = liveChip(frame, system), live = isLive(chip, frame), f = floorOf(frame.form);
+  const chip = liveChip(frame, system), live = isLive(chip, frame), f = chipFloor(chip, frame.form);
   containMap(rect, f.pkg, m);
   const box = (r: Rect, c: string): Rect => {
     const x = Math.round(m.ox + r.x * m.k), y = Math.round(m.oy + r.y * m.k);

@@ -5,11 +5,11 @@ import type { ChipSnapshot } from '../../../game';
 import { P, R, copyRect, partVersionOf, resetHitTarget, setRect, sumVersions } from '../../core';
 import type { HitTarget, LevelRegistry, LevelRenderer, Rect, WorldForm, WorldFrame } from '../../core';
 import { chipLabels } from './labels';
-import { coreSites, floorOf } from './layout';
+import { coreSites } from './layout';
 import { partRef } from './model';
 import type { TargetId } from './model';
 import { drawChipMini } from './mini';
-import { coresBlock, drawWorld, siteCount } from './world';
+import { chipFloor, coresBlock, drawWorld, siteCount } from './world';
 
 const owner = (s: ChipSnapshot) => ({ level: 'chip', id: s.systemId }) as const;
 function part(s: ChipSnapshot, out: HitTarget[], i: number, id: Exclude<TargetId, `site${number}` | 'pipe' | 'cores'>, r: Rect): number {
@@ -29,16 +29,20 @@ export function createChipRenderer(_registry: LevelRegistry): LevelRenderer<'chi
   let lastFrame: WorldFrame | null = null;
   return {
     id: 'chip', name: 'CPU',
-    size: (_s, out, form) => copyRect(floorOf(form).world, out),
-    focus: (_s, _vp, out, form) => copyRect(floorOf(form).focus, out),
-    miniRect: (_s, out, form) => copyRect(floorOf(form).pkg, out),
-    entry(_s, out, form) { const f = floorOf(form); out.x = f.inp.x; out.y = f.inp.y; return out; },
+    /** The die grows with its cores (user): it keeps 3× desktop / 2× phone and pans down rather than shrink. */
+    panAtRestScale: true,
+    size: (s, out, form) => copyRect(chipFloor(s, form).world, out),
+    focus: (s, _vp, out, form) => copyRect(chipFloor(s, form).focus, out),
+    miniRect: (s, out, form) => copyRect(chipFloor(s, form).pkg, out),
+    entry(s, out, form) { const f = chipFloor(s, form); out.x = f.inp.x; out.y = f.inp.y; return out; },
+    /** A die too tall for the view at 2 pans (core restPan): it rests on its top (the pipe, queue, cache, first cores). */
+    restCentre(s, out) { const f = chipFloor(s, lastFrame?.form); out.x = f.pkg.x + f.pkg.w / 2; out.y = f.focus.y; },
     draw(g, s, view, frame) { lastFrame = frame; drawWorld(g, s, frame, frame.form ?? 'desktop', view); },
     labels: (s, view, frame, out) => chipLabels(s, frame, out, frame.form ?? 'desktop', view),
     drawMini: drawChipMini,
     children: () => 0,
     targets(s, _view, out, from, form: WorldForm = 'desktop') {
-      const f = floorOf(form);
+      const f = chipFloor(s, form);
       let i = part(s, out, from, 'clock', f.clock);
       i = part(s, out, i, 'cache', f.cache);
       i = s.scheduler ? part(s, out, i, 'queue', f.queue) : slot(s, out, i, 'queue', f.queue, 0);
@@ -61,7 +65,7 @@ export function createChipRenderer(_registry: LevelRegistry): LevelRenderer<'chi
     // site i). GPU work pops on the System board.
     payoutAnchor(s, c, out, form) {
       if (c.system !== s.systemId || c.core === null) return -1;
-      const f = floorOf(form), sites = coreSites(f, siteCount(s));
+      const f = chipFloor(s, form), sites = coreSites(f, siteCount(s));
       if (c.core >= sites.length) return -1;
       const r = sites[c.core]!;
       copyRect(r, out); return c.core;
@@ -77,7 +81,7 @@ export function createChipRenderer(_registry: LevelRegistry): LevelRenderer<'chi
     },
     faults(s, out) {
       if (!out.length || (s.online !== 'crashed' && s.online !== 'dark')) return 0;
-      copyRect(floorOf(lastFrame?.form).die, out[0]!); return 1;
+      copyRect(chipFloor(s, lastFrame?.form).die, out[0]!); return 1;
     },
     icon(g) {
       g.clearRect(0, 0, 16, 16);

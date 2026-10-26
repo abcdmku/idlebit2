@@ -8,7 +8,7 @@ import type { ChipSnapshot, CoreView, QuoteResult, SystemId } from '../../../gam
 import { P, brackets, createRateAnimation, drawFamilyIcon, rateAnimation, transferProgress } from '../../core';
 import type { Rect, ViewPresentation, WorldFrame, WorldForm } from '../../core';
 import { MAX_CORES, arrangementOf, coreSites, coreText, floorOf, queueWells } from './layout';
-import type { CoreArrangement } from './layout';
+import type { CoreArrangement, Floor } from './layout';
 import { coreColor, drawGridPiece, drawShardGroups, remaining } from './shards';
 import { CLOCK_TRACE, addSite, bar, cacheBlock, clockBlock, coreBlock, drawMetal, lockedSite, pad, queueBlock, queueGhost, staticCpu } from './sprites';
 import type { Incoming } from './sprites';
@@ -31,6 +31,8 @@ export function isLive(chip: ChipSnapshot, frame: WorldFrame): boolean {
 export function siteCount(chip: ChipSnapshot): number {
   return Math.max(1, Math.min(MAX_CORES, chip.cores.length + (canAddCore(chip) ? 1 : 0)));
 }
+/** The chip's floorplan: its die grows a grid row at a time with the sites drawn. */
+export const chipFloor = (chip: ChipSnapshot, form: WorldForm = 'desktop'): Floor => floorOf(form, siteCount(chip));
 export function canAddCore(chip: ChipSnapshot): boolean {
   const n = chip.cores.length;
   if (n >= MAX_CORES || n >= chip.coreSites) return false;
@@ -89,7 +91,7 @@ const goldBracket = (g: G, r: Rect): void => brackets(g, r.x - 2, r.y - 2, r.w +
 
 /** `view` carries the tray quotes for the affordable brackets; without it none are drawn. */
 export function drawWorld(g: G, chip: ChipSnapshot, frame: WorldFrame, form: WorldForm, view?: ViewPresentation | null): void {
-  const f = floorOf(form), live = isLive(chip, frame), arr = arrangementOf(frame.scale, form);
+  const f = chipFloor(chip, form), live = isLive(chip, frame), arr = arrangementOf(frame.scale, form);
   g.drawImage(staticCpu(f, form), 0, 0);
   const sites = coreSites(f, siteCount(chip)), used = Math.max(1, Math.min(sites.length, chip.cores.length));
   centres.length = 0;
@@ -146,7 +148,7 @@ function drawCore(g: G, r: Rect, core: CoreView | undefined, live: boolean, chip
   coreBlock(g, r, busy, lent);
   dimIfAsleep(g, r, core, live);
   if (n > 2) {
-    if (busy) drawGridPiece(g, r, remaining(core.progress), colour);
+    if (busy) drawGridPiece(g, r, remaining(core.progress), colour, core.family);
     return;
   }
   // Big sites (L2): the task's family icon under the name, its piece gauge near the foot.

@@ -10,10 +10,9 @@ import { familyName, whole } from '../../core';
 import type { LabelWriter, ViewPresentation, WorldFrame, WorldForm } from '../../core';
 import { PHONE_TYPE, typeForScale } from '../../core';
 import { addMarkY } from './sprites';
-import { arrangementOf, coreSites, coreText, floorOf } from './layout';
-import { coreSleep, labelFits, readySpeedText, speedRange, tileLabelFits } from './speed';
-import { coreTag } from './tag';
-import { isLive, lentCore, queueOpen, siteCount, spilledOut } from './world';
+import { arrangementOf, coreSites, coreText } from './layout';
+import { coreSleep, labelFits, readySpeedText, tileLabelFits } from './speed';
+import { chipFloor, isLive, lentCore, queueOpen, siteCount, spilledOut } from './world';
 
 const LEVEL_NAMES: Readonly<Record<'l1' | 'l2' | 'l3', string>> = { l1: 'L1', l2: 'L2', l3: 'L3' };
 const CORE_NAMES = Array.from({ length: 32 }, (_, i) => `Core ${i + 1}`);
@@ -29,7 +28,7 @@ export function addCorePrice(view: ViewPresentation | null | undefined, chip: Ch
   return null;
 }
 export function chipLabels(chip: ChipSnapshot, frame: WorldFrame, out: LabelWriter, form: WorldForm, view?: ViewPresentation | null): void {
-  const f = floorOf(form), wide = arrangementOf(frame.scale, form) === 'wide', live = isLive(chip, frame), pad = wide ? 8 : 4;
+  const f = chipFloor(chip, form), wide = arrangementOf(frame.scale, form) === 'wide', live = isLive(chip, frame), pad = wide ? 8 : 4;
   const sc = chip.scheduler;
   if (sc) {
     out.label('queue', f.queue.x + pad, f.queue.y + 3).text('Queue', 'name', true).text(`${whole(live ? sc.queued : 0)} / ${whole(sc.q)}`, 'value');
@@ -61,23 +60,12 @@ export function chipLabels(chip: ChipSnapshot, frame: WorldFrame, out: LabelWrit
       if (labelFits(price.text, { x: add.x, y: py, w: add.w, h: add.y + add.h - py }, scale, t.body, t.line))
         out.label('addPrice', add.x + add.w / 2, py, 'center').text(price.text, price.affordable ? 'gold' : 'dim');
     }
-    let busy = 0;
-    for (const c of chip.cores) if (live && c.busy > 0) busy++;
-    // A clean spot (A25): inside the empty block's top-left, off the bus trace; on a full grid, over its first row.
-    // Each tile shows its own speed (user): a label centred in the tile when it fits, else the
-    // tile's readout (world.ts). A sleeping core shows its C-state, dimmed.
+    // Every tile shows its own speed (user): the die grows so a tile always fits its label (layout.ts).
+    // A sleeping core shows its C-state, dimmed. No busy tag: each tile shows its own state.
     for (let i = 0; i < Math.min(sites.length, chip.cores.length); i++) {
       const r = sites[i]!, core = chip.cores[i]!;
       if (!tileLabelFits(core, r, frame)) continue;
       out.label(LABEL_IDS[i]!, r.x + r.w / 2, r.y + 2, 'center').text(readySpeedText(core, chip, live), coreSleep(core) || !live ? 'dim' : 'value');
-    }
-    // The busy tag (tag.ts): in the widest empty row run, never over an installed core, the Clock or
-    // the lock mark; it carries the cores' speed only when their tiles cannot and it fits.
-    const tag = coreTag(chip, sites, f, frame);
-    if (tag) {
-      out.label('cores', tag.x, tag.y, 'left', true).text('Cores', 'name', true).text(`${busy} / ${whole(chip.cores.length)} busy`, 'value');
-      if (tag.speedY !== null) out.label('coresHz', tag.x, tag.speedY, 'left', true).text(speedRange(chip), 'mute');
-      else if (tag.speed) out.text(`· ${speedRange(chip)}`, 'mute');
     }
     return;
   }

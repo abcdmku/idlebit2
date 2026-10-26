@@ -4,7 +4,7 @@
 // empties as the shard finishes. Real state only: nothing moves unless the core's progress does.
 import { familyId } from '../../../game';
 import type { CoreView } from '../../../game';
-import { P, R, frame as outline, typeColor, typeOf } from '../../core';
+import { P, R, drawTypeMini, frame as outline, typeColor, typeOf } from '../../core';
 import type { Rect } from '../../core';
 
 type G = CanvasRenderingContext2D;
@@ -23,11 +23,12 @@ export function drawPiece(g: G, x: number, y: number, w: number, h: number, left
   if (fw > 0) R(g, x + 1, y + 1, fw, h - 2, colour);
 }
 /** The piece inside a small grid core site: a 4 art tall gauge at the foot of its top face. */
-export function drawGridPiece(g: G, r: Rect, left: number, colour: string): void {
+export function drawGridPiece(g: G, r: Rect, left: number, colour: string, family: number | null = null): void {
   if (r.w < 6 || r.h < 10) return;
-  // Short tiles (under 18 art px) leave room for their speed label: the piece drains along the foot row.
-  if (r.h < 18) { g.fillStyle = colour; g.fillRect(r.x + 1, r.y + r.h - 1, Math.round((r.w - 2) * Math.max(0, Math.min(1, left))), 1); return; }
-  drawPiece(g, r.x + 1, r.y + r.h - 7, r.w - 2, 4, left, colour);
+  // Under the speed label: the running task's type mini at the foot, then its piece draining beside it.
+  const type = family !== null ? typeOf(familyId(family)) : null, by = r.y + r.h - 8;
+  if (type && r.w >= 20) { drawTypeMini(g, type, r.x + 3, by - 1); drawPiece(g, r.x + 10, by, r.w - 13, 4, left, colour); return; }
+  drawPiece(g, r.x + 1, by, r.w - 2, 4, left, colour);
 }
 
 /**

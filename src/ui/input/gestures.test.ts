@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
+import { panKind } from './panKind';
 import { bindGestures, wheelUnits } from './gestures';
 describe('world viewport and gestures', () => {
   it('normalizes wheel units and crosses several semantic levels', () => {
@@ -63,5 +64,14 @@ describe('pan release', () => {
     send('pointerdown', 100, 0); send('pointermove', 90, 10); send('pointermove', 60, 40); send('pointermove', 40, 60); send('pointerup', 40, 60);
     expect(drag.mock.calls.at(-1)).toEqual([0, 0, 'end', -1000, 0]);
     dispose();
+  });
+});
+
+describe('what a drag or wheel pans at rest (panKind)', () => {
+  it('a CPU taller than the view pans like Room and World; with nothing to pan the wheel zooms', () => {
+    const chip = { level: 'chip' } as never, room = { level: 'room' } as never;
+    expect([panKind(chip, true, false), panKind(chip, false, false), panKind(room, true, false), panKind(chip, true, true)]).toEqual(['rest', null, 'rest', null]);
+    const rack = (n: number) => ({ level: 'rack', row: Array.from({ length: 3 }, (_, i) => ({ rackId: i < n ? i : null })) }) as never;
+    expect([panKind(rack(1), true, false), panKind(rack(2), false, false)]).toEqual([null, 'rack']);
   });
 });

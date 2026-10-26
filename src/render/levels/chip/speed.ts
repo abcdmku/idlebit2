@@ -42,13 +42,3 @@ export function dimIfAsleep(g: CanvasRenderingContext2D, r: Rect, c: CoreView, l
   if (!live || !coreSleep(c)) return;
   const a = g.globalAlpha; g.globalAlpha = a * 0.45; g.fillStyle = P.ink; g.fillRect(r.x, r.y, r.w, r.h); g.globalAlpha = a;
 }
-/** The cores' live speeds for the busy tag: one value when they match, else the range ("1–2 kHz"). */
-export function speedRange(chip: ChipSnapshot): string {
-  let lo = Infinity, hi = -Infinity;
-  for (const c of chip.cores) { if (c.sleep) continue; lo = Math.min(lo, c.hz); hi = Math.max(hi, c.hz); }
-  if (lo === Infinity) return chip.cores[0]?.sleep ?? '';
-  const a = formatHertz(lo), b = formatHertz(hi);
-  if (a === b) return a;
-  const ua = a.slice(a.lastIndexOf(' ')), ub = b.slice(b.lastIndexOf(' '));
-  return ua === ub ? `${a.slice(0, a.lastIndexOf(' '))}–${b}` : `${a}–${b}`;
-}

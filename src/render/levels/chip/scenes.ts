@@ -4,8 +4,8 @@
 import { familyId, systemId } from '../../../game';
 import type { ChipSnapshot, CoreView, TransferView } from '../../../game';
 
-export type CpuScene = 'boot' | 'landing' | 'mid' | 'shard' | 'max' | 'paused' | 'ring' | 'mesh' | 'c2' | 'c3' | 'c5' | 'c9' | 'c17';
-export const CPU_SCENES: readonly CpuScene[] = ['boot', 'landing', 'mid', 'shard', 'max', 'paused', 'ring', 'mesh', 'c2', 'c3', 'c5', 'c9', 'c17'];
+export type CpuScene = 'boot' | 'landing' | 'mid' | 'shard' | 'max' | 'paused' | 'ring' | 'mesh' | 'c2' | 'c3' | 'c5' | 'c6' | 'c9' | 'c12' | 'c17';
+export const CPU_SCENES: readonly CpuScene[] = ['boot', 'landing', 'mid', 'shard', 'max', 'paused', 'ring', 'mesh', 'c2', 'c3', 'c5', 'c6', 'c9', 'c12', 'c17'];
 let next = 383;
 interface Run { readonly taskId: number; readonly family: number; readonly shard: number; readonly threads: number }
 const core = (busy: boolean, progress: number, research = 0, run: Run | null = null): CoreView => {

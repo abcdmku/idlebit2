@@ -9,7 +9,7 @@ import { CAB, SWITCH_RECT, colX } from './layout';
 import { rackCol } from './row';
 
 const sp = { lo: 0, hi: 0 };
-/** "100 kHz", or "100–200 kHz" (one unit when they share it, as speedRange does for cores). */
+/** "100 kHz", or "100–200 kHz" (one unit when they share it). */
 export function speedText(lo: number, hi: number): string {
   const a = formatHertz(lo), b = formatHertz(hi);
   if (a === b) return a;

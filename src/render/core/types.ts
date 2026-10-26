@@ -153,6 +153,8 @@ export interface LevelRenderer<L extends LevelId = LevelId> {
   restEaseS?(snapshot: SnapshotOf<L>): number;
   /** The level is always shown whole at rest (System, D15.2): never panned, even below scale 2 on phone. */
   readonly wholeAtRest?: boolean;
+  /** Optional: rest at the framing's own scale N always; a focus too big for it pans (restPan) instead of dropping the scale (the CPU's growing die). */
+  readonly panAtRestScale?: boolean;
   /**
    * Optional: where a panned rest centres (art px), when the focus doesn't fit at 2. `hint` is the node
    * the player came from, or the home node of the level below. Defaults to the focus centre.

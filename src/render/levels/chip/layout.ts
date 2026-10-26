@@ -3,6 +3,8 @@
 // sits on the art lattice. The world is wider and taller than any viewport, so the board fills it.
 import type { Point, Rect, WorldForm } from '../../core';
 
+export const MAX_CORES = 32;
+
 export interface Floor {
   readonly world: Rect; readonly focus: Rect;
   readonly pkg: Rect; readonly die: Rect;
@@ -11,56 +13,70 @@ export interface Floor {
   readonly inp: Point;
   /** The two big core sites' width and gap. */
   readonly coreW: number; readonly gapX: number;
+  /** Grid columns past two sites (fixed per form; rows grow). */
+  readonly cols: number;
 }
-interface Spec { pkgW: number; coreW: number; gapX: number; gapY: number; clockW: number; S: number; cw: number; w: number; h: number; top: number }
+interface Spec { pkgW: number; coreW: number; gapX: number; gapY: number; clockW: number; S: number; cw: number; w: number; h: number; top: number; cols: number }
 const SPEC: Readonly<Record<WorldForm, Spec>> = {
-  desktop: { pkgW: 192, coreW: 56, gapX: 8, gapY: 8, clockW: 32, S: 56, cw: 24, w: 640, h: 400, top: 120 },
-  phone: { pkgW: 160, coreW: 44, gapX: 4, gapY: 4, clockW: 32, S: 56, cw: 24, w: 320, h: 480, top: 144 },
+  // cols: the most tiles a row that still fit the widest speed label ("1.02 kHz") at the form's rest scale
+  // (the CPU never drops it): 4 × 29 art px at 3× desktop, 2 × 44 at 2× phone.
+  desktop: { pkgW: 192, coreW: 56, gapX: 8, gapY: 8, clockW: 32, S: 56, cw: 24, w: 640, h: 400, top: 120, cols: 4 },
+  phone: { pkgW: 160, coreW: 44, gapX: 4, gapY: 4, clockW: 32, S: 56, cw: 24, w: 320, h: 480, top: 144, cols: 2 },
 };
 const r = (x: number, y: number, w: number, h: number): Rect => ({ x, y, w, h });
-function floorplan(s: Spec): Floor {
+/** A grid tile's least height (art px): its speed label line, then its task icon and progress bar. */
+export const TILE_H = 20;
+const TILE_GAP = 2;
+/** Grid rows for `count` sites (0 for the two big sites). */
+const rowsOf = (count: number, cols: number): number => (count <= 2 ? 0 : Math.ceil(Math.min(MAX_CORES, count) / cols));
+function floorplan(s: Spec, rows: number): Floor {
   const cx = s.w / 2, pkgX = cx - s.pkgW / 2, dieY = s.top + 8;
   const x0 = pkgX + 16, inner = s.pkgW - 32;
   const queue = r(x0, dieY + 8, inner, s.cw);
   const cache = r(x0, queue.y + s.cw + s.gapY, inner, s.cw);
-  const cores = r(x0, cache.y + s.cw + s.gapY, 2 * s.coreW + s.gapX, s.S);
+  // The cores area keeps the L2 height and grows downward a row at a time once tiles would be too short.
+  const coresH = Math.max(s.S, rows * (TILE_H + TILE_GAP) - TILE_GAP);
+  // the cores area runs to 4 art px short of the Clock (its trace gap)
+  const cores = r(x0, cache.y + s.cw + s.gapY, inner - s.clockW - 4, coresH);
   const clock = r(x0 + inner - s.clockW, cores.y, s.clockW, s.S);
-  const dieH = cores.y + s.S + 8 - dieY, pkg = r(pkgX, s.top, s.pkgW, dieH + 16);
+  const dieH = cores.y + coresH + 8 - dieY, pkg = r(pkgX, s.top, s.pkgW, dieH + 16);
   return {
-    world: r(0, 0, s.w, s.h), pkg, die: r(pkgX + 8, dieY, s.pkgW - 16, dieH), queue, cache, cores, clock,
+    world: r(0, 0, s.w, Math.max(s.h, pkg.y + pkg.h + 48)), pkg, die: r(pkgX + 8, dieY, s.pkgW - 16, dieH), queue, cache, cores, clock,
     // The rest frame: the package, its shadow and its socket lip. The pipe runs in the gutter above.
     focus: r(pkg.x - 4, pkg.y - 8, pkg.w + 8, pkg.h + 16),
-    inp: { x: cx, y: dieY }, coreW: s.coreW, gapX: s.gapX,
+    inp: { x: cx, y: dieY }, coreW: s.coreW, gapX: s.gapX, cols: s.cols,
   };
 }
-const FLOORS: Readonly<Record<WorldForm, Floor>> = { desktop: floorplan(SPEC.desktop), phone: floorplan(SPEC.phone) };
-export const floorOf = (form: WorldForm = 'desktop'): Floor => FLOORS[form];
+const FLOORS = new Map<string, Floor>();
+/** The floorplan for `count` drawn core sites (installed cores plus the add site): the die grows with the rows. */
+export function floorOf(form: WorldForm = 'desktop', count = 2): Floor {
+  const s = SPEC[form], rows = rowsOf(count, s.cols), key = `${form}:${rows}`;
+  let f = FLOORS.get(key);
+  if (!f) { f = floorplan(s, rows); FLOORS.set(key, f); }
+  return f;
+}
 
-export const MAX_CORES = 32;
-/** Core grids by cell count (cols × rows). Any site count up to 32 takes the next shape up (D34). */
-const GRIDS: Readonly<Record<number, readonly [number, number]>> = { 2: [2, 1], 4: [2, 2], 8: [4, 2], 12: [4, 3], 16: [4, 4], 24: [6, 4], 32: [8, 4] };
-const GRID_SIZES = [2, 4, 8, 12, 16, 24, 32] as const;
-/** The grid that holds `count` sites: the actual count when it is a grid size, else the next one up. */
-export const gridSize = (count: number): number => GRID_SIZES.find(n => n >= count) ?? MAX_CORES;
 const cells = new Map<string, readonly Rect[]>(), sites = new Map<string, readonly Rect[]>();
 /**
  * D34: the drawn core sites, `count` of them (the installed cores plus the one add site), in the
  * first cells of the grid shape for that count (gridCells). Core i is always cell i, row-major.
  */
 export function coreSites(f: Floor, count: number): readonly Rect[] {
-  const c = Math.min(MAX_CORES, Math.max(1, count)), key = `${f.pkg.w}:${c}`, found = sites.get(key);
+  const c = Math.min(MAX_CORES, Math.max(1, count)), key = `${f.pkg.w}:${f.cores.h}:${c}`, found = sites.get(key);
   if (found) return found;
   const out = gridCells(f, c).slice(0, c);
   sites.set(key, out);
   return out;
 }
-/** Every cell of the grid that holds `count` sites: two big sites (L2), or the next grid shape up. Cells past the sites are bare floor. */
+/**
+ * Every cell of the grid that holds `count` sites: two big sites (L2), or `f.cols` columns and as many
+ * rows as the sites need, filling the cores area (`f` is the floor for that count). Cells past the sites are bare floor.
+ */
 export function gridCells(f: Floor, count: number): readonly Rect[] {
-  const n = gridSize(Math.min(MAX_CORES, Math.max(2, count)));
-  const key = `${f.pkg.w}:${n}`, found = cells.get(key);
+  const big = count <= 2, cols = big ? 2 : f.cols, rows = big ? 1 : Math.ceil(Math.min(MAX_CORES, count) / cols), n = cols * rows;
+  const key = `${f.pkg.w}:${f.cores.h}:${n}`, found = cells.get(key);
   if (found) return found;
-  const [cols, rows] = GRIDS[n]!, z = f.cores, big = n === 2;
-  const gx = big ? f.gapX : 2, gy = 2;
+  const z = f.cores, gx = big ? f.gapX : TILE_GAP, gy = TILE_GAP;
   const w = big ? f.coreW : Math.floor((z.w - gx * (cols - 1)) / cols);
   const h = big ? z.h : Math.floor((z.h - gy * (rows - 1)) / rows);
   const out = Array.from({ length: n }, (_, i) => r(z.x + (i % cols) * (w + gx), z.y + Math.floor(i / cols) * (h + gy), w, h));

@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react';
 import { createCanvasRenderer, MAX_EXTRAPOLATION_MS, restPan } from '../render/core';
 import type { CanvasRenderer, RenderSnapshot, RestFraming, ViewPresentation } from '../render/core';
+import { panKind } from './input/panKind';
 import type { ShellLayout } from './layout';
 import { rackRowScroll } from '../render/levels/rack';
 
@@ -78,11 +79,8 @@ export function CanvasWorld() {
     // (it can be below N), and a release carries the flick, then snaps (the rack row to its pitch).
     let x0 = 0, y0 = 0, quiet: ReturnType<typeof setTimeout> | undefined, held: PanTarget | null = null, wheeling: PanTarget | null = null;
     const target = (): PanTarget | null => {
-      if (view.getState().partner) return null;
-      // The rack row pans only when it has a neighbour to pan to; otherwise the wheel zooms (QA-12).
-      const f = store.getSnapshot().focus;
-      if (f.level === 'rack') return f.row.filter(r => r.rackId !== null).length > 1 ? rackPan : null;
-      return restPan.active ? restPan : null;
+      const kind = panKind(store.getSnapshot().focus, restPan.active, !!view.getState().partner);
+      return kind === 'rack' ? rackPan : kind === 'rest' ? restPan : null;
     };
     const pan: PanHandler = {
       active: () => target() !== null,

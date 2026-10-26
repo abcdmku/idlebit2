@@ -5,12 +5,11 @@ import { familyId, systemId } from '../../../game';
 import type { WorldForm, WorldFrame } from '../../core';
 import { recordingContext } from '../../core/testCanvas';
 import { createChipRenderer } from '.';
-import { arrangementOf, coreSites, coreText, floorOf, gridCells, queueWells } from './layout';
+import { TILE_H, arrangementOf, coreSites, coreText, floorOf, gridCells, queueWells } from './layout';
 import { chipScene } from './scenes';
 import { readySpeedText } from './speed';
 import { formatHertz } from '../../../game';
 import { chipAfford, createChipAfford, drawWorld, siteCount } from './world';
-import { coreTag, overlaps } from './tag';
 
 const VIEW = { selectedId: null, picked: null, quotes: null, reducedMotion: false };
 beforeEach(() => {
@@ -111,15 +110,14 @@ describe('CPU labels', () => {
     const open = { ...chipScene('landing'), coreSites: 2, slots: [{ kind: 'core', index: 1, locked: false }, { kind: 'scheduler', index: 0, locked: false }] } as ChipSnapshot;
     expect(labels(open)).toMatchObject({ queue: 'Queue none', core1: 'Add Core 2' });
   });
-  it('gives every grid core its own speed when a label fits, else the tag carries it; the tag stays in the cores block', () => {
-    const max = chipScene('max'), full = labels(max), fl = floorOf('desktop');
-    // 32 tiles fill the grid: no tag over the cores (each runs at the Clock's speed).
+  it('gives every grid core its own speed, 32 included, and draws no busy tag', () => {
+    const max = chipScene('max'), full = labels(max);
     expect(full).not.toHaveProperty('cores');
-    expect(Object.keys(full).filter(k => /^core\d+$/.test(k))).toEqual([]);
+    expect(Object.keys(full).filter(k => /^core[0-9]+$/.test(k))).toHaveLength(32);
+    expect(full.core31).toBe('4 GHz');
     // D34: two cores and the add site take the 2 × 2 grid; the tag sits in its free row
     const four = { ...max, coreSites: 32, cores: max.cores.slice(0, 2), slots: [] };
-    // at 8 cores or fewer there is no busy tag: the tiles say it all (user)
-    expect(labelBuffer(four, 'desktop', false, 2).find('cores')).toBeNull(); void fl;
+    expect(labelBuffer(four, 'desktop', false, 2).find('cores')).toBeNull();
     expect(labels(four, 'desktop', false, 3).core0).toBe('4 GHz');
   });
   it('shows a sleeping core dimmed with its C-state instead of its speed', () => {
@@ -287,40 +285,44 @@ describe('CPU incoming queue wells', () => {
   });
 });
 
-describe('CPU core grids', () => {
-  it.each(['desktop', 'phone'] as const)('lays 12 cells as 4 × 3 and 24 as 6 × 4 on the art grid (%s)', form => {
-    const f = floorOf(form);
-    for (const [n, cols, rows] of [[12, 4, 3], [24, 6, 4]] as const) {
-      const s = gridCells(f, n);
-      expect(s).toHaveLength(n);
-      expect(new Set(s.map(r => r.x)).size).toBe(cols); expect(new Set(s.map(r => r.y)).size).toBe(rows);
-      for (const r of s) { expect(Number.isInteger(r.x) && Number.isInteger(r.w)).toBe(true); expect(r.x + r.w).toBeLessThanOrEqual(f.cores.x + f.cores.w); expect(r.y + r.h).toBeLessThanOrEqual(f.cores.y + f.cores.h); }
+describe('CPU core grids (user: always show the clock speed; the die grows)', () => {
+  it.each([['desktop', 4], ['phone', 2]] as const)('keeps a fixed column count and adds rows, the cache, queue and clock in place (%s)', (form, cols) => {
+    const small = floorOf(form, 3);
+    for (const n of [3, 6, 12, 33]) {
+      const f = floorOf(form, n), cells = gridCells(f, n), rows = Math.ceil(Math.min(32, n) / cols);
+      expect(cells).toHaveLength(rows * cols);
+      expect(new Set(cells.map(r => r.x)).size).toBe(cols); expect(new Set(cells.map(r => r.y)).size).toBe(rows);
+      for (const r of cells) {
+        expect(Number.isInteger(r.x) && Number.isInteger(r.y)).toBe(true); expect(r.h).toBeGreaterThanOrEqual(TILE_H);
+        expect(r.x + r.w).toBeLessThanOrEqual(f.cores.x + f.cores.w); expect(r.y + r.h).toBeLessThanOrEqual(f.cores.y + f.cores.h);
+      }
+      expect([f.queue, f.cache, f.clock]).toEqual([small.queue, small.cache, small.clock]);
+      expect(f.focus.y + f.focus.h).toBeLessThanOrEqual(f.world.h);
     }
-    expect(gridCells(f, 10)).toHaveLength(12); expect(gridCells(f, 20)).toHaveLength(24); expect(gridCells(f, 3)).toHaveLength(4);
-    // the drawn sites are only the first `count` cells, so core i keeps cell i as the grid grows
-    expect(coreSites(f, 10)).toHaveLength(10); expect(coreSites(f, 10)[3]).toEqual(gridCells(f, 12)[3]);
+    expect(floorOf(form, 33).pkg.h).toBeGreaterThan(floorOf(form, 6).pkg.h);
   });
 });
 
 describe('D34: installed cores plus one add site', () => {
   const at = (n: number): ChipSnapshot => { const max = chipScene('max'); return { ...max, coreSites: 32, cores: max.cores.slice(0, n), slots: [] }; };
-  it.each([['desktop', 3], ['phone', 2]] as const)('draws n + 1 sites up to 32; the busy tag only past 8 cores, on bare floor 1 px clear of every site (%s)', (form, scale) => {
+  // the CPU rests at the form's own scale always (panAtRestScale): 3× desktop, 2× phone
+  it.each([['desktop', 3], ['phone', 2]] as const)('draws n + 1 sites up to 32, never overlapping, each core with its speed (%s at %i)', (form, scale) => {
     for (let n = 1; n <= 32; n++) {
-      const chip = at(n), f = floorOf(form), sites = coreSites(f, siteCount(chip)), frame = frameAt(chip, 2000, { form, scale });
+      const chip = at(n), f = floorOf(form, siteCount(chip)), sites = coreSites(f, siteCount(chip));
       expect(sites).toHaveLength(n < 32 ? n + 1 : 32);
-      const tag = coreTag(chip, sites, f, frame);
-      if (n <= 8 || n === 32) { expect(tag).toBeNull(); continue; }
-      if (!tag) continue;
-      // never over a core or the add site, with 1 art px of clearance all round
-      for (const s of sites) expect(overlaps({ x: s.x - 1, y: s.y - 1, w: s.w + 2, h: s.h + 2 }, tag.area)).toBe(false);
-      expect(tag.area.x).toBeGreaterThanOrEqual(f.cores.x); expect(tag.area.x + tag.area.w).toBeLessThanOrEqual(f.cores.x + f.cores.w);
-      expect(tag.area.y + tag.area.h).toBeLessThanOrEqual(f.cores.y + f.cores.h);
+      for (let i = 0; i < sites.length; i++) for (let j = i + 1; j < sites.length; j++) {
+        const p = sites[i]!, q = sites[j]!;
+        expect(p.x < q.x + q.w && q.x < p.x + p.w && p.y < q.y + q.h && q.y < p.y + p.h).toBe(false);
+      }
+      const text = labels(chip, form, false, scale);
+      for (let i = 0; i < n; i++) expect(text[`core${i}`]).toMatch(/Hz/);
+      expect(text).not.toHaveProperty('cores');
     }
   });
   it('makes the cores one target over every core and the add site', () => {
-    const level = createChipRenderer(createLevelRegistry()), out = Array.from({ length: 64 }, createHitTarget), chip = at(5), f = floorOf('desktop');
+    const level = createChipRenderer(createLevelRegistry()), out = Array.from({ length: 64 }, createHitTarget), chip = at(5), f = floorOf('desktop', siteCount(chip));
     const n = level.targets(chip, VIEW, out, 0, 'desktop'), ids = out.slice(0, n).map(t => t.id);
-    expect(ids.filter(id => /^(cored+|sited+|cores)$/.test(id))).toEqual(['cores']);
+    expect(ids.filter(id => /^(core[0-9]+|site[0-9]+|cores)$/.test(id))).toEqual(['cores']);
     const t = out.slice(0, n).find(h => h.id === 'cores')!, sites = coreSites(f, siteCount(chip));
     expect(t.kind).toBe('part'); expect(t.slot).toBe(5);
     for (const s of sites) { expect(s.x).toBeGreaterThanOrEqual(t.rect.x); expect(s.x + s.w).toBeLessThanOrEqual(t.rect.x + t.rect.w); expect(s.y + s.h).toBeLessThanOrEqual(t.rect.y + t.rect.h); }

@@ -30,3 +30,14 @@ describe('rest pan (scale floor 2)', () => {
     expect(restPan.active).toBe(false); expect(small).toEqual(rect(0, 0, 100, 100));
   });
 });
+
+describe('rest pan at the framing scale (panAtRestScale, the CPU)', () => {
+  it('keeps N = 3 and pans a focus that fits at 2 but not at 3, instead of dropping the scale', () => {
+    const s = { level: 'chip' } as LevelSnapshot, tall = rect(0, 0, 200, 180);
+    frameRest({} as LevelRenderer, s, rect(0, 0, 200, 180), VP, F, { w: 720, h: 416, scale: 3 }, null, () => {});
+    expect(restPan.active).toBe(false);
+    frameRest({ panAtRestScale: true } as LevelRenderer, s, tall, VP, F, { w: 720, h: 416, scale: 3 }, null, () => {});
+    expect(restPan.active).toBe(true); expect(restPan.scale).toBe(3); expect(tall.h).toBe(Math.floor(416 / 3)); expect(tall.w).toBe(200);
+    restPan.reset();
+  });
+});

@@ -75,7 +75,7 @@ export const restPan = new RestPan();
  */
 export function frameRest(lv: LevelRenderer, s: LevelSnapshot, focus: Rect, vp: Rect, f: RestFraming, area: RestArea, hint: NodeRef | null,
   report: (where: string, error: unknown) => void): void {
-  const min = Math.min(2, f.scale), n = fitScale(focus, vp, f);
+  const min = lv.panAtRestScale ? f.scale : Math.min(2, f.scale), n = fitScale(focus, vp, f);
   if (n >= min) { restPan.idle(); return; }
   if (lv.wholeAtRest) {
     restPan.idle();
