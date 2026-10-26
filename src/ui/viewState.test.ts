@@ -64,13 +64,11 @@ describe('view state zooms', () => {
     view.dispatch({ type: 'cancel' });
     expect(view.getState()).toMatchObject({ selected: null, plate: false, focus: chip });
   });
-  it('one sheet at a time: research and build toggle, selecting closes them', () => {
+  it('the research sheet toggles, and selecting closes it', () => {
     const view = world();
     view.dispatch({ type: 'toggleSheet', sheet: 'research' });
     expect(view.getState().sheet).toBe('research');
-    view.dispatch({ type: 'toggleSheet', sheet: 'build' });
-    expect(view.getState().sheet).toBe('build');
-    view.dispatch({ type: 'toggleSheet', sheet: 'build' });
+    view.dispatch({ type: 'toggleSheet', sheet: 'research' });
     expect(view.getState().sheet).toBeNull();
     view.dispatch({ type: 'openResearch' });
     view.dispatch({ type: 'select', target: { id: 'x', kind: 'part', owner: chip, drill: null, part: null, unit: null, sw: null, port: null, slot: null, rect: { x: 0, y: 0, w: 1, h: 1 } } });

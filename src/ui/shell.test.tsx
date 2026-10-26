@@ -61,6 +61,12 @@ describe('band', () => {
     expect(store.actions).toEqual([{ type: 'endRound' }]);
     act(() => store.set({ round: { state: 'between' } }));
     expect(key().disabled).toBe(true);
+    // out of a round the same key, in the same box, is Return to market (user, 26 Oct)
+    expect(key().textContent).toBe('Return');
+    expect(rectOf('[data-testid=end-round]')).toBe(at);
+    act(() => store.set({ round: { canReturn: true } }));
+    act(() => key().click());
+    expect(store.actions.at(-1)).toEqual({ type: 'returnToMarket' });
     vi.useRealTimers();
   });
   it('keeps all five rungs in place; a locked rung opens research', () => {
@@ -150,10 +156,10 @@ describe('head card (user, 25 Oct: the main task below, above the deck)', () => 
   it('between rounds the same key reads Return, in the same place', () => {
     const store = fakeStore();
     mounted = card(store);
-    expect(rectOf('[data-testid=dismiss]')).toBe('504px 24px 144px 48px');
+    expect(rectOf('[data-testid=dismiss]')).toBe('960px 24px 144px 48px');
     act(() => store.set({ round: { state: 'between', canReturn: true }, feed: { timing: 'onReturn', headDeadlineTick: null } }));
     expect($('[data-testid=dismiss]')).toBeNull();
-    expect(rectOf('[data-testid=return]')).toBe('504px 24px 144px 48px');
+    expect(rectOf('[data-testid=return]')).toBe('960px 24px 144px 48px');
     expect(text('[data-testid=now]')).toContain('Starts after Return');
     expect(text('[data-testid=return]')).toBe('Return to market');
     act(() => $('[data-testid=return]')!.click());
@@ -165,49 +171,27 @@ function deck(store: FakeStore, size = DESKTOP) {
   return mount(<OffersScope><Deck /></OffersScope>, store, size);
 }
 
-describe('deck', () => {
-  it('controls never move: the head card over Buy, the build rows over Research', () => {
+describe('deck (user, 26 Oct: one row, Research beside the next task)', () => {
+  it('controls never move: Research at the left, the head card beside it, nothing else', () => {
     const store = fakeStore();
     mounted = deck(store);
-    const keys = ['[data-testid=now]', '[data-testid=buy]', '[data-testid=build-rows]', '[data-testid=research-key]'];
+    const keys = ['[data-testid=now]', '[data-testid=research-key]'];
     const before = keys.map(rectOf);
-    expect(before).toEqual(['24px 696px 672px 120px', '24px 816px 672px 48px', '720px 696px 696px 120px', '720px 816px 696px 48px']);
+    expect(before).toEqual(['288px 744px 1128px 120px', '24px 744px 240px 120px']);
+    expect([$('[data-testid=buy]'), $('[data-testid=build-rows]'), $('[data-testid=build-key]')]).toEqual([null, null, null]);
     act(() => store.set({ round: { state: 'between', canReturn: true }, feed: { timing: 'onReturn', headDeadlineTick: null } }));
     expect(keys.map(rectOf)).toEqual(before);
     act(() => store.set({ research: { active: 'fabKhz' as never, name: 'kHz fab', progress: 0.5, opsPerSec: 1200, queued: 2 } }));
     expect(keys.map(rectOf)).toEqual(before);
     mounted.unmount();
     mounted = deck(store);
-    expect(text('[data-testid=research-key]')).toBe('Research · kHz fab running · 1.2k ops/s · 2 queued50%');
+    expect([...$('[data-testid=research-key]')!.querySelectorAll('.t')].map(e => e.textContent)).toEqual(['Research', 'Running 50%', 'kHz fab']);
   });
-  it('the Buy key says it is saving up, with no ETA before the round has an income', () => {
-    const store = fakeStore();
-    mounted = deck(store);
-    expect(text('[data-testid=buy]')).toMatch(/· Saving up · —/);
-  });
-  it('with a round income, the Buy key says how long the saving takes', () => {
-    const store = fakeStore();
-    store.set({ hud: { incomeRecent: { dataPerSec: 0, creditsPerSec: 0.001 } } });
-    mounted = deck(store);
-    expect(text('[data-testid=buy]')).toMatch(/· Saving up · ~\d+ (min|h)/);
-  });
-  it('builds five rows from the sim quotes: x → x, prices, and where the pipe upgrades', () => {
-    const store = fakeStore();
-    mounted = deck(store);
-    const rows = [...mounted.host.querySelectorAll<HTMLElement>('[data-row]')];
-    expect(rows.map(r => r.dataset.row)).toEqual(['core', 'cache', 'clock', 'scheduler', 'link']);
-    expect(rows[4]!.textContent).toContain('At the Rack switch');
-    expect(rows[2]!.textContent).toMatch(/1 → [0-9.]+ Hz/);
-    expect(rows[1]!.textContent).toMatch(/1 → 2 b/);
-  });
-  it('phone: the head card spans the width above Build · Research · Buy; Build opens a sheet', () => {
+  it('phone: the same row, Research at the left at the head card\'s height', () => {
     const store = fakeStore();
     mounted = deck(store, { width: 390, height: 780 });
-    expect([rectOf('[data-testid=now]'), rectOf('[data-testid=build-key]'), rectOf('[data-testid=research-key]'), rectOf('[data-testid=buy]')])
-      .toEqual(['8px 616px 368px 80px', '8px 704px 80px 64px', '96px 704px 112px 64px', '216px 704px 160px 64px']);
-    expect(rectOf('[data-testid=dismiss]')).toBe('256px 16px 96px 48px');
-    act(() => $('[data-testid=build-key]')!.click());
-    expect($('[data-testid=build-sheet]')).not.toBeNull();
+    expect([rectOf('[data-testid=research-key]'), rectOf('[data-testid=now]')]).toEqual(['8px 688px 112px 80px', '128px 688px 248px 80px']);
+    expect(rectOf('[data-testid=dismiss]')).toBe('160px 16px 80px 48px');
   });
 });
 
@@ -332,7 +316,7 @@ describe('research cuts the line (D27)', () => {
     expect(cards[0]!.textContent).toBe('Bit Flip +1');
     expect(text('[data-testid=now]')).toContain('Next in line · runs on free threads');
     expect($('[data-testid=dismiss]')).toBeNull();
-    expect(text('[data-testid=research-key]')).toContain('next in line');
+    expect(text('[data-testid=research-key]')).toContain('Next in line');
   });
   it('once taken it leaves the strip; the tile shows it running', () => {
     const store = fakeStore();
@@ -340,7 +324,7 @@ describe('research cuts the line (D27)', () => {
     mounted = mount(<><QueueStrip /><OffersScope><Deck /></OffersScope></>, store, DESKTOP);
     expect($('[data-testid=research-head]')).toBeNull();
     expect($('.head-slot .tag')!.dataset.task).toBe('1:1:1');
-    expect(text('[data-testid=research-key]')).toBe('Research · Pipelining running · 1.2k ops/s42%');
+    expect([...$('[data-testid=research-key]')!.querySelectorAll('.t')].map(e => e.textContent)).toEqual(['Research', 'Running 42%', 'Pipelining']);
   });
   it('phone: the Research tile reads two clean lines in every state', () => {
     const store = fakeStore();

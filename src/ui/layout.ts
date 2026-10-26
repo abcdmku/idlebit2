@@ -7,9 +7,9 @@
 //
 // Desktop (N = 3, cell 24, from 1200 × 760; N = 2, cell 16, below that):
 //   band: ladder | SLA (centre) | Data over Credits (right); the strip; the world;
-//   deck: bay 1 = the head card (Dismiss) over Buy; bay 2 = build rows over Research.
-// Phone (N = 2, 8 px): band (ladder and the stacked currencies, then SLA), the strip, the world,
-//   the head card full width, then Build · Research · Buy. Buy and Research keep the thumb zone.
+//   deck: one row, Research at the left beside the head card (Dismiss).
+// Phone (N = 2, 8 px): band (ladder and the stacked currencies, then SLA), the strip, the world, then the
+//   same one row: Research beside the head card. Buying is done on the world's parts (user, 26 Oct).
 import type { Rect } from '../render/core';
 
 export interface SafeInsets { readonly top: number; readonly right: number; readonly bottom: number; readonly left: number }
@@ -39,10 +39,8 @@ interface Common {
   /** The head task's big card above the deck, and its Dismiss (Return to market between rounds). */
   readonly now: Rect;
   readonly dismiss: Rect;
-  readonly buy: Rect;
+  /** The Research tile, left of the head card at its height. */
   readonly research: Rect;
-  /** The build sheet's column (desktop bay 2), over the world. */
-  readonly drawer: Rect;
   /** The research screen: below the strip, over the world and the deck (the strip keeps showing the line). */
   readonly lab: Rect;
   /** Ladder rungs: the 16 × 16 art icon at N, centred; phone rungs are 48 px tap targets. */
@@ -65,31 +63,23 @@ interface Common {
   /** Callout size. */
   readonly callout: { readonly w: number; readonly h: number };
 }
-export interface DesktopLayout extends Common {
-  readonly kind: 'desktop';
-  /** The build list: five rows, one cell each and never under 24 px. */
-  readonly rows: readonly [Rect, Rect, Rect, Rect, Rect];
-}
-export interface PhoneLayout extends Common {
-  readonly kind: 'phone';
-  /** Opens the build sheet. */
-  readonly build: Rect;
-}
+export interface DesktopLayout extends Common { readonly kind: 'desktop' }
+export interface PhoneLayout extends Common { readonly kind: 'phone' }
 export type ShellLayout = DesktopLayout | PhoneLayout;
 
 const r = (x: number, y: number, w: number, h: number): Rect => ({ x, y, w, h });
 const inset = (a: Rect, d: number): Rect => r(a.x + d, a.y + d, a.w - 2 * d, a.h - 2 * d);
 const snap8 = (v: number) => Math.floor(v / 8) * 8;
 /** Keys are at least 44 px tall (touch) on every layout. */
-const KEY_W = 96, KEY_H = 48;
+const KEY_H = 48;
 
 /**
  * The N = 3 desktop from 1200 × 760 (50 × 31 cells of 24); the N = 2 desktop from 960 × 592
  * (60 × 37 cells of 16); below that, the phone.
  */
 const DESKTOP3 = { cols: 50, rows: 31 }, DESKTOP2 = { cols: 60, rows: 37 };
-/** Build rows are never shorter than this (a mouse target), at any size. */
-const ROW_MIN = 24;
+/** The deck row is five text lines of at least 24 px: the head card's three lines, its notice line and padding. */
+const LINE_MIN = 24;
 
 export function shellLayout(vw: number, vh: number, safe: SafeInsets = NO_INSETS): ShellLayout {
   const aw = Math.max(0, vw - safe.left - safe.right), ah = Math.max(0, vh - safe.top - safe.bottom);
@@ -110,7 +100,7 @@ function desktop(N: 2 | 3, aw: number, ah: number, safe: SafeInsets): DesktopLay
   const W = Math.floor(aw / U) * U, H = Math.floor(ah / U) * U;
   const x = safe.left + Math.floor((aw - W) / 2), y = safe.top + Math.floor((ah - H) / 2);
   const body = N === 3 ? 16 : 13, lh = N === 3 ? 24 : 16;
-  const rowH = Math.max(U, ROW_MIN), rowsH = 5 * rowH, deckH = rowsH + KEY_H, deckY = H - U - deckH;
+  const deckH = 5 * Math.max(U, LINE_MIN), deckY = H - U - deckH;
   const world = r(U, U, W - 2 * U, deckY - 2 * U);
   const band = r(U, U, world.w, 2 * U);
   const strip = r(U, band.y + band.h, world.w, 2 * U);
@@ -120,10 +110,8 @@ function desktop(N: 2 | 3, aw: number, ah: number, safe: SafeInsets): DesktopLay
   const headSlot = r(U, strip.y, headW, strip.h);
   const card = (i: number) => r(headSlot.x + headW + i * cardW, strip.y, cardW, strip.h);
   const top = strip.y + strip.h;
-  // The deck: bay 1 = the head card over Buy; bay 2 = the build rows over Research.
-  const b1w = Math.floor((world.w - U) / 2 / U) * U, b2x = world.x + b1w + U, b2w = world.w - b1w - U;
-  const now = r(world.x, deckY, b1w, rowsH);
-  const row = (i: number) => r(b2x, deckY + i * rowH, b2w, rowH);
+  // The deck: one row, Research at the left, then the head card.
+  const research = r(world.x, deckY, 10 * U, deckH), now = r(research.x + research.w + U, deckY, world.w - research.w - U, deckH);
   const view = r(world.x, top, world.w, world.y + world.h - top);
   // The band: the ladder at the left, the currencies stacked at the right, SLA centred between them.
   const band0 = rungs(band, 16 * N, U), rungLabel = r(band0[4].x + band0[4].w + 16, band.y, N === 3 ? 128 : 96, band.h);
@@ -137,9 +125,7 @@ function desktop(N: 2 | 3, aw: number, ah: number, safe: SafeInsets): DesktopLay
     world, view, band, strip, headSlot, cards: [card(0), card(1), card(2), card(3)],
     // The head card's key is wide enough for "Return to market" on one line; Dismiss keeps the same box.
     now, dismiss: r(now.x + now.w - lat - 144, now.y + lat, 144, KEY_H),
-    buy: r(world.x, deckY + rowsH, b1w, KEY_H), research: r(b2x, deckY + rowsH, b2w, KEY_H),
-    rows: [row(0), row(1), row(2), row(3), row(4)],
-    drawer: r(b2x, top, b2w, view.h), lab: r(world.x, top, world.w, H - U - top),
+    research, lab: r(world.x, top, world.w, H - U - top),
     rungs: band0, rungRow: band.h, rungLabel, sla, endKey, wallet,
     pipeSrc: { x: headSlot.x + lat + 8 * N, y: top }, pipeRunY: top + U,
     calloutBounds: inset(view, lat), callout: { w: 288, h: N === 3 ? 144 : 112 },
@@ -150,7 +136,7 @@ function phone(aw: number, ah: number, safe: SafeInsets): PhoneLayout {
   const N = 2, U = 8, lat = 8;
   const W = Math.floor(Math.min(aw, 440) / U) * U, H = Math.max(480, Math.floor(ah / U) * U);
   const x = safe.left + Math.floor((aw - W) / 2), y = safe.top;
-  const ctrlH = 64, nowH = 80, ctrlY = H - U - ctrlH, nowY = ctrlY - U - nowH;
+  const nowH = 80, nowY = H - U - nowH;
   const world = r(U, U, W - 2 * U, nowY - 2 * U);
   // The band: the ladder row (48 px rungs, a primary tap) with Data over Credits at its right, then SLA and End round.
   const rungRow = 48, band = r(U, U, world.w, rungRow + 48);
@@ -162,17 +148,14 @@ function phone(aw: number, ah: number, safe: SafeInsets): PhoneLayout {
   const cardW = Math.floor((world.w - headSlot.w) / 4 / U) * U;
   const card = (i: number) => r(headSlot.x + headSlot.w + i * cardW, strip.y, i === 3 ? world.w - headSlot.w - 3 * cardW : cardW, 64);
   const top = strip.y + strip.h;
-  const now = r(U, nowY, world.w, nowH);
-  const build = r(U, ctrlY, 80, ctrlH), research = r(build.x + build.w + U, ctrlY, 112, ctrlH);
-  const buyX = research.x + research.w + U;
+  // The deck: one row, Research at the left (the thumb), then the head card.
+  const research = r(U, nowY, 112, nowH), now = r(research.x + research.w + U, nowY, world.w - research.w - U, nowH);
   const view = r(world.x, top, world.w, world.y + world.h - top);
-  const sheetY = top + 64;
   return {
     kind: 'phone', N, lat, gutter: U, x, y, w: W, h: H, body: 13, lh: 16, big: 24, mid: 18,
     world, view, band, strip, headSlot, cards: [card(0), card(1), card(2), card(3)],
-    now, dismiss: r(now.x + now.w - 16 - KEY_W, now.y + 16, KEY_W, KEY_H),
-    build, research, buy: r(buyX, ctrlY, W - U - buyX, ctrlH),
-    drawer: r(U, sheetY, world.w, world.y + world.h - sheetY), lab: r(U, top, world.w, H - U - top),
+    now, dismiss: r(now.x + now.w - 8 - 80, now.y + 16, 80, KEY_H),
+    research, lab: r(U, top, world.w, H - U - top),
     rungs: band0, rungRow, rungLabel: r(walletX, band.y, 0, rungRow),
     sla: r(band.x, band.y + rungRow, band.w - 88, 48), endKey: r(band.x + band.w - 80, band.y + rungRow, 80, 48), wallet: r(walletX, band.y, band.x + band.w - U - walletX, rungRow),
     pipeSrc: { x: headSlot.x + 8 + 16, y: top }, pipeRunY: top + U,

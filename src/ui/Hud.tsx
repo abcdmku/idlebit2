@@ -11,6 +11,7 @@ import { amountText, clockText, slaFill, slaText, wholeText } from './hooks/form
 import { box, useLayout } from './shell/geometry';
 import { shallowEqual, useGameSelector, useShell, useViewState } from './storeHooks';
 import { LEVEL_NAMES } from './viewState';
+import { returnToMarket } from './input/commands';
 
 /** The ladder lists the deepest level first: CPU, System, Rack, Room, Global. */
 const LADDER: readonly LevelId[] = [...ORDER];
@@ -106,7 +107,7 @@ export const END_CONFIRM_MS = 3000;
 /** End round (spec §4.1): two taps within 3 s. Reserved in every phase; it only works while a round runs. */
 function EndRound() {
   const L = useLayout(), shell = useShell(), k = L.endKey;
-  const running = useGameSelector(s => s.round.state === 'running');
+  const running = useGameSelector(s => s.round.state === 'running'), canReturn = useGameSelector(s => s.round.canReturn);
   const [armed, setArmed] = useState(false), timer = useRef<ReturnType<typeof setTimeout>>(undefined);
   useEffect(() => () => clearTimeout(timer.current), []);
   useEffect(() => { if (!running) { clearTimeout(timer.current); setArmed(false); } }, [running]);
@@ -116,7 +117,10 @@ function EndRound() {
     setArmed(false);
     shell.dispatch({ type: 'endRound' });
   };
-  return <button type="button" className={`skey end-round ${armed ? 'warn two' : ''}`} style={box(k)} disabled={!running} data-testid="end-round"
+  // Out of a round the same key (same box) is Return to market, as the head card's key (user, 26 Oct).
+  if (!running) return <button type="button" className="skey end-round primary" style={box(k)} disabled={!canReturn} data-testid="end-round"
+    data-qa-target={k.h >= 44 ? "" : undefined} aria-label="Return to market" onPointerDown={e => e.stopPropagation()} onClick={() => returnToMarket(shell)}>Return</button>;
+  return <button type="button" className={`skey end-round ${armed ? 'warn two' : ''}`} style={box(k)} data-testid="end-round"
     data-qa-target={k.h >= 44 ? "" : undefined} aria-label={armed ? "End round? Tap again" : "End round"} onPointerDown={e => e.stopPropagation()} onClick={press}>
     {armed ? <><span>End round?</span><span>Tap again</span></> : 'End round'}</button>;
 }
