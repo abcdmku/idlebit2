@@ -229,26 +229,25 @@ Columns: id, short name, prerequisites, the zoom level where it first matters, e
 | `smt` | SMT | timeSlice, fabKhz | CPU | kHz W7 | Each core holds 2 running tasks. Scheduler K may reach 2× cores, still at most 32. Two tasks on one core each run at 0.6× the core's rate (1.2× combined). | Each core runs 2 tasks at once | `pickup` |
 | `dualSocket` | Dual socket | dualCore, rack | System | kHz W8 | CPU sockets 1→2. Every CPU in a system is identical: CPU 2 copies CPU 1's generation and levels, and an upgrade applies to all, priced × CPU count. All cores pool under one scheduler (D7.3). Socket factor 0.92 in `η_cfg` (D7.5). A task whose threads span sockets runs its RAM stream stages at 0.5× bandwidth. | Up to 2 CPUs per system | `density`, `threads` |
 | `quadSocket` | 4 sockets | dualSocket | System | kHz W9 | CPU sockets 2→4 (3 and 4). Socket factors 0.85 and 0.78. Denser per rack slot and switch port, less efficient than several small boxes. | Up to 4 CPUs per system | `density`, `rackDist` member specs |
-| `dma` | DMA engine | memController | System | Hz W5 | While a shard is in the RAM or disk part of a memory stage (D26), its core is free for another shard. The shard keeps its scheduler K slot. | Cores free up during RAM and disk. | `ram`, `storage` |
+| `dma` | DMA engine | systemBoard | System | Hz W5 | While a shard is in the RAM or disk part of a memory stage (D26), its core is free for another shard. The shard keeps its scheduler K slot. | Cores free up during RAM and disk. | `ram`, `storage` |
 | `prefetch` | Prefetcher | dma, l3Cache | System | kHz W6 | The shard at the front of the system queue is placed in the memory hierarchy early, and its first RAM part runs with RAM bandwidth no running shard is using (D26). | Queued shards preload from RAM | `ram` |
 
 ### 5.2 Memory (13)
 
 | id | Name | Requires | Level | Era / tier | Effect | Short | Answers |
 |---|---|---|---|---|---|---|---|
-| `memController` | Memory ctrl | systemBoard | System | Hz W4 | RAM part gen 0 (SDRAM), 1 slot: the second memory tier (D26). Working sets that overflow cache sit in RAM and their traffic runs at RAM bandwidth; RAM adds to the hierarchy that gates them. | Adds RAM: 1 SDRAM slot | `ram`, `gate` |
-| `ddr` | DDR | memController | System | Hz W5 | RAM gen 1: 2× gen-0 native bandwidth and capacity. Both generations have 36 levels; watts use the era's energy ratio, not a free bandwidth multiplier. | Opens DDR RAM: 2× speed and size | `ram` |
+| `ddr` | DDR | systemBoard | System | Hz W5 | RAM gen 1: 2× gen-0 native bandwidth and capacity. Both generations have 36 levels; watts use the era's energy ratio, not a free bandwidth multiplier. | Opens DDR RAM: 2× speed and size | `ram` |
 | `ddr2` | DDR2 | ddr, fabKhz | System | kHz W7 | RAM gen 2. | Opens DDR2 RAM | `ram` |
 | `ddr3` | DDR3 | ddr2, fabMhz | System | MHz W10 | RAM gen 3. | Opens DDR3 RAM | `ram`, `rackDist` |
 | `ddr4` | DDR4 | ddr3, room | Room | MHz W11 | RAM gen 4. | Opens DDR4 RAM | `roomDist` |
 | `ddr5` | DDR5 | ddr4, fabGhz | Global | GHz W12 | RAM gen 5. | Opens DDR5 RAM | `multiAz` member specs |
-| `dualChannel` | Dual channel | memController | System | Hz W5 | RAM slots 1→2. Capacity always sums. Two matched modules (same generation and level) run in dual channel: 2× module bandwidth; mismatched modules run single channel. No efficiency cost at 2 DIMMs. | 2 RAM slots; matched pairs 2× speed | `ram` |
+| `dualChannel` | Dual channel | systemBoard | System | Hz W5 | RAM slots 1→2. Capacity always sums. Two matched modules (same generation and level) run in dual channel: 2× module bandwidth; mismatched modules run single channel. No efficiency cost at 2 DIMMs. | 2 RAM slots; matched pairs 2× speed | `ram` |
 | `quadChannel` | Quad channel | dualChannel, fabKhz | System | kHz W7 | RAM slots 2→4, the cap on a general system (D7.4). Four matched modules run quad channel. DIMM factors 0.95 at 3 and 0.90 at 4 in `η_cfg` (D7.5). | 4 RAM slots; matched sets 4× speed | `ram` |
 | `octaChannel` | 8 channels | quadChannel, accelSystem, fabMhz | System | MHz W10 | On an accelerator system, 8 matched modules run 8-channel: 8× module bandwidth. General systems stay at 4 slots. | 8-channel RAM on accelerator boards | `gpu`, `roomDist` |
 | `ecc` | ECC memory | ddr2, rack | Rack | kHz W8 | RAM modules can be bought as ECC: 1.25× price, 1.1× watts. Tasks with gate `ecc` need ECC RAM on every system they touch. | Buy ECC RAM for ECC tasks | `storage`, `rackDist`, `gate` |
 | `rdimm` | Registered DIMM | quadChannel, ecc | Rack | MHz W9 | ECC module capacity ×2 at the same level and bandwidth. Every RAM generation still has all 36 levels. Replaces the old +4-level effect. See `hardware-progression.md`. | ECC RAM capacity ×2 | `rackDist`, `roomDist` per-member RAM |
 | `lowVoltRam` | Low-voltage RAM | ddr2 | System | kHz W7 | RAM idle and load watts ×0.7 at the same rates. | RAM watts ×0.7 | `energy`, `overload` |
-| `hotPages` | Hot pages | memController, storageCtl | System | Hz W5 | Rule (D26; was Virtual memory, now base): a spilled shard's hot data stays in fast tiers. Its disk traffic is `f_d²` of its memory traffic instead of `f_d`; the rest runs from RAM. A shard 25% on disk does 6% of its traffic there. | Spilled tasks touch disk less | `storage`, `ram` |
+| `hotPages` | Hot pages | storageCtl | System | Hz W5 | Rule (D26; was Virtual memory, now base): a spilled shard's hot data stays in fast tiers. Its disk traffic is `f_d²` of its memory traffic instead of `f_d`; the rest runs from RAM. A shard 25% on disk does 6% of its traffic there. | Spilled tasks touch disk less | `storage`, `ram` |
 
 ### 5.3 Acceleration (18)
 
@@ -258,7 +257,7 @@ Generation research charges the following Credit fee once at actual start, in ad
 
 | ID | Name | Requires | Level | Era / tier | Effect | Answers |
 |---|---|---|---|---|---|---|
-| `gpuGen1` | GPU gen 1, 1 kHz | memController | System | Hz W5 | Opens gen-1 models; 15,000 Data, 0 Credits, 1,500,000 work ops. | Opens 1 kHz GPU models | `gpu` |
+| `gpuGen1` | GPU gen 1, 1 kHz | systemBoard | System | Hz W5 | Opens gen-1 models; 15,000 Data, 0 Credits, 1,500,000 work ops. | Opens 1 kHz GPU models | `gpu` |
 | `gpuGen2` | GPU gen 2, 10 kHz | gpuGen1, fabKhz | System | kHz W7 | Opens gen-2 models and legacy NPU g1 when `npu` is also complete; 1,000,000 Data, 640,000,000 Credits, 200,000,000 work ops. | Opens 10 kHz GPU models | `gpu` |
 | `gpuGen3` | GPU gen 3, 100 kHz | gpuGen2, rack | System | kHz W8 | Opens gen-3 models; 4,000,000 Data, 6,400,000,000 Credits, 1,000,000,000 work ops. | Opens 100 kHz GPU models | `gpu` |
 | `gpuGen4` | GPU gen 4, 1 MHz | gpuGen3, fabMhz | System | MHz W10 | Opens gen-4 models; 40,000,000 Data, 64,000,000,000 Credits, 20,000,000,000 work ops. | Opens 1 MHz GPU models | `gpu` |
@@ -410,7 +409,7 @@ Network scopes (rack load balancer, then room, site and backbone):
 
 | id | Name | Requires | Level | Era / tier | Effect | Short | Answers |
 |---|---|---|---|---|---|---|---|
-| `systemBoard` | System | dualCore, l2Cache | System | Hz W4 | Opens the System level. The chip becomes the CPU on a board with a fixed board PSU (gen 0). Tray: CPU, RAM, GPU, Storage, each still gated by its own node. | Opens the System level | `ram`, `gpu`, `storage` |
+| `systemBoard` | System | dualCore, l2Cache | System | Hz W4 | Opens the System level. The chip becomes the CPU on a board with a fixed board PSU (gen 0) and SDRAM (RAM gen 0, D37: no separate RAM research). Tray: CPU, RAM, GPU, Storage; GPU and Storage still gated by their nodes. | Opens the System level | `ram`, `gpu`, `storage` |
 | `rack` | Rack | fabKhz | Rack | kHz W6 | Opens Rack. A free starter rack with air cooler, basic PDU, 4-port gen-0 switch (ports at 1 kHz, shared port/uplink ceiling 500 GHz) and a round-robin load balancer. Server port speeds can now be upgraded on the rack switch (D15); before this the pipe is fixed at 1 kHz. The system becomes server 1. | Opens the Rack level | `density`, `rackDist` |
 | `room` | Room | rack, fabMhz | Room | MHz W10 | Opens Room (one AZ hall): network rack with room switch and load balancer, CRAC, standby UPS, 2 rows. Rack uplinks can now be upgraded on the network rack (D15). | Opens the Room level | `density`, `roomDist` |
 | `hallExpansion` | Third row | room, spineLeaf | Room | GHz W11 | A third row of 8 rack slots: racks per room 16 → 24. `spineLeaf` supplies ports for racks 17–24. | Racks per room 16 → 24 | `density` |
@@ -691,26 +690,25 @@ export const RESEARCH_V3: readonly ResearchNode[] = [
   n("smt", "SMT", "compute", ["timeSlice", "fabKhz"], "cpu", "khz", 7, 1_000_000, [cap("threadsPerCore", 2), rule("smt", { shareRate: 0.6 })], ["pickup"]),
   n("dualSocket", "Dual socket", "compute", ["dualCore", "rack"], "system", "khz", 8, 2.7e6, [cap("cpuSockets", 2), rule("socketFactor", { s2: 0.92 }), rule("socketSpanPenalty", { ramBandwidth: 0.5 })], ["density", "threads"]),
   n("quadSocket", "4 sockets", "compute", ["dualSocket"], "system", "khz", 9, 1.5e7, [cap("cpuSockets", 4), rule("socketFactor", { s3: 0.85, s4: 0.78 })], ["density", "rackDist"]),
-  n("dma", "DMA engine", "compute", ["memController"], "system", "hz", 5, 8_000, [rule("dma")], ["ram", "storage"]), // D26: RAM and disk parts
+  n("dma", "DMA engine", "compute", ["systemBoard"], "system", "hz", 5, 8_000, [rule("dma")], ["ram", "storage"]), // D26: RAM and disk parts
   n("prefetch", "Prefetcher", "compute", ["dma", "l3Cache"], "system", "khz", 6, 50_000, [rule("prefetch")], ["ram"]),
 
   // Memory
-  n("memController", "Memory ctrl", "memory", ["systemBoard"], "system", "hz", 4, 9_000, [gen("ram", 0)], ["ram", "gate"]),
-  n("ddr", "DDR", "memory", ["memController"], "system", "hz", 5, 8_000, [gen("ram", 1)], ["ram"]),
+  n("ddr", "DDR", "memory", ["systemBoard"], "system", "hz", 5, 8_000, [gen("ram", 1)], ["ram"]),
   n("ddr2", "DDR2", "memory", ["ddr", "fabKhz"], "system", "khz", 7, 1_000_000, [gen("ram", 2)], ["ram"]),
   n("ddr3", "DDR3", "memory", ["ddr2", "fabMhz"], "system", "mhz", 10, 4e7, [gen("ram", 3)], ["ram", "rackDist"]),
   n("ddr4", "DDR4", "memory", ["ddr3", "room"], "room", "mhz", 11, 6e7, [gen("ram", 4)], ["roomDist"]),
   n("ddr5", "DDR5", "memory", ["ddr4", "fabGhz"], "global", "ghz", 12, 2e8, [gen("ram", 5)], ["multiAz"]),
-  n("dualChannel", "Dual channel", "memory", ["memController"], "system", "hz", 5, 8_000, [cap("ramSlots", 2), rule("multiChannel")], ["ram"]),
+  n("dualChannel", "Dual channel", "memory", ["systemBoard"], "system", "hz", 5, 8_000, [cap("ramSlots", 2), rule("multiChannel")], ["ram"]),
   n("quadChannel", "Quad channel", "memory", ["dualChannel", "fabKhz"], "system", "khz", 7, 1_000_000, [cap("ramSlots", 4), rule("dimmFactor", { d3: 0.95, d4: 0.9 })], ["ram"]),
   n("octaChannel", "8 channels", "memory", ["quadChannel", "accelSystem", "fabMhz"], "system", "mhz", 10, 4e7, [rule("multiChannel", { accelChannels: 8 })], ["gpu", "roomDist"]),
   n("ecc", "ECC memory", "memory", ["ddr2", "rack"], "rack", "khz", 8, 2.7e6, [rule("ecc", { price: 1.25, watts: 1.1 })], ["storage", "rackDist", "gate"]),
   n("rdimm", "Registered DIMM", "memory", ["quadChannel", "ecc"], "rack", "mhz", 9, 1.5e7, [rule("registeredCapacity", { factor: 2 })], ["rackDist", "roomDist"]),
   n("lowVoltRam", "Low-voltage RAM", "memory", ["ddr2"], "system", "khz", 7, 1_000_000, [rule("ramWatts", { factor: 0.7 })], ["energy", "overload"]),
-  n("hotPages", "Hot pages", "memory", ["memController", "storageCtl"], "system", "hz", 5, 8_000, [rule("hotPages", { diskExponent: 2 })], ["storage", "ram"]),
+  n("hotPages", "Hot pages", "memory", ["storageCtl"], "system", "hz", 5, 8_000, [rule("hotPages", { diskExponent: 2 })], ["storage", "ram"]),
 
   // Acceleration
-  n("gpuGen1", "GPU gen 1, 1 kHz", "accel", ["memController"], "system", "hz", 5, 8_000, [gen("gpu", 0)], ["gpu"]),
+  n("gpuGen1", "GPU gen 1, 1 kHz", "accel", ["systemBoard"], "system", "hz", 5, 8_000, [gen("gpu", 0)], ["gpu"]),
   n("gpuGen2", "GPU gen 2, 10 kHz", "accel", ["gpuGen1", "fabKhz"], "system", "khz", 7, 1_000_000, [gen("gpu", 1), gen("npu", 1)], ["gpu"]),
   n("gpuGen3", "GPU gen 3, 100 kHz", "accel", ["gpuGen2", "rack"], "system", "khz", 8, 2.7e6, [gen("gpu", 2)], ["gpu"]),
   n("gpuGen4", "GPU gen 4, 1 MHz", "accel", ["gpuGen3", "fabMhz"], "system", "mhz", 10, 4e7, [gen("gpu", 3)], ["gpu"]),
@@ -837,7 +835,7 @@ export const RESEARCH_V3: readonly ResearchNode[] = [
   n("closedLoop2", "Two-phase loop", "cooling", ["closedLoop", "regions"], "global", "ghz", 14, 3e9, [gen("roomCooler", 5)], ["heat", "energy"]),
 
   // Structure
-  n("systemBoard", "System", "structure", ["dualCore", "l2Cache"], "system", "hz", 3, 7_500, [view("system"), gen("psu", 0)], ["ram", "gpu", "storage"]),
+  n("systemBoard", "System", "structure", ["dualCore", "l2Cache"], "system", "hz", 3, 40_000, [view("system"), gen("psu", 0), gen("ram", 0)], ["ram", "gpu", "storage"]),
   n("rack", "Rack", "structure", ["fabKhz"], "rack", "khz", 7, 2.7e7, [view("rack"), gen("rackCooler", 0), gen("pdu", 0), gen("lb", 0), gen("switch", 0)], ["density", "rackDist"]),
   n("room", "Room", "structure", ["rack", "fabMhz"], "room", "mhz", 10, 1.2e8, [view("room"), gen("roomCooler", 0), gen("ups", 0), gen("row", 0)], ["density", "roomDist"]),
   n("hallExpansion", "Third row", "structure", ["room", "spineLeaf"], "room", "ghz", 11, 6e7, [cap("roomRows", 3)], ["density"]),

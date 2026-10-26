@@ -1,6 +1,6 @@
 import { capacity } from '../build/catalog/curves';
 import { GENERATION, GENERATION_FUEL, POWER_CTL } from '../build/catalog/infra';
-import { REGIONS, SERVERS_PER_RACK, TICK_MS } from '../core/constants';
+import { REGIONS, SERVERS_PER_RACK, TICK_MS, viewPricePerJ, viewW } from '../core/constants';
 import { MODE } from '../core/timers';
 import type { StartCtl } from '../types/build';
 import type { GameState } from '../types/state';
@@ -48,7 +48,7 @@ export function powerCtlView(state: GameState, rack: number): PowerCtlView | nul
   return {
     generation: ctl.gen, level: ctl.level,
     battery: {
-      capacityJ, chargeJ, secondsLeft: drawW > 0 ? chargeJ / drawW : null,
+      capacityJ: viewW(capacityJ), chargeJ: viewW(chargeJ), secondsLeft: drawW > 0 ? chargeJ / drawW : null,
       discharging: state.round.phase === 'running' && powered && chargeJ > 0 && drawW > 0,
     },
     start: startCtlView(ctl, awake, total, wakeMs(h.wakeTicks[rack])),
@@ -104,5 +104,5 @@ export function generationView(state: GameState, site: number): GenerationView |
   const outputW = capacity(GENERATION, gen.gen, gen.level) * factor;
   const usedW = state.hot.site.genUsedW[site] ?? 0;
   const fuelPrice = GENERATION_FUEL[gen.gen]! * region.energyPrice;
-  return { kind: GEN_KINDS[gen.gen]!, level: gen.level, outputW, usedW, marginalPrice: usedW < outputW ? fuelPrice : region.energyPrice };
+  return { kind: GEN_KINDS[gen.gen]!, level: gen.level, outputW: viewW(outputW), usedW: viewW(usedW), marginalPrice: viewPricePerJ(usedW < outputW ? fuelPrice : region.energyPrice) };
 }

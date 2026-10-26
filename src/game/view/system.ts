@@ -1,3 +1,4 @@
+import { viewW } from '../core/constants';
 import { ACCEL_GPU_SLOTS, ACCEL_MAX_CPUS, ACCEL_RAM_SLOTS, GENERAL_MAX_GPUS, QUEUE_SAMPLE, GENERAL_MAX_RAM, MAX_CPUS } from '../core/constants';
 import { capacity, capacity2, PARTS } from '../build/catalog';
 import type { SystemSpec } from '../types/build';
@@ -97,7 +98,7 @@ export function systemSnapshot(state: GameState, id: SystemId, parent: NodeRef |
     capacities: { cache: c.cacheBits[id] ?? 0, ram: c.ramCap[id] ?? 0, vram: c.vram[id] ?? 0, storage: c.storageCap[id] ?? 0 },
     used: { memory: (h.usedCache[id] ?? 0) + (h.usedRam[id] ?? 0), vram: h.usedVram[id] ?? 0, storage: h.usedDisk[id] ?? 0 },
     memory: { tiers: memoryTiers(state, id) },
-    drawW: h.drawW[id] ?? 0,
+    drawW: viewW(h.drawW[id] ?? 0),
     saveable: state.research.unlocks.rules.includes('configSave'),
     slots: st.slots,
     inbound: inboundTransfer(state, id),

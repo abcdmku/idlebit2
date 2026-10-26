@@ -1,3 +1,4 @@
+import { viewW } from '../core/constants';
 import type { CompiledBuffers, HotBuffers } from '../core/buffers';
 import { HOME_TEMP_F, MAX_ZONES_PER_SITE, RACKS_PER_ROOM, REGIONS, SERVERS_PER_RACK, TICK_MS } from '../core/constants';
 import { MODE } from '../core/timers';
@@ -92,9 +93,9 @@ export function supplyView(kind: SupplyKind, part: PartLevel, n: SupplyNumbers, 
   const deliveredW = n.failed ? 0 : n.usage * n.capacityW;
   const lossW = deliveredW * n.loss;
   return {
-    kind, generation: part.gen, level: part.level, capacityW: n.capacityW, deliveredW, usage: n.failed ? 0 : n.usage,
+    kind, generation: part.gen, level: part.level, capacityW: viewW(n.capacityW), deliveredW: viewW(deliveredW), usage: n.failed ? 0 : n.usage,
     overloadS: ticksToS(n.overTicks), failed: n.failed, rebootMs: n.failed ? n.rebootTicks * TICK_MS : null,
-    loss: n.loss, lossW, capped: n.capSwitch, capFactor: n.capFactor,
+    loss: n.loss, lossW: viewW(lossW), capped: n.capSwitch, capFactor: n.capFactor,
     creditsPerMinute: (deliveredW + lossW) * energyPrice * 60,
   };
 }
@@ -124,7 +125,7 @@ export function coolerView(c: LumpCompiled, h: LumpHot, i: number, part: CoolerB
   return {
     tech: COOL_TECHS[c.coolerTech[i] ?? 0] ?? 'air', generation: part.gen, level: part.level, duty,
     setpointF: c.hasSetpoint[i] === 1 ? (c.setpointF[i] ?? part.setpointF) : null,
-    watts: h.coolerW[i] ?? 0, capacityW: qc, equilibriumF: equilibriumF(qc, duty, c.leak[i] ?? 0, h.heatW[i] ?? 0, surroundF),
+    watts: viewW(h.coolerW[i] ?? 0), capacityW: viewW(qc), equilibriumF: equilibriumF(qc, duty, c.leak[i] ?? 0, h.heatW[i] ?? 0, surroundF),
   };
 }
 

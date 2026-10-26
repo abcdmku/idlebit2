@@ -1,3 +1,4 @@
+import { viewPricePerJ } from '../core/constants';
 import { G } from '../core/buffers';
 import { MAX_UPS, MAX_ZONES_PER_SITE, RACKS_PER_ROOM, REGIONS, TICK_MS } from '../core/constants';
 import { REGION_IDS } from '../types/catalog';
@@ -41,7 +42,7 @@ function siteView(state: GameState, regionIndex: number, site: number): SiteView
   const region = REGIONS[regionIndex]!;
   if (site < 0) {
     return { siteId: null, region: region.id, open: false, online: 'empty', zones: [], grid: null, dataPlane: null,
-      energyPrice: region.energyPrice, outsideF: region.outsideF, hottestF: region.outsideF, timerS: null, powered: false, wakeMs: null, generation: null };
+      energyPrice: viewPricePerJ(region.energyPrice), outsideF: region.outsideF, hottestF: region.outsideF, timerS: null, powered: false, wakeMs: null, generation: null };
   }
   const b = state.build.sites[site]!;
   const c = state.compiled.site, h = state.hot.site;
@@ -68,7 +69,7 @@ function siteView(state: GameState, regionIndex: number, site: number): SiteView
       generation: b.dataPlane.gen, bitsPerSec: c.dpSpeed[site] || ladderHz(b.dataPlane.k),
       latencyMs: (c.dpLatencyTicks[site] ?? 0) * TICK_MS, active: dpActive,
     },
-    energyPrice: region.energyPrice, outsideF: region.outsideF, hottestF: hottest,
+    energyPrice: viewPricePerJ(region.energyPrice), outsideF: region.outsideF, hottestF: hottest,
     ...sitePowerFields(state, site), generation: generationView(state, site),
   };
 }

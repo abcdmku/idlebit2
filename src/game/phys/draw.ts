@@ -33,6 +33,8 @@ export interface SystemDraw {
   capLoadW: number;
 }
 const out: SystemDraw = { deliveredW: 0, idleW: 0, capLoadW: 0 };
+/** D38: the CPU's fixed draw before System (W, internal units), billed as energy; the real model takes over at System. */
+export const PRE_SYSTEM_CPU_W = 10;
 
 const cstateFactor = (depth: number): number => {
   for (const c of CSTATES) if (c.depth === depth) return c.factor;
@@ -69,6 +71,8 @@ export function clockFactorOf(w: World, sys: number): number {
 export function systemDraw(w: World, sys: number, kind: number, settings: PhysSettings): SystemDraw {
   out.deliveredW = 0; out.idleW = 0; out.capLoadW = 0;
   if (kind === DRAW_NONE) return out;
+  // D38: before System the CPU draws a fixed power nothing changes (clock, cache and core upgrades included).
+  if (!settings.psuLive) { out.idleW = PRE_SYSTEM_CPU_W; out.deliveredW = PRE_SYSTEM_CPU_W; return out; }
   const c = w.compiled.sys, h = w.hot.sys;
   const o = sys * R;
   const uncoreIdle = c.idleW[o + CPU]!, ramIdle = c.idleW[o + RAM]!, gpuIdle = c.idleW[o + GPU]!, ioIdle = c.idleW[o + IO]!;

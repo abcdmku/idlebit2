@@ -1327,6 +1327,18 @@ The user's words:
 5. **Room.** A network rack's ports follow the same pattern. Uplinks, the data plane and the backbone stay their own link parts.
 6. **Views:** unchanged fields (`SwitchView.sameSpeed` is the match toggle; ports keep `speedHz`). The UI drops the system "Port" box and labels.
 
+**D36–D38, 25 Oct: power in µW, RAM with System, fixed CPU power before System (user).** Binding.
+
+> power should be united as uW not kW to start. also system should have ram already unlocked not needing research. also CPU uses power you cant avoid it but not being in system view. it should be fixed value until you can upgrade it in system.
+
+**D36 · Power scale.** `POWER_SCALE = 1e-6` real watts per sim watt (`core/constants.ts`). Implemented at the view boundary: the sim's watts, joules and price per joule keep their numbers, so Credits, heat, throttles, crashes and every rule are identical by construction (no thermal re-tuning needed). Every view converts with `viewW` / `viewPricePerJ`: supplies (`capacityW`, `deliveredW`, `lossW`), coolers (`watts`, `capacityW`), `SystemSnapshot.drawW`, Power control battery J, generation W and marginal price, `SiteView.energyPrice` (Credits/J ÷ scale), quote effects (`wattsBefore/After`, and W or J capacities), GPU quote stats (`idleW`, `loadW`, `efficiencyOpsPerJ`) and `gpuPower` points, and the rack-power research heading. A boot CPU reads about 10 µW. `formatWatts` and `formatEnergy` print sub-unit prefixes (mW, µW, nW, pW; mJ, µJ). The bot reads quote GPU watts back at sim scale.
+
+**D37 · RAM comes with System.** `systemBoard` grants RAM gen 0 (SDRAM); `memController` is gone, and its dependents (`dma`, `ddr`, `dualChannel`, `gpuGen1`; `hotPages` keeps `storageCtl`) need `systemBoard`. Later RAM generations keep their nodes. Tree: 164 nodes.
+
+**D38 · Fixed CPU power before System.** Before System the CPU draws a fixed `PRE_SYSTEM_CPU_W` = 10 sim W (10 µW shown), billed as energy; clock, cache and core upgrades don't change it (`phys/draw.ts`). At System the real model takes over and the PSU limit goes live, with the QA-02 sizing. The value is the boot chip's draw: 25 W changed nothing measurable, and 100 W left a passive opening insolvent. The handover is a step: pre-System energy is about 0% of gross, and the first full System-era rounds run 38–50% (seed 42), because a pushed Hz chip's real draw then bills.
+
+**Quick balance (seed 42):** `systemBoard` Data 7,500 → 40,000 (System had moved to 0:16 with free pre-System power). D20 passive round 1 unchanged (0:36 / 0:55 / 1:16); System 0:21; Rack 5:36.
+
 ## 16. Shared rules for agents
 
 - **Shared checkout.** Other agents work in the same checkout at the same time. Edit only the files your brief gives you. Never revert someone else's edits. Run no git command that changes state.

@@ -21,7 +21,7 @@ const changeOf = (s: GameState, id: string) => selectResearchTree(s).nodes.find(
 describe('research node change (before → after on the part it upgrades)', () => {
   it.each([
     [[], 'dualCore', { label: 'Cores per CPU', before: '1', after: '32' }],
-    [['memController'], 'ddr', { label: 'RAM', before: 'SDRAM', after: 'DDR' }],
+    [['systemBoard'], 'ddr', { label: 'RAM', before: 'SDRAM', after: 'DDR' }],
     [[], 'cstateC1', { label: 'Idle core power', before: '100%', after: '50%' }],
     [[], 'fifoSched', { label: 'Queue', before: 'No queue', after: '2 tasks' }],
     [[], 'l2Cache', { label: 'L2 cache', before: '—', after: 'Hz L2' }],

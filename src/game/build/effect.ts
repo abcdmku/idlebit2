@@ -1,3 +1,4 @@
+import { viewW } from '../core/constants';
 import { amount } from '../amount';
 import { allocCompiled } from '../core/buffers';
 import { DT_S, MAX_ACCELS, REGIONS } from '../core/constants';
@@ -91,7 +92,9 @@ export function preview(before: number, after: number, unit: CapacityUnit, wBefo
   const energyDelta = (wAfter - wBefore) * price;
   const gain = rateGain === null ? null : rateGain - energyDelta;
   return {
-    capacityBefore: before, capacityAfter: after, unit, wattsBefore: wBefore, wattsAfter: wAfter,
+    // D36: watts, joules and W/J capacities leave the sim at the view scale.
+    capacityBefore: unit === 'W' || unit === 'J' ? viewW(before) : before, capacityAfter: unit === 'W' || unit === 'J' ? viewW(after) : after, unit,
+    wattsBefore: viewW(wBefore), wattsAfter: viewW(wAfter),
     energyPerMinuteDelta: perMinute(wAfter - wBefore, price),
     paybackS: gain !== null && gain > 0 ? Number(cost) / gain : null,
   };

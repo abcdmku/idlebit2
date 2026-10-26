@@ -58,7 +58,7 @@ function relevant(def: ResearchDef, hardware: ReturnType<typeof inventory>): boo
   const has = (part: PartId) => gens.has(part);
   if (LEVELS.indexOf(def.level) > horizon) return false;
   // Only the first hardware unlock is discoverable before that hardware is installed.
-  if (def.category === 'memory' && !has('ram') && def.id !== 'memController') return false;
+  if (def.category === 'memory' && !has('ram')) return false;
   if (def.category === 'accel' && !has('gpu') && !has('npu') && def.id !== 'gpuGen1') return false;
   if (def.category === 'storage' && !has('storage') && def.id !== 'storageCtl') return false;
   if (['dma', 'prefetch'].includes(def.id) && !has('ram')) return false;

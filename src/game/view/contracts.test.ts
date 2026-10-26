@@ -1,3 +1,4 @@
+import { POWER_SCALE } from '../core/constants';
 import { capacity, capacity2, PARTS } from '../build/catalog';
 import { cloneCompiled, cloneHot, LOC } from '../core/buffers';
 import { ACCEL_CLOCKS, MAX_ACCELS, RACK_SLOTS_PER_ROW, RACKS_PER_ROOM } from '../core/constants';
@@ -91,7 +92,7 @@ describe('system part-value contract (R40)', () => {
     expect(snap.chip.pipe.speed).toBe(c.pipeSpeed[id]);
     expect(snap.chip.clock.hz).toBe(c.clockHz[id]);
     expect(snap.chip.cores.length * snap.cpuCount).toBe(c.cores[id]);
-    expect(snap.psu.capacityW).toBe(c.psuCapW[id]);
+    expect(snap.psu.capacityW).toBe(c.psuCapW[id]! * POWER_SCALE);
     for (let i = 0; i < spec.ram.length; i += 1) {
       const p = spec.ram[i]!;
       expect(snap.ram[i]).toMatchObject({

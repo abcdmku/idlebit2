@@ -61,7 +61,12 @@ export function formatRate(value:AmountInput,unit:string,signed=false):string {
   const d=decimal(value),prefix=signed&&!d.lt(0)?'+':'';
   return prefix+formatMetric(d)+(unit?' '+unit:'');
 }
-export const formatWatts=(value:AmountInput,signed=false):string=>formatRate(value,'W',signed);
+/** D36: watts with SI prefixes, sub-unit included: "41 µW", "2.5 mW", "41 kW", "1.2 GW". */
+export const formatWatts=(value:AmountInput,signed=false):string=>{
+  const n=Number(decimal(value).toString());
+  const [num,prefix]=siPartsAll(n);
+  return (signed&&n>=0?'+':'')+num+' '+prefix+'W';
+};
 
 /** HUD net rate, including the mockup's fixed two decimals below 10/min. */
 export function formatNet(value:AmountInput):string {
@@ -112,6 +117,18 @@ function siParts(n: number): [string, string] {
   return [sign + text, SI[i]!];
 }
 
+const SUB = ['m', 'µ', 'n', 'p', 'f'] as const;
+/** siParts plus sub-unit prefixes (m, µ, n, p, f) for values below 1 (D36: power and energy). */
+function siPartsAll(n: number): [string, string] {
+  const a = Math.abs(n);
+  if (!Number.isFinite(n) || a === 0 || a >= 1) return siParts(n);
+  let i = Math.min(SUB.length, Math.ceil(-Math.log10(a) / 3));
+  let text = sig3(a * 1000 ** i);
+  if (Number(text) >= 1000 && i > 1) { i -= 1; text = sig3(a * 1000 ** i); }
+  if (Number(text) >= 1000) return siParts(n < 0 ? -1 : 1);
+  return [(n < 0 ? MINUS : '') + text, SUB[i - 1]!];
+}
+
 /** Bits: "1 b", "64 b", "21.4 kb", "197 kb", "2.5 Mb", "1 Gb". */
 export function formatSize(bits: number): string {
   const [num, prefix] = siParts(bits);
@@ -135,9 +152,9 @@ export function formatClock(seconds: number): string {
   const h = seconds / 3600;
   return `${h < 10 ? String(Math.floor(h * 10) / 10) : String(Math.floor(h))} h`;
 }
-/** Energy: "600 MJ", "120 GJ" (a battery's capacity). */
+/** Energy: "600 MJ", "120 GJ", "5 µJ" (a battery's capacity; D36 sub-unit prefixes). */
 export function formatEnergy(joules: number): string {
-  const [num, prefix] = siParts(joules);
+  const [num, prefix] = siPartsAll(joules);
   return `${num} ${prefix}J`;
 }
 /** Work, the prefix on the number (the queue cards' style): "1 op", "3 ops", "53.4k ops", "1.2M ops". */

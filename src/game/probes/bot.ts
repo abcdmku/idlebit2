@@ -1,3 +1,4 @@
+import { POWER_SCALE } from '../core/constants';
 import { capacity } from '../build/catalog/curves';
 import { amountCompare, amountToNumber } from '../amount';
 import {
@@ -241,6 +242,9 @@ function configurePowerCtl(state: GameState): GameState {
   return s;
 }
 
+/** D36: GPU quote stats back at the sim scale. */
+const simGpu = <T extends { idleW: number; loadW: number }>(g: T): T => ({ ...g, idleW: g.idleW / POWER_SCALE, loadW: g.loadW / POWER_SCALE });
+
 /** A gate costing one second of income ranks like a rate part that pays back in this many seconds. */
 const GATE_PAYBACK_S = 20;
 
@@ -311,7 +315,8 @@ export function score(state: GameState, q: Quote): number | null {
     if (first) return supplyNeeded(state, a) ? GATE_PAYBACK_S * cost / Math.max(1, income(state)) : null;
     // A bigger native model is a gate when the last round failed on VRAM or GPU cores. Pushed
     // upgrades are not: their watts grow faster than their ops (D8), so they must pay back as rate.
-    const { before, after } = q.gpu;
+    // D36: quote watts are at the view scale; the bot compares them with sim prices and capacities.
+    const before = q.gpu.before && simGpu(q.gpu.before), after = simGpu(q.gpu.after);
     const bigger = a.type === 'installGpu' && after.upgrades === 0
       && (after.vramBits > (before?.vramBits ?? 0) || after.cores > (before?.cores ?? 0))
       && after.opsPerS > 2 * ENERGY_PRICE * (after.idleW + after.loadW);
@@ -443,8 +448,8 @@ function gpuFitsSupply(state: GameState, q: Quote): boolean {
   const c = state.compiled.sys;
   const fullW = c.coreIdleW[id]! + c.coreLoadW[id]! + c.clockIdleW[id]!
     + [0, 1, 2, 3].reduce((n, resource) => n + c.idleW[id * 4 + resource]! + c.loadW[id * 4 + resource]!, 0);
-  const beforeW = q.gpu.before ? q.gpu.before.idleW + q.gpu.before.loadW : 0;
-  return fullW - beforeW + q.gpu.after.idleW + q.gpu.after.loadW <= c.psuCapW[id]!;
+  const beforeW = q.gpu.before ? (q.gpu.before.idleW + q.gpu.before.loadW) / POWER_SCALE : 0;
+  return fullW - beforeW + (q.gpu.after.idleW + q.gpu.after.loadW) / POWER_SCALE <= c.psuCapW[id]!;
 }
 
 /** Do not repeatedly scrap a card for the same tray model, or buy a weaker replacement. */
@@ -561,7 +566,7 @@ function milestonePath(tree: ReturnType<typeof selectResearchTree>): { path: Set
 }
 
 /** Off-path research that unblocks income; a sensible player takes it as soon as the budget allows. */
-const ESSENTIAL = ['fifoSched', 'dualCore', 'memController', 'psu80', 'gpuGen1', 'storageCtl', 'lbCapability', 'portExpansion', 'sw100k', 'gddr6', 'gpuGen2', 'densePorts', 'meteredPdu'];
+const ESSENTIAL = ['fifoSched', 'dualCore', 'psu80', 'gpuGen1', 'storageCtl', 'lbCapability', 'portExpansion', 'sw100k', 'gddr6', 'gpuGen2', 'densePorts', 'meteredPdu'];
 /** Off-path research since the last milestone started may spend this share of the next milestone path's Data. */
 const OFF_PATH_SHARE = 0.5;
 

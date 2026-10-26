@@ -1,3 +1,4 @@
+import { viewW } from '../core/constants';
 import { capacity, ladderSpeed, partName, PARTS } from '../build/catalog';
 import { gpuModel } from '../build/catalog/gpuModels';
 import { LEVEL_NAMES } from '../core/constants';
@@ -70,7 +71,7 @@ export function researchPartSpecs(state: GameState, at: NodeRef | null = null): 
     switch: line(openRack ? switchSpec(openRack.switch) : NONE),
     lb: line(openRack ? routerSpec(openRack.lb) : NONE),
     rackCooling: line(openRack ? partName('rackCooler', openRack.cooler.gen) : NONE),
-    rackPower: line(openRack ? `${partName('pdu', openRack.pdu.gen)} · ${formatWatts(c.rack.pduCapW[openRack.id] ?? 0)}` : NONE),
+    rackPower: line(openRack ? `${partName('pdu', openRack.pdu.gen)} · ${formatWatts(viewW(c.rack.pduCapW[openRack.id] ?? 0))}` : NONE),
     netRack: line(openRoom ? `${switchSpec(openRoom.switch)} · ${routerSpec(openRoom.lb)}` : NONE),
     roomCooling: line(openRoom ? partName('roomCooler', openRoom.cooler.gen) : NONE),
     ups: line(openRoom?.ups[0] ? `${partName('ups', openRoom.ups[0].gen)}${openRoom.ups.length > 1 ? ` · ${openRoom.ups.length} units` : ''}` : NONE),

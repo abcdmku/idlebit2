@@ -1,3 +1,4 @@
+import { POWER_SCALE } from '../core/constants';
 import { amount } from '../amount';
 import { createInitialState, initialHot } from '../core/state';
 import { compileAll } from '../core/topology';
@@ -14,7 +15,7 @@ import { supplyLossW } from '../phys/supplies';
 const id = systemId(0);
 function fixture(psuGen = 0): GameState {
   const base = createInitialState(42);
-  const completed = ['systemBoard', 'memController', 'gpuGen1', ...(psuGen ? ['psu80'] : [])].map(researchId);
+  const completed = ['systemBoard', 'gpuGen1', ...(psuGen ? ['psu80'] : [])].map(researchId);
   const research = { ...base.research, completed, unlocks: deriveUnlocks(completed) };
   const build = { ...base.build, systems: base.build.systems.map((s) => s && ({ ...s,
     spec: { ...s.spec, psu: { gen: psuGen, level: 1, capped: false } } })) };
@@ -32,16 +33,17 @@ describe('GPU whole-system power quotes', () => {
     const small = fixture(), large = fixture(1);
     const weak = modelQuote(small), strong = modelQuote(large);
     expect(weak.gpu).toEqual(strong.gpu);
-    expect(weak.gpuPower!.after.deliveredW).toBeCloseTo(19810.3, 10);
-    expect(strong.gpuPower!.after.deliveredW).toBeCloseTo(19810.3, 10);
-    expect(weak.gpuPower!.after.capacityW).toBe(32768);
-    expect(strong.gpuPower!.after.capacityW).toBe(65536);
-    expect(weak.gpuPower!.after.inputW).toBeCloseTo(25753.39, 10);
-    expect(strong.gpuPower!.after.inputW).toBeCloseTo(23772.36, 10);
-    expect(weak.gpuPower!.after.headroomW).toBeCloseTo(12957.7, 10);
-    expect(strong.gpuPower!.after.headroomW).toBeCloseTo(45725.7, 10);
-    expect(weak.gpuPower!.after.lossW).toBeCloseTo(5943.09, 10);
-    expect(strong.gpuPower!.after.lossW).toBeCloseTo(3962.06, 10);
+    // D36: quote watts are at the view scale (sim W × POWER_SCALE).
+    expect(weak.gpuPower!.after.deliveredW).toBeCloseTo(19810.3 * POWER_SCALE, 12);
+    expect(strong.gpuPower!.after.deliveredW).toBeCloseTo(19810.3 * POWER_SCALE, 12);
+    expect(weak.gpuPower!.after.capacityW).toBeCloseTo(32768 * POWER_SCALE, 12);
+    expect(strong.gpuPower!.after.capacityW).toBeCloseTo(65536 * POWER_SCALE, 12);
+    expect(weak.gpuPower!.after.inputW).toBeCloseTo(25753.39 * POWER_SCALE, 12);
+    expect(strong.gpuPower!.after.inputW).toBeCloseTo(23772.36 * POWER_SCALE, 12);
+    expect(weak.gpuPower!.after.headroomW).toBeCloseTo(12957.7 * POWER_SCALE, 12);
+    expect(strong.gpuPower!.after.headroomW).toBeCloseTo(45725.7 * POWER_SCALE, 12);
+    expect(weak.gpuPower!.after.lossW).toBeCloseTo(5943.09 * POWER_SCALE, 12);
+    expect(strong.gpuPower!.after.lossW).toBeCloseTo(3962.06 * POWER_SCALE, 12);
   });
 
   it('publishes before/after whole-system power for hot upgrades and replacements separately from card duty', () => {
@@ -52,13 +54,13 @@ describe('GPU whole-system power quotes', () => {
     const state = { ...base, build, compiled, hot: initialHot({ compiled, seed: 42, round: base.round }) };
     const upgrade = quote(state, { kind: 'part', part: { unit: { kind: 'system', id }, slot: { kind: 'gpu', index: 0 } } }).quotes[0]!;
     const replacement = modelQuote(state, 0);
-    expect(upgrade.gpuPower!.before.deliveredW).toBeCloseTo(fullLoadWatts(spec, state.research.unlocks), 10);
+    expect(upgrade.gpuPower!.before.deliveredW).toBeCloseTo(fullLoadWatts(spec, state.research.unlocks) * POWER_SCALE, 12);
     expect(upgrade.gpuPower!.after.deliveredW).toBeGreaterThan(upgrade.gpuPower!.before.deliveredW);
     expect(upgrade.effect!.wattsBefore).toBe(upgrade.gpu!.before!.idleW);
     expect(upgrade.effect!.wattsAfter).toBe(upgrade.gpu!.after.idleW);
     expect(replacement.gpuPower!.before).toEqual(upgrade.gpuPower!.before);
-    expect(replacement.gpuPower!.after.deliveredW).toBeCloseTo(19810.3, 10);
-    expect(replacement.gpuPower!.after.inputW).toBeCloseTo(23772.36, 10);
+    expect(replacement.gpuPower!.after.deliveredW).toBeCloseTo(19810.3 * POWER_SCALE, 12);
+    expect(replacement.gpuPower!.after.inputW).toBeCloseTo(23772.36 * POWER_SCALE, 12);
   });
 
   it('includes CPU, RAM, all accelerators and drives without changing their component rules', () => {

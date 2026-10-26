@@ -1,3 +1,4 @@
+import { PRE_SYSTEM_CPU_W } from './draw';
 import { describe, expect, it, vi } from 'vitest';
 import { MODE } from '../core/timers';
 import { killSubtree } from '../exec';
@@ -66,10 +67,10 @@ describe('board PSU on the lone system', () => {
     physTicks(w, 1, (x) => expect(x.hot.bill[0]).toBeCloseTo(12 + 12 * 0.2 * 3));
   });
 
-  it('is dormant before System: no limit, no loss', () => {
+  it('is dormant before System: no limit, no loss, and the CPU draws its fixed power (D38)', () => {
     const w = physWorld(overloaded());
     w.research.unlocks = { ...w.research.unlocks, levels: { ...w.research.unlocks.levels, system: false } };
-    physTicks(w, 200, (x) => expect(x.hot.bill[0]).toBe(12));
+    physTicks(w, 200, (x) => expect(x.hot.bill[0]).toBe(PRE_SYSTEM_CPU_W));
     expect(w.hot.sys.psuOverTicks[0]).toBe(0);
     expect(w.hot.sys.mode[0]).toBe(MODE.onMarket);
   });

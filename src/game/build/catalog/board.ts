@@ -14,7 +14,8 @@ export const RAM_CAPACITY_FACTOR: readonly number[] = [1, 2, 4, 6, 8, 12, 16, 20
  */
 export const RAM: CatalogRow = {
   id: 'ram', scope: 'system', names: ['SDRAM', 'DDR', 'DDR2', 'DDR3', 'DDR4', 'DDR5'],
-  gates: [r('memController'), r('ddr'), r('ddr2'), r('ddr3'), r('ddr4'), r('ddr5')], curve: 'step',
+  // D37: SDRAM comes with the System board; later generations need their research.
+  gates: [r('systemBoard'), r('ddr'), r('ddr2'), r('ddr3'), r('ddr4'), r('ddr5')], curve: 'step',
   // SDRAM and DDR hold the System era's data-heavy working sets (tens of kbit) at mid levels, before E decays into loss.
   base: [256, 512, 2 ** 20, 2 ** 30, 2 ** 32, 2 ** 38], base2: [16, 32, 3.2e4, 6.4e7, 2.56e8, 1.28e11],
   capacityTable: RAM_CAPACITY_FACTOR, watts: { kind: 'ratio', era: [0, 0, 1, 2, 2, 3] },

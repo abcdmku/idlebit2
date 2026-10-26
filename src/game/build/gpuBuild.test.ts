@@ -1,3 +1,4 @@
+import { POWER_SCALE } from '../core/constants';
 import { amount } from '../amount';
 import { applyAction } from '../core/actions';
 import { DT_S, MAX_ACCELS } from '../core/constants';
@@ -144,9 +145,13 @@ describe('model GPU builds', () => {
     const up = quote(state, { kind: 'part', part: ref() }).quotes[0]!;
     const before = installedGpuStats({ kind: 'gpu', model: '1330', upgrades: 0 }, state.research.unlocks);
     const after = installedGpuStats({ kind: 'gpu', model: '1330', upgrades: 1 }, state.research.unlocks);
-    expect(up.gpu).toEqual({ before, after });
-    expect(up.effect).toMatchObject({ capacityBefore: 4000, capacityAfter: 10000,
-      wattsBefore: before.idleW + before.loadW / 2, wattsAfter: after.idleW + after.loadW / 2 });
+    // D36: quote watts at the view scale.
+    const view = (g: typeof before) => ({ ...g, idleW: g.idleW * POWER_SCALE, loadW: g.loadW * POWER_SCALE, efficiencyOpsPerJ: g.efficiencyOpsPerJ / POWER_SCALE });
+    expect(up.gpu!.before!.idleW).toBeCloseTo(view(before).idleW, 15);
+    expect(up.gpu!.after.loadW).toBeCloseTo(view(after).loadW, 15);
+    expect(up.effect).toMatchObject({ capacityBefore: 4000, capacityAfter: 10000 });
+    expect(up.effect!.wattsBefore).toBeCloseTo((before.idleW + before.loadW / 2) * POWER_SCALE, 15);
+    expect(up.effect!.wattsAfter).toBeCloseTo((after.idleW + after.loadW / 2) * POWER_SCALE, 15);
   });
 
   it('prices saved/copied pushed cards and merges only matching models hot', () => {

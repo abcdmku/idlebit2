@@ -48,7 +48,9 @@ describe('shared mockup currency formatting',()=>{
 describe('shared measurement and income formatting',()=>{
   it('pins the Phase 0D three-significant-figure plate/rate examples',()=>{
     expect(formatWatts('233.893',true)).toBe('+234 W');
-    expect(formatWatts('0.385')).toBe('0.385 W');
+    expect(formatWatts('0.385')).toBe('385 mW');
+    // D36: sub-unit SI prefixes for the µW start.
+    expect([formatWatts(1e-5), formatWatts(2.5e-3), formatWatts(41_000), formatEnergy(5e-6)]).toEqual(['10 µW', '2.5 mW', '41 kW', '5 µJ']);
     expect(formatRate('2000','ops/s')).toBe('2,000 ops/s');
     expect(formatRate('1.28999','/min')).toBe('1.29 /min');
     expect(formatWatts('-233.893',true)).toBe('−234 W');

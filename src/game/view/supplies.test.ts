@@ -1,3 +1,4 @@
+import { POWER_SCALE } from '../core/constants';
 import { MAX_UPS } from '../core/constants';
 import { buildState } from '../testkit/builders';
 import { rackId, roomId, systemId } from '../types/ids';
@@ -24,7 +25,8 @@ describe('baseline supply snapshot integration', () => {
     const state = stateWithDraw();
     const chip = chipSnapshot(state, systemId(1), null);
     expect(chip.psu).toEqual(systemSnapshot(state, systemId(1), null).psu);
-    expect(chip.psu).toMatchObject({ deliveredW: 75, lossW: 7.5 });
+    expect(chip.psu.deliveredW).toBeCloseTo(75 * POWER_SCALE, 15);
+    expect(chip.psu.lossW).toBeCloseTo(7.5 * POWER_SCALE, 15);
     expect(chip.psu.creditsPerMinute).toBeCloseTo(82.5 * 0.009 * 60);
   });
 

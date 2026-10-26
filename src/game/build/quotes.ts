@@ -1,3 +1,5 @@
+import { POWER_SCALE, viewW } from '../core/constants';
+import type { GpuPowerPoint, GpuPowerPreview } from '../types/quotes';
 import { meetLines } from './meet';
 import { POWER_SLOTS } from './partAccess';
 import { powerInstallPlans } from './powerParts';
@@ -136,6 +138,12 @@ export function toQuote(state: GameState, action: GameAction, plan: Plan, effect
   };
 }
 
+/** D36: GPU watts and ops per joule at the view scale. */
+const viewGpu = <T extends { idleW: number; loadW: number; efficiencyOpsPerJ: number }>(g: T): T =>
+  ({ ...g, idleW: viewW(g.idleW), loadW: viewW(g.loadW), efficiencyOpsPerJ: g.efficiencyOpsPerJ / POWER_SCALE });
+const point = (p: GpuPowerPoint): GpuPowerPoint => ({ deliveredW: viewW(p.deliveredW), capacityW: viewW(p.capacityW), lossW: viewW(p.lossW), inputW: viewW(p.inputW), headroomW: viewW(p.headroomW) });
+const viewPower = (p: GpuPowerPreview): GpuPowerPreview => ({ before: point(p.before), after: point(p.after) });
+
 function gpuMetadata(state: GameState, action: GameAction, plan: Plan): Pick<Quote, 'gpu' | 'gpuPower'> {
   if (action.type === 'installGpu') {
     const spec = state.build.systems[action.system]?.spec;
@@ -146,9 +154,9 @@ function gpuMetadata(state: GameState, action: GameAction, plan: Plan): Pick<Quo
       : action.index === null && spec.accels.length < MAX_ACCELS ? { ...spec, accels: [...spec.accels, native] }
         : card ? { ...spec, accels: spec.accels.map((old, index) => index === action.index ? native : old) } : null;
     return { gpu: {
-      before: card?.kind === 'gpu' ? installedGpuStats(card, state.research.unlocks) : null,
-      after: installedGpuStats(native, state.research.unlocks),
-    }, ...(proposed ? { gpuPower: gpuPowerPreview(state, action.system, proposed) } : {}) };
+      before: card?.kind === 'gpu' ? viewGpu(installedGpuStats(card, state.research.unlocks)) : null,
+      after: viewGpu(installedGpuStats(native, state.research.unlocks)),
+    }, ...(proposed ? { gpuPower: viewPower(gpuPowerPreview(state, action.system, proposed)) } : {}) };
   }
   if (action.type !== 'upgradePart' || action.part.unit.kind !== 'system' || action.part.slot.kind !== 'gpu') return {};
   const { unit, slot } = action.part;
@@ -156,8 +164,8 @@ function gpuMetadata(state: GameState, action: GameAction, plan: Plan): Pick<Quo
   if (card?.kind !== 'gpu') return {};
   const after = plan.ok ? plan.change.build.systems[unit.id]?.spec.accels[slot.index] : card;
   return after?.kind === 'gpu' ? {
-    gpu: { before: installedGpuStats(card, state.research.unlocks), after: installedGpuStats(after, state.research.unlocks) },
-    gpuPower: gpuPowerPreview(state, unit.id, plan.ok ? plan.change.build.systems[unit.id]!.spec : state.build.systems[unit.id]!.spec),
+    gpu: { before: viewGpu(installedGpuStats(card, state.research.unlocks)), after: viewGpu(installedGpuStats(after, state.research.unlocks)) },
+    gpuPower: viewPower(gpuPowerPreview(state, unit.id, plan.ok ? plan.change.build.systems[unit.id]!.spec : state.build.systems[unit.id]!.spec)),
   } : {};
 }
 

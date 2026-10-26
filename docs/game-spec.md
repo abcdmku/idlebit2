@@ -458,7 +458,7 @@ Program D10. The market is an **endless, ordered queue** per round. Nothing arri
 | Capability | Formula |
 |---|---|
 | hardware threads | `Σ cores × threadsPerCore` (1, or 2 with `smt`) |
-| core rate | `clockHz × clockFactor × η_cfg × e(T)` ops/s (D34: no lanes; a core runs one task thread at a time). `e(T)` is §10.4 (1 before Rack). `clockFactor` is §9.3's product of DVFS, turbo, thermal throttle and power-cap factors (1 by default). |
+| core rate | `clockHz × clockFactor × η_cfg × e(T)` ops/s (D34: no lanes; a core runs one task thread at a time). Before System the CPU draws a fixed 10 W of sim power (D38); every view shows watts × `POWER_SCALE` (1e-6, D36). `e(T)` is §10.4 (1 before Rack). `clockFactor` is §9.3's product of DVFS, turbo, thermal throttle and power-cap factors (1 by default). |
 | `η_cfg` | `socketFactor(sockets) × dimmFactor(RAM modules)` (program D7.5). `socketFactor` 1, 2, 3, 4 CPUs → 1.00, 0.92, 0.85, 0.78 **(s)**. `dimmFactor` 0–2 modules → 1.00, 3 → 0.95, 4 → 0.90 **(s)**; an `accelerator` board has `dimmFactor = 1` up to 8. The system plate shows `η_cfg`. |
 | `K` (concurrency) | scheduler `K`; 1 with no scheduler |
 | `Q` (queue) | scheduler `Q`; 0 with no scheduler |

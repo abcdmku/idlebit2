@@ -41,7 +41,7 @@ describe('contextual research discovery', () => {
 
   it('reveals board starter hardware and only the next structural scope', () => {
     const state = completed(createInitialState(42), 'systemBoard');
-    expect(ids(state)).toEqual(expect.arrayContaining(['memController', 'gpuGen1', 'storageCtl', 'rack']));
+    expect(ids(state)).toEqual(expect.arrayContaining(['gpuGen1', 'storageCtl', 'rack']));
     expect(ids(state)).not.toContain('gpuGen2');
     expect(ids(state)).not.toContain('ddr');
     expect(ids(state)).not.toContain('ssd');
