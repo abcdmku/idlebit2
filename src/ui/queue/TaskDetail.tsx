@@ -1,6 +1,7 @@
 // Task detail (user, 26 Oct): tapping any of the five strip cards opens what that task is, what it
 // pays and needs, and whether it can run. A plate right under the tapped card, with a pointer to it (user, 26 Oct); over the
 // bottom of the world. Back and Escape close it (viewState 'back'). No task numbers (D22).
+import { useMemo } from 'react';
 import { FAMILIES, formatHertz, formatOps, type QueueEntryView } from '../../game';
 import { typeColor, typeName, typeOf, type Rect } from '../../render/core';
 import { CoinIcon, GemIcon } from '../plates/icons';
@@ -17,6 +18,7 @@ import { shallowEqual, useGameSelector, useShell, useViewState } from '../storeH
 import { HeadClock, InQueue, TaskIcon } from './taskText';
 import { useMeet } from './meet';
 import { MeetKey } from './MeetKey';
+import { TaskWork } from './TaskWork';
 
 /** Keeps every number with its unit on one line ("100 kHz", "1 ms", "2 b", "4 systems"): a no-break space between them. */
 export const keepUnits = (s: string): string => s.replace(/([0-9][kMGTPEZY]?) (?=[A-Za-z%µ])/g, '$1\u00a0');
@@ -37,7 +39,7 @@ export function needLines(t: QueueEntryView): string[] {
 export function workLine(t: QueueEntryView): string {
   const work = `${formatOps(t.work)}`;
   if (t.transferS === null || !(t.transferS > 0)) return keepUnits(work);
-  return keepUnits(`${work} · lands in ${transferText(t.transferS)} on ${formatHertz(t.work / t.transferS)}`);
+  return keepUnits(`${work} · lands in ${transferText(t.transferS)} on ${formatHertz(t.payloadBits / t.transferS)}`);
 }
 
 /** Whole Data contribution; fractions carry across tasks in the simulation's meter. */
@@ -98,6 +100,8 @@ function OpenTask({ taskKey: key }: { taskKey: string }) {
   }, shallowEqual, 250);
   // One line per missing component, each at its minimal level (the sim's meet quote).
   const meet = useMeet(f.t);
+  const card = f.slot === 0 ? L.headSlot : L.cards[f.slot - 1] ?? L.headSlot;
+  const readAnchor = useMemo(() => anchorOf(card), [card.x, card.y, card.w, card.h]);
   const primaryMeet = meet.find(q => !q.locked && q.affordable) ?? meet[0];
   // A task that left the line (taken, met or dismissed) closes its detail.
   if (!f.t) { queueMicrotask(() => { if (shell.view.getState().task === key) shell.view.dispatch({ type: 'back' }); }); return null; }
@@ -107,19 +111,19 @@ function OpenTask({ taskKey: key }: { taskKey: string }) {
   const point = pointFix(t.blockedBy);
   const status = statusLine(t, f.running), fixes = t.blockedBy && !meet.length && !point ? fixLines(t, offers) : [];
   const needs = needLines(t).filter((_, i) => !(i === 0 && t.workingSetBits > 0 && ['cache', 'ram', 'disk'].includes(t.blockedBy ?? '')));
-  const card = f.slot === 0 ? L.headSlot : L.cards[f.slot - 1] ?? L.headSlot;
   const close = () => shell.view.dispatch({ type: 'back' });
   return <PlateFrame title={familyName(t.family)} sub={<span style={{ color }}>{typeName(typeOf(t.family))}</span>}
-    className="task-detail" bounds={L.view} readAnchor={anchorOf(card)} tip onClose={close}
+    className="task-detail" bounds={L.view} readAnchor={readAnchor} tip onClose={close}
     head={<span className="td-ic"><TaskIcon task={t} n={L.N} /></span>}>
     {status && <p className={`p-line td-status ${status.tone}`} data-testid="td-status">{status.text}</p>}
     <dl className="td-facts">
-      <dt>Pays</dt><dd data-testid="td-pays"><span className="gold"><CoinIcon />{wholeText(t.work)}</span>
+      <dt>Pays</dt><dd data-testid="td-pays"><span className="gold" title={`${t.cpuOps} Credits`}><CoinIcon />{wholeText(t.cpuOps)}</span>
         {dataOf(t) > 0 && <span className="data" title="Whole Data contribution. Partial Data adds up across tasks."><GemIcon />{wholeText(dataOf(t))}</span>}</dd>
       {needs.length > 0 && <><dt>Needs</dt><dd data-testid="td-needs">{needs.map(l => <span key={l}>{l}</span>)}</dd></>}
       {head && f.running && !t.committed && <><dt>Pickup</dt><dd><HeadClock blocked={t.blockedBy !== null} risk={false} /></dd></>}
       {head && f.running && t.committed && <><dt>Taken</dt><dd><InQueue task={t} /></dd></>}
     </dl>
+    <TaskWork key={key} task={t} />
     {(t.blockedBy || (head && f.running && t.dismissible)) && <div className="keys">
       {/* One line per missing component or research; each buys every level it needs in one tap. */}
       {primaryMeet && <MeetKey quote={primaryMeet} n={L.N} onAction={a => shell.dispatch(a)}

@@ -44,6 +44,14 @@ function coefficient(x: number): string {
  * Never a fraction. Fractional input rounds up (prices round up, D2).
  */
 export function wholeText(value: Amount | number | bigint): string {
+  if (typeof value !== 'number') {
+    const source = String(value), negative = source.startsWith('-'), digits = negative ? source.slice(1) : source;
+    if (/^\d+$/.test(digits) && digits.length > 36) {
+      let head = Number(digits.slice(0, 3)) + (Number(digits[3]) >= 5 ? 1 : 0), exponent = digits.length - 1;
+      if (head >= 1000) { head = 100; exponent += 1; }
+      return (negative ? MINUS : '') + (head / 100).toFixed(2) + 'e' + exponent;
+    }
+  }
   if (typeof value === 'string' && /^-?\d{1,15}$/.test(value)) {
     const neg = value.startsWith('-'), digits = neg ? value.slice(1) : value;
     if (digits.length <= 4) return (neg && digits !== '0' ? MINUS : '') + grouped(digits);

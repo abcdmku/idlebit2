@@ -1,7 +1,7 @@
 import { G, LOC } from '../core/buffers';
 import { headDeadlineTick, QUEUE_VISIBLE, RECENT_OUTCOMES } from '../core/constants';
 import type { World } from '../core/world';
-import { FAMILIES, familyKey, payoutAt } from '../market/families';
+import { FAMILIES, familyKey, payoutAt, payloadAt } from '../market/families';
 import { canRunFleet, classesOf, detailIndex, gateOn, isEligibleMode } from '../market/fleet';
 import { MODE } from '../core/timers';
 import type { FamilyDef } from '../types/catalog';
@@ -91,7 +91,7 @@ function entry(state: GameState, roundIndex: number, taskId: number, family: num
     committed, dismissible: !committed,
     blockedBy: gate !== 0 ? FAIL_DETAILS[detailIndex(gate)] ?? null : null,
     work, dataReward: work / (state.hot.fam.dataRatio[family] || def?.dataRatio || 1),
-    transferS: speed > 0 ? work / speed : null, windowEndTick, capableSystems: capable(def),
+    transferS: speed > 0 && def ? payloadAt(def, size) / speed : null, windowEndTick, capableSystems: capable(def),
   };
 }
 

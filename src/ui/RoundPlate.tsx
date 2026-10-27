@@ -14,7 +14,7 @@ import { amountText, clockText, wholeText } from './hooks/format';
 import { returnToMarket } from './input/commands';
 import type { ShellLayout } from './layout';
 import { useLayout } from './shell/geometry';
-import { useGameSelector, useShell } from './storeHooks';
+import { useGameSelector, useShell, useViewState } from './storeHooks';
 import { GoalBar, GoalRows, ReachDetails, reportBadge, RunwayValue } from './frontier/Reach';
 import { useRunway } from './frontier/Runway';
 
@@ -162,9 +162,10 @@ export function energyLines(e: EnergyBreakdown | null | undefined): typeof ENERG
 
 /** Mounted by the shell: shows while the round state is `ended`. */
 export function RoundPlate() {
-  const shell = useShell();
+  const shell = useShell(), view = useViewState();
   const r = useGameSelector(s => (s.round.state === 'ended' && s.round.lastReport ? s.round.lastReport : null));
-  if (!r) return null;
+  // A round may end while Settings is open; show its report after the player closes Settings.
+  if (!r || view.sheet === 'settings') return null;
   return <RoundReportPlate report={r}
     onReturn={() => returnToMarket(shell)} onClose={() => shell.dispatch({ type: 'dismissReport' })} />;
 }

@@ -1,4 +1,4 @@
-import { FAMILIES } from '../market/families';
+import { FAMILIES, payloadAt, workingSetAt } from '../market/families';
 import { REGION_IDS, type FamilyDef } from '../types/catalog';
 
 /** Resource clocks: cache loads/traffic use CPU; RAM and disk loads/traffic use RAM and IO. */
@@ -55,12 +55,10 @@ export const wantThreads = (shape: Shape, units: number): number => Math.max(1, 
 
 export const stageWorkAt = (shape: Shape, stage: number, scale: number): number => shape.fixed[stage]! + shape.perSize[stage]! * scale;
 
-export const workingSetOf = (shape: Shape, scale: number): number => shape.def.workingSet.fixed + shape.def.workingSet.perSize * scale;
+export const workingSetOf = (shape: Shape, scale: number): number => workingSetAt(shape.def, scale);
 export const vramOf = (shape: Shape, scale: number): number => shape.def.vramBits.fixed + shape.def.vramBits.perSize * scale;
 
-/** Bits one shard of `scale` units carries over every link: its Σ stage work (D10.4, spec §5.1). Derived, never authored. */
+/** Instruction bits carried over each link; local initial loading is not part of the payload. */
 export function memberPayload(shape: Shape, scale: number): number {
-  let bits = 0;
-  for (let i = 0; i < shape.stages; i += 1) bits += shape.fixed[i]! + shape.perSize[i]! * scale;
-  return bits;
+  return payloadAt(shape.def, scale);
 }

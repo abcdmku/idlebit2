@@ -1,5 +1,7 @@
 # CPU and RAM progression
 
+27 Oct, D51 override: all core base prices move down sixfold, rounded up. The current Hz/kHz/MHz/GHz core bases are 1,000 / 20,834 / 71,666,667 / 31,666,666,667 Credits. Additional-core growth uses those lower bases. This overrides older core-price examples below; clock, cache, memory and power formulas are unchanged.
+
 24 October 2026. Rules adopted from Borg's CPU and RAM calculation examples and corrected after the user's follow-up. The binding ruling is the **CPU/RAM progression** entry in `decisions.md` §15a. This document supplies the formulas referenced by `game-spec.md` §§9 and 12. Numeric starting values are **(s)**. Every CPU clock and RAM generation has 36 levels. Generation boundaries and negative profit never impose an earlier upgrade cap. No additional THz/PHz native CPU generations are required.
 
 This pass changes the specification and provides a balance probe. The shared runtime still needs integration by the game thread. These formulas have not yet been validated by a legal full-game campaign.

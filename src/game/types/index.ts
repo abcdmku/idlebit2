@@ -12,3 +12,4 @@ export type * from './quotes';
 export type { Amount } from '../amount';
 export type * from './save';
 export type * from './gpu';
+export type * from './tasks';

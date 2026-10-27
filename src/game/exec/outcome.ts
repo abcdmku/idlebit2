@@ -27,11 +27,12 @@ import { leaveStage, releaseRunning } from './stages';
 
 export const CAUSE: { readonly [C in FailCause]: number } = Object.fromEntries(FAIL_CAUSES.map((c, i) => [c, i])) as never;
 
-function addTally(w: World, family: number, pay: number, count: number): void {
+function addTally(w: World, family: number, pay: number, count: number, units: number): void {
   const t = w.hot.tally;
   if (t.len >= t.cap) growTable(TALLY, t, t.len + 1);
-  t.pay[t.len] = pay;
   t.count[t.len] = count;
+  t.family[t.len] = family;
+  t.units[t.len] = units;
   t.len += 1;
   const ratio = w.hot.fam.dataRatio[family]!;
   if (ratio > 0) w.hot.fam.dataTick[family] = w.hot.fam.dataTick[family]! + (count * pay) / ratio;
@@ -62,7 +63,7 @@ export function completeRecord(w: World, s: number, r: number, tau: number, doma
     const k = rec.count[r]!, pay = rec.payout[r]!;
     addSpill(w, k * traffic[0]!, k * traffic[1]!);
     recordCompletion(w, s, r, k, pay, tau, domain, 1);
-    addTally(w, rec.family[r]!, pay, k);
+    addTally(w, rec.family[r]!, pay, k, rec.units[r]!);
     tallyMet(w, rec.family[r]!, k, s, k * pay);
     freeRecord(w.hot, r);
     return;
@@ -78,7 +79,7 @@ export function completeRecord(w: World, s: number, r: number, tau: number, doma
   const family = par.family[p]!, work = par.work[p]!;
   addSpill(w, par.ramBits[p]!, par.diskBits[p]!);
   recordCompletion(w, s, r, 1, work, tau, domain, par.placed[p]!);
-  addTally(w, family, work, 1);
+  addTally(w, family, work, 1, par.units[p]!);
   tallyMet(w, family, 1, s, work);
   freeRecord(w.hot, r);
   freeParent(w.hot, p);

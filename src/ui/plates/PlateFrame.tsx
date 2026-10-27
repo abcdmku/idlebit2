@@ -128,7 +128,9 @@ export function PlateFrame({ title, sub, pips, head, footer, className = '', clo
       // The part has stood still for two frames (or there is none to follow): this is the frame.
       const key = a ? `${Math.round(a.x)},${Math.round(a.y)},${Math.round(a.w)},${Math.round(a.h)}` : 'none';
       stable = key === lastAnchor ? stable + 1 : 0; lastAnchor = key;
-      if (stable >= 2 || (!a && !subscribeFrame)) { held = true; root.dataset.held = 'true'; }
+      // A stationary anchor has no frame subscription to settle it. Hold its first layout, too,
+      // so content resize measurements cannot reset a drilled tree's scroll position.
+      if (stable >= 2 || !subscribeFrame) { held = true; root.dataset.held = 'true'; }
     };
     position();
     const observer = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(position);

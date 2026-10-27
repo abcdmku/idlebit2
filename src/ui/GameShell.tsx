@@ -27,6 +27,7 @@ import { ShellContext, createShellValue, type ShellContextValue, type ShellSurfa
 import { PlatformLine } from './shell/PlatformLine';
 import { createViewStore, initialView, type ViewStore } from './viewState';
 import { openingLevel, writeLastLevel } from './prefs';
+import { SettingsScreen } from './settings/SettingsScreen';
 import './styles/tokens.css';
 import './styles/shell.css';
 import './styles/plates.css';
@@ -157,6 +158,7 @@ export function GameShell({ store, registry, level, view, size, saveNow, childre
             <RoundPlate />
             <TaskDetail />
           </OffersScope>
+          <SettingsScreen />
           <LeaveDialog guard={guard} />
           {children}
         </div>

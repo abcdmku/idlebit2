@@ -2,7 +2,7 @@
 // profiles. Hand-built snapshots; no sim code runs. Dev and tests only.
 // 'shard' (D25): a shard on the port, a 2-thread Parallel shard on cores 1 and 2, and an
 // Accelerated shard in its GPU stage on card 1 (its thread held on core 4).
-import { FAMILIES, familyId, systemId } from '../../../game';
+import { FAMILIES, familyId, systemId, payoutCreditsAt, payloadAt } from '../../../game';
 import type { ChipSnapshot, CoreView, FamilyDef, GpuStats, PartRef, PartView, Quote, SupplyView, SystemSnapshot, TaskRequirementsView, TaskView,
   TransferView } from '../../../game';
 
@@ -52,7 +52,7 @@ const psu = (deliveredW: number): SupplyView => ({
 /** Freeze catalog facts at a chosen size (units) for hand-built scenes. */
 export function sceneTaskRequirements(family: FamilyDef, size: number): TaskRequirementsView {
   return {
-    family: family.id, label: family.name,
+    family: family.id, label: family.name, cpuOps: payoutCreditsAt(family, size), payloadBits: payloadAt(family, size),
     stages: family.stages.map(s => ({ resource: s.resource, work: s.work.fixed + s.work.perSize * size })),
     grain: family.grain, size, workingSetBits: family.workingSet.fixed + family.workingSet.perSize * size,
     gpuCoresMin: family.gpuCoresMin, vramBits: family.vramBits.fixed + family.vramBits.perSize * size,

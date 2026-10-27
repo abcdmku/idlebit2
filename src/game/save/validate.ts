@@ -122,13 +122,16 @@ function validateQueue(state: GameState): void {
     if (ids.has(id) || id >= nextTaskId) fail(path, 'duplicate or unreserved task identity');
     ids.add(id);
     if (!FAMILIES[int(t.family, `${path}.window[${i}].family`)]) fail(path, 'unknown family');
-    if (!(finite(t.size, `${path}.window[${i}].size`) >= 1)) fail(path, 'size must be at least one');
+    const size = finite(t.size, `${path}.window[${i}].size`);
+    if (size < 1 || !Number.isInteger(size)) fail(path, 'size must be a positive whole recipe count');
   }
   const rec = state.hot.rec;
   let front = 0;
   for (let r = 0; r < rec.len; r += 1) {
     const loc = rec.loc[r];
     if (loc === LOC.free) continue;
+    if (!Number.isFinite(rec.units[r]!) || !Number.isInteger(rec.units[r]!) || rec.units[r]! < 1)
+      fail('hot.rec.units', 'expected a positive whole recipe count');
     if (loc === LOC.probe) fail('hot.rec.loc', 'a take probe outlived its tick');
     if (ids.has(rec.taskId[r]!)) fail(path, 'a queued task is already taken');
     if (loc === LOC.front) front += 1;

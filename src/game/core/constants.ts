@@ -80,7 +80,7 @@ export const GATHER_WAIT_TICKS = secondsToTicks(10);
 export const CHECKPOINT_TICKS = secondsToTicks(10);
 export const MAX_UPS = 2;
 /** Catalog bound for per-family tallies. */
-export const MAX_FAMILIES = 64; // 6,912
+export const MAX_FAMILIES = 128;
 
 /**
  * Ceilings at the start (spec §12.2) and at the architecture caps ("archCap"). D39: research never raises a part

@@ -4,11 +4,11 @@ import type { FamilyDef } from '../types/catalog';
 export const CURVE = {
   /**
    * D30: every round starts at I = 0 and each task drawn advances I by 1 / k(I): k tasks per unit of I,
-   * The opening keeps its quadratic curve. Beyond I14, a cubic term gives fleet bands enough tasks
-   * for 10–45 minute rounds. Hardware never changes this curve, only how fast a round moves along it.
+   * The recipe market uses a shorter opening quadratic. Beyond I14, the cubic term supplies more
+   * fleet work. Hardware never changes this curve, only how fast a round moves along it.
    */
-  k0: 9, k1: 0.3, k2: 0.03,
-  fleetFrom: 14, fleetK: 0.35,
+  k0: 7, k1: 0.25, k2: 0.025,
+  fleetFrom: 14, fleetK: 0.25,
   sizeJit: 0.2, weightJit: 0.3, dataJit: 0.1,
   ramp: 1,
   sizeExp: 0.85,

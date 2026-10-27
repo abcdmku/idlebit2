@@ -87,6 +87,8 @@ export interface FamilyDef {
   readonly weight: number;
   /** Per unit of size, run in order: a shard of u units has stage work perSize × u (D25.1). */
   readonly stages: readonly StageDef[];
+  /** Target CPU work per intensity-size unit. Controls offered quantity, never the price of an operation. */
+  readonly marketWork: number;
   /**
    * D25.1: the fewest size units that must run together. A task has at most floor(s / ĝ) shards,
    * ĝ = max(grain, ceil(s / 256)); a shard of u units runs on max(1, floor(u / grain)) threads.

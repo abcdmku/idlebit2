@@ -5,10 +5,11 @@ import type { GameState, LedgerSample } from '../types/state';
 import { MAX_FAMILIES, NET_WINDOW_TICKS, REGIONS, DT_S, TICKS_PER_SECOND } from './constants';
 import { pushEvent } from './events';
 import { toAmount, type World } from './world';
+import { FAMILIES, payoutCreditsAt } from '../market/families';
 
 /**
  * Ledger phase (spec §9.8), once per tick:
- * 1. Credits: Σ count × payout over this tick's tally pairs (exact bigint).
+ * 1. Credits: Σ count × exact recipe reward over this tick's completed descriptors (bigint).
  * 2. Data: dataMeter += Σ per-family data in family order; whole Data credited.
  * 3. Energy: energyMeter += Σ region W × dt × price in region order; whole Credits debited.
  * Then insolvency (spec §11.4) and the net/min change-point ring.
@@ -19,7 +20,9 @@ export function ledgerPhase(w: World): void {
 
   let gross = 0n;
   const tally = hot.tally;
-  for (let i = 0; i < tally.len; i += 1) gross += BigInt(tally.pay[i]!) * BigInt(tally.count[i]!);
+  for (let i = 0; i < tally.len; i += 1) {
+    gross += BigInt(payoutCreditsAt(FAMILIES[tally.family[i]!]!, tally.units[i]!)) * BigInt(tally.count[i]!);
+  }
   tally.len = 0;
 
   let dataMeter = l.dataMeter;

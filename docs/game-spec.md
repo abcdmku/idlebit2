@@ -374,8 +374,8 @@ interface TaskInstance {
   id: number;             // reserved when the task enters the visible window, unique within the save, increasing
   family: FamilyId;
   headTick: number | null;// tick it became the head; null behind the head
-  size: number;           // s: whole units, >= members × grain (D25.1)
-  stages: StageCoef[];    // run in order; a shard of u units has stage work perUnit × u
+  size: number;           // s: whole recipe repetitions, >= members × grain (D50)
+  stages: StageCoef[];    // compiled from subtask recipes; read, CPU, GPU and write volumes
   grain: number;          // g: whole units that must run together (D25.1); replaces threads
   wsFixed: number;        // bits per shard
   wsPerUnit: number;      // bits per unit; a shard's working set is wsFixed + wsPerUnit × units
@@ -400,9 +400,9 @@ interface Shard {          // D25.1: a piece of one task; routed, transferred, a
 
 **Size and grain** (D25.1). `docs/tasks.md` §2 draws `s` and authors `g`. The **effective grain** is `ĝ = max(g, ceil(s / 256))`, so a task has at most `maxShards = 256` shards. A shard holds whole units and never fewer than `ĝ`, except that a task with `s < ĝ` is one shard. Per shard of `u` units: stage work `perUnit × u`, working set `wsFixed + wsPerUnit × u` (placed in the memory hierarchy, §6.5), VRAM `vramPerUnit × u`. `gpuCoresMin`, `ecc`, `tensor`, `region` and `wsFixed` apply to every shard unchanged.
 
-**Payout** is derived, not authored (program D2): `payout = W = s × Σ perUnit`, which is 1 Credit per op or bit of the task's stage work. It is paid **once, for the full task, when its last shard completes** (D25.5). A shard pays nothing on its own. Stage work is a whole number. `mem` stage work is the bits the task touches and pays like any work; where those bits sit changes only time (D26.2). Payload transfer and storage-node traffic (§6.10) are not task work and do not pay. There are no premiums or multipliers.
+**Payout** comes from the task's work recipe (D50): `Credits = s × recipeOps + ceil(wsFixed + wsPerUnit × s)`. Every leaf Read bit, Write bit, NOT, XOR, AND, OR or Shift bit is one CPU-equivalent operation and pays one Credit. Initial logical input loading is included. GPU execution retains the same base CPU-equivalent count. Memory traffic executes at its real tier rate. Exact whole-number arithmetic credits the wallet **once, for the full task, when its last shard completes**. Child totals, non-final shards, retries and placement overhead do not pay again. There are no premiums or payout multipliers.
 
-**Payload** is derived too (program D10.4): a shard's transfer size equals its work, `u × Σ perUnit` bits, at every hop of its path. A task's payload over all its shards equals its payout. It is computed, never stored (D18.4). A 1,000-op task takes 1 s to land over a 1 kHz link.
+**Payload** is the authored instruction work, `u × recipeOps` bits per shard at every hop. Logical initial loading is local work and is excluded from payload. Payload and exact payout are separate quantities. A 1,000-operation instruction stream takes 1 s to land over a 1 kHz link.
 
 **Completion window** (D26.5). `deadline = ceil(windowS_f × j / dt)` ticks, where `windowS_f` is the family's window (`docs/tasks.md` §5: 120 s for `rackDist`, 180 s `roomDist`, 240 s `multiAz`, 120 s `region`, 60 s Exchange Feed; none before `rackDist`) and `j` the task's frozen size jitter. The window is constant seconds because the market's size scale is the era's reference: a fleet that holds the 10 s head clock at intensity `I` finishes a mean task there in about one take interval. The clock starts at take (`takeTick`), router-queue time included. The task must be met by the end of tick `takeTick + deadline − 1` or it fails `late` (§4.2).
 
@@ -1484,6 +1484,20 @@ The core tray offers physical `Add core`. The Cores popup also offers the CPU's 
 
 A `dark` or `crashed` unit is visibly dark or broken. A `boot`, `goingOffline` or `cold` unit shows its seconds left; an `asleep` one shows it is asleep.
 
+### 16.5 Settings and music
+
+A reserved gear button beside Research opens Settings. Close, Escape and browser/phone Back return to the game. Settings provides Play/Pause, music volume from 0 to 100%, and track selection. Locked tracks name their required tier. Previously unlocked tracks remain selectable. If a round ends while Settings is open, its report waits until Settings closes.
+
+| Tier | Track |
+|---|---|
+| CPU | Clock Tones |
+| System | System Handshake |
+| Rack | Rack Mount |
+| Room | Dial Tone |
+| Global | Global Bit |
+
+CPU music is available from the start. Each later song opens with its existing tier research unlock. Music loops independently of simulation time, begins after a browser interaction, and pauses while the page is hidden. The selected song, enabled state and volume are local preferences, separate from the game save. Initial volume is 35%. Unlocking a song preserves the player's selection. Loading a save with fewer unlocked tiers selects the CPU song if the chosen song is locked.
+
 ## 17. Removed from v2
 
 Do not port these:
@@ -1525,7 +1539,7 @@ Rate parts draw by §9.1 with the `wPerUnit` listed; "idle" is for non-rate part
 | ID | Generations | Gates | Curve | `base` by g | Secondary by g | Watts | `price` by g | `upgrade` by g |
 |---|---|---|---|---|---|---|---|---|
 | `cpu` | Hz, kHz, MHz, GHz package | start, `fabKhz`, `fabMhz`, `fabGhz` | fixed | — | — | idle 0.1, 100, 1e5, 1e8 | 500, 5e4, 2.1e8, 9.3e10 | — |
-| `core` | Hz, kHz, MHz, GHz core | start, `fabKhz`, `fabMhz`, `fabGhz` | core | lanes 1, 2, 4, 8 | — | hardware energy ratio §9.1; native 10, 6, 3, 2 | 6000, 1.25e5, 4.3e8, 1.9e11 | 10, 1.2e5, 1.5e9, 7.7e12 |
+| `core` | Hz, kHz, MHz, GHz core | start, `fabKhz`, `fabMhz`, `fabGhz` | fixed, count growth | one thread at the CPU clock | — | hardware energy ratio §9.1; native 10, 6, 3, 2 | 1000, 20834, 71666667, 31666666667 (D51) | no core level upgrades |
 | `clock` | Hz, kHz, MHz, GHz oscillator | start, `fabKhz`, `fabMhz`, `fabGhz` | clock, 1.5×; L1–36 every generation | Hz 1, 1e3, 1e6, 1e9 | — | idle 0.1, 100, 1e5, 1e8 (core carries the load) | 20, 2e5, 8.6e8, 3.7e11 | 3, 1.5e4, 9e7, 2.4e11 per lane driven; 1.7× per level |
 | `scheduler` | Run queue, Multilevel, Work queue, Cluster runtime | start (D39), `fabKhz`, `fabMhz`, `fabGhz` | linear, L 1–8 for every g | `K` 1, 2, 3, 4 (≤ 32) | `Q` 2, 4, 4, 4 (≤ 32, program D7.2) | idle 0.1, 100, 1e5, 1e8 | 1000, 3e5, 4.3e8, 1.9e11 | 100, 1.2e5, 1.5e9, 7.7e12 |
 | `ram` | SDRAM, DDR, DDR2, DDR3, DDR4, DDR5 (per module) | `systemBoard`, `ddr`, `ddr2`, `ddr3`, `ddr4`, `ddr5` | RAM ladder §12.1; bandwidth 1.5×; L1–36, registered ECC capacity ×2 | bits 256, 512, 2^20, 2^30, 2^32, 2^38 | bit/s 16, 32, 3.2e4, 6.4e7, 2.56e8, 1.28e11 | hardware energy ratio §9.1; native 10, 10, 6, 3, 3, 2 | 3e5, 4.5e5, 5e6, 3e10, 5e10, 5e13 | 12, 12, 1.2e5, 1.5e9, 1.5e9, 7.7e12; 1.7× per level |

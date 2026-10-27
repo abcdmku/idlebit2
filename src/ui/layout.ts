@@ -41,6 +41,8 @@ interface Common {
   readonly dismiss: Rect;
   /** The Research tile, left of the head card at its height. */
   readonly research: Rect;
+  /** Settings always has its own reserved key beside or below Research. */
+  readonly settings: Rect;
   /** The research screen: below the strip, over the world and the deck (the strip keeps showing the line). */
   readonly lab: Rect;
   /** Ladder rungs: the 16 × 16 art icon at N, centred; phone rungs are 48 px tap targets. */
@@ -127,7 +129,7 @@ function landscape(aw: number, ah: number, safe: SafeInsets): PhoneLayout {
   const view = r(248, 56, W - 256, H - 56);
   return { kind: 'phone', N: 2, lat: 8, gutter: 8, x, y, w: W, h: H, body: 13, lh: 16, big: 24, mid: 18,
     world: view, view, band, strip: r(8, 64, 224, 128), headSlot, cards: [card(0), card(1), card(2), card(3)],
-    now, dismiss: r(now.x + now.w - 88, now.y + 24, 80, 48), research, lab: r(8, band.y + band.h, W - 16, H - band.y - band.h - 8),
+    now, dismiss: r(now.x + now.w - 88, now.y + 24, 80, 48), ...menuKeys(research), lab: r(8, band.y + band.h, W - 16, H - band.y - band.h - 8),
     rungs: band0, rungRow: 48, rungLabel: r(256, 8, 0, 48), sla, endKey, wallet,
     pipeSrc: { x: headSlot.x + headSlot.w, y: headSlot.y + 24 }, pipeRunY: view.y + 8,
     calloutBounds: inset(view, 8), callout: { w: Math.min(288, view.w - 16), h: 104 } };
@@ -136,6 +138,13 @@ function landscape(aw: number, ah: number, safe: SafeInsets): PhoneLayout {
 function rungs(band: Rect, rz: number, step: number): ShellLayout['rungs'] {
   const at = (i: number) => r(band.x + step + i * rz, band.y, rz, rz);
   return [at(0), at(1), at(2), at(3), at(4)];
+}
+
+/** Keep the deck's total footprint fixed while giving Settings a separate touch target. */
+function menuKeys(area: Rect): Pick<ShellLayout, 'research' | 'settings'> {
+  return area.w < 160
+    ? { research: r(area.x, area.y, area.w, 48), settings: r(area.x, area.y + 48, area.w, 48) }
+    : { research: r(area.x, area.y, area.w - 56, area.h), settings: r(area.x + area.w - 48, area.y, 48, 48) };
 }
 
 function desktop(N: 2 | 3, aw: number, ah: number, safe: SafeInsets): DesktopLayout {
@@ -168,7 +177,7 @@ function desktop(N: 2 | 3, aw: number, ah: number, safe: SafeInsets): DesktopLay
     world, view, band, strip, headSlot, cards: [card(0), card(1), card(2), card(3)],
     // The head card's key is wide enough for "Return to market" on one line; Dismiss keeps the same box.
     now, dismiss: r(now.x + now.w - lat - 144, now.y + nowTop(now.h, lh, true) + lh, 144, KEY_H),
-    research, lab: r(world.x, top, world.w, H - U - top),
+    ...menuKeys(research), lab: r(world.x, top, world.w, H - U - top),
     rungs: band0, rungRow: band.h, rungLabel, sla, endKey, wallet,
     pipeSrc: { x: headSlot.x + lat + 8 * N, y: top }, pipeRunY: top + U,
     calloutBounds: inset(view, lat), callout: { w: 288, h: N === 3 ? 144 : 112 },
@@ -198,7 +207,7 @@ function phone(aw: number, ah: number, safe: SafeInsets): PhoneLayout {
     kind: 'phone', N, lat, gutter: U, x, y, w: W, h: H, body: 13, lh: 16, big: 24, mid: 18,
     world, view, band, strip, headSlot, cards: [card(0), card(1), card(2), card(3)],
     now, dismiss: r(now.x + now.w - 8 - 80, now.y + 24, 80, KEY_H),
-    research, lab: r(U, H < 640 ? band.y + band.h : top, world.w, H - U - (H < 640 ? band.y + band.h : top)),
+    ...menuKeys(research), lab: r(U, H < 640 ? band.y + band.h : top, world.w, H - U - (H < 640 ? band.y + band.h : top)),
     rungs: band0, rungRow, rungLabel: r(walletX, band.y, 0, rungRow),
     sla: r(band.x, band.y + rungRow, band.w - 88, 48), endKey: r(band.x + band.w - 80, band.y + rungRow, 80, 48), wallet: r(walletX, band.y, band.x + band.w - U - walletX, rungRow),
     pipeSrc: { x: headSlot.x + 8 + 16, y: top }, pipeRunY: top + U,

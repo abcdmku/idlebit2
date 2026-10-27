@@ -10,8 +10,8 @@ import type { LevelId, LevelSnapshot, NodeRef, RenderSnapshot, ResearchId, Snaps
 
 export { LEVEL_NAMES } from '../game';
 
-/** A sheet over the world: the research screen. */
-export type Sheet = 'research';
+/** A page over the world. */
+export type Sheet = 'research' | 'settings';
 
 export interface ViewState {
   readonly focus: NodeRef;

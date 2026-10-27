@@ -345,6 +345,9 @@ export interface SiteView {
 export interface TaskRequirementsView {
   readonly family: FamilyId;
   readonly label: string;
+  /** Exact required CPU-equivalent operations, including logical initial loading. One Credit each. */
+  readonly cpuOps: Amount;
+  readonly payloadBits: number;
   readonly stages: readonly { readonly resource: Resource; readonly work: number }[];
   /** D25.1: the fewest units that must run together (the family grain). */
   readonly grain: number;
@@ -381,9 +384,9 @@ export interface QueueEntryView extends TaskRequirementsView {
   readonly dismissible: boolean;
   /** First missing requirement on current hardware, or null. */
   readonly blockedBy: FailDetail | null;
-  /** Σ stage work over every member, in ops and bits: the payout and the payload. */
+  /** Approximate CPU-equivalent work for rates. cpuOps is the exact payout; payloadBits excludes local loading. */
   readonly work: number;
-  /** Seconds the transfer takes at the current first-link speed (work / speed); null without a link. */
+  /** Seconds to transfer payloadBits at the current first-link speed; null without a link. */
   readonly transferS: number | null;
   /**
    * The player's online systems whose fixed hardware can run this task: the router's can-run gates

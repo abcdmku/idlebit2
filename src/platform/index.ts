@@ -4,3 +4,5 @@ export { DURABILITY_NOTICE, LEGACY_RESET_NOTICE, SAVE_KEY, clearSave, loadGame, 
 export { createGameOfflineRunner, gameOfflineEngine, type GameOfflineRunner } from './offline';
 export { mergeReports } from './reports';
 export { bitRougePersistence, createPersistenceAdapter, type PersistenceAdapter, type PersistenceDriver } from './persistence';
+export { createMusicPlayer, type MusicPlayer, type MusicSnapshot } from './music';
+export { readMusicPreferences, type MusicPreferences } from './musicPreferences';

@@ -1,5 +1,5 @@
 import { accelNeed } from '../core/accelerators';
-import { FAMILIES, workingSetAt } from '../market/families';
+import { FAMILIES, workingSetAt, payoutCreditsAt, payloadAt } from '../market/families';
 import type { FamilyId } from '../types/ids';
 import type { TaskRequirementsView } from '../types/views';
 
@@ -8,7 +8,7 @@ export function taskRequirements(family: FamilyId, size: number, deadline: numbe
   const def = FAMILIES[family]!;
   const need = accelNeed(def, size);
   return {
-    family, label: def.name,
+    family, label: def.name, cpuOps: payoutCreditsAt(def, size), payloadBits: payloadAt(def, size),
     stages: def.stages.map((stage) => ({ resource: stage.resource, work: stage.work.fixed + stage.work.perSize * size })),
     grain: def.grain, size, workingSetBits: workingSetAt(def, size),
     gpuCoresMin: need.gpuCores, vramBits: need.vramBits, deadline,

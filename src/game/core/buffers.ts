@@ -228,8 +228,8 @@ export const RQ = {
   rqUnits: { t: 'f64', stride: ROUTER_QUEUE_MAX }, rqSince: { t: 'i32', stride: ROUTER_QUEUE_MAX },
   rqFamily: { t: 'u16', stride: ROUTER_QUEUE_MAX }, rqHead: u8, rqLen: u8, rqWait: u8,
 } as const satisfies Layout;
-/** Completed cohorts this tick: (payout per task, count). Ledger sums and clears. */
-export const TALLY = { pay: f64, count: f64 } as const satisfies Layout;
+/** Completed cohorts this tick: family, original whole recipe units and count. Ledger derives exact Credits. */
+export const TALLY = { count: f64, family: u16, units: f64 } as const satisfies Layout;
 /** Fixed MAX_FAMILIES rows. *Tick columns are this tick's tallies; core clears them at tick end.
  * metSys / metRack / metRoom / metSite: the one unit where the family's cohorts completed this tick, -1 none yet, -2 several. */
 export const FAMILY_HOT = {

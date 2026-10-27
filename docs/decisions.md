@@ -1759,3 +1759,23 @@ The user rejected time frames for saving up and similar predictions. Unaffordabl
 ## D49, 27 Oct: clock access and one purchase per upgrade
 
 The user requires a direct clock upgrade in the Cores popup, alongside Add core. It consumes the same simulation quote and action as the Clock popup, including price, speed change, affordability and supply warnings. A task-fix key and a normal upgrade that buy the same target for the same price are shown once. The duplicate bottom purchase section is omitted, while distinct actions and research remain available.
+
+## D50, 27 Oct: composable task work and compact icon trees
+
+The user approved the 100-task library, ten tasks per workload tier, and requires large tasks to contain subtasks that contain further subtasks down to operations. The same recipe defines execution volumes, displayed counts and Credits. One base CPU-equivalent operation pays one Credit; GPU kernels retain the CPU-equivalent count. Initial logical input loading is included as a visible read branch. Credits are reconstructed exactly from the completed family's original units, never from a floating-point payout buffer. A logical task pays once at final completion; retries and placement copies do not mint more work.
+
+Read/write leaves consume the memory hierarchy's rates, with cache work using CPU clocks under D46. The compiler groups batched read, CPU, GPU and write volumes. Instruction payload excludes local initial loading. Recipe counts and rewards are exact; simulation work clocks and saved unit counts retain their finite numeric range. There is no authored final size tier.
+
+Task popups show the immediate work tree and support opening every child, Back and a compact parent selector. The library previews all families. Existing family icons and type silhouettes cover every branch, including mixed work. At the user's request, tree/library icons are native 16-pixel art with tight padding and inline counts; this explicitly overrides the shared art scale inside the work tree. Tap targets remain 44 pixels. Descriptions already visible in the popup are not repeated at the root. Stationary popup frames hold their first placement so content updates preserve the tree's scroll position.
+
+The market now sizes whole recipe repetitions against the work budget, shifts recipes whose smallest complete instance is too large, and shares each old family's weight with its new variants. The quick ramp is `k(I)=7+0.25I+0.025I²+0.25max(0,I−14)³`, with `U(I)=2^(0.85I)`. This tunes offered work rather than the price of an operation. The user accepts approximately 23 minutes instead of 26 minutes to System. Longer campaign pacing targets are not claimed proven by the short pass. Save version 29 resets older saves without migrations.
+
+## D51, 27 Oct: move the entire core price curve earlier
+
+The user sets the first extra Hz core to 1,000 Credits and explicitly requires shifting all core pricing. Divide every generation's base core price by six, rounding up to whole Credits: Hz 1,000; kHz 20,834; MHz 71,666,667; GHz 31,666,666,667. Existing additional-core growth applies to these lower bases, so the reduction also covers larger core counts, copied configurations and core contributions to CPU replacements. There is no separate multicore research gate in the current game. This supersedes the previous hardware-progression core prices; other component prices are unchanged.
+
+## D52, 27 Oct: settings and tier music
+
+The user supplied five MP3s and requested a settings icon, music volume and a new song at each tier. The gear has a reserved deck key beside Research. Settings uses the shared close key and modal keyboard behavior, with Play/Pause, a 0–100% volume slider and a track list that names each locked tier.
+
+The two Fax Tones attachments become Clock Tones for CPU and System Handshake for System. Rack Mount, Dial Tone and Global Bit unlock at Rack, Room and Global respectively. The game catalog reads existing research tier unlocks; there is no second progression counter. Songs loop, and unlocking one preserves the selected song. Browser playback starts after an interaction and pauses while hidden. Volume defaults to 35%. Enabled state, volume and track persist separately from the game save. A selected song that is locked in a loaded or reset game falls back to CPU after hydration. No save schema change is required.

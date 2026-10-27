@@ -46,7 +46,7 @@ export const typeColor = (type: TaskType): string => TYPE[type].a;
 export const typeName = (type: TaskType): string => TYPE[type].name;
 /** The family's type colour (since D23 a band shows its type's colour). */
 export const bandColor = (family: FamilyId | string): string => typeColor(typeOf(family));
-export const hasFamilyIcon = (family: FamilyId | string): boolean => !!BY_TYPE[typeOf(family)][keyOf(family)];
+export const hasFamilyIcon = (family: FamilyId | string): boolean => !!FAMILY[keyOf(family)];
 
 type Run = readonly [x: number, y: number, len: number, ch: string];
 const runCache = new Map<readonly string[], readonly Run[]>();
@@ -80,7 +80,7 @@ function drawRows(g: CanvasRenderingContext2D, rows: readonly string[], pal: Rea
 /** Draw a family's icon in the 16×16 cell whose top-left is (x, y), each art pixel `scale` px. */
 export function drawFamilyIcon(g: CanvasRenderingContext2D, family: FamilyId | string, x: number, y: number, scale = 1, tone: IconTone = 'type'): void {
   const type = typeOf(family), rows = BY_TYPE[type][keyOf(family)];
-  if (rows) drawRows(g, rows, palette(type, tone), x, y, scale);
+  drawRows(g, rows ?? TYPE_ICONS[type], palette(type, tone), x, y, scale);
 }
 /** Draw a task type's 5×5 mini (the sled LCD) at (x, y), no outline. */
 export function drawTypeMini(g: CanvasRenderingContext2D, type: TaskType, x: number, y: number, scale = 1): void {

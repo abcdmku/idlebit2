@@ -7,6 +7,7 @@ import { NO_DETAIL } from '../types/events';
 import type { QueuedTask } from '../types/state';
 import { baseWeight, CURVE, nextIntensity, sizeJitter, taskSize } from './curve';
 import { FAMILIES, payoutAt } from './families';
+import { recipeTotals } from './recipes';
 import { canRunFleet, detailIndex, DETAIL_CODE, isDownGate } from './fleet';
 import { failTasks } from './sla';
 import { researchQueued } from '../exec/researchTask';
@@ -36,7 +37,8 @@ export function drawTask(hot: HotBuffers, I: number): QueuedTask {
     if (draw < 0) { family = f; break; }
   }
   const j = sizeJitter(nextFloat(hot));
-  const size = taskSize(I, j, family.members, family.grain);
+  const workPerRecipe = Number(recipeTotals(family.key).ops) + family.workingSet.perSize;
+  const size = taskSize(I, j * family.marketWork / workPerRecipe, family.members, family.grain);
   const taskId = hot.g[G.nextTaskId]!;
   hot.g[G.nextTaskId] = taskId + 1;
   // D26.5: the completion window scales with the same frozen jitter; no extra RNG draw.

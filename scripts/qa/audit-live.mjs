@@ -24,7 +24,9 @@ export function liveAudit() {
   const v = [], clipped = [], ok = { dom: 0, text: 0, sprites: 0, runs: 0 };
   const fail = (rule, what, detail) => v.push({ rule, what, detail });
   const on8 = (n) => Math.abs(n - Math.round(n / 8) * 8) < 0.01;
-  const visible = (e) => !!(e.offsetParent || e.getClientRects().length) && getComputedStyle(e).visibility !== 'hidden';
+  const modal = [...stage.querySelectorAll('[aria-modal="true"]')].at(-1);
+  const visible = (e) => (!modal || modal.contains(e) || e.contains(modal))
+    && !!(e.offsetParent || e.getClientRects().length) && getComputedStyle(e).visibility !== 'hidden';
   const free = (e) => !!e.closest('[data-free], .v3-plate');
   const name = (e) => e.dataset.k || e.dataset.testid || (typeof e.className === 'string' ? e.className.split(' ')[0] : '') || e.tagName.toLowerCase();
   const say = (e) => `"${(e.textContent || '').trim().slice(0, 32)}"`;
@@ -40,7 +42,9 @@ export function liveAudit() {
   for (const c of stage.querySelectorAll('canvas.art')) {
     if (!visible(c)) continue;
     const r = c.getBoundingClientRect();
-    if (Math.abs(r.width - c.width * N) > 0.01 || Math.abs(r.height - c.height * N) > 0.01) fail(2, `sprite ${name(c.closest('[data-k],[data-testid]') || c)}`, `${c.width}x${c.height} art px shown at ${r.width}x${r.height} CSS px, not x${N}`);
+    // User, 27 Oct: work-tree icons use native 16px art to keep large recipes compact.
+    const scale = c.closest('.task-work') ? 1 : N;
+    if (Math.abs(r.width - c.width * scale) > 0.01 || Math.abs(r.height - c.height * scale) > 0.01) fail(2, `sprite ${name(c.closest('[data-k],[data-testid]') || c)}`, `${c.width}x${c.height} art px shown at ${r.width}x${r.height} CSS px, not x${scale}`);
     else ok.sprites++;
     if (getComputedStyle(c).imageRendering !== 'pixelated') fail(2, 'sprite', 'sprite is not pixelated');
   }

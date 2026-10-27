@@ -235,6 +235,30 @@
 .v3-plate.task-detail[data-tip="up"]::before { content: ''; position: absolute; top: calc(-1 * var(--s3)); left: calc(var(--tip-x, 24px) - 8px); width: 0; height: 0;
   border: 8px solid transparent; border-top: 0; border-bottom: 8px solid #e8e1ff; pointer-events: none; }
 
+.task-work { margin-top: 8px; padding-top: 4px; border-top: 1px solid var(--panel-hi); }
+.tw-head, .tw-current { display: flex; align-items: center; gap: 4px; }
+.tw-head { justify-content: space-between; }
+.tw-key { min-height: 44px; padding: 4px 8px; border: 1px solid var(--panel-hi); background: var(--well); color: var(--paper); }
+.tw-key:disabled { color: var(--muted); opacity: .6; }
+.tw-parents { min-height: 44px; min-width: 44px; width: 76px; padding: 4px; color: var(--paper); background: var(--well); border: 1px solid var(--panel-hi); font: inherit; }
+.tw-current { flex-wrap: wrap; }
+.tw-current > :last-child { margin-left: auto; }
+.task-work p { margin: 4px 0; }
+.tw-children { list-style: none; margin: 4px 0 0 4px; padding: 0 0 0 8px; border-left: 1px solid var(--panel-hi); }
+.tw-children li { position: relative; }
+.tw-children li::before { content: ''; position: absolute; left: -8px; top: 22px; width: 6px; height: 1px; background: var(--panel-hi); }
+.tw-child { width: 100%; min-height: 44px; display: grid; grid-template-columns: 16px minmax(0, 1fr) auto 8px; align-items: center; gap: 4px; padding: 2px 0;
+  background: transparent; color: var(--paper); border: 0; border-bottom: 1px solid var(--panel-hi); text-align: left; }
+.tw-label { display: flex; align-items: baseline; flex-wrap: wrap; gap: 0 4px; min-width: 0; }
+.tw-label > span { overflow-wrap: anywhere; }
+.tw-ops { font-variant-numeric: tabular-nums; white-space: nowrap; }
+.tw-exact { overflow-wrap: anywhere; font-variant-numeric: tabular-nums; }
+.tw-library label { display: flex; gap: 8px; align-items: center; margin: 4px 0; }
+.tw-library select { min-height: 44px; min-width: 0; flex: 1; color: var(--paper); background: var(--well); border: 1px solid var(--panel-hi); padding: 8px; font: inherit; }
+.tw-catalog { display: flex; width: 100%; align-items: center; gap: 4px; min-height: 44px; padding: 2px 0; color: var(--paper); background: transparent; border: 0; border-bottom: 1px solid var(--panel-hi); text-align: left; }
+.tw-catalog > :last-child { margin-left: auto; }
+.l-phone .tw-child { grid-template-columns: 16px minmax(0, 1fr) auto 8px; }
+
 /* Leave dialog: in game, Stay first and focused */
 .leave-veil { position: absolute; inset: 0; z-index: 40; background: #0e0b1c99; pointer-events: auto; display: grid; place-items: center; }
 .leave-veil .v3-plate.leave-dialog { position: relative; left: auto; top: auto; width: 288px; }

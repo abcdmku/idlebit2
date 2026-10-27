@@ -21,7 +21,8 @@ export const CORE: CatalogRow = {
   // hardware-progression.md §3: the core generation owns the energy ratio. Departure (§3, D29): the kHz core decays
   // 0.85 per pushed level (CSV 0.93), so kHz compute climbs across the System era and meets the 100 kHz pipe near Rack.
   base: [1, 1, 1, 1], watts: { kind: 'ratio', era: [0, 1, 2, 3], decay: [0.92, 0.85, 0.95, 0.9625] },
-  price: [6000, 1.25e5, 4.3e8, 1.9e11], upgrade: [0, 0, 0, 0],
+  // User, 27 Oct: shift the whole core curve down sixfold; retain count growth and round up Credits.
+  price: [1000, 20_834, 71_666_667, 31_666_666_667], upgrade: [0, 0, 0, 0],
 };
 export const CLOCK: CatalogRow = {
   // hardware-progression.md §2: ×1.5 per level, 36 levels; §5: upgrades ×1.7 per level × cores driven (D34).
