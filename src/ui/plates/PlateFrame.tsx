@@ -20,8 +20,8 @@ export interface PlatePosition {
   /** A small pointer up to the anchor when the plate sits under it (the task detail under its card). */
   tip?: boolean;
   /**
-   * Larger areas, in order, a plate may take when its head and main option, with a usable body, would not fit in
-   * `bounds` beside its part (phone: over the strip and deck, then over the HUD). Only then: a plate that fits keeps `bounds`.
+   * Larger areas, in order, a plate may take to fit its content (phone: over the strip and deck, then over the HUD).
+   * A plate that fits keeps `bounds`.
    */
   spill?: readonly Rect[] | null;
 }
@@ -96,27 +96,28 @@ export function PlateFrame({ title, sub, pips, head, footer, className = '', clo
       const a = !pinTop && readAnchor?.(target) ? target : null;
       // A plate beside its part may be narrower than its own width (place.ts); its natural width is read unset.
       if (!root.style.width) natural = root.offsetWidth;
-      let safe = areas[0]!, full = 0, at = placePlate(a, natural, 0, safe), headH = 40, footerH = 0;
+      let best: { safe: Rect; full: number; at: ReturnType<typeof placePlate>; head: number; footer: number; content: number; width: string } | null = null;
       for (const area of areas) {
-        safe = area;
-        root.style.setProperty('--plate-safe-width', `${Math.max(0, safe.w)}px`);
+        root.style.setProperty('--plate-safe-width', `${Math.max(0, area.w)}px`);
         root.style.width = '';
         // Never over the tapped part (place.ts): the natural height is measured first, then the place and its room.
-        full = naturalHeight();
-        at = placePlate(a, natural, full, safe, { beside, pinTop });
-        if (at.w < natural) { root.style.width = `${at.w}px`; full = naturalHeight(); at = placePlate(a, natural, full, safe, { beside, pinTop }); }
-        headH = measured.head; footerH = measured.footer;
-        // The head and the main option fit whole here with a usable body below them (a cramped body's least, and its More
-        // row), or all of it: this is the area. Else the next, larger one.
-        if (footerH === 0 || at.room >= full - measured.content + Math.min(CRAMPED_BODY + 24, measured.content)) break;
+        let full = naturalHeight();
+        let at = placePlate(a, natural, full, area, { beside, pinTop });
+        if (at.w < natural) { root.style.width = `${at.w}px`; full = naturalHeight(); at = placePlate(a, natural, full, area, { beside, pinTop }); }
+        const candidate = { safe: area, full, at, ...measured, width: root.style.width };
+        if (!best || Math.min(full, at.room) > Math.min(best.full, best.at.room)) best = candidate;
+        if (at.room >= full) { best = candidate; break; }
       }
+      const { safe, full, at, head: headH, footer: footerH, content: contentH, width } = best!;
+      root.style.setProperty('--plate-safe-width', `${Math.max(0, safe.w)}px`);
+      root.style.width = width;
       const height = Math.max(0, Math.min(full, at.room));
       root.style.height = `${height}px`;
       root.style.setProperty('--plate-safe-height', `${Math.max(0, at.room)}px`);
-      const pad = full - headH - footerH - measured.content;
+      const pad = full - headH - footerH - contentH;
       // Cramped: the head, the main option and the plate's padding leave too little body for what it holds.
       const body = height - headH - footerH - Math.max(0, pad) - 24;
-      root.dataset.cramped = String(footerH > 0 && body < Math.min(CRAMPED_BODY, measured.content));
+      root.dataset.cramped = String(footerH > 0 && body < Math.min(CRAMPED_BODY, contentH));
       root.style.left = `${Math.round(at.x)}px`;
       // Above its part, the plate's foot sits 8 px over the part.
       root.style.top = `${Math.round(a && at.y + at.h <= a.y ? Math.max(safe.y, a.y - 8 - height) : at.y)}px`;

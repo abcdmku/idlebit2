@@ -162,8 +162,8 @@ export function plateArea(layout: ShellLayout, bounds: Rect | null): Rect | null
 }
 
 /**
- * Where a phone plate may spill when its head and main option would not fit whole beside its part (R16): first over
- * the strip and the deck, then over the HUD too. Only such a plate spills; one that fits keeps `plateArea`.
+ * Where a phone plate may spill to fit its contents: first over the strip and the deck, then over the HUD too.
+ * A plate that fits keeps `plateArea`.
  */
 export function plateSpill(layout: ShellLayout, area: Rect | null): Rect[] | null {
   if (!area || layout.kind !== 'phone') return null;
