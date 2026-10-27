@@ -21,6 +21,20 @@ export function effectText(e: EffectPreview | null): string {
 const isUpgrade = (q: Quote) => q.action.type === 'upgradePart' || q.action.type === 'upgradeAll';
 const isReplace = (q: Quote) => q.action.type === 'replacePart' || q.action.type === 'replaceCpu';
 
+/** A task fix can quote upgradePartTo for the same purchase as a normal upgrade key. */
+export function samePurchase(a: Quote | null | undefined, b: Quote | null | undefined): boolean {
+  if (!a || !b || a.cost !== b.cost || a.currency !== b.currency) return false;
+  if (JSON.stringify(a.action) === JSON.stringify(b.action)) return true;
+  const target = (q: Quote): string | null => {
+    const action = q.action;
+    if (action.type !== 'upgradePart' && action.type !== 'upgradePartTo') return null;
+    const { unit, slot } = action.part;
+    return `${unit.kind}:${'id' in unit ? unit.id : ''}:${slot.kind}:${'socket' in slot ? slot.socket : ''}:${'index' in slot ? slot.index : ''}`;
+  };
+  const left = target(a), right = target(b);
+  return left !== null && left === right;
+}
+
 export function partQuotes(quotes: readonly Quote[]) {
   const replaces = quotes.filter(isReplace);
   return {
@@ -114,7 +128,6 @@ export function partMain(quotes: readonly Quote[], level: number, eccPriority = 
  * main option, pinned with its full consequence, is the first that improves without a loss (upgrade, else replace,
  * ECC first when the line waits on it); a dead Max or a known regression is never pinned. The others (its upgrade or
  * replace, other generations, ECC, an over-supply "… anyway") are one-line keys with their losses and warnings shown.
- * Payback is shown only when estimated.
  */
 export function PartKeys({ quotes, level, onAction, onResearch, researchName, unblocks = 0, eccPriority = false, part = 'all' }:
   Pick<PlateCommon, 'quotes' | 'onAction' | 'onResearch' | 'researchName'> & { level: number; unblocks?: number; eccPriority?: boolean;

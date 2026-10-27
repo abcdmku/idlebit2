@@ -1450,7 +1450,7 @@ Task popups show their description, processing work and capable-system count dir
 
 ### 16.3 Plates
 
-The core tray offers only physical `Add core`. Selecting a core shows facts and task details, without generic upgrade/replace controls. Clock and cache controls belong to the CPU. Keep existing backend lane research. Reuse `selectContextualResearchTree` for contextual research and preserve `selectResearchTree` for GPU model lookup. Desktop and CPU prototypes do not select a production layout.
+The core tray offers physical `Add core`. The Cores popup also offers the CPU's clock upgrade directly, with its normal quoted price and before/after speed. Selecting a core shows facts and task details, without generic core upgrade/replace controls. Clock and cache controls belong to the CPU. A task-fix purchase and a normal part upgrade for the same target and price appear once; omit the duplicate bottom section. Keep existing backend lane research. Reuse `selectContextualResearchTree` for contextual research and preserve `selectResearchTree` for GPU model lookup. Desktop and CPU prototypes do not select a production layout.
 
 - **Part:** name, generation, level, capacities, idle/load/actual watts, utilization, hot or cold label per action, upgrade price, replace price, capacity-preserving replace and locked reasons (§12.4).
 - **GPU:** model ID, upgrades, VRAM, cores, actual clock, effective rate, perf/W, per-card duty and reservation. Task GPU requirements show only cores and VRAM. Upgrade/replacement quotes show both capacities, clock, rate, actual system watts and exact price. Controls keep stable geometry.

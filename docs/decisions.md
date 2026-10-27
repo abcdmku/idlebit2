@@ -1755,3 +1755,7 @@ The user also requires task-popup details to stay visible. Description, processi
 ## D48, 27 Oct: remove saving and progression forecasts
 
 The user rejected time frames for saving up and similar predictions. Unaffordable purchases say "Saving up" without an ETA. Remove upgrade/replacement payback times, research completion/affordability ETAs and era pace forecasts, including predicted round counts. Keep real prices, shortfalls, progress, measured income and gameplay clocks. This changes presentation only; simulation rates, costs and internal balance calculations stay in the simulation.
+
+## D49, 27 Oct: clock access and one purchase per upgrade
+
+The user requires a direct clock upgrade in the Cores popup, alongside Add core. It consumes the same simulation quote and action as the Clock popup, including price, speed change, affordability and supply warnings. A task-fix key and a normal upgrade that buy the same target for the same price are shown once. The duplicate bottom purchase section is omitted, while distinct actions and research remain available.
