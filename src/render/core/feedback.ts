@@ -48,8 +48,7 @@ export class Feedback {
   private readonly versions = new Map<string, number>();
   private versionsFor: LevelSnapshot | null = null;
   private primed = false;
-  private flashAt = -Infinity;
-  private readonly flashRect = rect();
+  private readonly flashes = new Map<string, { at: number; rect: Rect }>();
   private readonly scratch = rect();
 
   /** A new epoch (load, reset): everything it carries is history. */
@@ -59,7 +58,7 @@ export class Feedback {
     this.lastFailure = lastSeqOf(s.failures ?? []); this.failSeen = -Infinity;
   }
   /** The focus world changed: its pops, part versions and flash go with it. */
-  leaveWorld(): void { this.pops.clear(); this.shards.clear(); this.versions.clear(); this.versionsFor = null; this.primed = false; this.flashAt = -Infinity; }
+  leaveWorld(): void { this.pops.clear(); this.shards.clear(); this.versions.clear(); this.versionsFor = null; this.primed = false; this.flashes.clear(); }
 
   /** Read new completions and failures. `pop`: at rest and running, so pops are placed; else only consumed. */
   take(s: RenderSnapshot, level: LevelRenderer, form: WorldForm, timeMs: number, nowS: number, pop: boolean): void {
@@ -106,10 +105,16 @@ export class Feedback {
       if (v === null) continue;
       const before = this.versions.get(key);
       if (this.primed && (before === undefined || v > before)) {
-        this.flashAt = nowS;
-        this.flashRect.x = t.rect.x; this.flashRect.y = t.rect.y; this.flashRect.w = t.rect.w; this.flashRect.h = t.rect.h;
+        this.flashes.set(key, { at: nowS, rect: { ...t.rect } });
       }
       this.versions.set(key, v);
+    }
+    // A removed die cell may be placed again at the same coordinate.
+    for (const key of this.versions.keys()) {
+      if (!key.startsWith('cell:') && !key.startsWith('core:') && !key.startsWith('cache:')) continue;
+      let found = false;
+      for (let i = 0; i < count; i++) if (targets[i]!.id === key) { found = true; break; }
+      if (!found) this.versions.delete(key);
     }
     this.primed = true;
   }
@@ -121,14 +126,18 @@ export class Feedback {
   }
   /** The purchase flash: a gold fill and a 1·N gold bracket on the part, once. */
   drawFlash(g: CanvasRenderingContext2D, nowS: number, cam: Camera, vp: Rect, ratio: PixelRatio): void {
-    const age = nowS - this.flashAt;
-    if (age < 0 || age >= FLASH_S) return;
-    const r = projectRect(cam, vp, ratio, this.flashRect, this.scratch), n = cam.s / ratio.x;
+    if (!this.flashes.size) return;
     g.save(); g.setTransform(ratio.x, 0, 0, ratio.y, 0, 0);
     g.beginPath(); g.rect(vp.x, vp.y, vp.w, vp.h); g.clip();
-    g.globalAlpha = 0.35 * (1 - age / FLASH_S); g.fillStyle = P.gold; g.fillRect(r.x, r.y, r.w, r.h);
-    g.globalAlpha = 1; g.translate(r.x - n, r.y - n); g.scale(n, n);
-    brackets(g, 0, 0, Math.round(r.w / n) + 2, Math.round(r.h / n) + 2, P.gold);
+    for (const [key, flash] of this.flashes) {
+      const age = nowS - flash.at;
+      if (age < 0 || age >= FLASH_S) { this.flashes.delete(key); continue; }
+      const r = projectRect(cam, vp, ratio, flash.rect, this.scratch), n = cam.s / ratio.x;
+      g.globalAlpha = 0.35 * (1 - age / FLASH_S); g.fillStyle = P.gold; g.fillRect(r.x, r.y, r.w, r.h);
+      g.save(); g.globalAlpha = 1; g.translate(r.x - n, r.y - n); g.scale(n, n);
+      brackets(g, 0, 0, Math.round(r.w / n) + 2, Math.round(r.h / n) + 2, P.gold);
+      g.restore();
+    }
     g.restore();
   }
   /** The failure beat at the pipe mouth: the cause's mark, red on an ink plate, at the shell's N. */

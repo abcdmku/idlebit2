@@ -192,7 +192,7 @@ export const RECORD = {
   /**
    * D26.1 placement per task, bits, written at start (exec/memory) and released once: cache, RAM, disk (memN
    * of it on the rack storage node). trafR/trafD: frozen traffic fractions of its mem stages (D26.2).
-   * vramR/vramD (vramN on the node): unified-memory VRAM overflow (D26.4). `part`: the current stage part.
+   * vramR/vramD (vramN on the node): unified-memory VRAM overflow (D26.4). `part`: stage part 0–2 or initial load 3–5.
    */
   memC: f64, memR: f64, memD: f64, memN: f64, trafR: f64, trafD: f64, vramR: f64, vramD: f64, vramN: f64, part: u8,
   loc: u8, owner: neg1, target: neg1, prev: neg1, next: neg1, parent: neg1, threads: u16,

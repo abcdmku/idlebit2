@@ -12,14 +12,14 @@ interface Run { readonly taskId: number; readonly family: number; readonly shard
 let coreN = 0;
 const core = (busy: boolean, progress: number, research = 0, run: Run | null = null): CoreView => ({
   socket: 0, generation: 0, level: 1, busy: busy ? 1 : 0, family: busy ? run?.family ?? 0 : null, taskId: busy ? run?.taskId ?? 380 + (coreN++ % 4) : null,
-  progress, threads: 1, research, cstate: 0, shard: busy ? run?.shard ?? 0 : null, shardThreads: busy ? run?.threads ?? 1 : 0, rate: 1024, hz: 1024, sleep: null,
+  activity: busy ? 'compute' : null, progress, threads: 1, research, cstate: 0, shard: busy ? run?.shard ?? 0 : null, shardThreads: busy ? run?.threads ?? 1 : 0, rate: 1024, hz: 1024, sleep: null,
 });
 const PARALLEL: Run = { taskId: 700, family: 13, shard: 1, threads: 2 }, ACCEL: Run = { taskId: 701, family: 22, shard: 0, threads: 1 };
 export function chipScene(stage: 'boot' | 'chip' | 'system' | 'shard', online: ChipSnapshot['online'] = 'onMarket'): ChipSnapshot {
   coreN = 0;
   if (stage === 'boot') return {
     level: 'chip', parent: null, systemId: ID, cpuCount: 1, online, tier: 0, psu: psu(0.65), clock: { hz: 1, effectiveHz: 1, generation: 0, level: 1 }, coreSites: 1,
-    cores: [core(false, 0, 0.36)], cache: { levels: [{ kind: 'l1', bits: 1, generation: 0, level: 1 }], usedBits: 0, capacityBits: 1, spilledOutBits: 0 },
+    cores: [core(false, 0, 0.36)], cache: { levels: [{ kind: 'l1', bits: 1, generation: 0, level: 1 }], usedBits: 0, loadedBits: 0, capacityBits: 1, spilledOutBits: 0 },
     scheduler: null, queue: [], researchShare: 0.36, pipe: { speed: 1000, transfer: null, waiting: false }, slots: [{ kind: 'core', index: 1, locked: true }, { kind: 'scheduler', index: 0, locked: true }],
   };
   const sys = stage !== 'chip', shard = stage === 'shard';
@@ -28,7 +28,8 @@ export function chipScene(stage: 'boot' | 'chip' | 'system' | 'shard', online: C
   return {
     level: 'chip', parent: sys ? PARENT : null, systemId: ID, cpuCount: 1, online, tier: 0, psu: psu(5.5),
     clock: { hz: sys ? 8 : 4, effectiveHz: sys ? 8 : 4, generation: 0, level: sys ? 4 : 3 }, coreSites: sys ? 4 : 2, cores,
-    cache: { levels: [{ kind: 'l1', bits: sys ? 64 : 8, generation: 0, level: sys ? 7 : 4 }], usedBits: sys ? 32 : 0, capacityBits: sys ? 64 : 8, spilledOutBits: 0 },
+    cache: { levels: [{ kind: 'l1', bits: sys ? 64 : 8, generation: 0, level: sys ? 7 : 4 }], usedBits: sys ? 32 : 0, loadedBits: sys ? 32 : 0,
+      capacityBits: sys ? 64 : 8, spilledOutBits: 0 },
     scheduler: { generation: 0, level: sys ? 3 : 2, strategy: 'fifo', q: sys ? 8 : 4, queued: sys ? 3 : 0, k: sys ? 4 : 2, running: sys ? 3 : 0, reserved: 0 },
     queue: sys ? [{ taskId: 390, family: familyId(1) }, { taskId: 391, family: familyId(2) }, { taskId: 392, family: familyId(0) }] : [],
     researchShare: 0.5, pipe: { speed: 1000, transfer: null, waiting: false }, slots: sys ? [] : [{ kind: 'core', index: 2, locked: true }],
@@ -39,9 +40,9 @@ const part = (kind: PartView['kind'], slot: number, level: number, active: boole
   ...(kind === 'ram' ? { capacityBits: 8192 * 2 ** (level - 1), rateBits: 1000 * level } : kind === 'drive' ? { capacityBits: 131072 * level, rateBits: 4 * level } : {}) });
 /** Explicit native catalog row, not a second simulation or inferred model. */
 export const GPU_SCENE_STATS: GpuStats = {
-  model: '1330', generation: 1, series: 3, tier: 30, upgrades: 0, cores: 4, vramBits: 8192,
+  tierIndex: 0, maxTierIndex: 5, model: '1330', generation: 1, series: 3, tier: 30, cores: 4, vramBits: 8192,
   clockHz: 1000, opsPerS: 4000, tensorOpsPerS: 4000, idleW: 200, loadW: 2000,
-  efficiencyOpsPerJ: 4000 / 2200, maxUpgrades: 5,
+  efficiencyOpsPerJ: 4000 / 2200,
 };
 const gpu = (slot: number, active: boolean, held = active ? 2048 : 0): PartView => ({ ...part('gpu', slot, 1, active), gpu: GPU_SCENE_STATS, vramUsedBits: held });
 const psu = (deliveredW: number): SupplyView => ({

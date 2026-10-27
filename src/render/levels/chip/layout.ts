@@ -28,8 +28,8 @@ const SPEC: Readonly<Record<WorldForm, Spec>> = {
   phone: { pkgW: 168, coreW: 74, gapX: 4, gapY: 4, clockW: 32, S: 56, cw: 24, w: 320, h: 480, top: 144, cols: 4, inset: 8, clockAbove: true },
 };
 const r = (x: number, y: number, w: number, h: number): Rect => ({ x, y, w, h });
-/** A grid tile's least height (art px): its speed label line, then its task icon and progress bar. */
-export const TILE_H = 20;
+/** A grid tile reserves speed and activity lines above its task icon and progress bar. */
+export const TILE_H = 28;
 const TILE_GAP = 2;
 /** Grid rows for `count` sites (0 for the two big sites). */
 const rowsOf = (count: number, cols: number): number => (count <= 2 ? 0 : Math.ceil(Math.min(MAX_CORES, count) / cols));

@@ -1,98 +1,109 @@
 /* Plates (ported from the mockup's plate kit). D2.1: one body size, var(--body);
    only the plate title is larger. Emphasis is colour or weight. Gold means money. */
 .v3-plate {
+  --s1: 4px; --s2: 8px; --s3: 12px; --s4: 16px;
   --pb: var(--body, 13px);
-  position: absolute; left: 0; top: 0; z-index: 10; width: 300px; max-width: calc(100% - 16px); box-sizing: border-box;
+  position: absolute; left: 0; top: 0; z-index: 10; width: 300px; max-width: min(calc(100% - 16px), var(--plate-safe-width, 100%)); box-sizing: border-box;
   max-height: var(--plate-safe-height, none); overflow-y: auto; overscroll-behavior: contain;
-  padding: 10px 12px 12px; background: #1b1437; color: #efeaff;
-  font: 400 var(--pb)/1.35 "Chakra Petch", sans-serif; font-variant-ligatures: none;
+  padding: var(--s3); background: #1b1437; color: #efeaff;
+  font: 400 var(--pb)/var(--lh) "Chakra Petch", sans-serif; font-variant-ligatures: none;
   box-shadow: 0 0 0 2px #e8e1ff, 0 0 0 4px #0e0b1c, 6px 8px 0 2px rgba(5, 3, 12, 0.55);
   pointer-events: auto; touch-action: pan-y; user-select: none;
 }
-.l-desktop .v3-plate { width: 300px; }
+.plate-content { overflow-y: auto; overscroll-behavior: contain; scrollbar-width: thin; scrollbar-color: #74679f #1b1437; }
+.plate-footer { padding-top: var(--s2); }
 .v3-plate * { font-size: var(--pb); }
-.v3-plate p { margin: 5px 0 0; }
+.v3-plate p { margin: var(--s1) 0 0; }
 .v3-plate button { font-family: inherit; -webkit-tap-highlight-color: transparent; }
 .v3-plate button:focus-visible, .v3-plate input:focus-visible { outline: 2px solid #8ef5ff; outline-offset: 2px; }
 
 /* head */
-.v3-plate .p-head { position: relative; display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; min-height: 24px; }
-.v3-plate.has-x .p-head { padding-right: 56px; min-height: 40px; }
+.v3-plate .p-head { position: sticky; top: calc(-1 * var(--s3)); z-index: 4; background: #1b1437; display: flex; align-items: baseline; gap: var(--s2); flex-wrap: wrap; min-height: 24px; }
+.v3-plate.has-x .p-head { padding-right: 48px; min-height: 36px; }
 /* The close key spans the header; nothing below it runs under the key (QA-19). */
-.v3-plate .p-head .p-title { font-size: var(--head); line-height: 18px; font-weight: 700; }
+.v3-plate .p-head .p-title { font-size: var(--head); line-height: var(--lh); font-weight: 700; }
 .v3-plate .p-sub { color: #a99be6; }
 .v3-plate .p-head .pz { margin-left: auto; }
-.v3-plate .pips { display: inline-flex; gap: 2px; margin-left: auto; align-self: center; }
+.v3-plate .pips { display: inline-flex; gap: var(--s1); margin-left: auto; align-self: center; }
 .v3-plate .pips i { width: 6px; height: 6px; background: #8ef5ff; box-shadow: 0 0 0 1px #0e0b1c; }
 .v3-plate .pips i:not(.on) { background: #2c2552; }
-.v3-plate .p-x { position: absolute; right: -8px; top: -8px; width: 48px; height: 48px; border: 0; padding: 0; display: flex; align-items: center;
+.v3-plate .p-x { position: absolute; right: -8px; top: -8px; }
+.v3-plate .p-x, .lab .p-x { width: 44px; height: 44px; border: 0; padding: 0; display: flex; align-items: center;
   justify-content: center; background: #1f1a3a; box-shadow: inset 0 0 0 2px #0e0b1c, inset 0 4px 0 #3a2f6e, inset 0 -6px 0 #15122a;
   color: #a99be6; cursor: pointer; }
 
 /* facts */
-.v3-plate .p-status { min-height: 18px; color: #efeaff; }
+.v3-plate .p-status { min-height: var(--lh); color: #efeaff; }
 .v3-plate .p-status.warn { color: #ffab98; }
-.v3-plate .p-bar { height: 6px; margin-top: 6px; background: #2a1d4a; box-shadow: 0 0 0 1px #0e0b1c; }
+.v3-plate .p-bar { height: 6px; margin-top: var(--s1); background: #2a1d4a; box-shadow: 0 0 0 1px #0e0b1c; }
 .v3-plate .p-bar b { display: block; height: 100%; background: #8ef5ff; }
 .v3-plate .p-bar.warn b { background: #ffb03b; }
-.v3-plate .p-line { min-height: 18px; margin-top: 3px; }
+.v3-plate .p-line { min-height: var(--lh); margin-top: var(--s1); }
 .v3-plate .p-line.ben { color: #8ef5ff; }
 .v3-plate .p-line.warn { color: #ffab98; }
 .v3-plate .p-line.muted, .v3-plate .p-hint { color: #a99be6; }
-.v3-plate .p-hint.payback { min-height: 18px; color: #b8ffe6; }
-.v3-plate .p-list { list-style: none; margin: 7px 0 0; padding: 0; display: grid; gap: 3px; }
-.v3-plate .p-list li { display: flex; gap: 8px; min-height: 18px; align-items: center; }
-.v3-plate .p-list .v { margin-left: auto; color: #ffcc3d; }
+.v3-plate .p-hint.payback { min-height: var(--lh); color: #b8ffe6; }
 
 /* prices and glyphs */
-.pz { display: inline-flex; align-items: center; gap: 3px; color: #ffcc3d; white-space: nowrap; font-weight: 600; }
+.pz { display: inline-flex; align-items: center; gap: 4px; color: #ffcc3d; white-space: nowrap; font-weight: 600; }
 .pz.d { color: #27d9a0; }
 .px-ic { width: 9px; height: 9px; flex: none; image-rendering: pixelated; }
-.px-ic.lock { width: 7px; height: 8px; vertical-align: -1px; }
+.px-ic.lock { width: 14px; height: 16px; vertical-align: -2px; flex: none; }
 
 /* keys */
-.v3-plate .keys { display: flex; flex-direction: column; gap: 6px; margin-top: 9px; }
-.v3-plate .key { display: flex; align-items: center; justify-content: center; flex-wrap: wrap; column-gap: 8px; row-gap: 0; min-height: 44px; width: 100%;
-  box-sizing: border-box; border: 0; padding: 4px 10px 6px; font-weight: 700; line-height: 1.15; color: #2a1700; background: #ffcc3d; cursor: pointer;
+.v3-plate .keys { display: flex; flex-direction: column; gap: var(--s2); margin-top: var(--s2); }
+.v3-plate .key { display: flex; align-items: center; justify-content: center; flex-wrap: wrap; column-gap: var(--s2); row-gap: 0; min-height: 44px; width: 100%;
+  box-sizing: border-box; border: 0; padding: var(--s1) var(--s2); font-weight: 700; line-height: var(--lh); color: #2a1700; background: #ffcc3d; cursor: pointer;
   text-align: left; box-shadow: inset 0 -4px 0 #c4861c, inset 0 2px 0 #fff1a6, 0 0 0 2px #0e0b1c; }
 .v3-plate .key .pz { color: #2a1700; }
 .v3-plate .key .pz.d { color: #064d3a; }
 .v3-plate .key:active:not(:disabled) { transform: translateY(2px); box-shadow: inset 0 -2px 0 #c4861c, 0 0 0 2px #0e0b1c; }
-.v3-plate .key:disabled { background: #342c55; color: #9a92bf; box-shadow: inset 0 -4px 0 #231d40, 0 0 0 2px #0e0b1c; cursor: not-allowed; }
-.v3-plate .key:disabled .pz { color: #9a92bf; }
-.v3-plate .key.replace { background: #e8ae45; }
-.v3-plate .key.row { justify-content: space-between; background: #29234b; color: #efeaff; box-shadow: inset 0 -4px 0 #1b1437, inset 0 2px 0 #5d5296, 0 0 0 2px #0e0b1c; }
+.v3-plate .key:disabled { background: #342c55; color: #b9b0df; box-shadow: inset 0 -4px 0 #231d40, 0 0 0 2px #0e0b1c; cursor: not-allowed; }
+.v3-plate .key:disabled .pz { color: #b9b0df; }
+.v3-plate .key.replace:not(:disabled) { background: #29234b; color: #efeaff; box-shadow: inset 0 0 0 1px #74679f, inset 0 -3px #171127; }
+.v3-plate .key.replace:not(:disabled) .pz { color: #ffcc3d; }
+.part-option { display: flex; flex-direction: column; gap: var(--s1); }
+.option-name { font-weight: 600; display: flex; justify-content: space-between; gap: var(--s2); }
+.price-short .pz { color: #b9b0df; }
+.option-values { color: #c9c1e5; line-height: var(--lh); }
+.v3-plate .option-cold { margin: 0; color: #ffbf8a; }
+.option-warning { color: #ffab98; }
+.v3-plate .power-limit { text-align: left; }
+.unsafe-option summary { min-height: 44px; display: flex; align-items: center; cursor: pointer; color: #c9c1e5; }
+.unsafe-option summary::after { content: '+'; margin-left: auto; }
+.unsafe-option[open] summary::after { content: '−'; }
+.unsafe-option summary:focus-visible { outline: 2px solid var(--focus); outline-offset: -2px; }
+.v3-plate .part-option .key { justify-content: space-between; }
+.v3-plate .key.row { position: relative; left: auto; top: auto; width: 100%; justify-content: space-between; background: #29234b; color: #efeaff; box-shadow: inset 0 -4px 0 #1b1437, inset 0 2px 0 #5d5296, 0 0 0 2px #0e0b1c; }
 .v3-plate .key.go { background: #efeaff; color: #1b1437; box-shadow: inset 0 -4px 0 #a99be6, inset 0 2px 0 #fff, 0 0 0 2px #0e0b1c; }
 .v3-plate .key.ghost { justify-content: center; background: #29234b; color: #efeaff; box-shadow: inset 0 -4px 0 #1b1437, inset 0 2px 0 #5d5296, 0 0 0 2px #0e0b1c; }
 .v3-plate .key.locked-action { background: #332767; color: #efeaff; box-shadow: inset 0 -3px 0 #271f55, inset 0 2px 0 #5d5296, 0 0 0 2px #0e0b1c; }
 .v3-plate .key.locked-action .action-detail { color: #ff9be6; }
-.v3-plate .key .action-detail { flex-basis: 100%; font-weight: 400; text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.v3-plate .key .action-detail { flex-basis: 100%; font-weight: 400; text-align: center; white-space: normal; overflow-wrap: anywhere; }
 .v3-plate .key .action-detail em { display: block; font-style: normal; }
 
-.v3-plate .need { margin: 0; color: #a99be6; text-align: center; }
+.v3-plate .need { margin: var(--s1) 0 0; color: #a99be6; text-align: left; }
 .v3-plate .need.warn { color: #ffab98; }
 .v3-plate .key-slot { margin: 0; min-height: 44px; display: flex; align-items: center; justify-content: center; color: var(--dim);
   background: #120d28; box-shadow: inset 2px 2px 0 #07050f, inset -2px -2px 0 #2a2252; }
-.v3-plate .key-pair { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+.v3-plate .key-pair { display: grid; grid-template-columns: 1fr 1fr; gap: var(--s2); }
 
-/* port grid, toggle, choices */
-.v3-plate .cx-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px; margin-top: 8px; }
-.l-desktop .v3-plate .cx-grid { grid-template-columns: repeat(6, 1fr); }
-.v3-plate .cx-cell, .v3-plate .cx-tog, .v3-plate .cx-row { position: relative; min-height: 44px; padding: 4px 6px 3px; box-sizing: border-box; border: 0; width: 100%;
-  background: #261d48; color: #efeaff; box-shadow: inset 0 -3px 0 #160f2e, 0 0 0 2px #0e0b1c; font-weight: 600; line-height: 1.2; text-align: left; cursor: pointer; }
-.v3-plate .cx-cell b { display: block; font-weight: 700; color: #ffd27a; margin-top: 2px; white-space: nowrap; }
-.v3-plate .cx-cell.dim, .v3-plate .cx-cell.dim b { color: #8d84b3; }
-.v3-plate .cx-cell.sel { background: #33296b; box-shadow: inset 0 -3px 0 #160f2e, 0 0 0 2px #efeaff; }
-.v3-plate .cx-cell i { position: absolute; right: 5px; top: 5px; width: 6px; height: 4px; background: #1f3a2c; box-shadow: 0 0 0 1px #0e0b1c; }
-.v3-plate .cx-cell i.on { background: #7be38f; }
-.v3-plate .cx-tog { display: flex; align-items: center; gap: 10px; margin-top: 6px; }
+/* Toggle and choice controls. */
+.v3-plate .cx-tog, .v3-plate .cx-row { position: relative; min-height: 44px; padding: var(--s1) var(--s2); box-sizing: border-box; border: 0; width: 100%;
+  background: #261d48; color: #efeaff; box-shadow: inset 0 -3px 0 #160f2e, 0 0 0 2px #0e0b1c; font-weight: 600; line-height: var(--lh); text-align: left; cursor: pointer; }
+.v3-plate .cx-tog { display: flex; align-items: center; gap: var(--s2); margin-top: var(--s2); }
 .v3-plate .cx-tog s { flex: none; position: relative; width: 30px; height: 16px; background: #15122a; box-shadow: 0 0 0 2px #0e0b1c; text-decoration: none; }
 .v3-plate .cx-tog s::after { content: ""; position: absolute; left: 2px; top: 2px; width: 12px; height: 12px; background: #6e6698; }
 .v3-plate .cx-tog.on s { background: #128a68; }
 .v3-plate .cx-tog.on s::after { left: 16px; background: #b8ffe6; }
 .v3-plate .cx-tog small, .v3-plate .cx-row small { display: block; font-weight: 400; color: #a99be6; }
-.v3-plate .cx-rows { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-top: 8px; }
-.v3-plate .cx-row { display: flex; align-items: center; gap: 8px; }
+/* Two choices a row where they fit, one in a narrow plate: never a row cut off at the side. */
+.v3-plate .cx-rows { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--s2); margin-top: var(--s2); }
+.v3-plate .cx-row span { min-width: 0; overflow-wrap: normal; }
+.system-power { scroll-margin-top: var(--s2); }
+.system-power .cx-rows { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.system-power .cx-row { justify-content: center; padding: var(--s1); }
+.v3-plate .cx-row { display: flex; align-items: center; gap: var(--s2); }
 .v3-plate .cx-row u { flex: none; width: 10px; height: 10px; background: #15122a; box-shadow: 0 0 0 2px #0e0b1c; text-decoration: none; }
 .v3-plate .cx-row.on { background: #33296b; box-shadow: inset 0 -3px 0 #160f2e, 0 0 0 2px #efeaff; }
 .v3-plate .cx-row.on u { background: #8ef5ff; }
@@ -100,117 +111,108 @@
 .v3-plate .cx-row.lock small { color: #ffab98; }
 
 /* cooler setpoint */
-.v3-plate .setpoint { display: grid; grid-template-columns: 1fr 44px 56px 44px; align-items: center; gap: 4px; margin-top: 8px; min-height: 44px; }
-.v3-plate .setpoint.lock { grid-template-columns: auto 1fr; gap: 8px; color: #8d84b3; }
+.v3-plate .setpoint { display: grid; grid-template-columns: minmax(0, 1fr) 44px 56px 44px; align-items: center; gap: var(--s2); margin-top: var(--s2); min-height: 44px; }
+.v3-plate .setpoint.lock { grid-template-columns: auto 1fr; gap: var(--s2); color: #8d84b3; }
 .v3-plate .setpoint.lock small { color: #ffab98; }
 .v3-plate .setpoint b { text-align: center; color: #8ef5ff; }
-.v3-plate .setpoint .step { height: 44px; border: 0; background: #29234b; color: #efeaff; font-weight: 700; cursor: pointer;
+.v3-plate .setpoint .step { height: 44px; padding: 0; text-align: center; border: 0; background: #29234b; color: #efeaff; font-weight: 700; cursor: pointer;
   box-shadow: inset 0 -3px 0 #15122a, inset 0 2px 0 #5d5296, 0 0 0 2px #0e0b1c; }
 .v3-plate .setpoint .step:disabled { color: var(--dim); cursor: default; }
 
 /* market row: what the unit is doing, the switch pips, and the "On market" toggle key (fixed place) */
-.v3-plate .p-online { display: grid; gap: 4px 8px; margin-top: 8px; }
-.v3-plate .sw-t { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-width: 0; }
+.v3-plate .p-online { display: grid; gap: var(--s1) 8px; margin-top: var(--s2); }
+.v3-plate .sw-t { display: flex; align-items: center; justify-content: space-between; gap: var(--s2); min-width: 0; min-height: var(--lh); }
 .v3-plate .sw-t b { font-weight: 700; }
 .v3-plate .sw-s { color: #a99be6; }
 .v3-plate .p-online:is([data-state="online"], [data-state="paused"]) .sw-t b { color: #7dff9a; }
 .v3-plate .p-online:is([data-state^="going"], [data-state="booting"], [data-state="cold"]) .sw-t b { color: #ffb03b; }
 .v3-plate .p-online[data-state="crashed"] .sw-t b { color: #ff6a5a; }
 .v3-plate .p-online[data-state="offline"] .sw-t b { color: var(--dim); }
-.v3-plate .sw-pips { display: flex; gap: 2px; flex: none; visibility: hidden; }
+.v3-plate .sw-pips { display: flex; gap: var(--s1); flex: none; visibility: hidden; }
 .v3-plate .p-online:is([data-state^="going"], [data-state="booting"], [data-state="cold"]) .sw-pips { visibility: visible; }
 .v3-plate .sw-pips i { width: 4px; height: 10px; background: #2a2440; box-shadow: 0 0 0 1px #0e0b1c; }
 .v3-plate .sw-pips i.on { background: #ffb03b; }
-.v3-plate .mk { width: 100%; height: 48px; margin-top: 4px; border: 0; padding: 0; font: inherit; font-weight: 700; cursor: pointer; text-align: center;
+.v3-plate .mk { width: 100%; height: 44px; margin-top: 0; border: 0; padding: 0; font: inherit; font-weight: 700; cursor: pointer; text-align: center;
   background: #1f7a52; color: #fff; box-shadow: inset 0 -4px 0 #0f4a31, inset 0 2px 0 #57f0b4, 0 0 0 2px #0e0b1c; }
 .v3-plate .mk[aria-pressed="false"] { background: #29234b; color: #c9c2ee; box-shadow: inset 0 -4px 0 #1b1437, inset 0 2px 0 #5d5296, 0 0 0 2px #0e0b1c; }
 .v3-plate .mk:disabled { background: #342c55; color: #9a92bf; box-shadow: inset 0 -4px 0 #231d40, 0 0 0 2px #0e0b1c; cursor: not-allowed; }
 
 /* configuration plate */
 .v3-plate.cfg { width: 362px; }
-.l-desktop .v3-plate.cfg { width: 374px; padding: 8px 10px 10px; }
-.cfg .cfg-sec { margin-top: 8px; }
-.l-desktop .cfg .cfg-sec { margin-top: 5px; }
-.cfg .cfg-lab { display: block; line-height: 14px; color: #a99be6; margin-bottom: 4px; }
-.cfg .cfg-row { display: grid; gap: 6px; }
-.cfg .tiers .cfg-row { grid-template-columns: repeat(4, 1fr); height: 64px; }
-.cfg .copies .cfg-row { grid-template-columns: repeat(3, 1fr) 0; height: 72px; }
-.cfg .copies .cfg-row:has(.more) { grid-template-columns: repeat(3, 1fr) 56px; }
-.cfg .saved .cfg-row { grid-template-columns: 1fr 1fr; grid-auto-rows: 44px; height: 94px; align-content: start; }
-.l-desktop .cfg .saved .cfg-row { height: 44px; grid-template-columns: 1fr 1fr 56px; }
-.cfg .cfg-opt { position: relative; min-width: 0; min-height: 44px; padding: 4px 2px; border: 0; cursor: pointer; color: #efeaff;
-  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px;
+.l-desktop .v3-plate.cfg { width: 374px; }
+.cfg .cfg-sec + .cfg-sec { margin-top: var(--s4); }
+.cfg .cfg-lab { display: block; line-height: var(--lh); color: #a99be6; }
+.cfg .cfg-row { display: grid; gap: var(--s2); margin-top: var(--s1); }
+/* Every barebones build shows (seven for a server: five CPU tiers, accelerator, storage node), four a row, wrapping. */
+.cfg .tiers .cfg-row { grid-template-columns: repeat(auto-fit, minmax(80px, 1fr)); grid-auto-rows: minmax(64px, auto); }
+/* Every copy and saved build shows (they wrap and the body scrolls): none waits behind a More. */
+.cfg .copies .cfg-row { grid-template-columns: repeat(3, 1fr); grid-auto-rows: minmax(80px, auto); }
+.cfg .copies .cfg-row.named-row { grid-auto-rows: 44px; grid-template-columns: 1fr 1fr; }
+.cfg .saved .cfg-row { grid-template-columns: 1fr 1fr; grid-auto-rows: 44px; align-content: start; }
+.cfg .cfg-opt { position: relative; min-width: 0; min-height: 44px; padding: var(--s1); border: 0; cursor: pointer; color: #efeaff;
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: var(--s1);
   background: #120d28; box-shadow: inset 2px 2px 0 #07050f, inset -2px -2px 0 #3a2f6e; }
 .cfg .cfg-opt .ic { width: 32px; height: 24px; image-rendering: pixelated; flex: none; }
-.cfg .cfg-opt.copy .ic { width: 88px; height: 32px; }
-.cfg .cfg-opt .nm { line-height: 15px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
-.cfg .cfg-opt .pr { height: 16px; display: flex; align-items: center; }
-.cfg .cfg-opt .lk { color: #8a81b8; display: inline-flex; align-items: center; gap: 4px; }
+.cfg .cfg-opt.copy .ic { width: min(88px, 100%); height: 32px; object-fit: contain; }
+.cfg .cfg-opt .nm { line-height: var(--lh); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
+.cfg .tiers .cfg-opt .nm { white-space: normal; text-align: center; overflow-wrap: break-word; }
+/* Each tile is its own buy key: its difference (a one-line note), its price; over a supply it is ringed. */
+.cfg .cfg-opt .nt { line-height: var(--lh); color: #a99be6; text-align: center; }
+.cfg .cfg-opt:disabled { cursor: default; color: #b9b0df; }
+.cfg .cfg-opt.over { box-shadow: inset 0 0 0 1px #ffab98; }
+.cfg .cfg-opt .pr { min-height: var(--lh); display: flex; align-items: center; }
+.cfg .cfg-opt .lk { color: #8a81b8; display: inline-flex; align-items: center; gap: var(--s1); }
 .cfg .cfg-opt.lock .ic { opacity: .4; }
 .cfg .cfg-opt.lock .nm { color: #8a81b8; }
-.cfg .cfg-opt.named { flex-direction: row; justify-content: space-between; padding: 0 8px; gap: 6px; }
+.cfg .cfg-opt.named { flex-direction: row; justify-content: space-between; padding: 0 var(--s2); gap: var(--s2); }
 .cfg .cfg-opt.named .nm { text-align: left; flex: 1; }
 .cfg .cfg-opt.more { color: #a99be6; }
 .cfg .cfg-opt[aria-pressed="true"] { background: #2a2052; box-shadow: inset 0 0 0 2px #efeaff, inset 0 0 0 4px #0e0b1c; }
-.cfg .cfg-empty { margin: 0; height: 100%; display: flex; align-items: center; justify-content: center; text-align: center; padding: 0 12px;
+.cfg .cfg-empty { margin: 0; height: 100%; display: flex; align-items: center; justify-content: center; text-align: center; padding: 0 var(--s3);
   color: var(--dim); background: #120d28; box-shadow: inset 2px 2px 0 #07050f, inset -2px -2px 0 #2a2252; grid-column: 1 / -1; }
-.cfg .cfg-detail { margin: 8px 0 0; height: 32px; line-height: 16px; color: #c8c2ff; overflow: hidden; }
+.cfg .cfg-detail { margin: var(--s1) 0 0; min-height: 0; line-height: var(--lh); color: #c8c2ff; }
 .cfg .cfg-detail.warn { color: #ffab98; }
-.l-desktop .cfg .cfg-detail { height: 16px; margin-top: 5px; white-space: nowrap; text-overflow: ellipsis; }
-.cfg .keys { margin-top: 6px; }
 .cfg .key.buy { justify-content: space-between; }
 
 /* save prompt: pinned high, never under an on-screen keyboard */
 .v3-plate.save { width: 342px; }
-.l-desktop .v3-plate.save { width: 340px; padding: 8px 12px 10px; }
-.save .save-field { display: flex; align-items: center; gap: 8px; margin-top: 10px; height: 44px; padding: 0 10px;
+.l-desktop .v3-plate.save { width: 340px; }
+.save .save-field { display: flex; align-items: center; gap: var(--s2); margin-top: var(--s2); height: 44px; padding: 0 var(--s2);
   background: #120d28; box-shadow: inset 2px 2px 0 #07050f, inset -2px -2px 0 #3a2f6e; }
 .save .save-lab { color: #a99be6; }
-.save .save-field input { flex: 1; min-width: 0; height: 32px; border: 0; padding: 0 2px; background: transparent; color: #efeaff; caret-color: #8ef5ff;
+.save .save-field input { flex: 1; min-width: 0; height: 32px; border: 0; padding: 0 var(--s1); background: transparent; color: #efeaff; caret-color: #8ef5ff;
   font: 400 16px/1 "Chakra Petch", sans-serif; user-select: text; -webkit-user-select: text; outline: none; }
 .save .save-field:focus-within { box-shadow: inset 2px 2px 0 #07050f, inset -2px -2px 0 #3a2f6e, inset 0 0 0 2px #8ef5ff; }
-.save .p-line.muted { margin-top: 6px; }
-.save .save-keys { display: grid; grid-template-columns: 1fr 112px; gap: 8px; margin-top: 10px; }
+.save .save-keys { display: grid; grid-template-columns: 1fr; gap: var(--s2); margin-top: var(--s2); }
 .save .key.go { justify-content: center; }
 
 
 /* the router queue (D25.7): one well per slot, filled in the queued task's type colour */
-.v3-plate .lb-queue { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-top: 8px; }
+.v3-plate .lb-queue { display: flex; align-items: center; gap: var(--s2); flex-wrap: wrap; margin-top: var(--s2); }
 .v3-plate .lb-queue .v { color: #efeaff; }
-.v3-plate .lb-wells { display: flex; flex-wrap: wrap; gap: 2px; flex-basis: 100%; }
+.v3-plate .lb-wells { display: flex; flex-wrap: wrap; gap: var(--s1); flex-basis: 100%; }
 .v3-plate .lb-wells i { width: 8px; height: 8px; background: #120d28; box-shadow: inset 0 0 0 1px #3a2f6e; }
 .v3-plate .lb-wells i.on { background: var(--well, #a6f6ff); box-shadow: none; }
 
-/* the memory hierarchy (D26): one bar per tier; spilled bits hatched */
-.v3-plate .mem-tiers { display: grid; gap: 6px; margin-top: 8px; }
-.v3-plate .mem-tier { display: grid; grid-template-columns: 48px 1fr; column-gap: 8px; align-items: center; }
-.v3-plate .mem-tier .v { text-align: right; color: #efeaff; }
-.v3-plate .mem-bar { grid-column: 1 / -1; display: flex; height: 6px; background: #120d28; box-shadow: 0 0 0 1px #0e0b1c; }
-.v3-plate .mem-bar b { display: block; background: #a6f6ff; }
-.v3-plate .mem-bar s { display: block; min-width: 4px; background: repeating-linear-gradient(135deg, #ffb03b 0 2px, #5a3208 2px 4px); }
-.v3-plate .mem-tier .v.warn { color: #ffb03b; } .v3-plate .mem-tier .v.dim { color: var(--dim); }
-.v3-plate .mem-note { grid-column: 1 / -1; color: #a99be6; min-height: 1.35em; }
-
 /* D31 Start row: three fixed steppers and the order; the busy stepper is reserved and greyed before gen 1 */
-.v3-plate .start-row { display: grid; gap: 4px; margin-top: 8px; padding-top: 8px; box-shadow: inset 0 2px 0 #29234b; }
-.v3-plate .start-head { display: grid; gap: 2px; margin: 0; }
+.v3-plate .start-row { min-width: 0; grid-template-columns: minmax(0, 1fr); display: grid; gap: var(--s2); margin-top: var(--s2); padding-top: var(--s2); box-shadow: inset 0 2px 0 #29234b; }
+.v3-plate .start-head { display: grid; gap: var(--s1); margin: 0; }
 .v3-plate .start-head span { color: #a99be6; }
 .v3-plate .start-step { margin-top: 0; grid-template-columns: 1fr 44px 72px 44px; }
 .v3-plate .start-step.off { color: var(--dim); }
 .v3-plate .start-step.off b { color: var(--dim); }
-.v3-plate .start-row { min-width: 0; grid-template-columns: minmax(0, 1fr); }
-.v3-plate .start-order { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); grid-template-columns: auto; align-items: center; gap: 4px; min-height: 44px; }
-.v3-plate .start-order > span { padding-right: 4px; }
-.v3-plate .start-order .opt { min-width: 0; height: 44px; text-align: center; padding: 0 4px; border: 0; font: inherit; cursor: pointer; background: #29234b; color: #c9c2ee;
+.v3-plate .start-order { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); grid-template-columns: auto; align-items: center; gap: var(--s2); min-height: 44px; }
+.v3-plate .start-order > span { padding-right: var(--s1); }
+.v3-plate .start-order .opt { min-width: 0; height: 44px; text-align: center; padding: 0 var(--s1); border: 0; font: inherit; cursor: pointer; background: #29234b; color: #c9c2ee;
   box-shadow: inset 0 -4px 0 #1b1437, inset 0 2px 0 #5d5296, 0 0 0 2px #0e0b1c; }
 .v3-plate .start-order .opt.on { background: #3a2f6e; color: #efeaff; font-weight: 700; box-shadow: inset 0 -4px 0 #271f55, inset 0 2px 0 #efeaff, 0 0 0 2px #0e0b1c; }
 
 /* D31 site generation row */
-.v3-plate .gen-row { display: grid; gap: 2px; margin-top: 8px; }
+.v3-plate .gen-row { display: grid; gap: var(--s1); margin-top: var(--s2); }
 .v3-plate .gen-row p { margin: 0; }
 .v3-plate .gen-sub { color: #a99be6; }
 .v3-plate .gen-row[data-kind="none"] b { color: var(--dim); }
-.v3-plate .gen-bar { display: block; height: 6px; margin-top: 4px; background: #2a2440; box-shadow: 0 0 0 1px #0e0b1c; }
+.v3-plate .gen-bar { display: block; height: 6px; margin-top: var(--s1); background: #2a2440; box-shadow: 0 0 0 1px #0e0b1c; }
 .v3-plate .gen-bar b { display: block; height: 100%; background: #7dff9a; }
 .v3-plate .start-step .step { text-align: center; padding: 0; }
 .v3-plate .start-step > span { white-space: nowrap; }
@@ -230,7 +232,7 @@
 .l-phone .v3-plate.task-detail { width: calc(100% - 16px); }
 /* The pointer up to the tapped card (a plate under its anchor). */
 .v3-plate.task-detail[data-tip="up"] { overflow: visible; }
-.v3-plate.task-detail[data-tip="up"]::before { content: ''; position: absolute; top: -10px; left: calc(var(--tip-x, 24px) - 8px); width: 0; height: 0;
+.v3-plate.task-detail[data-tip="up"]::before { content: ''; position: absolute; top: calc(-1 * var(--s3)); left: calc(var(--tip-x, 24px) - 8px); width: 0; height: 0;
   border: 8px solid transparent; border-top: 0; border-bottom: 8px solid #e8e1ff; pointer-events: none; }
 
 /* Leave dialog: in game, Stay first and focused */
@@ -253,12 +255,80 @@
 .v3-plate .core-list li.busy span { color: #8ef5ff; }
 
 /* D35: the switch's ports, one row each when Match ports is off */
-.v3-plate .port-list { list-style: none; margin: 8px 0 0; padding: 0; display: grid; gap: 4px; }
+.v3-plate .port-list { list-style: none; margin: var(--s2) 0 0; padding: 0; display: grid; gap: var(--s2); }
+.v3-plate .port-list li { display: flex; flex-direction: column; gap: var(--s1); }
+.v3-plate .port-peer { margin: 0; color: #a99be6; }
 .v3-plate .port-list li.sel .key { box-shadow: inset 0 0 0 2px #efeaff, 0 0 0 2px #0e0b1c; }
 
 /* The system at a glance: one tappable row per part */
-.v3-plate .sys-summary { list-style: none; margin: 8px 0 0; padding: 0; display: grid; gap: 2px; }
-.v3-plate .sum-row { width: 100%; min-height: 44px; display: flex; justify-content: space-between; align-items: center; gap: 8px; padding: 0 8px;
+.v3-plate .sys-summary { list-style: none; margin: var(--s2) 0 0; padding: 0; display: grid; gap: var(--s2); }
+.v3-plate .sum-row { width: 100%; min-height: 44px; display: flex; justify-content: space-between; align-items: center; gap: var(--s2); padding: 0 var(--s2);
   border: 0; font: inherit; color: #efeaff; background: #221b44; cursor: pointer; text-align: left; }
 .v3-plate .sum-row span { color: #a99be6; }
 .v3-plate .sum-row:disabled { cursor: default; color: var(--dim); }
+
+/* Direct options (OptionRow): each is its own priced key, its consequence above it. The main one is pinned in the
+   footer with its full consequence; the others are one-line keys, so options never become equal walls. */
+.v3-plate .opts { display: flex; flex-direction: column; gap: var(--s2); margin-top: var(--s2); }
+.v3-plate .opt .option-values { margin: 0; }
+.v3-plate .opt .option-values .fx { white-space: normal; }
+.v3-plate .opt.primary .opt-name { margin: 0; font-weight: 600; }
+.v3-plate .opt { display: flex; flex-direction: column; gap: var(--s1); }
+.v3-plate .opt .key { margin-top: var(--s1); }
+.v3-plate .cpu-row { display: flex; flex-wrap: wrap; align-items: center; gap: var(--s1) 8px; margin-top: var(--s1); }
+.v3-plate .cpu-row .p-line { flex: 1 1 140px; min-width: 0; margin: 0; }
+.v3-plate .key.open-cpu { width: auto; flex: none; padding: 0 var(--s3); }
+/* On a gold key the price sits in a dark chip, so the coin keeps its gold face (never a hollow ring). */
+.v3-plate .key:not(.replace):not(.ghost):not(.go):not(.row):not(.quiet):not(.locked-action):not(:disabled) .pz,
+.v3-plate .key:not(.replace):not(.ghost):not(.go):not(.row):not(.quiet):not(.locked-action):not(:disabled) .pz.d { padding: 0 var(--s1); background: #2a1700; color: #ffcc3d; }
+.v3-plate .plate-footer .key { justify-content: space-between; min-height: 48px; }
+.v3-plate .key.locked-action .kl .px-ic.lock { margin-right: var(--s2); vertical-align: -3px; }
+/* One consequence format: labelled before → after lines, ↑ better, ↓ worse in the warning colour. */
+.v3-plate .fx.down, .v3-plate .fx .trend { white-space: nowrap; }
+.v3-plate .fx.up .trend { color: #8ef5ff; }
+.v3-plate .fx.down { color: #ffab98; }
+
+/* R16 plate layout (PlateFrame): an explicit-height grid of head, body, the "More ↓" row and the footer. The body is the
+   only scroller and its own row clips it, so nothing paints under the cue or the footer and every visible control is
+   whole or clipped by the body. While measuring (data-measure) nothing limits the plate, to read its natural height. */
+.v3-plate:has(> .plate-content) { display: grid; grid-template-rows: auto minmax(0, 1fr) auto auto; grid-template-columns: minmax(0, 1fr); max-height: none; overflow: visible; }
+.v3-plate > .plate-content { min-height: 0; max-height: none; }
+.v3-plate > .plate-more { height: 0; overflow: hidden; display: flex; align-items: center; justify-content: center; color: #efeaff; visibility: hidden; pointer-events: none; }
+.v3-plate[data-scrolls="true"] > .plate-more { height: 24px; }
+.v3-plate[data-more="true"] > .plate-more { visibility: visible; }
+.v3-plate[data-measure="true"] { height: auto !important; }
+.v3-plate[data-measure="true"] > .plate-content { overflow: visible; }
+.v3-plate[data-measure="true"] > .plate-more { height: 0; }
+/* Cramped (the head and the main option alone fill the room): the whole plate scrolls, the main option right under the
+   head and the other options after it; the cue sits in the head. */
+.v3-plate[data-cramped="true"]:has(> .plate-content) { display: flex; flex-direction: column; overflow-y: auto; }
+.v3-plate[data-cramped="true"] > .p-head { order: 0; flex: none; top: calc(-1 * var(--s3)); }
+.v3-plate[data-cramped="true"] > .plate-footer { order: 1; flex: none; padding-top: var(--s1); }
+.v3-plate[data-cramped="true"] > .plate-content { order: 2; flex: none; overflow: visible; }
+.v3-plate[data-cramped="true"] > .plate-more { display: none; }
+.v3-plate[data-cramped="true"][data-more="true"] > .p-head::after { content: 'More ↓'; margin-left: auto; color: #a99be6; }
+.v3-plate .opts-fix { margin-top: var(--s2); }
+
+/* Open CPU in the plate head: beside the subtitle, clear of the close key. */
+.v3-plate .p-head .key.open-cpu { width: auto; min-height: 44px; margin: 0; padding: 0 var(--s2); flex: none; }
+
+/* R17: an empty board site reserves, at open, the room of the part its Add installs. That view is laid out only while
+   the frame measures itself (data-measure), overlaid on the add view, then never shown or hit. */
+.plate-reserve { display: none; }
+.v3-plate[data-measure="true"] .plate-reserve { display: block; visibility: hidden; }
+.v3-plate[data-measure="true"] .p-head .plate-reserve { display: inline-flex; }
+.reserve-stack { display: grid; grid-template-columns: minmax(0, 1fr); }
+.reserve-stack > * { grid-area: 1 / 1; min-width: 0; }
+.v3-plate > .plate-footer:has(> .reserve-stack > .plate-reserve:only-child) { display: none; }
+.v3-plate[data-measure="true"] > .plate-footer:has(> .reserve-stack > .plate-reserve:only-child) { display: block; }
+
+.v3-plate .key:has(> .pz) { justify-content: space-between; }
+.v3-plate .key:is(.row, .ghost, .quiet) .pz { color: #ffcc3d; }
+.v3-plate .key:is(.row, .ghost, .quiet) .pz.d { color: #27d9a0; }
+.v3-plate .key:disabled .pz { color: #b9b0df; }
+.v3-plate .cx-row.lock small { display: inline-flex; flex: none; margin-left: auto; }
+.v3-plate .system-power .cx-row { gap: var(--s1); }
+.v3-plate .plate-section { margin-top: var(--s4); }
+.v3-plate .power-option { display: flex; flex-direction: column; gap: var(--s1); }
+.v3-plate .power-option p { margin: 0; }
+.v3-plate .power-option .cold { display: block; font-style: normal; color: #ffbf8a; }

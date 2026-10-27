@@ -12,6 +12,7 @@ import { barebonesRack, barebonesRoom, barebonesSite, barebonesSystem } from './
 import { reseedForRound } from './rng';
 import { MODE } from './timers';
 import { compileAll, syncHotSizes } from './topology';
+import { runwayMark } from '../build/research/runway';
 
 /** D39: L2, L3 and the scheduler are bought from the start; research never unlocks a part type. */
 const START_GENS: readonly PartId[] = ['cpu', 'core', 'clock', 'l1', 'l2', 'l3', 'scheduler', 'psu'];
@@ -37,6 +38,7 @@ export function newRound(index: number, startTick: number, reports: RoundState['
   return {
     phase: 'running', index, startTick, endTick: null, autoReturnTick: null, autoReturnOn, peakIntensity: 0, grace: 0,
     gross: ZERO_AMOUNT, data: ZERO_AMOUNT, energy: ZERO_AMOUNT, researchOps: 0, reports,
+    frontier: { bestI: 0, bestRound: 0, bestMet: 0, bestMetRound: 0, taken: [], takenAtStart: 0 }, runwayStart: null,
   };
 }
 
@@ -84,7 +86,7 @@ export function createInitialState(seed: number = DEFAULT_SEED): GameState {
   const compiled = compileAll(build, research);
   const hot = initialHot({ compiled, seed: seed >>> 0, round: newRound(1, 0) });
   const market = preparedMarket(hot, seed >>> 0, 1);
-  const round = { ...newRound(1, 0), grace: graceOf(market.window) };
+  const round = { ...newRound(1, 0), grace: graceOf(market.window), runwayStart: runwayMark(research, 0, 0) };
   return {
     schema: 'bitrouge-v3', epoch: 0, seed: seed >>> 0,
     clock: { tick: 0, carryMs: 0 },

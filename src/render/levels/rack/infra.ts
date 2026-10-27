@@ -57,10 +57,9 @@ function drawReadout(g: G, s: RackSnapshot, quiet: boolean): void {
   lcdText(g, r.x + Math.max(2, (r.w - lcdWidth(deg)) >> 1), r.y + 2, deg, tempCol(s.tempF));
   let l2: string, c2: string;
   if (s.crashed) { l2 = 'HALT'; c2 = P.fault; }
-  else if (s.crashS > 0) { l2 = label('CRSH ', Math.ceil(s.crashS)); c2 = P.fault; }
-  // A28: the efficiency reads as a bare percent under the °F (the callout names it). The 29 px
-  // display holds 6 LCD glyphs a line, so "59°F · 101%" stacks as two lines with no separator.
-  else { const e = Math.round(s.eff * 100); l2 = label('', e, '%'); c2 = e < 100 ? P.amber : mix(P.led, P.ink, 0.25); }
+  else if (s.crashS > 0) { l2 = label('HOT ', Math.ceil(s.crashS)); c2 = P.fault; }
+  // Show an efficiency penalty only; the plate names the quantity.
+  else { const e = Math.round(s.eff * 100); l2 = e < 100 ? label('', e, '%') : ''; c2 = P.amber; }
   lcdText(g, r.x + Math.max(2, (r.w - lcdWidth(l2)) >> 1), r.y + 8, l2, c2);
 }
 
@@ -139,8 +138,8 @@ function drawPduHead(g: G, s: RackSnapshot): void {
   const lx = r.x + 16, lw = 36;
   R(g, lx, r.y + 1, lw, 9, P.ink); R(g, lx + 1, r.y + 2, lw - 2, 7, mix(P.amber, P.ink, 0.85));
   let text: string, col: string;
-  if (sp.failed) { text = label('RBT ', Math.ceil((sp.rebootMs ?? 0) / 1000), 'S'); col = P.fault; }
-  else if (sp.overloadS > 0) { text = label('OVL ', Math.ceil(sp.overloadS), 'S'); col = use > 1 ? P.fault : P.amber; }
+  if (sp.failed) { text = label('RBT ', Math.ceil((sp.rebootMs ?? 0) / 1000)); col = P.fault; }
+  else if (sp.overloadS > 0) { text = label('OVL ', Math.ceil(sp.overloadS)); col = use > 1 ? P.fault : P.amber; }
   else { text = label('', Math.round(use * 100), '%'); col = use > 0.9 ? P.amber : P.led; }
   lcdText(g, lx + 2, r.y + 3, text, col, lx + 1, lx + lw - 1);
   const bx = lx + lw + 2, lit = Math.round(Math.min(1.1, use) * 10);

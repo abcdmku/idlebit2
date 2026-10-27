@@ -53,14 +53,22 @@ export function portSpeedPrice(fromHz: number | string, toHz: number | string, s
  */
 export const ROUTER_QUEUE_PRICE = { rack: { m: 12, era: 1 }, room: { m: 288, era: 2 }, site: { m: 864, era: 3 }, global: { m: 6912, era: 3 } } as const;
 export type RouterScope = keyof typeof ROUTER_QUEUE_PRICE;
+// Catalog prices are independent of game state. Keep the expensive decimal powers out of repeated
+// copy/configuration quotes; clearing a bounded memo changes only computation time.
+const queuePriceMemo: Record<RouterScope, Map<number, bigint>> = { rack: new Map(), room: new Map(), site: new Map(), global: new Map() };
 
 /** lbQueueStep(L → L + 1) = ceil(m × u / 0.7 × ((L + 1)^α − L^α)), exact decimal (spec §12.7). */
 export function lbQueueStep(scope: RouterScope, level: number): bigint {
   if (!Number.isSafeInteger(level) || level < 1) throw new RangeError('Expected a router queue level of at least 1');
+  const memo = queuePriceMemo[scope], found = memo.get(level);
+  if (found !== undefined) return found;
   const { m, era } = ROUTER_QUEUE_PRICE[scope];
   const price = new PriceDecimal(level + 1).pow(ALPHA).minus(new PriceDecimal(level).pow(ALPHA))
     .times(CLOCK_UPGRADE[era]!).times(m).div('0.7');
-  return BigInt(price.toSignificantDigits(64).ceil().toFixed(0));
+  const result = BigInt(price.toSignificantDigits(64).ceil().toFixed(0));
+  if (memo.size >= 4096) memo.clear();
+  memo.set(level, result);
+  return result;
 }
 
 /** Σ lbQueueStep from level 1 to `level`: what a configuration with that queue level adds (spec §13.3). */
@@ -77,10 +85,18 @@ const priceSpeed = (k: number): string => {
 };
 
 /** One port/uplink step. Data-plane zones are identical ports, each rounded before summing. */
+const networkPriceMemo = new WeakMap<NetworkLadderDef, Map<string, bigint>>();
 export function networkStepPrice(row: NetworkLadderDef, k: number, uplink = false, zones = 1): bigint {
   if (!Number.isSafeInteger(zones) || zones < 1) throw new RangeError('Expected a positive whole zone count');
+  let memo = networkPriceMemo.get(row);
+  if (!memo) networkPriceMemo.set(row, memo = new Map());
+  const key = `${k}:${uplink}:${zones}`, found = memo.get(key);
+  if (found !== undefined) return found;
   const streams = uplink ? row.uplinkStreams ?? row.streams : row.streams;
-  return portSpeedPrice(priceSpeed(k), priceSpeed(k + 1), streams) * BigInt(row.id === 'dataPlane' ? zones : 1);
+  const result = portSpeedPrice(priceSpeed(k), priceSpeed(k + 1), streams) * BigInt(row.id === 'dataPlane' ? zones : 1);
+  if (memo.size >= 4096) memo.clear();
+  memo.set(key, result);
+  return result;
 }
 
 /** Sum the individually rounded steps; same-speed actions sum this for each changed port. */

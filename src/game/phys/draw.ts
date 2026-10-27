@@ -36,10 +36,7 @@ const out: SystemDraw = { deliveredW: 0, idleW: 0, capLoadW: 0 };
 /** D38: the CPU's fixed draw before System (W, internal units), billed as energy; the real model takes over at System. */
 export const PRE_SYSTEM_CPU_W = 10;
 
-const cstateFactor = (depth: number): number => {
-  for (const c of CSTATES) if (c.depth === depth) return c.factor;
-  return 1;
-};
+const cstateFactor = (w: World, depth: number): number => depth > 0 ? w.research.unlocks.ruleParams.coreIdle?.factor ?? 1 : 1;
 
 /** Load factor of core watts from DVFS, turbo and throttle (spec §9.3), before the cap. */
 export function loadFactorOf(w: World, sys: number): number {
@@ -64,15 +61,24 @@ export function clockFactorOf(w: World, sys: number): number {
  * Watts follow work (D6.1): compile gives cores, RAM and drives
  * idleW = 0.1 × wPerUnit × native × push^0.25 and loadW = wPerUnit × rate × push^0.3 at clock
  * factor 1. Clock, caches, package and scheduler are idle-only, so the cores carry all CPU load
- * and DVFS, turbo, throttle and the cap scale it. Accelerator watts come from evaluated hardware.
+ * and DVFS, turbo, throttle and the cap scale it. CPU busy excludes reserved threads waiting on
+ * GPU, RAM or IO stages. Accelerator watts come from evaluated hardware.
  * The lone system's pipe draws 0.1 W per bit/s it sent this tick (D10.4). Core utilization is `busy / cores`; RAM counts
  * as fully used while a stage runs, accelerators use per-card busy seconds, drives IO stages / ncq.
  */
+export function cpuDrawW(w: World, sys: number, kind: number, settings: PhysSettings): number {
+ if(kind===DRAW_NONE)return 0;if(!settings.realDraw)return PRE_SYSTEM_CPU_W;
+ const c=w.compiled.sys,h=w.hot.sys,base=c.clockIdleW[sys]!+c.idleW[sys*4]!;
+ if(kind===DRAW_SLEEP)return S3_FACTOR*(c.coreIdleW[sys]!+base);
+ const cores=c.cores[sys]!,busy=kind===DRAW_FULL?Math.min(cores,Math.max(0,h.busy[sys]!)):0;
+ const idle=cores>0?c.coreIdleW[sys]!*(busy+(cores-busy)*cstateFactor(w,h.cstate[sys]!))/cores:c.coreIdleW[sys]!;
+ return idle+base*(settings.packageIdle&&busy===0?PACKAGE_IDLE_FACTOR:1)+(cores>0?c.coreLoadW[sys]!*busy/cores*loadFactorOf(w,sys)*capFactorOf(w,sys):0);
+}
 export function systemDraw(w: World, sys: number, kind: number, settings: PhysSettings): SystemDraw {
   out.deliveredW = 0; out.idleW = 0; out.capLoadW = 0;
   if (kind === DRAW_NONE) return out;
   // D38: before System the CPU draws a fixed power nothing changes (clock, cache and core upgrades included).
-  if (!settings.psuLive) { out.idleW = PRE_SYSTEM_CPU_W; out.deliveredW = PRE_SYSTEM_CPU_W; return out; }
+  if (!settings.realDraw) { out.idleW = PRE_SYSTEM_CPU_W; out.deliveredW = PRE_SYSTEM_CPU_W; return out; }
   const c = w.compiled.sys, h = w.hot.sys;
   const o = sys * R;
   const uncoreIdle = c.idleW[o + CPU]!, ramIdle = c.idleW[o + RAM]!, gpuIdle = c.idleW[o + GPU]!, ioIdle = c.idleW[o + IO]!;
@@ -85,7 +91,7 @@ export function systemDraw(w: World, sys: number, kind: number, settings: PhysSe
   const cores = c.cores[sys]!;
   const busy = full && cores > 0 ? Math.min(cores, Math.max(0, h.busy[sys]!)) : 0;
   const u = cores > 0 ? busy / cores : 0;
-  const coreIdle = cores > 0 ? (c.coreIdleW[sys]! * (busy + (cores - busy) * cstateFactor(h.cstate[sys]!))) / cores : c.coreIdleW[sys]!;
+  const coreIdle = cores > 0 ? (c.coreIdleW[sys]! * (busy + (cores - busy) * cstateFactor(w, h.cstate[sys]!))) / cores : c.coreIdleW[sys]!;
   const pkg = settings.packageIdle && busy === 0 ? PACKAGE_IDLE_FACTOR : 1;
   const idle = coreIdle + (c.clockIdleW[sys]! + uncoreIdle) * pkg + ramIdle + gpuIdle + ioIdle;
   let load = 0, capLoad = 0;
@@ -140,13 +146,14 @@ export function updateCState(w: World, sys: number, settings: PhysSettings): voi
 }
 
 /**
- * P-state switches for the next tick (spec §9.3). DVFS holds while nothing is queued or reserved.
+ * P-state switches for the next tick (spec §9.3). DVFS holds while nothing is queued or reserved,
+ * and no CPU thread holds research.
  * Turbo needs DVFS off, PSU usage under 90% and, once the rack is opened, the rack under 80 °F.
  */
 export function updatePStates(w: World, sys: number, settings: PhysSettings): void {
   const h = w.hot.sys;
   const flags = settings.sys[sys]!;
-  const dvfs = (flags & SYS_DVFS) !== 0 && h.queueLen[sys] === 0 && h.reserved[sys] === 0;
+  const dvfs = (flags & SYS_DVFS) !== 0 && h.queueLen[sys] === 0 && h.reserved[sys] === 0 && h.researchThreads[sys] === 0;
   const rack = w.compiled.sys.rack[sys]!;
   const coolRack = w.compiled.rack.opened[rack] !== 1 || w.hot.rack.tempF[rack]! < TURBO_MAX_F;
   const turbo = (flags & SYS_TURBO) !== 0 && !dvfs && h.psuUsage[sys]! < TURBO_MAX_USAGE && coolRack;

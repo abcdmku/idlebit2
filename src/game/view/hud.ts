@@ -6,6 +6,7 @@ import { SLA_WINDOW } from '../core/constants';
 import type { HudSnapshot, RoundSnapshot } from '../types/snapshot';
 import { recentIncome, roundIncome } from './research';
 import type { GameState } from '../types/state';
+import { frontierView } from './frontier';
 
 export { slaPercent };
 
@@ -52,7 +53,9 @@ export function roundSnapshot(state: GameState, prev: RoundSnapshot | null): Rou
   const available = state.research.unlocks.rules.includes('autoReturn');
   const inMs = autoReturnInMs(state);
   const canReturn = round.phase !== 'running';
+  const frontier = frontierView(state);
   if (prev && prev.index === round.index && prev.state === round.phase && prev.lastReport === lastReport && prev.canReturn === canReturn
+    && prev.frontier === frontier
     && prev.autoReturn.available === available && prev.autoReturn.on === round.autoReturnOn && prev.autoReturn.inMs === inMs) return prev;
-  return { index: round.index, state: round.phase, lastReport, canReturn, autoReturn: { available, on: round.autoReturnOn, inMs } };
+  return { index: round.index, state: round.phase, lastReport, frontier, canReturn, autoReturn: { available, on: round.autoReturnOn, inMs } };
 }

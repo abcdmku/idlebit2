@@ -1,15 +1,14 @@
-import { MAX_SHARDS } from '../core/constants';
 import { FAMILIES } from '../market/families';
 import { REGION_IDS, type FamilyDef } from '../types/catalog';
 
-/** Resource clock indices (RES_CLOCKS): the stride index of every per-resource hot column. A mem stage runs on RAM and IO (disk) parts (D26.2). */
+/** Resource clocks: cache loads/traffic use CPU; RAM and disk loads/traffic use RAM and IO. */
 export const CPU = 0;
 export const RAM = 1;
 export const GPU = 2;
 export const IO = 3;
 export const NRES = 4;
 
-/** Stage resource → the clock its work runs on: mem stages run on RAM and IO (disk) parts (D26.2). */
+/** Stage resources; memory.ts splits mem stages over the CPU, RAM and IO clocks. */
 const RES_CODE = { compute: CPU, mem: RAM, gpu: GPU } as const;
 
 /**
@@ -53,9 +52,6 @@ export function shapeOf(family: number): Shape {
 
 /** D25.3: threads a shard of `units` wants, max(1, floor(units / grain)). */
 export const wantThreads = (shape: Shape, units: number): number => Math.max(1, Math.floor(units / shape.grain));
-
-/** D25.1: the effective grain of a task of `size` units, max(grain, ceil(size / 256)). */
-export const effectiveGrain = (shape: Shape, size: number): number => Math.max(shape.grain, Math.ceil(size / MAX_SHARDS));
 
 export const stageWorkAt = (shape: Shape, stage: number, scale: number): number => shape.fixed[stage]! + shape.perSize[stage]! * scale;
 

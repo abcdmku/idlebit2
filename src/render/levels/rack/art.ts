@@ -4,13 +4,12 @@
 import { silk, silkWidth, P, R, fanAngle, fanAnimation, createFanAnimation, mix, px } from '../../core';
 import type { FanAnimation, TaskType } from '../../core';
 import type { RouteStrategyId } from '../../../game';
+import { ROUTE_NAMES } from '../../../game';
 
 type G = CanvasRenderingContext2D;
 
 /** Load balancer LCD names by strategy (rack LB and the room network rack). */
-export const LB_SHORT: Readonly<Partial<Record<RouteStrategyId, string>>> = {
-  firstFit: 'FIFO', roundRobin: 'RR', leastConn: 'LC', weighted: 'WT', leastWork: 'LW', binPack: 'PACK', latency: 'LAT', price: 'PRC', affinity: 'AFF',
-};
+export const LB_SHORT = Object.fromEntries(Object.entries(ROUTE_NAMES).map(([id, copy]) => [id, copy.short])) as Readonly<Record<RouteStrategyId, string>>;
 
 /** In-art LCD text, clipped to columns [x0, x1). Keeps existing window dimensions. */
 export function lcdText(g: G, x: number, y: number, text: string, c: string, x0 = -1e9, x1 = 1e9): number {
@@ -110,7 +109,7 @@ export function drawLayer(g: G, key: string, w: number, h: number, draw: (g: G) 
 // name. Whole words, longest first; the renderer picks the first that fits. 4 characters always fit.
 const TYPE_LCD: Readonly<Record<TaskType, readonly string[]>> = {
   compute: ['COMPUTE', 'COMP'], parallel: ['PARALLEL', 'PARAL', 'PARL'], memory: ['MEMORY', 'MEM'], accel: ['ACCEL', 'GPU'],
-  storage: ['STORAGE', 'STOR'], cluster: ['CLUSTER', 'DIST'], zones: ['ZONES', 'ZONE'], region: ['REGION', 'REGN'],
+  storage: ['STORAGE', 'STOR'], cluster: ['DISTRIB', 'DIST'], zones: ['ZONES', 'ZONE'], region: ['REGION', 'REGN'],
 };
 const typeCache = new Map<string, string>();
 /** Fixed LCD text for a task type that fits `max` characters. Cached: no per-frame strings. */

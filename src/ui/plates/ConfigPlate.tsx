@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { useEffect, useRef, type ReactNode } from 'react';
 import type { Amount, ConfigSource, Quote, UnitRef } from '../../game';
 import { COPY_FROM, UNIT_NOUN } from './copy';
 import { drawTierIcon, MINI_SIZE, type ConfigKind } from './configArt';
@@ -10,7 +10,6 @@ import type { PlateCommon } from './types';
 
 type AddQuote = Quote & { action: { type: 'addUnit'; source: ConfigSource } };
 const isAdd = (q: Quote): q is AddQuote => q.action.type === 'addUnit';
-const sameAction = (a: AddQuote, b: AddQuote) => JSON.stringify(a.action.source) === JSON.stringify(b.action.source);
 
 export interface ConfigOptions { barebones: AddQuote[]; copies: AddQuote[]; saved: AddQuote[] }
 /** Splits the add-unit quotes into the plate's three rows, in quote order. */
@@ -21,6 +20,30 @@ export function configOptions(quotes: readonly Quote[]): ConfigOptions {
     copies: adds.filter((q) => q.action.source.kind === 'copy'),
     saved: adds.filter((q) => q.action.source.kind === 'saved'),
   };
+}
+
+/**
+ * What a barebones build holds, read from the configurations it installs (configModel, defaults): a server's
+ * CPU tier with one core and 1 cache cell on a power supply; a rack, zone or site with its own infrastructure.
+ */
+export function barebonesText(kind: ConfigKind, q: AddQuote): string {
+  const s = q.action.source;
+  if (kind === 'system' && s.kind === 'barebones') {
+    if (s.storageNode) return 'One drive and a power supply. No CPU.';
+    if (s.board === 'accelerator') return '1 core, 1 cache cell, power supply. GPU bays empty.';
+    return '1 core, 1 cache cell, power supply. No RAM or storage.';
+  }
+  if (kind === 'rack') return 'Cooling, PDU, load balancer, 4-port switch. No servers.';
+  if (kind === 'room') return '2 rack rows, cooling, UPS, network rack. No racks.';
+  return 'Grid supply, data plane, one empty zone.';
+}
+
+/** A barebones tile's short name: the CPU tier for a server, else "Empty rack" (the section already says Barebones). */
+function tileName(kind: ConfigKind, q: AddQuote): string {
+  const s = q.action.source;
+  if (s.kind !== 'barebones') return q.label;
+  if (kind !== 'system') return `Empty ${UNIT_NOUN[kind]}`;
+  return s.storageNode ? 'Storage node' : q.label;
 }
 
 /** Credits still missing for a price, or null when affordable or unknown. */
@@ -36,6 +59,8 @@ export interface ConfigPlateProps extends PlateCommon {
   /** Wallet Credits, for "N more Credits". */
   credits?: Amount;
   landscape?: boolean;
+  /** A copy's world name ("Rack A", "Zone A", "US East"); the sim's label otherwise. */
+  nameOf?: ((from: UnitRef) => string) | null;
   /** Draws a live mini of a unit to copy (renderer art). Optional: wells stay plain without it. */
   drawCopy?: ((from: UnitRef, g: CanvasRenderingContext2D, w: number, h: number) => void) | null;
 }
@@ -49,78 +74,67 @@ function Canvas({ w, h, className, draw }: { w: number; h: number; className: st
   return <canvas ref={ref} className={className} width={w} height={h} aria-hidden="true" />;
 }
 
-const CopyPer = 3;
-function usePager<T>(list: readonly T[], per: number) {
-  const [page, setPage] = useState(0);
-  const pages = Math.max(1, Math.ceil(list.length / per)), p = page % pages;
-  return { slice: list.slice(p * per, p * per + per), pages, page: p, next: () => setPage(p + 1) };
+/** A tile's difference from the plain barebones server, shown under its name. */
+function tileNote(kind: ConfigKind, q: AddQuote): string | null {
+  const s = q.action.source;
+  if (kind !== 'system' || s.kind !== 'barebones') return null;
+  return s.storageNode ? 'One drive, no CPU' : s.board === 'accelerator' ? 'GPU bays empty' : null;
 }
 
 /**
- * Configuration plate: the one way to add a server, rack, zone or site (program §11). Three rows of
- * option wells (barebones tiers, copies, saved names), one detail line and one buy key. Every row
- * keeps its height whether it holds four options or none.
+ * Configuration plate: the one way to add a server, rack, zone or site (program §11). Every option is its own
+ * priced key (user, 26 Oct: one tap opens the slot, the second builds): barebones tiers under one line saying
+ * what a barebones holds, copies by their world names, saved names. A supply the builds would overload is said
+ * once, with its fix, above them.
  */
-export function ConfigPlate({ kind, title, sub, credits, landscape, drawCopy, quotes, onAction, onClose, onResearch: _r, researchName: _n, bootS: _b, ...frame }: ConfigPlateProps) {
+export function ConfigPlate({ kind, title, sub, credits: _c, landscape, drawCopy, nameOf, quotes, onAction, onClose, onResearch, researchName, bootS: _b, ...frame }: ConfigPlateProps) {
   const noun = UNIT_NOUN[kind];
   const opts = configOptions(quotes?.quotes ?? []);
-  const [pick, setPick] = useState<AddQuote | null>(null);
-  // Re-read the pick from the latest quotes so affordability follows the wallet.
-  const chosen = pick ? [...opts.barebones, ...opts.copies, ...opts.saved].find((q) => sameAction(q, pick)) ?? null : null;
-  const copies = usePager(opts.copies, CopyPer), saved = usePager(opts.saved, landscape ? 2 : 4);
-  const [mw, mh] = MINI_SIZE[kind];
+  // Every copy and saved build is its own tile in the scrolling body: none waits behind a More (user, 26 Oct).
+  const [mw, mh] = MINI_SIZE[kind], namedCopies = kind === 'room' || kind === 'site';
+  const all = [...opts.barebones, ...opts.copies, ...opts.saved], over = all.find(q => q.overSupply && !q.locked);
+  const plain = opts.barebones.find(q => q.action.source.kind === 'barebones' && !q.action.source.board && !q.action.source.storageNode) ?? opts.barebones[0];
 
-  const option = (q: AddQuote, cls: string, art: ReactNode) =>
-    <button key={JSON.stringify(q.action.source)} type="button" className={`cfg-opt ${cls}${q.locked ? ' lock' : ''}`}
-      aria-pressed={chosen != null && sameAction(chosen, q)}
-      aria-label={`${q.label}, ${q.locked ? `locked: ${q.locked.text}` : `${wholeText(q.cost)} Credits`}`}
-      onClick={() => setPick(q)}>
+  const name = (q: AddQuote) => q.action.source.kind === 'copy' && nameOf ? nameOf(q.action.source.from) : tileName(kind, q);
+  const press = (q: AddQuote) => {
+    const lock = q.locked;
+    if (lock?.code === 'research' && lock.node) { onResearch?.(lock.node); return; }
+    if (!lock && q.affordable) { onAction(q.action); onClose(); }
+  };
+  const option = (q: AddQuote, cls: string, art: ReactNode) => {
+    const lock = q.locked, research = lock?.code === 'research' && lock.node ? researchName?.(lock.node) ?? lock.text : null, note = tileNote(kind, q);
+    return <button key={JSON.stringify(q.action.source)} type="button" className={`cfg-opt ${cls}${lock ? ' lock' : ''}${q.overSupply ? ' over' : ''}`}
+      disabled={!research && (!!lock || !q.affordable)}
+      aria-label={research ? `${name(q)}: research ${research}` : `Add ${name(q)}, ${lock ? lock.text : `${q.cost} Credits`}${q.overSupply ? ', over the supply at full load' : ''}`}
+      onClick={() => press(q)}>
       {art}
-      <span className="nm">{q.label}</span>
-      <span className="pr">{q.locked ? <span className="lk"><LockIcon /> Locked</span> : <Price cost={q.cost} />}</span>
+      <span className="nm">{name(q)}</span>
+      {note && <span className="nt">{note}</span>}
+      <span className="pr">{research ? <span className="lk"><LockIcon /></span> : lock ? <span className="lk"><LockIcon /> {lock.text}</span>
+        : <span className={q.affordable ? '' : 'price-short'}><Price cost={q.cost} /></span>}</span>
     </button>;
-  const more = (pg: { pages: number; page: number; next: () => void }) => pg.pages > 1 &&
-    <button type="button" className="cfg-opt more" onClick={pg.next}><span className="nm">More</span><span className="pr">{pg.page + 1} / {pg.pages}</span></button>;
-
-  const what = !chosen ? '' : chosen.action.source.kind === 'barebones' ? `${chosen.label} barebones`
-    : chosen.action.source.kind === 'copy' ? `Copy of ${chosen.label}` : `“${chosen.label}”`;
-  const short = chosen && !chosen.locked && !chosen.affordable ? shortfall(chosen.cost, credits) : null;
-  const detail = !chosen ? 'Pick a starting point. Prices include every part.'
-    : chosen.locked ? `${what} · ${chosen.locked.text}`
-    : short ? `${what} · ${short} more Credits`
-    : !chosen.affordable ? `${what} · Needs more Credits`
-    : `${what} · ${chosen.action.source.kind === 'barebones' ? `${chosen.label} CPU at level 1, base cache. Nothing else.` : 'Total price, every part included'}`;
-  const canBuy = Boolean(chosen && !chosen.locked && chosen.affordable);
+  };
 
   return <PlateFrame {...frame} closeKey onClose={onClose} title={title ?? `New ${noun}`} sub={sub} className="cfg">
+    {over && <OverSupplyNote quote={over} onAction={q => onAction(q.action)} />}
     <div className="cfg-sec tiers"><span className="cfg-lab">Barebones</span>
+      {plain && <p className="cfg-detail">{barebonesText(kind, plain)}</p>}
       <div className="cfg-row">
-        {opts.barebones.slice(0, 4).map((q) => option(q, 'tier', <Canvas w={16} h={12} className="ic"
-          draw={(g) => drawTierIcon(g, kind, q.action.source.kind === 'barebones' ? q.action.source.tier : 0, Boolean(q.locked))} />))}
+        {opts.barebones.map((q) => option(q, 'tier', <Canvas w={16} h={12} className="ic"
+          draw={(g) => drawTierIcon(g, kind, q.action.source.kind === 'barebones' ? 0 : 0, Boolean(q.locked))} />))}
       </div></div>
-    <div className="cfg-sec copies"><span className="cfg-lab">{COPY_FROM[kind]}</span>
-      <div className="cfg-row">
-        {opts.copies.length === 0 ? <p className="cfg-empty">No other {noun}s yet</p>
-          : copies.slice.map((q) => option(q, 'copy', <Canvas w={mw} h={mh} className="ic" draw={(g) => {
+    {opts.copies.length > 0 && <div className="cfg-sec copies"><span className="cfg-lab">{COPY_FROM[kind]}</span>
+      {/* No level draws a zone or site mini, so those copies are named tiles, not empty wells. */}
+      <div className={`cfg-row${namedCopies ? ' named-row' : ''}`}>
+        {namedCopies ? opts.copies.map((q) => option(q, 'named', null))
+          : opts.copies.map((q) => option(q, 'copy', <Canvas w={mw} h={mh} className="ic" draw={(g) => {
             g.fillStyle = '#0e0b1c'; g.fillRect(0, 0, mw, mh);
             if (drawCopy && q.action.source.kind === 'copy') drawCopy(q.action.source.from, g, mw, mh);
           }} />))}
-        {more(copies)}
-      </div></div>
-    <div className="cfg-sec saved"><span className="cfg-lab">Saved</span>
+      </div></div>}
+    {opts.saved.length > 0 && <div className="cfg-sec saved"><span className="cfg-lab">Saved</span>
       <div className="cfg-row">
-        {opts.saved.length === 0 ? <p className="cfg-empty">Save a {noun} with its floppy icon to reuse it here</p>
-          : saved.slice.map((q) => option(q, 'named', null))}
-        {more(saved)}
-      </div></div>
-    <p className={`cfg-detail${chosen && (chosen.locked || !chosen.affordable) ? ' warn' : ''}`} aria-live="polite">{detail}</p>
-    <div className="keys">
-      <button type="button" className="key buy" disabled={!canBuy}
-        onClick={() => { if (chosen && canBuy) { onAction(chosen.action); onClose(); } }}>
-        <span className="kl">{chosen?.locked ? 'Locked' : `Add ${noun}`}</span>
-        {chosen && !chosen.locked && <Price cost={chosen.cost} />}
-      </button>
-      {chosen && <OverSupplyNote quote={chosen} onAction={q => onAction(q.action)} />}
-    </div>
+        {opts.saved.map((q) => option(q, 'named', null))}
+      </div></div>}
   </PlateFrame>;
 }

@@ -1,6 +1,6 @@
 import type { CompiledBuffers } from '../core/buffers';
 import { RACKS_PER_ROOM, SERVERS_PER_RACK } from '../core/constants';
-import { FAMILIES, stageWork } from '../market/families';
+import { FAMILIES, stageWork, workingSetAt } from '../market/families';
 import type { Resource } from '../types/catalog';
 
 /** Router kinds as net/scope (rack 0, room 1, site 2, global 3); kept local so market/ may use this. */
@@ -47,7 +47,9 @@ function maximaOf(c: CompiledBuffers): Maxima {
     for (let k = 0; k < SERVERS_PER_RACK; k += 1) {
       const sys = c.rack.servers[rack * SERVERS_PER_RACK + k]!;
       if (sys < 0 || s.alive[sys] !== 1 || s.kind[sys] !== 0) continue;
-      const rates = [s.threadRate[sys]! * Math.max(1, s.threads[sys]!), s.ramBw[sys]!, Math.max(s.gpuOps[sys]!, s.tensorOps[sys]!), s.ioRate[sys]!];
+      const node = s.diskNode[sys]!;
+      const rates = [s.threadRate[sys]! * Math.max(1, s.threads[sys]!), s.ramBw[sys]!, Math.max(s.gpuOps[sys]!, s.tensorOps[sys]!),
+        s.ioRate[sys]! + (node >= 0 ? s.ioRate[node]! : 0)];
       for (let r = 0; r < NRES; r += 1) m.rack[rack * NRES + r] = Math.max(m.rack[rack * NRES + r]!, rates[r]!);
       mn.rack[rack * 2] = Math.min(mn.rack[rack * 2]!, (s.cacheBits[sys]! + s.ramCap[sys]!) / Math.max(1, s.keff[sys]!));
       mn.rack[rack * 2 + 1] = Math.min(mn.rack[rack * 2 + 1]!, s.memCap[sys]!);
@@ -77,10 +79,11 @@ export function floorShards(c: CompiledBuffers, kind: number, id: number, family
   const rates = kind === RACK ? m.rack : kind === ROOM ? m.room : kind === SITE ? m.site : m.global;
   const base = kind === GLOBAL ? 0 : id * NRES;
   const f = FAMILIES[family]!;
-  let seconds = 0;
+  // Any placement takes at least bits / the fastest available memory or CPU rate.
+  const memoryRate = Math.max(rates[base]!, rates[base + 1]!, rates[base + 3]!);
+  let seconds = memoryRate > 0 ? workingSetAt(f, units) / memoryRate : 0;
   for (const stage of f.stages) {
-    // A mem stage is timed at RAM bandwidth, its fastest tier with a rate (cache traffic is free).
-    const rate = rates[base + RES[stage.resource]]!;
+    const rate = stage.resource === 'mem' ? memoryRate : rates[base + RES[stage.resource]]!;
     // A resource no system below has adds no time: fewer shards, never more.
     if (rate > 0) seconds += stageWork(stage, units) / rate;
   }

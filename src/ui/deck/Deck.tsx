@@ -1,6 +1,5 @@
 // The deck (user, 26 Oct): one row, the Research tile at the left beside the head task's card. Buying
-// happens on the world's parts (one-tap plates); the featured-buy logic lives on in offers.ts for the
-// round report's Fix line and the task detail.
+// happens on the world's parts (one-tap plates); offers.ts supplies fixes for the task detail.
 import { useMemo } from 'react';
 import { selectContextualResearchTree } from '../../game';
 import { projectKey } from '../research/model';
@@ -33,18 +32,19 @@ function ResearchKey() {
   const idle = !r.active && ready ? <span className="gold">{ready} ready</span>
     : r.needsData ? <span className="dim">Needs Data</span> : <span className="dim">Idle</span>;
   // Icon at the top left, the title beside it, then one state line (and, on desktop, the project).
-  const pad = d ? L.lat : 8, icon = 16 * n, tx = pad + icon + 8, line2 = d ? pad + 2 * L.lh : 48;
+  const compact = !d && k.w < 112, flat = !d && k.h === 48;
+  const pad = d ? L.lat : 8, icon = 16 * n, tx = compact ? pad : pad + icon + 8, line2 = d ? pad + L.lh : flat ? 24 : compact ? 56 : 48;
   return <button type="button" className={`panel research${open ? ' open' : ''}`} style={box(k)} data-k="research" data-testid="research-key" data-qa-target
     aria-expanded={open} aria-label={r.active ? `Research ${r.active} ${pct}` : ready ? `Research, ${ready} ready` : 'Research'}
     onClick={() => view.dispatch({ type: 'toggleSheet', sheet: 'research' })}>
     <i className="rim-track" data-free="art" style={{ left: n, top: n, width: k.w - 2 * n, height: 2 * n }}>
       <b className="rim-fill" data-tone="rnd" style={{ height: 2 * n, width: Math.round((k.w / n - 2) * r.progress) * n }} /></i>
-    <span className="aic" style={{ left: pad, top: pad }}><ArtCanvas w={16} h={16} n={n} artKey="flask" draw={drawFlask} /></span>
-    <T x={tx} y={d ? pad : 16} w={k.w - tx - 4}>{r.stopped ? <b className="warn">Stopped</b> : <b>Research</b>}</T>
-    <T x={pad} y={line2} w={k.w - 2 * pad}>{r.stopped ? <span className="warn">no Credits</span>
-      : r.active ? <span className="rnd">{r.waiting ? 'Next in line' : `Running ${pct}`}</span>
+    <span className="aic" style={{ left: compact ? Math.floor((k.w - icon) / 16) * 8 : pad, top: pad }}><ArtCanvas w={16} h={16} n={n} artKey="flask" draw={drawFlask} /></span>
+    <T x={tx} y={d || flat ? pad : compact ? 40 : 16} w={k.w - tx - 4}>{r.stopped ? <b className="warn">Stopped</b> : <b>Research</b>}</T>
+    <T x={d || flat ? tx : pad} y={line2} w={k.w - (d || flat ? tx : pad) - pad}>{r.stopped ? <span className="warn">no Credits</span>
+      : r.active ? <span className="rnd">{r.waiting ? compact ? 'Next' : 'Next in line' : compact ? pct : `Running ${pct}`}</span>
       : r.paused ? <span className="mute">Paused</span> : idle}</T>
-    {d && r.active && <T x={pad} y={line2 + L.lh} w={k.w - 2 * pad} className="mute">{r.active}</T>}
+    {d && r.active && <T x={tx} y={line2 + L.lh} w={k.w - tx - pad} className="mute">{r.active}</T>}
   </button>;
 }
 

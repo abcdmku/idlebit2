@@ -32,7 +32,7 @@ import type { CanvasRendererDebug, ChildView, FrameClock, HitTarget, LevelId, Le
   Rect, RenderSnapshot, RestArea, TransitionInfo, ViewPresentation, WorldFrame } from './types';
 import { drawVeil } from './unit';
 
-export const MAX_CHILDREN = 32, MAX_TARGETS = 128, MAX_FAULTS = 16;
+export const MAX_CHILDREN = 32, MAX_TARGETS = 272, MAX_FAULTS = 16;
 const CHILD_IDS = Array.from({ length: MAX_CHILDREN }, (_, i) => `child${i}`);
 interface WorldBuffer { canvas: HTMLCanvasElement; g: CanvasRenderingContext2D; size: Rect }
 type MutableFrame = { -readonly [K in keyof WorldFrame]: WorldFrame[K] };
@@ -262,7 +262,7 @@ export function createCanvasRenderer(canvas: HTMLCanvasElement, registry: LevelR
       epoch = next.epoch; effects.clear(); fb.reset(next); partsFor = null;
       endZoom(clock.nowS); chain.reset(); curLevel = null; pausedAt = null;
     }
-    const paused = next.round.state !== 'running';
+    const paused = next.round.state !== 'running' && !(next.feed.research?.running && next.feed.research.opsPerSec > 0);
     const live = next.simTimeMs + Math.max(0, Math.min(MAX_EXTRAPOLATION_MS, clock.sincePublishMs));
     if (!paused) pausedAt = null; else pausedAt ??= live;
     frame ??= { snapshot: next, timeMs: 0, paused, reducedMotion: false, zoom: null, form, visible: null };
@@ -279,7 +279,7 @@ export function createCanvasRenderer(canvas: HTMLCanvasElement, registry: LevelR
     catch (error) { reportRenderError(`${next.focus.level} payoutAnchor`, error); }
     if (!zoom.active) { drawRest(next.focus, clock.nowS); drawFaults(next.focus); drawWorldLabels(clock.nowS); }
     if (framing) fb.drawFailure(g, clock.nowS, framing, viewport, ratio);
-    if (paused) { g.save(); g.translate(viewport.x * ratio.x, viewport.y * ratio.y); drawVeil(g, viewport.w * ratio.x, viewport.h * ratio.y); g.restore(); }
+    if (next.round.state !== 'running') { g.save(); g.translate(viewport.x * ratio.x, viewport.y * ratio.y); drawVeil(g, viewport.w * ratio.x, viewport.h * ratio.y); g.restore(); }
     effects.update(Math.max(0, clock.nowS - lastNow)); lastNow = clock.nowS;
     g.setTransform(ratio.x, 0, 0, ratio.y, 0, 0);
     if (!zoom.active) effects.draw(g, nextView.reducedMotion);
@@ -324,6 +324,11 @@ export function createCanvasRenderer(canvas: HTMLCanvasElement, registry: LevelR
       const count = fillTargets(snapshot.focus);
       for (let i = 0; i < count; i++) if (targets[i].id === id) { projectRect(cam, viewport, ratio, targets[i].rect, out); return true; }
       return false;
+    },
+    getTargets() {
+      if (disposed || !fontReady || !snapshot || !view || zoom.active) return [];
+      const count = fillTargets(snapshot.focus);
+      return targets.slice(0, count).map(t => copyHitTarget(t, createHitTarget()));
     },
     hold(progress) { held = progress; zoom.hold(progress); },
     press(target) { pressedId = target ? target.id : null; },

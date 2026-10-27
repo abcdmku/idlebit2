@@ -90,7 +90,8 @@ function entry(state: GameState, roundIndex: number, taskId: number, family: num
     kind: 'task', task: { epoch: state.epoch, roundIndex, taskId }, key: taskId, icons: face.icons,
     committed, dismissible: !committed,
     blockedBy: gate !== 0 ? FAIL_DETAILS[detailIndex(gate)] ?? null : null,
-    work, transferS: speed > 0 ? work / speed : null, windowEndTick, capableSystems: capable(def),
+    work, dataReward: work / (state.hot.fam.dataRatio[family] || def?.dataRatio || 1),
+    transferS: speed > 0 ? work / speed : null, windowEndTick, capableSystems: capable(def),
   };
 }
 
@@ -176,6 +177,7 @@ export function feedSnapshot(state: GameState, prev: FeedSnapshot | null, sameEv
     window,
     research,
     headDeadlineTick: running && !researchHead ? headDeadlineTick(state.market.headTick) : null,
+
     blockedBy: window[0]?.blockedBy ?? null,
     transfers: transfers(state),
     inTransfer: g[G.transitCount] ?? 0, queued: g[G.queued] ?? 0, running: g[G.running] ?? 0,

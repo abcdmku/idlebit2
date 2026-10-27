@@ -16,6 +16,7 @@ export function generationLines(g: GenerationView | null): [string, string] {
 }
 
 export function GenerationRow({ generation }: { generation: GenerationView | null }) {
+  if (!generation) return null;
   const [head, sub] = generationLines(generation);
   const used = generation && generation.outputW > 0 ? Math.min(1, generation.usedW / generation.outputW) : 0;
   return <div className="gen-row" data-testid="generation-row" data-kind={generation?.kind ?? 'none'}>

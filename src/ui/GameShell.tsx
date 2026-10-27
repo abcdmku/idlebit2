@@ -7,6 +7,7 @@ import type { LevelId } from '../game';
 import type { GameStore } from '../platform';
 import type { LevelRegistry } from '../render/core';
 import { Callout } from './callout/Callout';
+import { WorldControls } from './input/WorldControls';
 import { CanvasWorld } from './CanvasWorld';
 import { Deck } from './deck/Deck';
 import { OffersScope } from './deck/useOffers';
@@ -26,10 +27,10 @@ import { ShellContext, createShellValue, type ShellContextValue, type ShellSurfa
 import { PlatformLine } from './shell/PlatformLine';
 import { createViewStore, initialView, type ViewStore } from './viewState';
 import { openingLevel, writeLastLevel } from './prefs';
-import { SupplyToast } from './shell/supplyToast';
 import './styles/tokens.css';
 import './styles/shell.css';
 import './styles/plates.css';
+import './styles/frontier.css';
 
 export interface GameShellProps {
   store: GameStore;
@@ -144,10 +145,10 @@ export function GameShell({ store, registry, level, view, size, saveNow, childre
         <div className="stage" style={{ ...box({ x: layout.x, y: layout.y, w: layout.w, h: layout.h }), ...vars }} data-testid="stage"
           data-n={layout.N} data-lat={layout.lat} data-kind={layout.kind}>
           <CanvasWorld />
+          <WorldControls />
           <Hud />
           <QueueStrip />
           <PlatformLine saveNow={saveNow} />
-          <SupplyToast />
           <OffersScope>
             <Deck />
             <Callout />

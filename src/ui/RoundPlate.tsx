@@ -1,33 +1,22 @@
-// Round over: an in-world plate over the paused, veiled world (program §12, mockup
-// core/round-plate.js). Duration, SLA, met, failed by cause (all six, zeros dimmed so the grid
-// never moves), the top failure details (D5.3), the fix for the top one with an inline Buy (A02,
-// D20.3), failures by task type, Credits and Data earned, energy and net (spec §4.7), and one
-// Return to market key. Closing it dismisses the report; the head's key then returns.
-import { pointAt, pointFix, type PointFix } from './input/pointAt';
-import { useContext, useEffect, useRef, type CSSProperties } from 'react';
+// Round over: an in-world plate over the paused, veiled world (program §12). It leads with the reach
+// against the frontier (D40: tasks done, the goal ruler, the best and the next era), then the details:
+// end reason, Net and Data against the last round, earned, energy, counts, causes (all seven, zeros
+// dimmed so the grid never moves), failures by type. One Return to market key. Closing it dismisses the report.
+import { useEffect, useLayoutEffect, useRef, type CSSProperties } from 'react';
 import { FAIL_CAUSES, formatOps } from '../game';
-import type { EnergyBreakdown, FailCause, FailDetail, Quote, RoundEndedBy, RoundReport, RoundTypeTally } from '../game';
-import { useMeet } from './queue/meet';
-import { MeetKey } from './queue/MeetKey';
+import type { EnergyBreakdown, FailCause, RoundEndedBy, RoundReport, RoundTypeTally } from '../game';
 import { P, drawCause, typeColor, typeName } from '../render/core';
-import { ArtCanvas } from './art/ArtCanvas';
-import { drawMiniIcon } from './art/deckArt';
-import { OffersContext } from './deck/useOffers';
-import { actionable, WALL_ROWS, type Offer, type Offers } from './deck/offers';
-import { offerAction, PriceText, RightText } from './deck/offerUi';
-import { CurrencyIcon } from './Hud';
+import { CoinIcon } from './plates/icons';
+import { AutoReturnControl } from './AutoReturnControl';
 import { useDialogFocus } from './hooks/useDialogFocus';
-import { CAUSE_NAME, causeLine } from './hooks/feedModel';
-import { amountText, clockText, slaFill, slaText, wholeText } from './hooks/format';
+import { CAUSE_NAME } from './hooks/feedModel';
+import { amountText, clockText, wholeText } from './hooks/format';
 import { returnToMarket } from './input/commands';
 import type { ShellLayout } from './layout';
 import { useLayout } from './shell/geometry';
 import { useGameSelector, useShell } from './storeHooks';
-
-/** The SLA over the 60–100% band, so the 80% floor sits at the middle. */
-export function SlaMeter({ percent }: { percent: number }) {
-  return <i className="g-meter" aria-hidden="true"><b style={{ width: `${slaFill(percent).toFixed(1)}%` }} /><em /></i>;
-}
+import { GoalBar, GoalRows, ReachDetails, reportBadge, RunwayValue } from './frontier/Reach';
+import { useRunway } from './frontier/Runway';
 
 function CauseIcon({ cause, lit }: { cause: FailCause; lit: boolean }) {
   const ref = useRef<HTMLCanvasElement>(null);
@@ -38,42 +27,6 @@ function CauseIcon({ cause, lit }: { cause: FailCause; lit: boolean }) {
     drawCause(g, cause, 1, 1, lit ? P.fault : P.silkLo);
   }, [cause, lit]);
   return <canvas ref={ref} width={7} height={7} aria-hidden="true" />;
-}
-
-/** "Can't run · cache ×2": the two most common (cause, detail) pairs, or a dash. Reserved one line either way. */
-export function detailLine(report: RoundReport): string {
-  const pairs = report.details.length ? report.details.slice(0, 2) : FAIL_CAUSES.filter(c => report.failedByCause[c] > 0)
-    .sort((a, b) => report.failedByCause[b] - report.failedByCause[a]).slice(0, 2).map(c => ({ cause: c, detail: null, count: report.failedByCause[c] }));
-  const top = pairs.map(d => `${causeLine(d.cause, d.detail)} ×${wholeText(d.count)}`);
-  return top.length ? top.join(' · ') : '—';
-}
-
-/**
- * The build rows that answer a failure detail, best first, on the level the player is looking at.
- * Spill (D26): more RAM keeps work off the disk; a faster drive makes what still spills quicker.
- */
-/** A timeout is too little speed: the clock on a CPU, the CPU on a system. */
-const SLOW_ROWS = ['clock', 'cpu', 'core'];
-
-/** The offer that fixes the round's top failure (A02), or null. */
-export function fixOffer(report: RoundReport, offers: Offers | null): Offer | null {
-  const top = report.details[0] ?? topCause(report);
-  if (!top || !offers) return null;
-  // Work that ran mostly from disk was slow because RAM was short (D26.2): a timeout or a late task is fixed by RAM first.
-  const spilled = report.spill && report.deliveredWork > 0 && report.spill.diskWork / report.deliveredWork >= 0.25;
-  const slow = top.cause === 'timeout' || top.cause === 'late';
-  const keys = top.detail && WALL_ROWS[top.detail] ? WALL_ROWS[top.detail]!
-    : slow ? (spilled || top.cause === 'late' ? ['ram', 'storage', ...SLOW_ROWS] : SLOW_ROWS) : [];
-  // Never a dead end (QA-05): a maxed part or a lock with no research behind it is no fix.
-  for (const k of keys) { const o = offers.rows.find(r => r.key === k && actionable(r)); if (o) return o; }
-  return null;
-}
-
-/** The cause with the most failures, when the sim recorded no detail pairs. */
-function topCause(report: RoundReport): { cause: FailCause; detail: FailDetail | null; count: number } | null {
-  let best: FailCause | null = null;
-  for (const c of FAIL_CAUSES) if (report.failedByCause[c] > 0 && (best === null || report.failedByCause[c] > report.failedByCause[best])) best = c;
-  return best ? { cause: best, detail: null, count: report.failedByCause[best] } : null;
 }
 
 /** "From disk: 18% of work · RAM 40%": where met work's memory traffic ran (D26.7). Reserved one line. */
@@ -93,58 +46,73 @@ function failedByType(rows: readonly RoundTypeTally[]): { type: RoundTypeTally['
   });
 }
 
-function FixLine({ offer, n, meet, point, onClose }: { offer: Offer | null; n: number; meet?: Quote | null; point?: PointFix | null; onClose?: () => void }) {
-  const shell = useShell(), act = offer ? offerAction(offer) : null;
-  // A down power supply or a hot rack: open the part's plate (lead, 26 Oct). The report closes to show it.
-  if (point) return <div className="rp-fix" data-testid="rp-fix"><span className="rp-fix-t"><b>{point.name}</b></span>
-    <button type="button" className="key quiet" data-testid="rp-point" onClick={() => { onClose?.(); pointAt(shell, point.kind); }}>Open</button></div>;
-  // The head waits on the same thing: buy every level it needs in one tap (the sim's meet line).
-  if (meet) return <div className="rp-fix" data-testid="rp-fix"><MeetKey quote={meet} n={n} className="key quiet rp-meet" onAction={a => shell.dispatch(a)}
-    onResearch={id => shell.view.dispatch({ type: 'openResearch', project: id })} /></div>;
-  if (!offer) return <div className="rp-fix" data-testid="rp-fix"><span className="dim">Fix: —</span></div>;
-  return <div className="rp-fix" data-testid="rp-fix">
-    <ArtCanvas w={8} h={8} n={n} artKey={`fix:${offer.icon}:${offer.affordable}`} draw={g => drawMiniIcon(g, offer.icon, !offer.affordable)} />
-    <span className="rp-fix-t"><b>{offer.name}</b> <span className="mute">{offer.change}</span></span>
-    <span className="v">{offer.price !== null ? <PriceText offer={offer} n={n} /> : <RightText offer={offer} n={n} />}</span>
-    {/* A quiet secondary key: Return to market is the report's primary (user, 26 Oct). */}
-    {act && <button type="button" className={`key quiet${offer.affordable ? '' : ' ghost'}`} data-testid="rp-fix-buy"
-      onClick={() => { if ('action' in act) shell.dispatch(act.action); else shell.view.dispatch({ type: 'openResearch', project: act.research.node }); }}>
-      {'action' in act ? 'Buy' : 'Research'}</button>}
-  </div>;
-}
-
 /** Where the plate sits: centred over the free world; on phone below the queue strip, clear of the head (A15). */
 function plateStyle(L: ShellLayout): CSSProperties {
-  const v = L.view, gap = L.kind === 'desktop' ? L.lat : 8;
+  const v = L.kind === 'desktop' ? L.lab : L.view, gap = L.kind === 'desktop' ? L.lat : 8;
   return L.kind === 'desktop'
     ? { left: v.x + v.w / 2, top: v.y + v.h / 2, transform: 'translate(-50%, -50%)', maxHeight: v.h - 2 * gap }
     : { left: v.x + v.w / 2, top: v.y + gap, transform: 'translateX(-50%)', maxHeight: v.h - 2 * gap };
 }
 
-export function RoundReportPlate({ report, percent, onReturn, onClose }: {
-  report: RoundReport; percent: number; onReturn: () => void; onClose: () => void;
+export function RoundReportPlate({ report, onReturn, onClose }: {
+  report: RoundReport; onReturn: () => void; onClose: () => void;
 }) {
-  const ref = useRef<HTMLElement>(null), L = useLayout(), n = L.N, offers = useContext(OffersContext);
+  const ref = useRef<HTMLElement>(null), contentRef = useRef<HTMLDivElement>(null), L = useLayout();
+  const shell = useShell();
   useDialogFocus(ref, onClose);
+  const updateMore = () => {
+    const root = ref.current, body = contentRef.current;
+    if (!root || !body) return;
+    const css = getComputedStyle(root), keys = root.querySelector<HTMLElement>('.keys');
+    const fullHeight = (root.querySelector<HTMLElement>('.p-head')?.offsetHeight ?? 0) + body.scrollHeight
+      + (keys?.offsetHeight ?? 0) + parseFloat(css.paddingTop) + parseFloat(css.paddingBottom);
+    root.dataset.scrollable = String(fullHeight > parseFloat(css.maxHeight) + 2);
+    root.dataset.more = String(body.scrollHeight - body.scrollTop - body.clientHeight > 2);
+  };
+  useLayoutEffect(() => {
+    updateMore();
+    const ro = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(updateMore);
+    if (contentRef.current) ro?.observe(contentRef.current);
+    contentRef.current?.addEventListener('toggle', updateMore, true);
+    const keys = ref.current?.querySelector('.keys');
+    if (keys) ro?.observe(keys);
+    const body = contentRef.current;
+    return () => { ro?.disconnect(); body?.removeEventListener('toggle', updateMore, true); };
+  }, [L, report]);
   const failed = FAIL_CAUSES.reduce((sum, c) => sum + report.failedByCause[c], 0);
-  const head = useGameSelector(s => s.feed.window[0] ?? null, (a, b) => a?.key === b?.key && a?.blockedBy === b?.blockedBy, 500);
-  const headMeet = useMeet(head && head.blockedBy !== null && head.blockedBy === (report.details[0]?.detail ?? null) ? head : null)[0] ?? null;
   const chips = failedByType(report.byType ?? []);
-  const energy = report.energy ?? null, net = report.net ?? null;
+  const energy = report.energy ?? null;
+  const prev = shell.store.getState().round.reports.find(r => r.index === report.index - 1) ?? null;
+  const eras = useRunway().eras, badge = reportBadge(report);
   return <section ref={ref} className="v3-plate round-plate has-x" role="dialog" aria-modal="true" aria-label="Round over" tabIndex={-1}
-    data-testid="round-plate" style={{ ...plateStyle(L), overflowY: 'auto' }} onPointerDown={e => e.stopPropagation()} onWheel={e => e.stopPropagation()}>
+    data-testid="round-plate" style={plateStyle(L)} onPointerDown={e => e.stopPropagation()} onWheel={e => e.stopPropagation()}>
     <header className="p-head">
-      <b className="p-title">Round over</b>
-      <span className="p-sub">Round {report.index} · {clockText(report.durationMs)} · {ENDED_BY[report.endedBy]}</span>
+      <b className="p-title">Round {report.index} over</b>
+      <span className="p-sub">{clockText(report.durationMs)}</span>
+      {badge && <span className="rp-badge" data-testid="rp-badge">{badge}</span>}
       <button type="button" className="p-x" aria-label="Close report" onClick={onClose}>
         <i className="x-glyph" aria-hidden="true" style={{ width: 12, height: 12, '--x-w': '1px' } as CSSProperties} /></button>
     </header>
-    <div className="rp-sla"><span className="rp-k">SLA</span><span className="rp-v">{slaText(percent)}</span><SlaMeter percent={percent} /></div>
+    <div className="round-content" ref={contentRef} onScroll={updateMore}>
+    {/* D40: progress shows here only: the reach, its bar over the bands with the best before, and what is next. */}
+    <p className="rp-reach" data-testid="rp-reach"><b className="rp-big">{wholeText(report.met)}</b> <span className="mute">tasks done this round</span></p>
+    <GoalBar report={report} />
+    <ul className="p-list rp-next">
+      <GoalRows report={report} />
+      {(report.frontier.runwayStart || report.frontier.runwayEnd) && <li data-testid="rp-runway"><span className="mute">Next era</span>
+        <span className="v"><RunwayValue start={report.frontier.runwayStart} end={report.frontier.runwayEnd} eras={eras} /></span></li>}
+    </ul>
+    <details className="round-details"><summary>Round details</summary>
+    <p className="mute">{ENDED_BY[report.endedBy]}</p>
+    <ReachDetails report={report} prev={prev} />
+    <ul className="p-list rp-bottom">
+      <li><span>Earned</span><span className="v gold"><CoinIcon />{amountText(report.gross)}</span></li>
+      {energy !== null && <li><span>Energy</span><span className="v mute" data-testid="rp-energy">−<CoinIcon />{amountText(energy)}</span></li>}
+    </ul>
     {/* D28: the whole round's counts. Dismissed tasks never count toward SLA; this is the one place they show. */}
     <ul className="p-list rp-top">
-      <li><span>Completed</span><span className="v" data-testid="rp-met">{wholeText(report.met)}</span></li>
       <li className="bad"><span>Failed</span><span className="v" data-testid="rp-failed">{wholeText(failed)}</span></li>
-      <li><span>Dismissed</span><span className="v mute" data-testid="rp-dismissed">{wholeText(report.dismissed)}</span></li>
+      <li><span>Dismissed</span><span className="v" data-testid="rp-dismissed">{wholeText(report.dismissed)}</span></li>
     </ul>
     <div className="rp-causes">
       {FAIL_CAUSES.map(c => {
@@ -154,25 +122,20 @@ export function RoundReportPlate({ report, percent, onReturn, onClose }: {
         </span>;
       })}
     </div>
-    <p className="rp-detail" data-testid="rp-detail">{detailLine(report)}</p>
-    <FixLine offer={fixOffer(report, offers)} n={n} meet={headMeet} point={pointFix(report.details[0]?.detail)} onClose={onClose} />
-    <p className="rp-spill mute" data-testid="rp-spill">{spillLine(report)}</p>
-    <p className="rp-types" data-testid="rp-types"><span className="mute">Failed:</span>
+    <p className="rp-spill mute" data-testid="rp-spill">Peak intensity {report.peakIntensity.toFixed(1)}{report.spill.diskWork > 0 ? ` · ${spillLine(report)}` : ''}</p>
+    <p className="rp-types" data-testid="rp-types"><span className="mute">Failed by type</span>
       {chips.length ? chips.map(c => <span key={c.type} className="rp-chip" data-task-type={c.type}>
         <b style={{ color: typeColor(c.type) }}>{typeName(c.type)}</b> {c.text}</span>) : <span className="dim"> none</span>}</p>
-    {/* Earned, energy and net as a 2 × 2 grid, so the plate fits the view with its Return key in sight. */}
-    <ul className="p-list rp-bottom">
-      <li><span>Credits earned</span><span className="v gold"><CurrencyIcon kind="credits" n={n} />{amountText(report.gross)}</span></li>
-      <li><span>Data earned</span><span className="v data"><CurrencyIcon kind="data" n={n} />{amountText(report.data)}</span></li>
-      {energy !== null && <li><span>Energy</span><span className="v mute" data-testid="rp-energy">−<CurrencyIcon kind="credits" n={n} />{amountText(energy)}</span></li>}
-      {net !== null && <li><span>Net</span><span className="v gold" data-testid="rp-net"><CurrencyIcon kind="credits" n={n} />{amountText(net)}</span></li>}
-    </ul>
     {/* D31: where the energy came from. Unbilled lines read as saved; billed ones as spent. */}
     {energyLines(report.energyBreakdown).length > 0 && <ul className="p-list rp-bottom rp-energy" data-testid="rp-energy-lines">
       {energyLines(report.energyBreakdown).map(l => <li key={l.key} data-line={l.key}><span>{l.label}</span>
-        <span className={`v ${l.paid ? 'mute' : 'ben'}`}>{l.paid ? '−' : ''}<CurrencyIcon kind="credits" n={n} />{amountText(report.energyBreakdown[l.key])}{l.paid ? '' : ' saved'}</span></li>)}
+        <span className={`v ${l.paid ? 'mute' : 'ben'}`}>{l.paid ? '−' : ''}<CoinIcon />{amountText(report.energyBreakdown[l.key])}{l.paid ? '' : ' saved'}</span></li>)}
     </ul>}
+    </details>
+    </div>
+    <div className="report-more" aria-hidden="true">More ↓</div>
     <div className="keys">
+      <AutoReturnControl />
       <button type="button" className="key go" data-testid="rp-return" onClick={onReturn}>Return to market</button>
     </div>
   </section>;
@@ -201,8 +164,7 @@ export function energyLines(e: EnergyBreakdown | null | undefined): typeof ENERG
 export function RoundPlate() {
   const shell = useShell();
   const r = useGameSelector(s => (s.round.state === 'ended' && s.round.lastReport ? s.round.lastReport : null));
-  const percent = useGameSelector(s => s.hud.sla.percent);
   if (!r) return null;
-  return <RoundReportPlate report={r} percent={percent}
+  return <RoundReportPlate report={r}
     onReturn={() => returnToMarket(shell)} onClose={() => shell.dispatch({ type: 'dismissReport' })} />;
 }

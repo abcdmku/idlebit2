@@ -3,6 +3,7 @@ import type { FailCause, FailCounts, FailDetail } from './events';
 import type { GameState } from './state';
 import type { ResearchId } from './ids';
 import type { TaskTypeId } from './views';
+import type { ReportFrontier } from './frontier';
 
 export interface RoundTypeTally {
   readonly type: TaskTypeId;
@@ -30,6 +31,8 @@ export interface RoundReport {
   /** (cause, detail) counts, count descending, at most 6. */
   readonly details: readonly { readonly cause: FailCause; readonly detail: FailDetail; readonly count: number }[];
   readonly peakIntensity: number;
+  /** D40: reach against the frontier before this round, first-taken families and the milestone runway. */
+  readonly frontier: ReportFrontier;
   /** Tasks dismissed this round (free; outside the SLA). */
   readonly dismissed: number;
   /** The SLA sums in ops (spec §4.2). */

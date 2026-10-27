@@ -20,9 +20,9 @@ Program D10 (tasks are pulled, never throttled). It supersedes the fixed 2 s cad
 | # | Change | Where |
 |---|---|---|
 | 17 | **Endless queue.** The market is an ordered queue per round, generated on demand. The player sees the first five, head first. No arrival cadence, schedule or pending feed. | §5.2, §16.2 |
-| 18 | **Head-only clock.** Only the head has a 10 s clock, from the tick it becomes the head. It times out (`timeout`) or, if no online hardware can run it, fails as `cantRun`. The next task then becomes the head with a fresh 10 s. A head no hardware can run blocks the line. | §4.2, §5.2 |
+| 18 | **Head-only clock, restored by the user 26 Oct.** The head has a 10 s pickup window. If it cannot be taken it fails as `cantRun` or `timeout` and affects SLA. Manual dismissal is free and outside SLA. No automatic skipping or outgrown end. | §4.2, §5.2 |
 | 19 | **Pull admission.** Hardware takes the head as soon as it has room and its first link is free. Order is strict: nothing behind the head is taken first. Taking is pickup. | §6.4, §7.6 |
-| 20 | **Inbound pipe.** Every system has an inbound link from boot: the **pipe**, 1 kHz on the 1-2-5 ladder. Its upgrades open with `netSpeed`. From Rack on, the pipe becomes the system's switch port. | §7.2, §7.3, A.1 |
+| 20 | **Inbound pipe, updated by D29.** Every system has an inbound link from boot: the **pipe**, 100 kHz on the 1-2-5 ladder. It is the system's switch port, fixed until Rack opens its upgrades. | §7.2, §7.3, A.1 |
 | 21 | **Payload is work.** A task's transfer size is its work, `Σ stage work`, per member. `payloadBits` is derived, not authored. Transfer time = work / link speed at every hop. | §5.1, §7.4 |
 | 22 | **Prefetch.** With a scheduler, the pipe fills free queue slots while cores compute. Without one, the core waits for each transfer. | §6.4, §6.7 |
 | 23 | **One take per slot per tick.** Each slot takes at most one new task per tick. This bounds per-tick work for tiny tasks. | §6.4 |
@@ -32,15 +32,15 @@ Program D10 (tasks are pulled, never throttled). It supersedes the fixed 2 s cad
 | 27 | **Strategies.** System strategies order the system queue only; the market order is fixed. `mlfq` becomes aging inside the queue. `reserveOnRoute` becomes **queued take**. | §8.1, §7.6 |
 | 28 | **Link catalog scale.** Payload = work makes the A.3 port, uplink, data plane and backbone speeds far too slow from Rack on. A.3 needs a re-base; see its note. | A.3 |
 | 29 | **Removed:** `arrivalCadenceTicks`, scheduled arrival offsets, `dismissOnArrival`, the pending feed and `feedVisible`, transit deadlines, `cantRun · link`. | App. B |
-| 30 | **D13: the pipe is the upstream port.** A unit's inbound speed is the speed of the port it plugs into upstream: system → rack-switch port (default 1 kHz), rack uplink → room network-rack port, room (AZ) → backbone. There is no separate `pipe` part. Before the upstream device exists, the unit sits on that device's default port; at boot the lone system is on a 1 kHz rack-switch port, and pipe upgrades are port upgrades. | §7.2, A.1, A.3 |
+| 30 | **D13: the pipe is the upstream port.** A unit's inbound speed is the speed of the port it plugs into upstream: system → rack-switch port (default 1 kHz), rack uplink → room network-rack port, room (AZ) → backbone. There is no separate `pipe` part. Before the upstream device exists, the unit sits on that device's default port; at boot the lone system is on a 100 kHz rack-switch port, and pipe upgrades are port upgrades. | §7.2, A.1, A.3 |
 | 31 | **D13: defaults per generation.** Every link generation has a default (base) speed. Room network-rack defaults carry about 12 rack ports' traffic; data plane and backbone defaults carry a full room. A higher tier is never slower by default. | A.3 |
 | 32 | **Withdrawn:** "the rack uplink starts at port 1's speed" (row 20, D10.4). A rack uplink starts at the room network rack's default port speed. | §7.2 |
 | 33 | **D14: price parity.** A port-speed step to X costs the native clock work from the old speed to X in the CPU generation whose native range holds X. A closed formula replaces the per-generation `portStep` table. Uplinks, room ports, the data plane and the backbone use the same curve, scaled by the streams they carry (12 or 288). Reaching a 10 kHz pipe costs about 415,000 Credits, not 510. | §12.5, A.3 |
 | 34 | **D14: `netSpeed` moves** to Hz W2, 100 Data, requiring only `fifoSched`. | research doc §5.6, §6 |
 | 35 | **A.3 table replaced.** The pre-re-base ladder table (10 kHz – 10 GHz switches, `portStep` by generation) is gone. A.3 now lists the re-based catalog with the D13 defaults. | A.3 |
-| 36 | **D15: links upgrade where they plug in, once that structure exists.** A system's port (its pipe) stays at the 1 kHz switch default until the player has a Rack, then steps on the rack switch. A rack uplink stays at the room network-rack default until Room, then steps on the network rack. A room's uplink steps at the data plane once Global is open, and its backbone link once `regions` adds it. Before then the link shows its fixed speed and where it becomes upgradeable. | §7.2, §12.5, §16.3 |
+| 36 | **D15: links upgrade where they plug in, once that structure exists.** A system's port stays at 100 kHz until Rack, following D29's default, then steps on the rack switch. A rack uplink stays at the room network-rack default until Room, then steps on the network rack. A room's uplink steps at the data plane once Global is open, and its backbone link once `regions` adds it. Before then the link shows its fixed speed and where it becomes upgradeable. | §7.2, §12.5, §16.3 |
 | 37 | **D15: `netSpeed` and the `linkSpeed` ceiling are removed.** No research gates a link speed step; the structure node does (`rack`, `room`, `dataCenter`, `regions`). This supersedes D13.2's pre-Rack pipe upgrades and D14.2's `netSpeed`. | §7.2, §12.2, App. B, research doc §5.6 |
-| 38 | **D15: pre-Rack income is capped** by the fixed 1 kHz pipe at 1,000 ops/s. Tasks above 10,000 ops can't be taken in time and fail. That wall, at `I` ≈ 13–14, is the push to the Rack. Hz-era and Rack prices must fit that income (`docs/tasks.md` §12). | §6.4, `tasks.md` |
+| 38 | **Pre-Rack link cap, updated by D29.** The fixed 100 kHz port carries at most 100,000 payload bits/s. A head above 1,000,000 payload bits cannot transfer within its 10 s deadline. Work, memory and accelerator gates can bind earlier. | §6.4, `tasks.md` |
 | 39 | **D16: pre-Rack re-price.** SDRAM 3e5 (from 2e6), DDR 4.5e5, a full kHz CPU 2e6, a barebones kHz server 5e5, the rack frame and starter-rack parts 2.4e6. Research Data: W4 4,000, W5 6,000, W6 10,000; `rack` moves to W6 at 30,000. | A.1–A.4, research doc §3.3 |
 | 40 | **D16: post-Rack install prices** follow the model's re-fitted rungs: ×1/85 Rack, ×1/7 MHz fab, ×1/21 Room, ×1/27 GHz fab, ×1/9 Data center, ×1/11 Regions. Upgrade prices are unchanged. | App. A |
 | 41 | **D18.3: `lbL4` and `lbAsic` are deleted.** Their only effect was routing capacity. Load balancers have one generation per scope; the tree has 162 nodes. | A.2, research doc §5.6 |
@@ -94,9 +94,11 @@ User rulings D7 (program §15a). For S1 (contract), S3 (execution) and S5 (build
 
 The user's calculation examples and follow-up supersede the generic clock/RAM doubling curve and their old 1%-of-gross native energy calibration. Every CPU clock and RAM generation has L1–36. Throughput grows 1.5× per level, freely crossing later tiers' native rates. Native CPU energy ratios are 10, 6, 3 and 2, with efficiency declining inside each era. Isolated operating costs exceed potential output at about L29/L26/L23/L20, but those upgrades remain purchasable through L36. RAM capacity and bandwidth use separate curves. Clock/RAM prices grow 1.7× per step. The binding ruling is program §15a **CPU/RAM progression**; [the focused specification](hardware-progression.md) records formulas and source evidence. These rules await shared runtime integration and a legal campaign balance pass.
 
+Current corrections from the 26 October UX review: the default pre-Rack pipe is 100 kHz under D29. Upgrade previews use D38's fixed pre-System draw, and the full model starts at System. Task details use the current round's Data ratio, with fractions carried in the wallet meter. Research holds one thread per system during a round and can use every thread between rounds; it blocks the market front only until taken. The renderer shows that research activity even when the market is paused.
+
 ## 1. The game
 
-The player runs computing hardware that serves a global market of tasks. A **round** starts when the player returns their infrastructure to the market. Tasks wait in an endless global queue. Hardware pulls the head as soon as it has room, over an inbound pipe that starts at 1 kHz. The head must be taken within 10 s of becoming the head. A taken task runs through hardware stages and, when it completes, pays 1 Credit per unit of work plus some Data, which funds research. The market's intensity rises with every task drawn, from zero each round (D30). Tasks grow from 1-bit CPU operations, through RAM, GPU and storage work, to distributed tasks that span racks, zones and regions. Every failed task lowers the round's work-weighted SLA. When SLA falls below 80%, the round ends at once and every system pauses at no cost. Between rounds the player builds, upgrades, replaces, researches and saves configurations, then returns to the market. Energy is billed continuously, so every watt competes with income. The core decision is upgrade versus replace: levels are cheap but lose performance per watt, while native newer generations cost more and run efficiently. The camera zooms from a single CPU through System, Rack and Room to the Global map.
+The player runs computing hardware that serves a global market of tasks. A **round** starts when the player returns their infrastructure to the market. Tasks wait in an endless global queue. Hardware pulls the head as soon as it has room, over an inbound pipe that starts at 100 kHz. The head must be taken within 10 s of becoming the head. A taken task runs through hardware stages and, when it completes, pays 1 Credit per unit of work plus some Data, which funds research. The market's intensity rises with every task drawn, from zero each round (D30). Tasks grow from 1-bit CPU operations, through RAM, GPU and storage work, to distributed tasks that span racks, zones and regions. Every failed task lowers the round's rolling task-count SLA. When SLA falls below 80%, the round ends at once and every system pauses at no cost. Between rounds the player builds, upgrades, replaces, researches and saves configurations, then returns to the market. Energy is billed continuously, so every watt competes with income. The core decision is upgrade versus replace: levels are cheap but lose performance per watt, while native newer generations cost more and run efficiently. The camera zooms from a single CPU through System, Rack and Room to the Global map.
 
 ## 2. Units, time and numbers
 
@@ -175,7 +177,7 @@ Home is open from the start; `regions` opens all 8 regions, and each site is bou
 
 | State | Meaning | Ends when |
 |---|---|---|
-| `running` | Hardware pulls tasks from the queue and runs them. SLA is live. | SLA < 0.80 at the SLA step (§14), or the player ends it (End round). |
+| `running` | Hardware pulls tasks from the queue and runs them. SLA is live. | SLA < 0.80, the existing no-completion stall limit, or End round. |
 | `ended` | The round just ended and the report is shown. Mechanically identical to `between`. | The player dismisses the report, takes any action, or returns to market. |
 | `between` | Nothing is pulled. Hardware is paused unless research runs (§11.3). | Return to market, by the player or by auto-return. |
 
@@ -188,7 +190,7 @@ A new game starts in `running`, round 1, with the queue's first five tasks alrea
 4. makes every system whose own switch and every ancestor switch are online `onMarket` at once, unless it is in a downtime (§4.3). With start controllers (D31, §4.4), each powered scope instead applies its "Start with": global, then zones, then racks; the rest start `standby` or `asleep`. Rack batteries refill (§9.9). Units switched offline stay out. There is no partial return;
 5. resumes research stopped for insolvency (§11.4).
 
-**Round end.** At the SLA step, if the round is `running` and `SLA < 0.80`:
+**Round end.** At the SLA step, a running round ends on `SLA < 0.80` or the existing no-completion stall limit:
 1. every task in transfer, queued or running is dropped, and the rest of the round's queue is discarded. Dropped tasks count as neither met nor failed and pay nothing;
 2. every online/offline transition, boot and drain completes at once; cold changes complete at once;
 3. the round state becomes `ended` and the report is frozen (§4.7);
@@ -220,7 +222,7 @@ A task is **met** when its last shard completes (§6.8). It **fails** with exact
 | Cause ID | Label | When |
 |---|---|---|
 | `timeout` | Timed out | It was the head and was not taken by the end of tick `headTick + 99` (§5.2), while some online hardware could run it. A minimum-split task: its minimum split could not be placed, or taken into a router queue, in that window. |
-| `cantRun` | Can't run | It was the head and was not taken by the end of tick `headTick + 99`, and no online hardware could run it at that moment (§6.3, §7.8). Record the current missing requirement once. |
+| `cantRun` | Can't run | It was not taken by the end of tick `headTick + 99` and no hardware in the static capability set could run it (§6.3, §7.8). Record its missing requirement once and count the failure toward SLA. |
 | `misroute` | Misrouted | One of its shards was delivered to a system that cannot run that shard (§7.5). |
 | `power` | Power | One of its shards was queued or running on a system that lost power (§9.4). |
 | `heat` | Heat | One of its shards was queued or running on a system whose rack or zone crashed (§10.7). |
@@ -264,7 +266,7 @@ Every system, rack, zone and site has an online switch, `intent ∈ {online, off
 
 **Room.** A system **has room** when `admitted + reserved < slots`, where `admitted` and `reserved` count shards (an unsplit task is one shard) and `reserved` counts those routed to it and still in transfer: every route reserves its slot (§7.6). A router has room when a system below it has room or its own queue has a free slot (§7.1). A system without room is **full**: with no scheduler, that means busy; with a scheduler, its queue is full. Every router, the base first-fit included, sends a task only to a system that can admit it now (§7.7). Systems that are not `onMarket` or `asleep` count as full (program D1.5).
 
-**`bootSeconds`** is one boot time, 10 s at base, lowered by `fastBoot` research (program D1.8). It sets the online and offline transitions, the boot of a unit added mid-round, the cold-change downtime, the reboot after a supply failure, and the minimum crash recovery.
+**`bootSeconds`** is one boot time, 10 s at base, lowered by Boot loader research (D45) (program D1.8). It sets the online and offline transitions, the boot of a unit added mid-round, the cold-change downtime, the reboot after a supply failure, and the minimum crash recovery.
 
 The static fleet capability check counts systems in `onMarket`, `asleep`, `boot` and `cold`: they will accept work within `bootSeconds`. It does not count `offline`, `goingOffline`, `paused`, `dark` or `crashed`.
 
@@ -321,7 +323,7 @@ A cold change while a round runs:
 
 Between rounds a cold change is instant.
 
-**`rollingUpgrade`** applies one configuration to every server of a rack as a single purchase. The servers change one at a time in slot order: each drains, takes its cold downtime, and the next starts when it returns.
+**`rollingUpgrade`** applies one configuration to every server of a rack as a single purchase. During a round the servers change one at a time in slot order: each drains, takes its cold downtime, and the next starts when it returns. Waiting servers keep their old hardware and continue working. The quoted total is paid once and the reserved changes survive saving and loading. Reserved servers reject conflicting hardware edits until their turn finishes. Between rounds all outstanding paid changes complete immediately. Hot changes need no downtime.
 
 Purchases are never refunded. A replaced or removed part is scrapped.
 
@@ -342,14 +344,20 @@ Frozen at round end:
 | Delivered and failed work, final SLA | float64 ops; SLA to one decimal |
 | Spill (D26) | share of delivered work whose memory traffic ran from RAM, and from disk | float64 fractions |
 | Dismissed | integer |
+| End reason | `sla`, `player` or `stall` for current rounds |
 | Peak intensity `I` | float64 |
 | Gross payouts | integer Credits |
 | Data earned | integer Data |
 | Energy cost during the round | integer Credits |
 | Net | integer Credits |
 | Research work done during the round | float64 ops |
+| Frontier (D40) | most tasks completed in one round before this one; best peak `I` before the round and its round; families taken for the first time this round; the next milestone's runway mark at Return and at the end |
 
 The last 20 reports are kept **(s)**.
+
+**Frontier (D40).** Every round restarts at `I = 0` (D30). Progress shows at round end only, with no added HUD track or feed events. The measure is tasks completed in one round, with an endless ladder of counts (10, 15, 20, 30, 50, 75, 100, then six per ×10). This supports thousands, tens of thousands and millions of tasks without adding named tiers to learn. The save keeps the best tasks per round and its round, the best peak `I` and its round, and every family ever taken. The report opens with "Round N over" and its duration, then the task count as its lead heading and one ruler from 0. Marks show the reached goal and the next two, labelled by task count; the gold fill ends at this round's count. Below, "Best" shows the previous record, or "Previous best" with a NEW BEST badge when beaten. Best has its own row and no line across the bar. "Next era" shows the milestone's saved-cost or research-work progress across the round, such as "Rack 59% → 71%". Round details holds the end reason, Net and Data against the last round, first-taken families, SLA, earnings, energy, failed and dismissed counts, causes and spill. Auto return and Return to market stay in the footer. There is no Next goal row, failure summary or fix key (user, 26 Oct).
+
+The user rejected the 26 Oct skip-based report addition. Do not show its skipped-payout line, wall plot, fit-count routes or "A fit, not pay" copy. Keep the concise report, expandable details and Return. Failure causes remain available inside details.
 
 ## 5. Tasks and the market
 
@@ -404,20 +412,21 @@ Hardware, routing, service and research never change `payout` or `dataRatio`.
 
 ### 5.2 Market
 
-Program D10. The market is an **endless, ordered queue** per round. Nothing arrives on a schedule and nothing throttles it. The only limits are the hardware's room, its link speed and the head's 10 s clock.
+Program D10, restored by the user's 26 Oct correction. The market is an **endless, ordered queue** per round. Nothing arrives on a schedule and nothing throttles it. Hardware room, link speed and the head's 10 s pickup window govern takes. An unsupported head blocks the line until it is taken after an upgrade, dismissed manually or fails at its deadline. There is no automatic skipping.
 
 **The queue.**
 - The queue is generated on demand from the round's seeded curve (`docs/tasks.md` §3). Its state is the **window**: the next five tasks, head first, saved with frozen IDs and descriptors (family, size). Nothing behind the window exists yet.
 - When a task leaves the window (taken, failed or dismissed), the rest shift up and one new task is drawn at the back, at the current intensity `I`. The draw happens in the same step, so the window always shows five.
-- **Intensity advances per task drawn (D30).** After each draw `I ← I + 1/k(I)`, `k(I) = 9 + 0.3 I + 0.03 I²` tasks per unit **(s)**. `I` never advances with time, and every round starts at `I = 0`: fast hardware moves through the small early tasks quickly, slow hardware crawls, and the curve is the same for both.
+- **Intensity advances per task drawn (D30, fleet pacing tune 26 Oct).** After each draw `I ← I + 1/k(I)`, `k(I) = 9 + 0.3 I + 0.03 I² + 0.35 max(0, I − 14)³` tasks per unit **(s)**. The opening through I14 is unchanged; later bands contain more tasks. `I` never advances with time, and every round starts at `I = 0`: fast hardware moves through the small early tasks quickly, slow hardware crawls, and the curve is the same for both.
 - Hardware, idle time, utilization, SLA and window occupancy never change `I` or the draws. `I` follows round age only.
 - New tasks have `count = 1`. A split task is one logical task and pays once (D25.5).
 
 **The head and its clock.**
 - Position 1 is the **head**. Only the head has a clock. A task becomes the head when the task in front of it leaves.
 - `headTick` is the first tick in which the head can be taken. If the previous head left during the pull or routing step of tick `t`, it is `t`. If it left later in tick `t` (at the deadline step, or by a player action between ticks), it is `t + 1`.
-- The head must be taken by the end of tick `headTick + 99` (100 ticks, 10 s). Otherwise it fails at that tick's deadline step: `cantRun` if no hardware in the static capability set (§4.3) can run it, `timeout` otherwise. The next task becomes the head with a fresh 10 s.
-- Order is strict. Nothing behind the head is taken before it, at any scope. A head that no online hardware can run blocks the line until it is dismissed or fails.
+- The head must be taken by the end of tick `headTick + 99` (100 ticks, 10 s). Otherwise it fails once: `cantRun` when the static capability set (§4.3) cannot run it, `timeout` when it could run but was not taken. Power/heat/offline fleet-down cases retain their actual failure classification. The next task gets a fresh 10 s.
+- Busy, asleep, booting and cold-swapping systems remain in the static capability check. Temporary lack of room does not turn into automatic dismissal.
+- Order is strict. Nothing behind the head is taken before it, at any scope. A head the fleet cannot run blocks until manual dismissal, a purchase makes it runnable, or its deadline fails it. Manual play can avoid that SLA failure by dismissing; idle play cannot. The former `autoSkip` research remains retired.
 - Taken tasks have no deadline. They can still fail with their system (§6.9).
 
 **Taking** (pickup). A task is taken when it is split and every shard's slot is reserved, with transfers queued on the first link of their paths (§6.4, §7.6), or when the top router takes it into its queue (§7.1, D25.7). Taking is immediate and repeats in the same tick while the new head can also be taken.
@@ -433,7 +442,7 @@ Program D10. The market is an **endless, ordered queue** per round. Nothing arri
 - Round end prepares the next round once: its seed, round jitters and its first five tasks, drawn from `I = 0` (D30), each draw advancing `I`. They show as "after Return". The player may dismiss them; each dismissal draws a replacement at the next intensity.
 - Return and auto-return start that queue as is, without reseeding or regenerating. Paused time never ages it.
 
-**Saves.** Save the round index, seed and jitters, the window (IDs, descriptors, `committed`), the queue-front entries, `headTick`, the market RNG words and `I`. Saving, loading, snapshots and opening panels never draw. Validate on load: unique window IDs, known families, finite sizes, `headTick` ordering. Bump the save version and reset older pre-live saves; the implementation owner picks the number.
+**Saves.** Save the round index, seed and jitters, the window (IDs, descriptors, `committed`), the queue-front entries, `headTick`, the market RNG words and `I`. Legacy skip/closing fields and logged tasks may be retained for compatibility only; current rounds do not use them to skip or end. Saving, loading, snapshots and opening panels never draw. Validate on load: unique window IDs, known families, finite sizes, `headTick` ordering. Bump the save version and reset older pre-live saves; the implementation owner picks the number.
 
 ## 6. Execution in a system
 
@@ -464,7 +473,7 @@ Program D10. The market is an **endless, ordered queue** per round. Nothing arri
 | `Q` (queue) | scheduler `Q`; 0 with no scheduler |
 | `Keff` | Every core runs a task (D34 fix, 25 Oct): hardware threads. `timeSlice`: `2 × max(K, threads)`. With `dma`: `max(K, threads)`. The scheduler's `K` no longer caps running tasks below the core count; its levels raise `Q`. |
 | `slots` | `Keff + Q` |
-| cache | `Σ` over sockets of L1 + L2 + L3 capacity: the cache tier. Cache-resident traffic costs no time (it runs inside compute). |
+| cache | `Σ` over sockets of L1 + L2 + L3 capacity: the cache tier. Loading and touching each cache bit consumes one CPU op (D46). |
 | RAM | `Σ` module capacity: the RAM tier |
 | disk | `Σ` drive capacity, plus the rack storage node's free capacity with `sharedStorage` (§6.10): the disk tier |
 | `memCap` | the hierarchy, cache + RAM + disk (D26.1). The only memory gate. |
@@ -501,9 +510,9 @@ A system **has room to take** when all hold:
 - The pull sends the head's work over the pipe: it lands at `τ + Σ stage work / pipe speed`, carried into later ticks if needed (§7.4).
 - A head it can't run blocks the line until it is dismissed, a purchase makes it runnable, or it fails as `cantRun` (§5.2).
 
-**Without a scheduler** (`slots = 1`), the core waits for each transfer. A task takes `transfer + compute`, and the next pull starts when it completes.
+**Without a scheduler** a system holds only its running tasks; the next pull starts when a core frees.
 
-**With a scheduler**, transfers prefetch into free queue slots while the cores compute. A task costs the system `max(transfer, compute / Keff)` per take in steady state.
+**With a scheduler**, free queue slots fill ahead while the cores compute. From Rack on, transfers prefetch into those slots, and a task costs the system `max(transfer, compute / Keff)` per take in steady state.
 
 **From Rack on**, the top router takes the head and splits it (§7.6, §7.7). Each shard is admitted when its transfer is delivered (§7.5).
 
@@ -535,16 +544,18 @@ A shard keeps its threads until it completes. Base: it never gains threads mid-s
 
 ### 6.6 Stages and shared resources
 
-Stages run in order. At constant rates a stage takes `work / rate`, so a task takes `sum(work / rate)`, as in v2.
+Stages run in order. At constant rates a stage takes `work / rate`.
+
+**Initial loading (D46).** Every shard loads its reserved working set before its first authored stage, including tasks with only compute stages. Load cache, then RAM, then disk. Cache bits consume one CPU op each on the shard's assigned threads. RAM bits consume their module bandwidth and disk bits consume drive IO, with the usual pool sharing and drive holds. Unified-memory VRAM overflow also loads at its RAM or disk rate. Capacity reservation is immediate; loading is work. It adds no fixed delay. At constant uncontended rates, loading takes `c / cpuRate + (r + vramR) / ramRate + (d + vramD) / diskRate`. Four cache bits followed by four compute ops take 8 s on one 1 Hz thread, plus inbound transfer time. Loading does not add to the authored payout or payload.
 
 | Resource | Rate for one task | How it is shared |
 |---|---|---|
 | `compute` | `Σ` rates of its threads. `timeSlice`: `min(want × meanCoreRate, totalCoreRate / running)`. A D27 research holder's threads are busy (§11.2). | Threads are assigned; not pooled. |
-| `mem` (D26.2) | Split at start into up to three parts by the shard's placement fractions `f_c = c/ws`, `f_r = r/ws`, `f_d = d/ws`, run in that order: the cache part costs no time; the RAM part runs at RAM bandwidth (a shard whose threads span more than one CPU gets at most `0.5 ×`, `socketSpanPenalty`); the disk part runs at disk IO. | Cache: none. RAM: pool. Disk: pool among holders. |
+| `mem` (D26.2, D46) | Split into cache, RAM and disk parts by frozen placement fractions. Cache traffic consumes CPU ops on the shard's threads; RAM traffic runs at RAM bandwidth; disk traffic runs at disk IO. | Cache: assigned CPU threads. RAM: pool. Disk: pool among holders. |
 | `gpu` | Its lifetime domain's ordinary or tensor rate × `1 / n`, where `n` counts all active ordinary and tensor tasks on that domain. | Fair sharing per domain, updated at stage events |
 | disk part of `mem` | Disk IO (`Σ` drives). At most `ioConcurrency` shards hold the drives at once (program D1.2); a shard takes a hold when it enters its disk part and one is free, oldest first, and keeps it until that part ends. A storage-node part also crosses both server links (§6.10). | Pool among holders |
 
-**Spill formula** (D26.2). A `mem` stage of `M` bits touched takes `M × f_r / ramRate + M × f_d / diskRate` at constant rates; with `ws = 0` it costs nothing. So per stage: `time = compute / rate + Σ_tier (bits touched in the tier / tier rate)`, with the cache rate taken as infinite: cache serves at core speed, inside the compute time. The fractions are frozen at start, so the parts are ordinary stages on the existing RAM and IO clocks: deterministic and delta-invariant. With `hotPages`, the disk part touches `M × f_d²` bits and the RAM part `M × (f_r + f_d − f_d²)` (to cache when there is no RAM).
+**Memory traffic formula** (D46, supersedes D26.2's free cache). A `mem` stage of `M` bits touched takes `M × f_c / cpuRate + M × f_r / ramRate + M × f_d / diskRate` at constant rates. Cache traffic is additional CPU work. With `ws = 0`, memory traffic uses the CPU. The fractions are frozen at start, so initial loading and stage traffic use the existing CPU, RAM and IO work clocks, with deterministic event transitions and delta invariance. With `hotPages`, subsequent disk traffic touches `M × f_d²` bits and the saved disk traffic goes to RAM, or cache without RAM. Initial loading still writes the full placement.
 
 **Unified memory** (D26.4). With `unifiedMemory`, a GPU stage of `G` ops whose VRAM need sits partly outside VRAM (fractions `v_r` in RAM, `v_d` on disk) is followed by a RAM part of `G × v_r` bits and a disk part of `G × v_d` bits at those tiers' rates. Without it, VRAM is a gate.
 
@@ -563,7 +574,7 @@ For each system that is `onMarket`, `goingOffline` while draining, or holding re
 3. **Chaining** (every strategy except `timeSlice`). When a task completes at `τc`, it frees its slot, threads and memory. The system at once starts the next queued task by strategy, at `τc`, appended to the visit list. Before Rack it also pulls the head at `τc` if §6.4 allows; that task starts when its transfer lands. The new task takes the freed threads first. Under `timeSlice`, the next task starts at the next tick's allocation.
 4. **Idle time.** Each core's time not used by tasks is idle, including time spent waiting for a transfer or behind a blocked head. Idle time and the reserved research share go to research (§11.2).
 
-Utilization for power (§9.1) comes from this step: busy time per core, pool consumption per pool.
+Utilization for power (§9.1) comes from this step: CPU-stage work plus held research per core, pool consumption per pool. Threads reserved by GPU, RAM or IO stages stay unavailable to other tasks but do not draw active CPU load power while waiting.
 
 ### 6.8 Completion and payout
 
@@ -634,7 +645,7 @@ All network transfer happens on **links**. A link has one or more channels. Each
 - Ports are assigned in slot order. A system or storage node without a rack switch port, or a rack without a room switch port, has no link: it gets no tasks.
 - The market enters at the gateway site's data plane, free. A site other than the gateway is reachable only through its backbone link to the gateway.
 - **The pipe is the upstream port** (program D10.4, D13). A unit's inbound pipe is the port it plugs into upstream, at that port's speed:
-  - a system plugs into a rack-switch port. The switch default is 1 kHz (`k = 0`);
+  - a system plugs into a rack-switch port. The switch default is 100 kHz (`k = 6`, D29);
   - a rack's uplink plugs into a room network-rack port, at that switch generation's default speed (A.3);
   - a room (AZ) plugs into the site's data plane and, from Regions on, the backbone, at their default speed (A.3).
 - **Before the upstream device exists**, the unit is already on that device's default port, at a fixed speed (D15). At boot the lone system's link is the rack switch's default speed. It can't be upgraded until the player has a Rack; then it runs at its rack-switch port's speed, which steps on the switch (D35, §12.5). The player never sees or buys a system port.
@@ -655,7 +666,7 @@ speed(k) = [1, 2, 5][k mod 3] × 10^(3 + floor(k / 3))   bit/s
 k = 0 → 1 kHz; 3 → 10 kHz; 9 → 1 MHz; 15 → 100 MHz; 18 → 1 GHz; 21 → 10 GHz
 ```
 
-The pipe and every switch port, uplink, data plane and backbone link use this one ladder. Each switch, data plane and backbone generation has a base index `baseK` and a top index `topK` (Appendix A.3). Every port of that part stays within them. A port's default is its generation's `baseK` (D13). Before Rack, the lone system's port is fixed at 1 kHz (D15).
+The pipe and every switch port, uplink, data plane and backbone link use this one ladder. Each switch, data plane and backbone generation has a base index `baseK` and a top index `topK` (Appendix A.3). Every port of that part stays within them. A port's default is its generation's `baseK` (D13). Before Rack, the lone system's port is fixed at 100 kHz (D29).
 
 ### 7.4 Transfers
 
@@ -704,7 +715,7 @@ for each router R that exists, in that order:
 // 2. Take market heads at the top router.
 repeat while the round is running:
     head = the queue's head
-    if head can't run on the fleet (§6.3): stop        // it blocks; §5.2 decides cantRun
+    if head can't run on the fleet (§6.3): stop        // blocked until dismissal, a purchase or pickup expiry
     if top.queue is empty and (tree = split(top, head)) is not null:
         reserve(tree)                                  // taken: split now
     else if top.queue has a free slot:
@@ -942,14 +953,14 @@ Each is a research rule (Appendix C). Factors multiply.
 
 | Rule | Condition | Effect |
 |---|---|---|
-| `coreIdle` (C1, C3, C6) | A core idle for at least `afterS` (0, 1, 1 s). The deepest researched state applies, limited by the system's C-state limit (hot setting). | That core's `idleFactor` = 0.5, 0.15 or 0.02. A task starting on a core in C3 or C6 starts after `wakeS` (0.2 or 1 s), a physical latency. |
+| `coreIdle` (C-state levels 1-36) | Idle CPU cores after System, when C-state is on. The first purchase enables it. | Idle core power x `(74 - 2 * level) / 100`: 0.72 at level 1, 0.02 at level 36. No added sleep or wake latency. Active core load is unchanged. |
 | `packageIdle` | Every core of a socket idle the whole tick. | That socket's clock, caches and the scheduler: `idleFactor = 0.2`. |
 | `s3Sleep` | A system in a rack with no admitted or reserved task for 10 s, and not holding research (D27). | Mode `asleep`: every part's `idleFactor = 0.03`, no load. An asleep system is never a split candidate (D31). When a router can't split an entry for lack of awake room, it wakes that shortage, lowest index first (or in its start controller's order). They are `onMarket` after `s3WakeS` (2 s, or the controller's level), drawing idle meanwhile. |
 | `dvfs` (system switch, default on once researched) | At allocation the system's queue is empty and nothing is reserved on it. | Its cores: clock × 0.5, core and clock `loadFactor` 0.3. |
 | `turbo` (system switch) | Not under `dvfs`; previous tick's PSU usage < 0.90; from Rack on, rack `T < 80 °F`. | Clock × 1.25, core and clock `loadFactor` 1.8. |
 | `thermalThrottle` | Rack `T >= 95 °F`; holds until `T < 90 °F`. | The rack's systems: clock × 0.5, core and clock `loadFactor` 0.5. |
 | `powerCap` (supply switch on PSU and PDU) | See §9.5. | Clock × `capFactor`. |
-| `ramWatts` (`lowVoltRam`) | Always. | RAM idle and load × 0.7. |
+| `ramWatts` (Memory voltage levels 1-36) | Installed RAM. | RAM idle and load x `(74 - 2 * level) / 100`; capacity and bandwidth are unchanged. |
 | `ecc` | ECC modules. | RAM idle and load × 1.1. |
 | `vramScale` (`hbm`) | GPUs. | VRAM idle share × 0.5 only. Core idle and load watts stay unchanged. |
 | `npuTensorOnly` | NPUs. | Tensor-only, zero GPU cores. Use the frozen NPU coefficient 0.125 and its own legacy power curve, independent of GPU models. |
@@ -1019,7 +1030,7 @@ whole = floor(energyMeter);  wallet -= whole;  energyMeter -= whole
 A rack's **Power control** unit (its fifth infrastructure slot, under the cooler) holds the rack's battery and its smart start (§4.4) as one part. Its generations are Lead-acid (gen 0, basic start), Li-ion (gen 1, adds the `busy` trigger and batch wake) and LFP (gen 2). Levels follow the flow curve: battery capacity ×2 per level and wake latency by level (§4.4). The empty slot is locked until `powerCtl` is researched; then it is bought from its add plate like any infrastructure part.
 - **Discharge.** While the round runs and the rack is powered, the rack PDU's input for the tick (servers in any mode, cooler, switch, LB and losses) is drawn from the battery first: `fromBattery = min(batteryJ, pduInput × dt)`, `batteryJ −= fromBattery`. Only the rest is billed (§9.8). A battery adds no capacity: PDU usage, `tOver`, losses and heat are unchanged.
 - **Battery time** shown on the rack plate and LCD: `batteryJ / pduInput` seconds at current draw, while discharging.
-- **Recharge.** At Return to market (and auto-return) every battery refills to capacity, billed on that tick at `refillJ × 0.25 × the site's marginal price` (§9.10).
+- **Recharge.** At Return to market (and auto-return) every battery refills to capacity, billed immediately at `refillJ × 0.25 × the site's marginal price` (§9.10). Whole Credits settle before the action returns, leaving the fractional energy meter in `[0, 1)` so an immediate save is valid. The next tick does not charge the refill again.
 - **Size.** L1 capacity is 60 s of a fresh era rack at full draw **(s)**: about 10 min of an idle awake rack, so it covers boots, wakes and the D30 climb.
 - A `standby` rack draws nothing and keeps its charge.
 
@@ -1135,6 +1146,8 @@ Each rack and zone has a crash timer `tHot`, in seconds:
 - Completion is checked at the research step (§14). Effects apply from the next tick.
 - Research work is CPU compute only (D27). GPUs and NPUs do not research.
 
+Repeatable purchases (D45) are an exception to processor projects: C-state, Memory voltage and Boot loader each have 36 levels. Buying level 1 unlocks and applies it for 100,000 Credits; each later price is the previous whole-Credit price x 1.8, rounded up. They cost 0 Data and 0 ops, apply immediately, and leave any active processor research untouched. Their initial prerequisite is System; Memory voltage is only listed when RAM is installed. These replace the separate C1/C3/C6, low-voltage RAM and fast/warm-boot nodes. CSV `manual` fields are ignored test data.
+
 ### 11.2 Research is a task that cuts the line (D27)
 
 Starting a project, or the next queued project starting, puts the **research task** at the front of the market queue.
@@ -1160,7 +1173,7 @@ At the ledger step, if the wallet is negative after the energy debit, research *
 
 ### 12.1 Generations, levels and curves
 
-Each part type has generations `g = 0, 1, …` and levels `L >= 1`. A generation becomes buyable when the research effect `gen: (part, g)` is complete; generation `g >= 1` of a part also needs its generation 0 (the research doc's rule 2). Levels inside a generation are never gated by research, only by the ceilings in §12.2. GPUs instead use the accepted model-ID and `upgrades=0..5` contract in §12.6. Generic adapters may derive `gen=g-1` and `level=upgrades+1`; those values are not the saved GPU build.
+Each part type has generations `g = 0, 1, …` and levels `L >= 1`. A generation becomes buyable when the research effect `gen: (part, g)` is complete; generation `g >= 1` of a part also needs its generation 0 (the research doc's rule 2). Levels inside a generation are never gated by research, only by the ceilings in §12.2. GPUs instead use the generation/type/tier model-ID contract in §12.6. Generic adapters may derive `gen=g-1` and `level=tierIndex+1`; those values are not the saved GPU build.
 
 | Curve | Level factor `x(L)` | Level range | Primary capacity |
 |---|---|---|---|
@@ -1173,7 +1186,7 @@ Each part type has generations `g = 0, 1, …` and levels `L >= 1`. A generation
 
 RAM capacity factors by level are `[1, 2, 4, 6, 8, 12, 16, 20, 24, 28, 32, 40, 48, 56, 64, 80, 96, 112, 128, 160, 192, 224, 256, 320, 384, 448, 512, 640, 768, 896, 1024, 1280, 1536, 1792, 2048, 3072]`. Its bandwidth has its own factor. Registered DIMM research multiplies ECC module capacity by 2 without changing bandwidth or level. This replaces `ramLevelBonus = 4`; no CPU/RAM upgrade extends beyond L36. `l3LevelBonus` still extends L3. Other secondary capacities follow their catalog curves. CPU/RAM no longer inherit the generic `flow` level or price formulas.
 
-Old CPU/RAM hardware may run faster than later generations' native parts. Crossing a tier's native rate or becoming loss-making adds no purchase gate. Only L36 is the level ceiling. Show marginal payback and whole-part operating loss separately, and leave normally affordable/researched upgrades enabled through L35 → L36.
+Old CPU/RAM hardware may run faster than later generations' native parts. Crossing a tier's native rate or becoming loss-making adds no purchase gate. Only L36 is the level ceiling. Show whole-part operating loss without a payoff-time prediction, and leave normally affordable/researched upgrades enabled through L35 → L36.
 
 ### 12.2 Ceilings
 
@@ -1218,7 +1231,7 @@ Special prices:
 - **CPUs.** Every CPU action costs its single-CPU price × the system's CPU count (program D7.3). Adding a CPU costs a copy of CPU 1: its package, cores, clock and caches at their generations and levels, priced as in §13.3.
 - **Accelerator board.** Installing it costs `acceleratorBoard` (A.4) on top of the parts.
 - **ECC.** An ECC module costs 1.25 × the module price, upgrades included.
-- **Upgrade all.** The RAM and drive plates raise every unit of the same generation one level; price is the sum. The GPU plate adds one hot upgrade to each eligible card below its five-upgrade cap and sums exact per-model prices.
+- **Upgrade all.** The RAM and drive plates raise every unit of the same generation one level; price is the sum. A GPU upgrade advances its current model one tier, up to tier 90, at the exact difference in card value (§12.6).
 - **Rows.** A zone's `n`th row costs `upgradePrice(row, L = n − 1)`.
 - **Shells** (rack frame, storage node chassis, zone, site) have fixed prices and escalation (Appendix A.4).
 
@@ -1228,11 +1241,11 @@ Special prices:
 - **Replace** installs the newest researched generation at level 1. It is cold (§4.5). The plate also offers a **capacity-preserving replace**: the lowest native level whose primary capacity is at least the current one, priced as install plus every intervening upgrade.
 - **Replace only moves up** (D39, user bug). A replace offers, and the action accepts, only generations above the installed one, in catalog order; this covers every part, the switch, Power control, the start controllers and site generation (solar, wind, fuel cell, own plant). A replacement GPU must be a strictly better model natively: more ops/s and no less VRAM (hot pushes are not a tier), so a cross-series sidegrade is not offered.
 - **Replace CPU** on the System board replaces, in one cold change, every package, core, clock and cache of the system with the newest researched CPU generation: cores carried over one for one and caches at the lowest level that preserves their bits, the clock at L1. Its price is the sum, with each core at the new generation's core price (D34: no extra-core surcharge on a replace).
-- CPU and RAM quotes preview throughput, full-use electrical draw and normalized energy ratio. RAM replacement preserves capacity bits and shows bandwidth separately. Payback uses the change in net income at the same workload and tariff. If that change is non-positive, show **No payback at this load**. If the part's operating cost exceeds its output, separately show **Costs more to run than it produces**. Neither warning disables an upgrade. Fab research must be affordable on a profitable prior-era fleet before loss-making overclocks are needed. See `hardware-progression.md` §§5–6.
+- CPU and RAM quotes preview throughput, full-use electrical draw and normalized energy ratio. RAM replacement preserves capacity bits and shows bandwidth separately. If the part's operating cost exceeds its output, show **Costs more to run than it produces**. The warning does not disable an upgrade. Do not show payback times. Fab research must be affordable on a profitable prior-era fleet before loss-making overclocks are needed. See `hardware-progression.md` §§5–6.
 - A replacement that cannot hold what the part holds is not offered at that level; the plate names the shortfall.
 - Within a generation, capacity grows as `x` while load watts grow as `x^1.3` (§9.1), so energy per unit of work rises as you push old parts. A native generation starts back at `push = 1` and opens a higher level ceiling. Replace wins over a horizon; upgrade wins short.
 
-The part plate shows, for both options: price, capacity after, watts after at current utilization, energy cost change per minute, and payback `price / gain` when the net-income gain at current load is positive ("No payback at this load" otherwise).
+The part plate shows, for both options: price, capacity after, watts after at current utilization and energy cost change per minute. Saving-up and payback time forecasts are omitted (D48).
 
 ### 12.5 Switches, data plane and backbone
 
@@ -1259,23 +1272,23 @@ portStep(k→k+1) = ceil(m × u / 0.7 × ((x / b)^α − (y / b)^α))
 - **Match ports (D35, the same-speed toggle; default on).** Ports belong to the switch; a system has no port of its own. While on, any port step raises every port: let `kmax` be the highest port index; if every port is at `kmax` the target is `kmax + 1`, otherwise `kmax`; every port below the target goes to it, priced as the sum of the per-port steps. That whole-switch step is offered while off too. While off, each port also steps alone. A port added while on arrives at the common speed, priced with its steps; while off, at the base speed. The toggle does not cover uplinks.
 - **Port count.** `ports` lies between `minPorts` and the ceiling (`rackPorts`, `roomPorts`). The `j`th port beyond `minPorts` costs `ceil(portAdd[g] × portAddGrowth^(j−1))`. A new port arrives at `baseK[g]`.
 - **Uplinks.** Up to the `uplinks` ceiling. Extra uplinks cost like a port.
-- **Install and replace.** `installPrice(g)` buys the switch with `minPorts` ports and one uplink at `baseK[g]`. Replacing keeps the port and uplink count (extra ports priced at the new generation) and sets each port to `clamp(k, baseK[g'], topK[g'])`.
+- **Install and replace.** `installPrice(g)` buys the switch with `minPorts` ports at `baseK[g]` and one uplink at the upstream device's default, at least the switch's own base (D13). Configuration copies pay only for uplink steps above that native default. Replacing keeps the port and uplink count (extra ports priced at the new generation) and sets each port to `clamp(k, baseK[g'], topK[g'])`.
 - **Data plane.** One port per zone, created with the zone at no extra cost. All its ports share one index `k`. A step costs `portStep(k→k+1)` with `m = 288`, × zones. Latency belongs to the generation.
 - **Backbone link.** One link from the gateway to one site, one index `k`, latency by generation. Each link is bought separately at `installPrice`.
 
 ### 12.6 GPU models and exact prices
 
-`gpu-progression.md` is the accepted numeric catalog. Buy preconfigured GSMT model IDs, generations 1 through 9, series 3/5/7/9 and tiers 30/50/60/70/80/90. The nine clock classes are 1 kHz, 10 kHz, 100 kHz, 1 MHz, 10 MHz, 100 MHz, 1 GHz, 10 GHz and 100 GHz. Series emphasize cores, VRAM, clock and all specs respectively. Higher tiers improve every spec. `3350` is gen 3, core-heavy, tier 50, in the 100 kHz class.
+`gpu-progression.md` is the accepted numeric catalog. A GPU is its generation, type and tier. Research opens generations 1–9. Types 3/5/7/9 emphasize cores, VRAM, clock/efficiency and all specs. Tiers advance **30 → 50 → 60 → 70 → 80 → 90** in place. The nine clock classes remain 1 kHz through 100 GHz. `3350` is generation 3, core type, tier 50.
 
-Save `GpuBuild {kind:'gpu', model:GpuModelId, upgrades:number}` and validate through one central evaluator. No model objects or inferred model IDs enter saves. For `B(g)=4,000,000 * 10^(g-1)`, native price is `P=B(g) * seriesPrice * tierPrice`. Hot upgrades `u=0..5` multiply cores and VRAM by `2^u`, clock by `1.25^u` and ordinary rate by `2.5^u`. The next upgrade costs `ceil(P * 3^u / 10)` for `u<5`, with no install escalation. Calculate these amounts with integers and convert decimal strings to `Amount`.
+Save `GpuBuild {kind:'gpu', model:GpuModelId}` and validate through one central evaluator. No model objects, inferred IDs or separate push counts enter new saves. Tier steps are hot and preserve running work. They double cores and VRAM, raise clock and improve energy per operation. Generation replacement is cold and retains type and tier; it increases ordinary work 20× and VRAM 16×. Changing type at the same generation and tier is cold: charge any rise in card value, with no refund on a fall. An empty bay offers tier 30 of the newest affordable researched generation (newest if none is affordable), one key per type; requirement/fix actions may install higher researched tiers directly.
 
-Install escalation counts other GPUs only. With `n` other GPUs after removing a replacement target, charge `ceil(P * 5^e / 4^e)`, `e=max(0,n-1)`. NPU count does not affect it. Configuration copies pay native install plus all hot upgrades. Any model replacement is cold, including same-generation tier changes. Hot upgrades preserve work and holds; future rates change at the next tick boundary.
+Generation 1 base value is 1,000,000 Credits; later bases are `4,000,000 × 10^(g-1)`. Type 9 multiplies value by 4. Tier multipliers are `1,3,7,16,36,80`. With `n` other GPUs, `V(model,n)=ceil(P(model) × 5^e / 4^e)`, `e=max(0,n-1)`. Exclude the target and NPUs. An install or configuration copy pays `V`; a tier or generation step pays **V(after,n) − V(before,n)**. Subtract rounded whole values so ladder purchases telescope exactly at a fixed install position. Use bigint and `Amount`.
 
-Series 9 costs more than the combined comparable 3/5/7-series cards, including the accepted successive-slot comparison. Native G990 is the strongest and most efficient native model in its generation. Hot pushes reduce efficiency and cap at five. Capacity-preserving replacement must preserve both GPU cores and VRAM and show clock, rate and watts separately. Do not assume a faster next-generation card satisfies an old core floor.
+Native G990 remains the strongest and most efficient native model in its generation. The push energy penalty is removed. GPU energy follows the model and tier calibration in `gpu-progression.md`, retaining the native 6/3/2 era targets. Tier steps improve efficiency; generation changes retain the era efficiency tradeoff. Quotes show work, task-fit capacity, power and any supply/cold consequences. No raw-rate figure is a guaranteed market earnings forecast.
 
-Next-generation research costs `160 * B(currentGen)` Credits, half the current G990 price `320 * B(currentGen)`, plus Data and work before buying any model. For gen 3, 3990 costs 128,000,000,000 Credits; gen-4 research costs 64,000,000,000, and research plus native 4960 costs 176,000,000,000, excluding energy. These local comparisons establish choices, not campaign balance.
+Research costs continue to follow D32's Data/Credit and hardware-work rules. The older `160 × B(currentGen)` research fee is superseded. Local model comparisons do not establish campaign balance or satisfaction.
 
-Bump the save/catalog revision and reset old v3 GPU builds, configurations, accelerator research and pool state together. Do not migrate a model from old ops/s. Acceptance needs legal campaign and per-card performance evidence, delta invariance and all-card research/power accounting. CPU/RAM specialized integration remains outside this GPU wave.
+Save version 26 restores the original CPU parts alongside the current GPU tier models. Older saves reset without migration under the pre-live policy. The broader reward-loop work is tracked in `upgrade-experience.md`.
 
 ### 12.7 Router queues (D25.7)
 
@@ -1304,7 +1317,7 @@ A configuration is a named, serializable description of a unit. It never stores 
 
 | Kind | Stores |
 |---|---|
-| system | board type; CPU count; for CPU 1 (copied to all): package g; cores (g, L each); clock (g, L); L1, L2, L3 (g, L) or none. Scheduler (g, L, strategy) or none. RAM modules (g, L, ECC). GPUs (kind, model ID, upgrades); legacy NPUs (kind, gen, level). Drives (g, L). PSU (g, L, cap switch). DVFS, turbo and C-state settings. Online switch. |
+| system | board type; CPU count; for CPU 1 (copied to all): package g; cores (g, L each); clock (g, L); L1, L2, L3 (g, L) or none. Scheduler (g, L, strategy) or none. RAM modules (g, L, ECC). GPUs (kind, model ID encoding tier); legacy NPUs (kind, gen, level). Drives (g, L). PSU (g, L, cap switch). DVFS, turbo and C-state settings. Online switch. |
 | storage node | drives (g, L); PSU (g, L) |
 | rack | cooler (g, L, setpoint); power control (g, L, start settings: start with, wake trigger, order; D31) or none; PDU (g, L, cap switch); load balancer (g, L, strategy, filters, queue level `L` 1–32); switch (g, ports with `k` each, uplinks with `k` each, toggle); a system or storage-node configuration per occupied server slot; online switch |
 | zone | rows; room switch (as rack switch); room load balancer (as rack); room cooling (g, L, setpoint); UPS(s) (g, L, room start controller and settings, D31); a rack configuration per occupied slot; online switch |
@@ -1316,9 +1329,9 @@ Tapping an empty server slot, the next free rack slot, the Zone item or the Site
 
 1. **Barebones** (always available).
    - Accelerator system (with `systemBoard`, D39): as a general barebones system on the `accelerator` board, with one CPU.
-   - System, at any CPU tier `g` whose chip generation is researched: one socket with package g, one core g at L1, clock g L1, L1 g L1, and a PSU: the newest researched PSU generation at the lowest level whose capacity covers the system's full-load watts (its top level if none does). No scheduler, RAM, GPU or storage.
+   - System, at any CPU tier `g` whose chip generation is researched: one socket with package g, one core g at L1, clock g L1, L1 g L1, and a PSU: the cheapest researched PSU and levels that cover full-load watts, or the largest researched capacity if none fits. No scheduler, RAM, GPU or storage.
    - Storage node (with `sharedStorage`): chassis, one drive of the newest researched generation at L1, PSU as above.
-   - Rack: frame; cooler gen 0 L1; PDU gen 0 L1; load balancer gen 0 L1 on `firstFit` with a 1-slot queue; switch gen 0 with 4 ports and 1 uplink at 1 kHz. No servers.
+   - Rack: frame; cooler gen 0 L1; PDU gen 0 L1; load balancer gen 0 L1 on `firstFit` with a 1-slot queue; switch gen 0 with four 100 kHz ports and one uplink at the room network rack's 10 GHz native default. No servers.
    - Zone: shell; network rack with room switch gen 0 (4 ports, 1 uplink, base speed) and room load balancer gen 0 L1 on `firstFit` with a 1-slot queue; 2 rows; room cooling gen 0 L1; UPS gen 0 L1. No racks.
    - Site: shell; data plane gen 0 at base speed on `firstFit`; grid feed gen 0 L1; one barebones zone. Placed at a free map location in an open region.
 2. **Copy** a sibling: a system or storage node in this rack, a rack in this zone, a zone in this site, a site in the world.
@@ -1409,6 +1422,10 @@ The mockups decide the look. This section lists only the data each surface needs
 
 ### 16.1 HUD
 
+Core and component progress bars fill from 0% at the start to 100% at completion, using measured stage progress. CPU miniatures follow the same direction. Research uses the same close-button appearance and 44 px target as the other popups.
+
+Task popups show their description, processing work and capable-system count directly on opening, without a Details disclosure.
+
 | Field | Source |
 |---|---|
 | Credits | wallet, whole Credits, larger than body text |
@@ -1435,7 +1452,7 @@ The mockups decide the look. This section lists only the data each surface needs
 
 The core tray offers only physical `Add core`. Selecting a core shows facts and task details, without generic upgrade/replace controls. Clock and cache controls belong to the CPU. Keep existing backend lane research. Reuse `selectContextualResearchTree` for contextual research and preserve `selectResearchTree` for GPU model lookup. Desktop and CPU prototypes do not select a production layout.
 
-- **Part:** name, generation, level, capacities, idle/load/actual watts, utilization, hot or cold label per action, upgrade price, replace price, capacity-preserving replace, payback (§12.4), locked reasons.
+- **Part:** name, generation, level, capacities, idle/load/actual watts, utilization, hot or cold label per action, upgrade price, replace price, capacity-preserving replace and locked reasons (§12.4).
 - **GPU:** model ID, upgrades, VRAM, cores, actual clock, effective rate, perf/W, per-card duty and reservation. Task GPU requirements show only cores and VRAM. Upgrade/replacement quotes show both capacities, clock, rate, actual system watts and exact price. Controls keep stable geometry.
 - **Supply:** delivered W, capacity, usage, loss W, `m`, `tOver` (once nonzero), cap switch and `capFactor`.
 - **Cooler:** `T`, `Teq`, `H / Qc`, duty, setpoint, watts, `tHot`, throttle state.
@@ -1445,7 +1462,8 @@ The core tray offers only physical `Add core`. Selecting a core shows facts and 
 - **Port** (opened from the CPU view's pipe): speed, transfer in progress, share of time the cores waited on it. Before Rack: the fixed 1 kHz and "Upgrade at the Rack switch" (D15). From Rack on: next step price and Buy, as "x → x" (D15.4).
 - **Network rack:** the room switch and room load balancer, as above.
 - **Configuration:** the options of §13.2 with total price and locked reason; the save-name prompt.
-- **Research:** project name, Data cost, optional exact Credit fee, work volume, progress, effective research rate (ops/s), mode, queue with missing Data/Credit reasons, paid status and locked reasons.
+- **Research (D45):** only research relevant to the current hardware and stage is listed, plus the next container unlock and prerequisites of an explicitly opened project. Locked projects are dim rows with the same geometry as normal rows. Opening a row shows its effect, full currency costs, processing work and unmet research prerequisites together, followed by its action. There is no second Details disclosure, running strip, era ribbon, forecast, search or locked/done fold. Repeatable entries show one next level, and remain open at the next level after purchase. Back follows prerequisite history, then returns to the originating hardware or task. Level tabs and the title/Close controls stay fixed while the list scrolls.
+- **Runway data (D40, revised by D45/D48):** next-era progress uses real balances and research costs. Retained runway views show prices, balances, measured percentages and earned amounts. Do not show forecasts of saving time, future rounds or research completion.
 - **Round report:** §4.7.
 
 
@@ -1453,7 +1471,7 @@ The core tray offers only physical `Add core`. Selecting a core shows facts and 
 
 | Level | Data per element |
 |---|---|
-| CPU | Exactly four parts (program D7.1): clock, cache (one block, total bits; L1, L2, L3 on its plate), scheduler, cores. Per core: busy fraction this tick, the shard on each thread (task ID, shard index, family, progress fraction, and how many threads that shard holds, so cores running one shard draw as one group), research share, C-state. Effective clock. Cache bits used / capacity per level, and the running shards' bits that spilled past cache (D26.7). Scheduler: queue entries, reserved count, running count, `K`, `Q`, strategy. Empty core sites up to `coreSites`. The inbound pipe (D10.4) is the incoming connector, not a fifth part: its speed, the task in transfer with bits sent / total, and whether the core is waiting on it. Tapping it opens the port plate (§16.3): before Rack the fixed 1 kHz and "Upgrade at the Rack switch"; from Rack on, the next step as "x → x". |
+| CPU | Exactly four parts (program D7.1): clock, cache (one block, total bits; L1, L2, L3 on its plate), scheduler, cores. Per core: busy fraction, current activity (Cache load, Cache read or Compute), the shard on each thread (task ID, shard index, family, progress fraction, and how many threads that shard holds, so cores running one shard draw as one group), research share, C-state. Effective clock. Cache reserved bits, loaded bits and capacity; its lights fill from actual loading progress, including fractional bits, and remain lit until release. CPU miniatures use the same loaded count. Cache bits used / capacity per level, and the running shards' bits that spilled past cache (D26.7). Scheduler: queue entries, reserved count, running count, `K`, `Q`, strategy. Empty core sites up to `coreSites`. The inbound pipe (D10.4) is the incoming connector, not a fifth part: its speed, the task in transfer with bits sent / total, and whether the core is waiting on it. Tapping it opens the port plate (§16.3): before Rack the fixed 1 kHz and "Upgrade at the Rack switch"; from Rack on, the next step as "x → x". |
 | System | Board type, CPU count, `η_cfg`. The memory tiers filling (D26.7): cache, RAM and disk capacity, used bits, spilled bits (bits that didn't fit a faster tier) and rate. The shard arriving on the system's port and each running shard (task ID, shard index of count, units, threads held, GPU domain), so a shard is drawn splitting between the CPU and the GPU card. PSU usage, `tOver`, loss W. RAM used / capacity and bandwidth use per module. Per-card GPU/NPU duty, VRAM holds and assigned tasks; GPU model ID, upgrades, cores, clock and effective rate. Drive IO use and holds. Mode. |
 | Rack | Power control (under the cooler): battery charge, battery time at current draw, awake count of total, next wake. Per server slot: mode, busy fraction, admitted and reserved shard counts. Every shard transfer on the uplinks and ports (task ID, shard index of count, target slot, bits sent of total), so a task is drawn arriving on the uplink and fanning out to the servers. LB queue entries.
  Per port and uplink: busy flag and speed. Load balancer routes per second. Cooler `T` and duty. PDU usage and `tOver`. `tHot`. |
@@ -1509,14 +1527,11 @@ Rate parts draw by §9.1 with the `wPerUnit` listed; "idle" is for non-rate part
 | `cpu` | Hz, kHz, MHz, GHz package | start, `fabKhz`, `fabMhz`, `fabGhz` | fixed | — | — | idle 0.1, 100, 1e5, 1e8 | 500, 5e4, 2.1e8, 9.3e10 | — |
 | `core` | Hz, kHz, MHz, GHz core | start, `fabKhz`, `fabMhz`, `fabGhz` | core | lanes 1, 2, 4, 8 | — | hardware energy ratio §9.1; native 10, 6, 3, 2 | 6000, 1.25e5, 4.3e8, 1.9e11 | 10, 1.2e5, 1.5e9, 7.7e12 |
 | `clock` | Hz, kHz, MHz, GHz oscillator | start, `fabKhz`, `fabMhz`, `fabGhz` | clock, 1.5×; L1–36 every generation | Hz 1, 1e3, 1e6, 1e9 | — | idle 0.1, 100, 1e5, 1e8 (core carries the load) | 20, 2e5, 8.6e8, 3.7e11 | 3, 1.5e4, 9e7, 2.4e11 per lane driven; 1.7× per level |
-| `l1` | L1 by tier | start, `fabKhz`, `fabMhz`, `fabGhz` | flow | bits 1, 1024, 2^20, 2^30 | — | idle 0.1, 100, 1e5, 1e8 | 20, 1.25e5, 4.3e8, 1.9e11 | 3, 1.2e5, 1.5e9, 7.7e12 |
-| `l2` | L2 by tier | start (D39), `fabKhz`, `fabMhz`, `fabGhz` | flow | bits 8, 8192, 2^23, 2^33 | — | idle 2 × `l1` | 4e4, 5e5, 8.6e8, 3.7e11 | 12, 1.2e5, 1.5e9, 7.7e12 |
-| `l3` | L3 by tier; gen 4 Stacked L3 | start (D39), `fabKhz`, `fabMhz`, `fabGhz`, `stacked3d` | flow (+`l3LevelBonus`) | bits 64, 65536, 2^26, 2^36, 2^39 (gen 4: 8× gen 3) | — | idle 6 × `l1` (gen 4: gen 3 watts) | 2e5, 7e5, 1.7e9, 7.4e11, 4e13 | 12, 1.2e5, 1.5e9, 7.7e12, 7.7e12 |
 | `scheduler` | Run queue, Multilevel, Work queue, Cluster runtime | start (D39), `fabKhz`, `fabMhz`, `fabGhz` | linear, L 1–8 for every g | `K` 1, 2, 3, 4 (≤ 32) | `Q` 2, 4, 4, 4 (≤ 32, program D7.2) | idle 0.1, 100, 1e5, 1e8 | 1000, 3e5, 4.3e8, 1.9e11 | 100, 1.2e5, 1.5e9, 7.7e12 |
-| `ram` | SDRAM, DDR, DDR2, DDR3, DDR4, DDR5 (per module) | `memController`, `ddr`, `ddr2`, `ddr3`, `ddr4`, `ddr5` | RAM ladder §12.1; bandwidth 1.5×; L1–36, registered ECC capacity ×2 | bits 64, 128, 2^20, 2^30, 2^32, 2^38 | bit/s 16, 32, 3.2e4, 6.4e7, 2.56e8, 1.28e11 | hardware energy ratio §9.1; native 10, 10, 6, 3, 3, 2 | 3e5, 4.5e5, 5e6, 3e10, 5e10, 5e13 | 12, 12, 1.2e5, 1.5e9, 1.5e9, 7.7e12; 1.7× per level |
-| `gpu` | 216 GSMT models, displayed generations 1..9 | `systemBoard`, then `gpuGen2` through `gpuGen9` | model + 0..5 hot upgrades | cores × actual clock | model VRAM × hot upgrades × `vramMult` | model coefficient and split idle, §9.1 | exact catalog price, §12.6 | `ceil(P * 3^u / 10)` |
+| `ram` | SDRAM, DDR, DDR2, DDR3, DDR4, DDR5 (per module) | `systemBoard`, `ddr`, `ddr2`, `ddr3`, `ddr4`, `ddr5` | RAM ladder §12.1; bandwidth 1.5×; L1–36, registered ECC capacity ×2 | bits 256, 512, 2^20, 2^30, 2^32, 2^38 | bit/s 16, 32, 3.2e4, 6.4e7, 2.56e8, 1.28e11 | hardware energy ratio §9.1; native 10, 10, 6, 3, 3, 2 | 3e5, 4.5e5, 5e6, 3e10, 5e10, 5e13 | 12, 12, 1.2e5, 1.5e9, 1.5e9, 7.7e12; 1.7× per level |
+| `gpu` | GSMT generation/type/tier, generations 1..9 | `systemBoard`, then `gpuGen2` through `gpuGen9` | tiers 30→50→60→70→80→90 | cores × tier clock | model VRAM × `vramMult` | tier/model coefficient, §12.6 | exact card value, §12.6 | difference of rounded card values |
 | `npu` | Four explicit legacy rows, g0..3 | `systemBoard`; plus `gpuGen2` / `tensorCores` / `matrixGpu` for g1/2/3 | flow, L1..11+g | ops/s 32, 64000, 128000000, 256000000000 | VRAM bits 64, 524288, 1073741824, 549755813888, × `vramMult` | 0.125 W per op/s, legacy curve | 3000000, 7500000, 45000000000, 75000000000000 | 12, 120000, 1500000000, 7700000000000 |
-| `storage` | HDD, SSD, NVMe, SCM (per drive): the disk tier (D26) | `systemBoard`, `ssd`, `nvme`, `scm` | flow | bits 2048, 2^24, 2^34, 2^44 | IO bit/s 1, 2,000, 1.6e7, 6.4e10 (D26.2 re-base; were 16, 3.2e4, 6.4e7, 1.28e11) | drive 1 W per bit/s | 2e6, 5e6, 3e10, 5e13 | 12, 1.2e5, 1.5e9, 7.7e12 |
+| `storage` | HDD, SSD, NVMe, SCM (per drive): the disk tier (D26) | `systemBoard`, `ssd`, `nvme`, `scm` | flow; capacity and IO 2× per level | bits 2048, 2^24, 2^34, 2^44 | IO bit/s 512, 2,000, 1.6e7, 6.4e10 | drive 1 W per bit/s | 3e5, 5e6, 3e10, 5e13 | 12, 1.2e5, 1.5e9, 7.7e12 |
 | `psu` | Bench, 80 Plus, Bronze, Gold, Platinum, Titanium | `systemBoard`, `psu80`, `psuBronze`, `psuGold`, `psuPlatinum`, `psuTitanium` | flow | W 256, 1024, 1e5, 4e5, 2e8, 4e11 | — | supply (loss only) | 1000, 1e5, 1e6, 3e6, 1e10, 1e13 | 12, 12, 1.2e5, 1.2e5, 1.5e9, 7.7e12 |
 
 - GPU tensor technology grants factor 4 to displayed generations 4+ with `tensorCores`, or factor 8 to generations 6+ with `matrixGpu`, replacing 4. NPU tensor factors are its own fixed 1, 1, 4, 8. No new NPU generations or GPU parity follow from the nine-model-generation ladder.
@@ -1651,7 +1666,7 @@ const upgradePrice = (r: PartRow, g: number, L: number, lanes = 1) =>
 |---|---|
 | `tickMs` | 100 **(s)** |
 | `headSeconds` | 10: the head must be taken by the end of tick `headTick + 99` |
-| `bootSeconds` (online and offline transitions, mid-round add, cold change, supply reboot, crash minimum) | 10 at base; lowered by `fastBoot` (5 s, then 2 s) |
+| `bootSeconds` (online and offline transitions, mid-round add, cold change, supply reboot, crash minimum) | 10 s at base; Boot loader levels 1-36 use `(946 - 26 * level) / 100` s, rounded to the nearest simulation tick (9.2 s at level 1, 0.1 s at level 36). |
 | `slaThreshold` | 0.80 |
 | `slaGrace` (G) | 10 × the largest of the five opening tasks' work **(s)** |
 | `overloadFailSeconds` | 10 |
@@ -1685,7 +1700,7 @@ const upgradePrice = (r: PartRow, g: number, L: number, lanes = 1) =>
 | `dataRatio` | 10 to 100 Credits per Data, per family (`docs/tasks.md`) |
 | `smtShare` | 0.6 |
 | `socketSpanRamFactor` | 0.5 |
-| `cStates` (factor / after / wake) | C1 0.5 / 0 / 0; C3 0.15 / 1 / 0.2; C6 0.02 / 1 / 1 s |
+| C-state factor / after / wake | `(74 - 2 * level) / 100` / 0 / 0; levels 1-36 |
 | `packageIdleFactor` | 0.2 |
 | `s3` (after / factor / wake) | 10 s / 0.03 / 2 s |
 | `dvfs` (clock / load) | 0.5 / 0.3 |
@@ -1697,11 +1712,11 @@ const upgradePrice = (r: PartRow, g: number, L: number, lanes = 1) =>
 | `mlfqAgingSeconds` | 3 |
 | `cutThroughPerHopSeconds` | 0.001 |
 | `ioConcurrency` | 1; 4 with `ncq` |
-| Cache-tier traffic cost | 0 s: cache serves at core speed (D26.2) |
-| Drive IO at L1 (D26.2) | HDD 1, SSD 2,000, NVMe 1.6e7, SCM 6.4e10 bit/s: 1/16, 1/16, 1/4 and 1/2 of their era's RAM bandwidth **(s)** |
+| Cache-tier loading and traffic | 1 CPU op per bit on the shard's assigned threads (D46) |
+| Drive IO at L1 | HDD 512, SSD 2,000, NVMe 1.6e7, SCM 6.4e10 bit/s **(s)**; each drive level doubles its IO rate |
 | Completion windows (D26.5) | `rackDist` 120 s, `roomDist` 180 s, `multiAz` 240 s, `region` 120 s, Exchange Feed 60 s, × size jitter **(s)** |
 | `eccPriceFactor`, `eccWattsFactor` | 1.25, 1.1 |
-| `lowVoltRamFactor` | 0.7 |
+| Memory voltage factor | `(74 - 2 * level) / 100`, levels 1-36 |
 | `extraUnitGrowth`, `extraCoreGrowth` | 1.25, 1.65 **(s)** |
 | `autoReturnDelaySeconds` | 120; 15 with `cronTuning` |
 | `offlineCapHours` | 8; then 12, 24 and 48 by research (D1.10, D19.3) |
@@ -1769,7 +1784,7 @@ Points where this spec differs from the research doc, and what the research doc 
 |---|---|---|---|
 | Cooling generations (program D1.11) | Rack: Air `rack`, Water `rackWater` (gen 1). Room: 3 generations. | Rack: 2 air + 2 water generations; `rackWater` is gen 2. Room: 2 air, 2 water, 2 closed loop. | Add nodes `rackAir2`, `rackWater2`, `roomAir2`, `chilledWater2`, `closedLoop2`; renumber `rackWater` to gen 2, `closedLoop` to gen 4. |
 | GPU progression and VRAM | Nine `gpuGen` nodes; separate tensor technology and total VRAM multipliers. | Accepted GSMT catalog, core/VRAM gates and runtime domains, §§6, 12.6. | Regenerate tree and fees from the research appendix; no separate VRAM part. |
-| `fastBoot` (D1.8) | One step, 10 s → 5 s, pending approval. | One `bootSeconds` for transitions, adds, cold changes, reboots and crash minimum; 10 → 5 → 2 s. | Mark approved; add a second node for 2 s. |
+| Boot loader (D45) | One repeatable entry, 36 levels. | One boot latency for transitions, adds, cold changes, reboots and crash minimum. | Uses the CPU CSV effects and the D45 purchase prices. |
 | Base router (D1.5) | Base is round robin, blind to state and full queues. | Base is `firstFit` at every scope; it already skips full, booting, crashed and offline units. | Add a `roundRobin` strategy node. Update the "Base behavior" table. `lbHealth` and `binPacking` keep the research doc's definitions (D4.4); §8.3 and §8.4 follow them. |
 | Offline cap (D1.10, D19.3) | Fixed at 8 h. | 8 → 12 → 24 → 48 h by research (`offline12`, `offline24`, `offline48`). | Add two nodes with an `offlineCap` rule (suggest `cronTuning` and `researchQueue` as hosts, as the research doc proposed). |
 | `lbCapability` | Checks "threads". | `threads` is gone (D25.3); the grain is never a gate (§6.3). | Done under D25. |

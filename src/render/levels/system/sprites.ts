@@ -85,8 +85,15 @@ export function drawGpuSlot(g: G, f: Rect): void {
   R(g, f.x + f.w - 8, y - 4, 3, 6, P.steelLo);
 }
 /** A GPU card lying flat over its slot: passive fins, one VRAM pair per level, a strip lit on GPU stages. */
-export function drawGpuCard(g: G, f: Rect, level: number, on: boolean, colour: string): void {
-  const n = Math.min(4, Math.max(1, level));
+/**
+ * One memory chip per GPU tier (tier 30 = 1 … tier 90 = 6; an NPU, per level up to 6). `busy` is the card's real
+ * duty last tick: that share of its chips lights, so a bigger or busier card visibly lights more.
+ */
+function chipRow(g: G, x: number, y: number, w: number, level: number, busy: number, colour: string, h: number): void {
+  const n = Math.min(6, Math.max(1, level)), pitch = Math.max(3, Math.min(8, Math.floor((w - 4) / n))), lit = Math.round(Math.max(0, Math.min(1, busy)) * n);
+  for (let i = 0; i < n; i++) { R(g, x + 3 + i * pitch, y + 1, pitch - 2, h, P.ink); R(g, x + 4 + i * pitch, y + 2, Math.max(1, pitch - 4), 1, i < lit ? colour : '#3d3858'); }
+}
+export function drawGpuCard(g: G, f: Rect, level: number, on: boolean, colour: string, busy = 0): void {
   R(g, f.x + 4, f.y + 1, f.w - 8, 2, SLOT);
   const t = prism(g, f.x + 1, f.y + 6, f.w - 2, f.h - 9, 6, { top: '#3f3a5a', front: '#24203a' });
   const tx = t.x, ty = t.y, tw = t.w, th = t.h;
@@ -94,7 +101,7 @@ export function drawGpuCard(g: G, f: Rect, level: number, on: boolean, colour: s
   R(g, tx + tw - 10, ty + 3, 7, th - 5, P.steelLo); R(g, tx + tw - 9, ty + 4, 5, 1, P.steel);
   R(g, tx + 2, ty + 1, tw - 4, 1, on ? colour : mix(colour, P.ink, 0.55));
   const fy = ty + th;
-  for (let i = 0; i < n; i++) { R(g, tx + 3 + i * 8, fy + 1, 6, 3, P.ink); R(g, tx + 4 + i * 8, fy + 2, 4, 1, '#3d3858'); }
+  chipRow(g, tx, fy, tw, level, busy, colour, 3);
   R(g, tx + 2, fy + 4, tw - 4, 1, on ? colour : mix(colour, P.ink, 0.6));
   if (on) bloom(g, tx, ty, tw, th + 6, colour, 0.18 / 0.35);
 }
@@ -105,14 +112,13 @@ export function drawModuleEmpty(g: G, f: Rect): void {
   for (const [x, y] of [[f.x + 2, f.y - 3], [f.x + f.w - 4, f.y - 3], [f.x + 2, f.y + f.h - 6], [f.x + f.w - 4, f.y + f.h - 6]] as const) R(g, x, y, 2, 2, P.steelLo);
 }
 /** Baseboard module with its passive heatsink; HBM stacks by level; the bar lights on GPU stages. */
-export function drawModule(g: G, f: Rect, level: number, on: boolean, colour: string): void {
-  const n = Math.min(4, Math.max(1, level));
+export function drawModule(g: G, f: Rect, level: number, on: boolean, colour: string, busy = 0): void {
   const t = prism(g, f.x, f.y, f.w, f.h - 6, 6, { top: '#3f3a5a', front: '#24203a' });
   const tx = t.x, ty = t.y, tw = t.w, th = t.h;
   for (let x = tx + 2; x < tx + tw - 2; x += 2) R(g, x, ty + 6, 1, th - 9, '#2b2742');
   R(g, tx + 2, ty + 2, tw - 4, 2, on ? colour : mix(colour, P.ink, 0.55));
   const fy = ty + th;
-  for (let i = 0; i < n; i++) R(g, tx + 3 + i * 7, fy + 1, 5, 2, P.ink);
+  chipRow(g, tx, fy, tw, level, busy, colour, 2);
   R(g, tx + 2, fy + 4, tw - 4, 1, on ? colour : mix(colour, P.ink, 0.6));
   if (on) bloom(g, tx, ty, tw, th + 6, colour, 0.18 / 0.35);
 }
@@ -150,7 +156,7 @@ export function drawM2(g: G, f: Rect, level: number, on: boolean): void {
 
 /** Installed and empty sprites per board style. */
 export function drawRamPart(g: G, b: BoardLayout, f: Rect, level: number, on: boolean): void { (b.dimm === 'h' ? drawDimm : drawDimmV)(g, f, level, on); }
-export function drawGpuPart(g: G, b: BoardLayout, f: Rect, level: number, on: boolean, colour: string): void { (b.dimm === 'h' ? drawGpuCard : drawModule)(g, f, level, on, colour); }
+export function drawGpuPart(g: G, b: BoardLayout, f: Rect, level: number, on: boolean, colour: string, busy = 0): void { (b.dimm === 'h' ? drawGpuCard : drawModule)(g, f, level, on, colour, busy); }
 export function drawDrivePart(g: G, b: BoardLayout, f: Rect, level: number, on: boolean): void { (b.dimm === 'h' ? drawDrive : drawM2)(g, f, level, on); }
 export function drawEmptySite(g: G, b: BoardLayout, type: 'cpu' | 'ram' | 'gpu' | 'drive', f: Rect): void {
   if (type === 'cpu') drawSocketEmpty(g, f);

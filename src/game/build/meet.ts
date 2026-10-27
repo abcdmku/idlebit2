@@ -10,6 +10,7 @@ import { planAdd, planReplace, planUpgradeTo } from './partPlans';
 import { planInstallGpu } from './gpuPlans';
 import { fail, type Plan } from './plan';
 import { newestGen } from './research/unlocks';
+import { planRamEcc } from './eccPlans';
 
 /**
  * The "meet" quote (a blocked task's "Buy X" key): for each component the task gates on and the system
@@ -80,19 +81,22 @@ export function meetLines(state: GameState, system: SystemId, need: MeetNeed): M
     }
     out.push(add('drive'));
   }
-  if (need.ecc && c.ecc[system] !== 1) out.push(add('ram', true));
+  if (need.ecc && c.ecc[system] !== 1) out.push(spec.ram.length
+    ? { action: { type: 'convertRamToEcc', system }, plan: planRamEcc(state, system) }
+    : add('ram', true));
   if (need.cores !== undefined && c.cores[system]! < need.cores) out.push(add('core'));
   // GPU: the cheapest model with the VRAM and cores, among researched generations (else the first one that has them, locked).
-  if ((need.vramBits !== undefined && c.vram[system]! < need.vramBits) || (need.gpuCores !== undefined && need.gpuCores > 0 && !spec.accels.some((a) => a.kind === 'gpu' && evaluateGpu(a.model, a.upgrades).cores >= need.gpuCores!))) {
+  if ((need.vramBits !== undefined && c.vram[system]! < need.vramBits) || (need.gpuCores !== undefined && need.gpuCores > 0 && !spec.accels.some((a) => a.kind === 'gpu' && evaluateGpu(a.model).cores >= need.gpuCores!))) {
     const fits = GPU_MODEL_IDS.filter((m) => {
-      const st = evaluateGpu(m, 0);
+      const st = evaluateGpu(m);
       return st.vramBits >= (need.vramBits ?? 0) && st.cores >= (need.gpuCores ?? 0);
     });
-    const plans = fits.map((model) => ({ model, plan: planInstallGpu(state, system, model, null) }));
+    const slots = [null, ...spec.accels.map((_, index) => index)];
+    const plans = fits.flatMap(model => slots.map(index => ({ model, index, plan: planInstallGpu(state, system, model, index) })));
     const open = plans.filter((p) => p.plan.ok).sort((a, b) => Number(a.plan.ok && b.plan.ok ? a.plan.change.price - b.plan.change.price : 0n));
     const pick = open[0] ?? plans.sort((a, b) => (gpuModel(a.model)!.generation - gpuModel(b.model)!.generation))[0];
-    out.push(pick ? { action: { type: 'installGpu', system, model: pick.model, index: null }, plan: pick.plan }
-      : { action: { type: 'installGpu', system, model: GPU_MODEL_IDS[0]!, index: null }, plan: fail('cap', 'No GPU has that much') });
+    out.push(pick ? { action: { type: 'installGpu', system, model: pick.model, index: pick.index }, plan: pick.plan }
+      : { action: { type: 'installGpu', system, model: GPU_MODEL_IDS[0]!, index: null }, plan: fail('cap', 'No GPU is big enough') });
   }
   return out;
 }

@@ -14,8 +14,30 @@ import { newestGen } from './research/unlocks';
 import { planAddRow, planAddUnit, regionOpen } from './units';
 import { boardLimit } from './partPlans';
 import { planInstallGpu } from './gpuPlans';
+import { gpuAtGeneration } from './catalog/gpuModels';
 import { installedGpuStats } from './gpu';
 import type { GpuModelId } from '../types/gpu';
+
+function chipTray(state: GameState, id: SystemId): Item[] {
+  const unit = { kind: 'system' as const, id };
+  const cpu = state.build.systems[id]?.spec.cpu;
+  const at = (slot: PartRef['slot']): PartRef => ({ unit, slot });
+  const coreGen = cpu?.cores[0]?.gen ?? 0;
+  const core: Item = { action: { type: 'addPart', system: id, kind: 'core', generation: coreGen }, plan: planAdd(state, id, 'core', coreGen), capText: 'Core limit reached' };
+  // The cache item: the cheapest upgrade of a built cache, or adding an unbuilt L2 / L3 once researched (their chip slots).
+  const adds: Option[] = cpu ? (['l2', 'l3'] as const).filter((k) => !cpu[k]).map((kind): Option => {
+    const g = Math.max(0, newestGen(state.research.unlocks, kind, PARTS[kind].base.length));
+    return [{ type: 'addPart', system: id, kind, generation: g }, planAdd(state, id, kind, g)];
+  }) : [];
+  const caches = [...cheapest(state, (['l1', 'l2', 'l3'] as const).filter((k) => cpu?.[k]).map((kind) => at({ kind, socket: 0 }))), ...adds]
+    .sort(([, x], [, y]) => Number((x.ok ? 0n : 1n) - (y.ok ? 0n : 1n)) || Number((planPrice(x) ?? 0n) - (planPrice(y) ?? 0n)));
+  const sched = state.build.systems[id]?.spec.scheduler;
+  const sg = Math.max(0, newestGen(state.research.unlocks, 'scheduler', 4));
+  const scheduler: Option[] = sched ? [upgrade(state, at({ kind: 'scheduler' }))] : [[{ type: 'addPart', system: id, kind: 'scheduler', generation: sg }, planAdd(state, id, 'scheduler', sg)]];
+  const fallback: GameAction = { type: 'upgradePart', part: at({ kind: 'clock', socket: 0 }) };
+  // D34: an installed core has no upgrade of its own (the clock is the speed upgrade).
+  return [core, best(caches, fallback), best([upgrade(state, at({ kind: 'clock', socket: 0 }))], fallback), best(scheduler, fallback)];
+}
 
 /*
  * The build tray: 4 primary quotes per level (R13).
@@ -50,31 +72,10 @@ function addOrUpgrade(state: GameState, system: SystemId, kind: 'ram' | 'drive',
     .sort(([, x], [, y]) => Number((x.ok ? 0n : 1n) - (y.ok ? 0n : 1n)) || Number((planPrice(x) ?? 0n) - (planPrice(y) ?? 0n)));
 }
 
-function chipTray(state: GameState, id: SystemId): Item[] {
-  const unit = { kind: 'system' as const, id };
-  const cpu = state.build.systems[id]?.spec.cpu;
-  const at = (slot: PartRef['slot']): PartRef => ({ unit, slot });
-  const coreGen = cpu?.cores[0]?.gen ?? 0;
-  const core: Item = { action: { type: 'addPart', system: id, kind: 'core', generation: coreGen }, plan: planAdd(state, id, 'core', coreGen), capText: 'Core limit reached' };
-  // The cache item: the cheapest upgrade of a built cache, or adding an unbuilt L2 / L3 once researched (their chip slots).
-  const adds: Option[] = cpu ? (['l2', 'l3'] as const).filter((k) => !cpu[k]).map((kind): Option => {
-    const g = Math.max(0, newestGen(state.research.unlocks, kind, PARTS[kind].base.length));
-    return [{ type: 'addPart', system: id, kind, generation: g }, planAdd(state, id, kind, g)];
-  }) : [];
-  const caches = [...cheapest(state, (['l1', 'l2', 'l3'] as const).filter((k) => cpu?.[k]).map((kind) => at({ kind, socket: 0 }))), ...adds]
-    .sort(([, x], [, y]) => Number((x.ok ? 0n : 1n) - (y.ok ? 0n : 1n)) || Number((planPrice(x) ?? 0n) - (planPrice(y) ?? 0n)));
-  const sched = state.build.systems[id]?.spec.scheduler;
-  const sg = Math.max(0, newestGen(state.research.unlocks, 'scheduler', 4));
-  const scheduler: Option[] = sched ? [upgrade(state, at({ kind: 'scheduler' }))] : [[{ type: 'addPart', system: id, kind: 'scheduler', generation: sg }, planAdd(state, id, 'scheduler', sg)]];
-  const fallback: GameAction = { type: 'upgradePart', part: at({ kind: 'clock', socket: 0 }) };
-  // D34: an installed core has no upgrade of its own (the clock is the speed upgrade).
-  return [core, best(caches, fallback), best([upgrade(state, at({ kind: 'clock', socket: 0 }))], fallback), best(scheduler, fallback)];
-}
-
 /**
- * The GPU item. With no card, the newest generation's entry card. With cards (QA-15), the installed
- * card's next step first: the cheapest card upgrade, or that entry card in place of the weakest card
- * only when it is faster (R44: never a downgrade); then, with a free bay, adding the entry card; else Max.
+ * The GPU item. With no card, the newest generation's entry card. With cards (QA-15), the cheapest next
+ * step: a card's tier up, the weakest card moved to the newest generation at its own type and tier, or,
+ * with a free bay, adding the entry card; else Max.
  */
 function gpuItem(state: GameState, id: SystemId): Item {
   const spec = state.build.systems[id]!.spec, u = state.research.unlocks;
@@ -90,7 +91,8 @@ function gpuItem(state: GameState, id: SystemId): Item {
     const rate = installedGpuStats(c.card, u).opsPerS;
     if (rate < weakRate) { weakest = c; weakRate = rate; }
   }
-  if (installedGpuStats({ kind: 'gpu', model, upgrades: 0 }, u).opsPerS > weakRate) options.push(install(weakest.index));
+  const later = gpuAtGeneration(weakest.card.model, generation);
+  if (later) options.push([{ type: 'installGpu', system: id, model: later, index: weakest.index }, planInstallGpu(state, id, later, weakest.index)]);
   if (freeBay) options.push(install(null));
   return best(options, { type: 'installGpu', system: id, model, index: weakest.index });
 }
@@ -123,11 +125,11 @@ function globalTray(state: GameState): Item[] {
   const u = state.research.unlocks;
   const free = REGION_IDS.findIndex((r) => regionOpen(u, r) && !b.sites.some((s) => s?.region === r));
   const region = free < 0 ? REGION_IDS.findIndex((r) => !b.sites.some((s) => s?.region === r)) : free;
-  const site: Option[] = region < 0 ? [] : [[{ type: 'addUnit', parent: { kind: 'global' }, slot: region, source: { kind: 'barebones', tier: 0 } }, planAddUnit(state, { kind: 'global' }, region, { kind: 'barebones', tier: 0 })]];
+  const site: Option[] = region < 0 ? [] : [[{ type: 'addUnit', parent: { kind: 'global' }, slot: region, source: { kind: 'barebones' } }, planAddUnit(state, { kind: 'global' }, region, { kind: 'barebones' })]];
   const scheduler = [upgrade(state, { unit: { kind: 'global' }, slot: { kind: 'globalScheduler' } })];
   const home = b.sites[0];
   const z = home ? home.zones.findIndex((x) => x === null) : -1;
-  const zone: Option[] = home && z >= 0 ? [[{ type: 'addUnit', parent: { kind: 'site', id: home.id }, slot: z, source: { kind: 'barebones', tier: 0 } }, planAddUnit(state, { kind: 'site', id: home.id }, z, { kind: 'barebones', tier: 0 })]] : [];
+  const zone: Option[] = home && z >= 0 ? [[{ type: 'addUnit', parent: { kind: 'site', id: home.id }, slot: z, source: { kind: 'barebones' } }, planAddUnit(state, { kind: 'site', id: home.id }, z, { kind: 'barebones' })]] : [];
   const fallback: GameAction = scheduler[0]![0];
   return [best(site, fallback), best(backboneOptions(state), fallback), best(scheduler, fallback), best(zone, fallback)];
 }

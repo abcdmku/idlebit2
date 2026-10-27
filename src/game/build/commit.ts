@@ -52,7 +52,8 @@ function inventoryChanges(before: BuildState, change: BuildChange): { changed: n
     if (have === want) continue;
     const moved = have.some((card, slot) => {
       const next = want[slot];
-      return card.kind === 'gpu' ? next?.kind !== 'gpu' || card.model !== next.model
+      // A tier step keeps the card (same generation and type); only its specs change.
+      return card.kind === 'gpu' ? next?.kind !== 'gpu' || card.model.slice(0, 2) !== next.model.slice(0, 2)
         : next?.kind !== 'npu' || card.gen !== next.gen;
     });
     if (moved || have.length > want.length) { changed.add(s); kill.add(s); }
@@ -111,6 +112,3 @@ export function commitBuild(state: GameState, change: BuildChange): ActionOutcom
   reconcileAccelerators(w, state.compiled, inventoryChangedSystems);
   return { ok: true, state: commitWorld(after, w, state.clock.carryMs) };
 }
-
-/** A free, hot change of build (strategies, filters, setpoints, switches). */
-export const commitHot = (state: GameState, build: BuildState): ActionOutcome => commitBuild(state, { build, price: 0n });

@@ -24,9 +24,9 @@ export const QUEUE_MAX = 32;
 const lockText = (q: Quote | undefined) => (q?.locked ? q.locked.text : null);
 
 export function lbLines(view: LbView, child: LbChild): Line[] {
-  const s = ROUTE_NAMES[view.strategy], Child = child[0].toUpperCase() + child.slice(1);
-  const lines: Line[] = [{ text: view.strategy === 'firstFit' ? `${Child} 1 first; if full, ${child} 2, and so on.` : s.note, tone: 'ben' }];
-  if (s.blind && !view.filters.includes('capability')) lines.push({ text: `Capability-blind: a task can land on a ${child} that cannot run it`, tone: 'warn' });
+  const s = ROUTE_NAMES[view.strategy];
+  const lines: Line[] = [];
+  if (s.blind && !view.filters.includes('capability')) lines.push({ text: `Can send tasks to a ${child} that can't run them`, tone: 'warn' });
   else if (view.misroutesThisRound > 0) lines.push({ text: `${view.misroutesThisRound} misrouted this round`, tone: 'warn' });
   return lines;
 }
@@ -40,7 +40,7 @@ export function LbQueue({ view }: { view: LbView }) {
   // D26.5: a queued task's completion window runs from take; the soonest one due is what matters.
   const due = q.entries.reduce<number | null>((m, e) => (e.windowEndTick === null ? m : m === null ? e.windowEndTick : Math.min(m, e.windowEndTick)), null);
   return <div className="lb-queue" data-testid="lb-queue">
-    <span className="k">Queue</span><b className="v">{used}/{q.slots}</b><span className="mute">L{q.level}/{QUEUE_MAX}</span>
+    <span className="k">Queue</span><b className="v">{used}/{q.slots}</b>
     <span className="lb-wells" aria-label={`${used} of ${q.slots} queue slots used`}>
       {Array.from({ length: q.slots }, (_, i) => {
         const e = q.entries[i];
@@ -79,17 +79,18 @@ export function LbBody({ unit, view, quotes, queueQuote, onAction, onResearch, r
   return <>
     <LbQueue view={view} />
     <div className="keys">
-      {queueQuote && <QuoteKey quote={queueQuote} label={max ? `Queue ${level} · max` : `Queue ${level} → ${level + 1}`}
+      {queueQuote && !max && <QuoteKey quote={queueQuote} label={max ? `Queue ${level} · max` : `Queue ${level} → ${level + 1}`}
         onAction={(q) => onAction(q.action)} onResearch={onResearch} researchName={researchName} />}
-      {capacity && <QuoteKey quote={capacity} label={`Capacity${capacity.effect ? ` · ${Math.round(capacity.effect.capacityAfter)} a second` : ''}`} onAction={(q) => onAction(q.action)} onResearch={onResearch} researchName={researchName} />}
+      {capacity && capacity.locked?.code !== 'ceiling' && <QuoteKey quote={capacity} label={`Capacity${capacity.effect ? ` · ${Math.round(capacity.effect.capacityAfter)}/s` : ''}`} onAction={(q) => onAction(q.action)} onResearch={onResearch} researchName={researchName} />}
     </div>
-    <Choices rows={rows} label="Routing" onPick={pick} />
+    <section className="plate-section"><p className="cfg-lab">Strategy</p><Choices rows={rows.filter(r => r.id.startsWith('s:'))} label="Strategy" onPick={pick} /></section>
+    <section className="plate-section"><p className="cfg-lab">Filters</p><Choices rows={rows.filter(r => r.id.startsWith('f:'))} label="Filters" onPick={pick} /></section>
   </>;
 }
 
 /** Load balancers have no routing capacity (D12.5); the plate reports routes taken. */
 export function lbStatus(view: LbView) {
-  return { text: `${Math.round(view.routedPerSec)} routing decisions a second`, progress: view.routedPerSec > 0 ? 1 : 0 };
+  return { text: `${Math.round(view.routedPerSec)} routed/s`, progress: null };
 }
 
 export interface LbPlateProps extends PlateCommon { unit: ScopeRef; view: LbView; child?: LbChild; title?: string; queueQuote?: Quote | null; children?: ReactNode }
@@ -97,9 +98,9 @@ export interface LbPlateProps extends PlateCommon { unit: ScopeRef; view: LbView
 /** The rack load balancer plate (mockup rack/econ.js lbSpec): its strategy, filters and queue. */
 export function LbPlate({ unit, view, child = 'server', title = 'Load balancer', queueQuote, quotes, onAction, onResearch, researchName, children, ...frame }: LbPlateProps) {
   const st = lbStatus(view);
-  return <PlateFrame {...frame} title={title} sub={`${ROUTE_NAMES[view.strategy].name} · queue ${view.queue.level}/${QUEUE_MAX}`} className="lb">
+  return <PlateFrame {...frame} title={title} sub={ROUTE_NAMES[view.strategy].name} className="lb">
     <Status text={st.text} progress={st.progress} />
-    <Lines lines={lbLines(view, child)} slots={2} />
+    <Lines lines={lbLines(view, child)} slots={1} />
     <LbBody unit={unit} view={view} child={child} quotes={quotes} queueQuote={queueQuote}
       onAction={onAction} onResearch={onResearch} researchName={researchName} />
     {children}

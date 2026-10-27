@@ -16,6 +16,14 @@ const rackPan: PanTarget = {
   scrollTo: x => { rackRowScroll.scrollTo(x); }, scrollBy: dx => { rackRowScroll.scrollBy(dx); },
   setDragging: on => rackRowScroll.setDragging(on), release: vx => { rackRowScroll.release(vx); },
 };
+/** A rack row whose cabinet is taller than the view: the row sideways (A06), the cabinet's rest pan up and down. */
+const rackRestPan: PanTarget = {
+  get x() { return rackRowScroll.offset; }, get y() { return restPan.y; }, get scale() { return rackRowScroll.scale; },
+  scrollTo: (x, y) => { rackRowScroll.scrollTo(x); restPan.scrollTo(restPan.x, y); },
+  scrollBy: (dx, dy) => { rackRowScroll.scrollBy(dx); restPan.scrollBy(0, dy); },
+  setDragging: on => { rackRowScroll.setDragging(on); restPan.setDragging(on); },
+  release: (vx, vy) => { rackRowScroll.release(vx); restPan.release(0, vy); },
+};
 import { activateTarget, zoomGesture } from './input/commands';
 import { bindGestures, type PanHandler } from './input/gestures';
 import { useLayout } from './shell/geometry';
@@ -68,7 +76,7 @@ export function CanvasWorld() {
       const snapshot = store.getSnapshot(), nowS = now / 1000;
       if (snapshot !== published) { published = snapshot; publishedAt = now; }
       const since = now - publishedAt, live = snapshot.simTimeMs + Math.max(0, Math.min(MAX_EXTRAPOLATION_MS, since));
-      if (snapshot.round.state === 'running') pausedAt = null; else pausedAt ??= live;
+      if (snapshot.round.state === 'running' || (snapshot.feed.research?.running && snapshot.feed.research.opsPerSec > 0)) pausedAt = null; else pausedAt ??= live;
       const drawable = registry.has(snapshot.focus.level) && (!snapshot.partner || registry.has(snapshot.partner.level));
       if (drawable) { renderer.draw(snapshot, present(view.getState()), { nowS, sincePublishMs: since }); surface.drawCount++; }
       view.settle(drawable && renderer.transition !== null);
@@ -82,7 +90,7 @@ export function CanvasWorld() {
     let x0 = 0, y0 = 0, quiet: ReturnType<typeof setTimeout> | undefined, held: PanTarget | null = null, wheeling: PanTarget | null = null;
     const target = (): PanTarget | null => {
       const kind = panKind(store.getSnapshot().focus, restPan.active, !!view.getState().partner);
-      return kind === 'rack' ? rackPan : kind === 'rest' ? restPan : null;
+      return kind === 'rack' ? rackPan : kind === 'rackRest' ? rackRestPan : kind === 'rest' ? restPan : null;
     };
     const pan: PanHandler = {
       active: () => target() !== null,

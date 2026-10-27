@@ -22,11 +22,11 @@ export const PDU: CatalogRow = {
  * whose only effect was routing capacity. Strategies, filters and placements come from research.
  */
 export const LB: CatalogRow = {
-  id: 'lb', scope: 'rack', names: ['Basic LB'], gates: [r('rack')], curve: 'fixed',
+  id: 'lb', scope: 'rack', names: ['Load balancer'], gates: [r('rack')], curve: 'fixed',
   base: [0], watts: { kind: 'idle', idle: [160] }, price: [2.4e6], upgrade: [0],
 };
 export const ROOM_LB: CatalogRow = {
-  id: 'roomLb', scope: 'room', names: ['Room basic LB'], gates: [r('room')], curve: 'fixed',
+  id: 'roomLb', scope: 'room', names: ['Room load balancer'], gates: [r('room')], curve: 'fixed',
   base: [0], watts: { kind: 'idle', idle: [2560] }, price: [9.5e10], upgrade: [0],
 };
 /** Rows: linear, L = rows; 8 rack slots per row. The nth row costs upgradePrice(row, L = n − 1). */

@@ -38,13 +38,13 @@ const CEILING: Readonly<Record<string, ResearchPartId>> = {
 };
 /** Rules: the part whose behaviour they change. */
 const RULE: Readonly<Record<string, ResearchPartId>> = {
-  coreIdle: 'clock', workStealing: 'cores',
+  coreIdle: 'psu', workStealing: 'cores',
   packageIdle: 'cpu', dvfs: 'cpu', turbo: 'cpu', numaAware: 'cpu',
   dma: 'ram', prefetch: 'ram', multiChannel: 'ram', ramWatts: 'ram', hotPages: 'ram', ecc: 'ram',
   tensorRate: 'gpu', vramPerLevel: 'gpu', vramScale: 'gpu', unifiedMemory: 'gpu', gpuLink: 'gpu',
   ncq: 'drive', sharedStorage: 'drive', hotPlug: 'drive',
   powerCap: 'psu', s3Sleep: 'psu',
-  accelBoard: 'board', telemetry: 'board', autoReturn: 'board', autoSkip: 'board', offlineCap: 'board', bootSeconds: 'board',
+  accelBoard: 'board', telemetry: 'board', autoReturn: 'board', offlineCap: 'board', bootSeconds: 'board',
   configSave: 'board', rollingUpgrade: 'board', liveMigration: 'board', hotSwap: 'board', gracefulDrain: 'board',
   cutThrough: 'switch', qos: 'switch',
   shardSteal: 'lb', gather: 'lb', checkpointing: 'lb',

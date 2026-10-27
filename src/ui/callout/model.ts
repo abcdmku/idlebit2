@@ -1,22 +1,11 @@
 // Click to upgrade (D15.4): what a tapped world target offers, and where its callout sits.
 // Desktop docks it in the right gutter with a leader to the part; phone sits it above or below (A07).
-import { LEVEL_NAMES, type LevelSnapshot, type NodeRef, type PartSlotKind, type Quote, type QuoteResult } from '../../game';
+import { LEVEL_NAMES, selectUnitLabel, type GameState, type LevelSnapshot, type NodeRef, type PartSlotKind, type Quote, type QuoteResult } from '../../game';
 import type { HitTarget } from '../../render/core';
-import { rackLetter, regionName, SLOT_TITLE, zoneLetter } from '../plates/copy';
+import { SLOT_TITLE } from '../plates/copy';
 import { changeText, type Offer, type Offers } from '../deck/offers';
 import { isPowerCtl } from '../plates/targets';
-
-
-/** A unit a target opens: "System 1", "Rack B", "AZ a". */
-export function nodeName(ref: NodeRef, focus: LevelSnapshot): string {
-  switch (ref.level) {
-    case 'chip': return 'CPU';
-    case 'system': return `System ${ref.id + 1}`;
-    case 'rack': return `Rack ${rackLetter(ref.id)}`;
-    case 'room': return focus.level === 'global' ? `Room ${ref.id + 1}` : `AZ ${zoneLetter(focus.level === 'room' ? focus.zone : 0)}`;
-    case 'global': return LEVEL_NAMES.global;
-  }
-}
+import { targetUnit } from '../plates/market';
 
 /** What an empty site adds, from the renderer's stable target id, and the deck row that sells it. */
 const SITE_PART: Readonly<Record<string, { label: string; row: string | null }>> = {
@@ -33,21 +22,18 @@ export function slotSite(t: HitTarget, focus: LevelSnapshot): { name: string; ro
 }
 
 /** The board's own labels where they differ from the plate titles (A07). */
-const BOARD_NAME: Partial<Record<PartSlotKind, string>> = { l1: 'Cache', scheduler: 'Queue' };
+const BOARD_NAME: Partial<Record<PartSlotKind, string>> = { l1:'Cache', scheduler: 'Queue' };
 
-export function targetName(t: HitTarget, focus: LevelSnapshot): string {
+export function targetName(t: HitTarget, focus: LevelSnapshot, state: GameState): string {
   if (isPowerCtl(t)) return 'Power control';
-  const site = t.unit?.kind === 'site' && focus.level === 'global' ? focus.sites.find(s => s.siteId === t.unit!.id) : undefined;
-  if (site) return regionName(site.region);
-  if (t.drill && (t.kind === 'child' || t.kind === 'unit')) return nodeName(t.drill, focus);
+  const unit = targetUnit(t);
+  if (unit) return selectUnitLabel(state, unit);
+  if (t.drill && (t.kind === 'child' || t.kind === 'unit')) return LEVEL_NAMES[t.drill.level];
   if (t.kind === 'port') return t.port === -1 ? 'Uplink' : 'Switch';
   if (t.kind === 'slot') return slotSite(t, focus).name;
-  if (t.kind === 'unit' && t.unit) return t.unit.kind === 'system' ? `System ${t.unit.id + 1}` : t.unit.kind === 'rack' ? `Rack ${rackLetter(t.unit.id)}` : 'Unit';
   if (t.part) {
     const k = t.part.slot.kind;
     if (k === 'core') return `Core ${(t.part.slot as { index: number }).index + 1}`;
-    // One cache level reads "Cache", as on the board; several name their level ("L2 cache").
-    if ((k === 'l1' || k === 'l2' || k === 'l3') && focus.level === 'chip' && focus.cache.levels.length > 1) return SLOT_TITLE[k];
     return BOARD_NAME[k] ?? SLOT_TITLE[k];
   }
   return LEVEL_NAMES[t.owner.level];
@@ -80,9 +66,9 @@ export interface CalloutModel {
  * What the callout shows for a target. A part the deck lists reads the deck's own row, so the
  * world and the deck always agree (A08); every other target reads its plate quotes.
  */
-export function calloutModel(t: HitTarget, focus: LevelSnapshot, quotes: QuoteResult | null, offers: Offers | null): CalloutModel {
+export function calloutModel(t: HitTarget, focus: LevelSnapshot, quotes: QuoteResult | null, offers: Offers | null, state: GameState): CalloutModel {
   const kind = t.part?.slot.kind, drill = t.drill;
-  let name = targetName(t, focus), change = '', offer: CalloutModel['offer'] = null;
+  let name = targetName(t, focus, state), change = '', offer: CalloutModel['offer'] = null;
   // An empty site reads as what you'd add there ("Add queue", "Add Core 2", "Add RAM") and its deck row's offer.
   const site = t.kind === 'slot' ? slotSite(t, focus) : null;
   const siteRow = site?.row && offers ? offers.rows.find(r => r.key === site.row && r.quote) ?? null : null;

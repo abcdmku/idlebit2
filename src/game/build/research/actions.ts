@@ -5,6 +5,32 @@ import type { ResearchId } from '../../types/ids';
 import type { GameState, ResearchState } from '../../types/state';
 import { withoutKey } from './projects';
 import { researchDef } from './tree';
+import { deriveUnlocks } from './effects';
+import { compileAll, syncHotSizes } from '../../core/topology';
+import { commitWorld, openWorld } from '../../core/world';
+import { pushEvent } from '../../core/events';
+
+/** Level purchases apply their rule now and leave any processor research running. */
+function purchase(state: GameState, id: ResearchId): ActionOutcome {
+  const def = researchDef(id)!;
+  const lock = researchLock(state.research, id);
+  if (lock) return reject(state, lock.code, lock.reason);
+  const paid = debitCredits(state, def.creditCost);
+  if (!paid.ok) return paid;
+  const completed = [...state.research.completed, id];
+  const research = { ...state.research, completed, unlocks: deriveUnlocks(completed) };
+  const systems = def.purchase?.series === 'cstate' && def.purchase.level === 1
+    ? state.build.systems.map(s => s && ({ ...s, spec: { ...s.spec, settings: { ...s.spec.settings, cStateLimit: 1 as const } } }))
+    : state.build.systems;
+  const build = { ...state.build, systems, revision: state.build.revision + 1 };
+  const compiled = compileAll(build, research);
+  const next = { ...paid.state, research, build, compiled };
+  const w = openWorld(next);
+  syncHotSizes(w.hot, compiled);
+  pushEvent(w, { kind: 'researchCompleted', project: id });
+  w.report.researchCompleted.push(id);
+  return accept(commitWorld(next, w, next.clock.carryMs));
+}
 
 /** Why `id` can't be researched now, or null. Prerequisites may be satisfied by `pending` (active or queued earlier). */
 export function researchLock(r: ResearchState, id: ResearchId, pending: readonly ResearchId[] = []): { code: 'invalid' | 'locked'; reason: string; node: ResearchId | null } | null {
@@ -21,6 +47,7 @@ const solvent = (state: GameState) => amountCompare(state.wallet.credits, 0) >= 
 
 /** Resumes paid progress free; a first start atomically pays Data and its optional Credit fee. */
 function start(state: GameState, id: ResearchId): ActionOutcome {
+  if (researchDef(id)?.purchase) return purchase(state, id);
   const r = state.research;
   if (r.active === id) return accept(state);
   const lock = researchLock(r, id);
@@ -47,6 +74,7 @@ export const researchHandlers: HandlerMap = {
 
   /** Adds a project to the queue (researchQueue ceiling counts active + queued). With nothing active it starts. */
   queueResearch: (state, action) => {
+    if (researchDef(action.project)?.purchase) return purchase(state, action.project);
     const r = state.research;
     const id = action.project;
     if (r.active === id || r.queue.includes(id)) return accept(state);

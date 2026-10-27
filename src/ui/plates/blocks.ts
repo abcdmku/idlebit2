@@ -2,7 +2,7 @@
 
 /** What each board part supplies, as the blocks it clears (QA-21). */
 const PART_BLOCKS: Readonly<Partial<Record<string, readonly string[]>>> = {
-  l1: ['cache'], l2: ['cache'], l3: ['cache'], ram: ['ram'], drive: ['disk'], gpu: ['gpu', 'vram', 'gpuCores'],
+  l1: ['cache'], l2: ['cache'], l3: ['cache'], ram: ['ram', 'ecc'], drive: ['disk'], gpu: ['gpu', 'vram', 'gpuCores'],
 };
 /** Tasks in the visible line waiting on what `part` supplies. */
 export function blockedOn(window: readonly { readonly blockedBy: string | null }[], part: string | undefined): number {
@@ -16,6 +16,6 @@ export function firstBlockedFor<T extends { readonly blockedBy: string | null }>
   return clears ? window.find(t => t.blockedBy !== null && clears.includes(t.blockedBy)) ?? null : null;
 }
 
-/** Two parts supply the same thing (L1 and L2 both hold the working set). */
+/** Parts that supply the same resource. */
 export const sameSupply = (a: string | undefined, b: string | undefined): boolean =>
   !!a && !!b && (a === b || (!!PART_BLOCKS[a] && PART_BLOCKS[a]![0] === PART_BLOCKS[b]?.[0]));

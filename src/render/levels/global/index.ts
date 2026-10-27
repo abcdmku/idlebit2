@@ -32,6 +32,7 @@ function siteRefsOf(id: SiteId): SiteRefs {
 }
 const SCHED: PartRef = { unit: { kind: 'global' }, slot: { kind: 'globalScheduler' } };
 const SITE_IDS = CELLS.map((_, i) => `site${i}`), REGION_IDS_T = CELLS.map((_, i) => `region${i}`), LINK_IDS = CELLS.map((_, i) => `link${i}`);
+const ZONE_IDS = CELLS.map((_, i) => [0, 1, 2].map(z => `zone${i}-${z}`));
 const scratch: Rect = { x: 0, y: 0, w: 0, h: 0 };
 
 export function globalChildren(s: GlobalSnapshot, out: ChildView[]): number {
@@ -57,7 +58,14 @@ export function globalTargets(s: GlobalSnapshot, out: HitTarget[], from: number)
   for (let i = 0; i < s.sites.length && i < CELLS.length; i++) {
     const site = s.sites[i], b = CELLS[i];
     setRect(scratch, b.x + 2, b.y + 2, b.w - 4, SIGN_H);
-    if (site.siteId !== null) { const t = put(SITE_IDS[i], 'unit', scratch); if (t) t.unit = siteRefsOf(site.siteId).unit; }
+    if (site.siteId !== null) {
+      const refs = siteRefsOf(site.siteId), t = put(SITE_IDS[i], 'unit', scratch);
+      if (t) t.unit = refs.unit;
+      for (const zone of site.zones) if (zone.roomId === null && zone.zone < TILES[i].length) {
+        const empty = put(ZONE_IDS[i][zone.zone], 'slot', TILES[i][zone.zone]);
+        if (empty) { empty.unit = refs.unit; empty.slot = zone.zone; }
+      }
+    }
     else if (site.open) { const t = put(REGION_IDS_T[i], 'slot', b); if (t) t.slot = i; }
   }
   for (let i = 0; i < s.backbone.links.length; i++) {

@@ -1,16 +1,22 @@
-import { useCallback, useMemo, useState } from 'react';
-import { researchId, selectResearchTree, selectSavedConfigs, type GameAction, type SupplyView, type LevelSnapshot, type QuoteRequest, type QuoteResult, type ResearchId, type ScopeRef, type UnitRef } from '../../game';
+import { useCallback, useMemo, useRef } from 'react';
+import { REGION_IDS, researchId, selectResearchTree, selectUnitLabel, selectSavedConfigs, type GameAction, type SupplyView, type LevelSnapshot, type Quote, type QuoteRequest, type QuoteResult, type ResearchId, type ScopeRef, type UnitRef } from '../../game';
 import type { HitTarget, Rect } from '../../render/core';
+import type { ShellLayout } from '../layout';
 import { useGameSelector, useQuote, useShell, useViewState } from '../storeHooks';
 import { ConfigPlate } from './ConfigPlate';
 import type { ConfigKind } from './configArt';
 import { CoolerPlate } from './CoolerPlate';
-import { rackLetter, regionName, zoneLetter } from './copy';
+import { regionName, zoneLetter } from './copy';
 import { fahrenheit, percent } from './format';
-import { LbPlate } from './LbPlate';
+import { LbBody, LbPlate } from './LbPlate';
+import { SiteSummary } from './SiteSummary';
 import { SystemSummary } from './SystemSummary';
+import { SystemPower } from './SystemPower';
 import { NetworkRackPlate } from './NetworkRackPlate';
+import { CoresPlate } from './CoresPlate';
 import { PartPlate } from './PartPlate';
+import { LinkPlate } from './LinkPlate';
+import { BoardPartPlate } from './BoardPartPlate';
 import { GpuPlate } from './GpuPlate';
 import { partFacts } from './partFacts';
 import { nextDefaultName, SavePrompt } from './SavePrompt';
@@ -18,7 +24,6 @@ import { SupplyPlate } from './SupplyPlate';
 import { PowerCtlPlate } from './PowerCtlPlate';
 import { PowerKeys } from './PowerKeys';
 import { isPowerCtl } from './targets';
-import { CoresPlate } from './CoresPlate';
 import { blockedOn, firstBlockedFor, sameSupply } from './blocks';
 import { useMeet } from '../queue/meet';
 import { SitePlate } from './SitePlate';
@@ -28,6 +33,7 @@ import { SwitchPlate } from './SwitchPlate';
 import type { PlateCommon } from './types';
 import { ServerPlate, UnitPlate } from './UnitPlate';
 import { marketOf, type MarketState } from './market';
+import { QuoteKey } from './widgets';
 
 /** The unit a level snapshot shows, for configuration-plate parents and online rows. */
 function focusUnit(f: LevelSnapshot): ScopeRef {
@@ -53,10 +59,22 @@ export function plateRequest(t: HitTarget, focus: LevelSnapshot): QuoteRequest |
   if (isPowerCtl(t) && focus.level === 'rack') return { kind: 'power', unit: { kind: 'rack', id: focus.rackId } };
   if (isCores(t)) return null;
   if (t.kind === 'slot' && t.slot !== null) {
+    // A board site quotes its own add: each RAM or drive generation, or a copy of CPU 1 into an empty socket.
+    const board = /^(?:slot-|add:)(ram|drive|cpu)[0-9]*$/.exec(t.id);
+    // An empty RAM or drive site quotes the next module (the sim adds after the last), whichever "+" was tapped; a
+    // filled one (its Add bought) quotes its own module.
+    if (focus.level === 'system' && board) {
+      const n = board[1] === 'ram' ? focus.ram.length : board[1] === 'drive' ? focus.storage.length : focus.cpuCount;
+      const i = board[1] === 'cpu' || t.slot < n ? t.slot : n;
+      return { kind: 'part', part: { unit: { kind: 'system', id: focus.systemId },
+        slot: board[1] === 'cpu' ? { kind: 'cpu', socket: i } : { kind: board[1] as 'ram' | 'drive', index: i } } };
+    }
     if (focus.level === 'chip' || focus.level === 'system') return t.part ? { kind: 'part', part: t.part } : { kind: 'tray', at: t.owner };
     return { kind: 'add', parent: t.unit ?? focusUnit(focus), slot: t.slot };
   }
   if (t.kind === 'port' && t.sw) return { kind: 'switch', sw: t.sw };
+  // A zone's inbound link step.
+  if (isInbound(t)) return { kind: 'inbound', at: t.owner };
   if ((t.kind === 'part' || t.kind === 'link') && t.part) {
     const s = t.part.slot, u = t.part.unit;
     if (s.kind === 'switch' && u.kind === 'rack') return { kind: 'switch', sw: { kind: 'rack', id: u.id } };
@@ -74,6 +92,7 @@ export function plateRequest(t: HitTarget, focus: LevelSnapshot): QuoteRequest |
 
 /** The part a quote buys, by slot kind. */
 const partKindOf = (q: { action: { type: string } }): string | undefined => {
+  if (q.action.type === 'convertRamToEcc') return 'ram';
   const a = q.action as { part?: { slot: { kind: string } }; kind?: string };
   return a.part?.slot.kind ?? a.kind;
 };
@@ -100,8 +119,10 @@ export function hasPlate(t: HitTarget, focus: LevelSnapshot): boolean {
   return !!plateRequest(t, focus) || t.kind === 'unit';
 }
 
-/** The cores are one component (D34, user 26 Oct): the renderer's one `cores` block (its part is core 0's ref). */
-export const isCores = (t: Pick<HitTarget, 'id' | 'part'>) => t.id === 'cores' || t.part?.slot.kind === 'core';
+/** A zone's entry has no part of its own. Server links start at Rack. */
+export const isInbound = (t: Pick<HitTarget, 'kind' | 'id' | 'part'>) => t.kind === 'link' && !t.part && (t.id === 'entry' || t.id === 'pipe');
+
+export const isCores = (t: Pick<HitTarget,'id'|'part'>) => t.id==='cores'||t.part?.slot.kind==='core';
 
 /** The router a target is (D25.7): the rack LB, the room LB in the network rack, or the global scheduler. */
 export function routerOf(t: HitTarget, focus: LevelSnapshot): ScopeRef | null {
@@ -123,19 +144,47 @@ export function gpuPlateSlot(t: HitTarget, focus: LevelSnapshot): number | null 
   return undefined;
 }
 
+/**
+ * Where a plate may sit. A short portrait phone has too little world for a choice plate beside its part, so
+ * there it may also cover the task strip and the deck while it is open; the HUD with the wallet stays clear.
+ */
+export function plateArea(layout: ShellLayout, bounds: Rect | null): Rect | null {
+  if (!bounds || layout.kind !== 'phone') return bounds;
+  // A short landscape (R16): the world is a narrow band right of the strip and deck, so a plate may also cover that
+  // column while open, which leaves room beside its part for the main option; the HUD with the wallet stays clear.
+  if (layout.w >= 640 && layout.h < 480) {
+    const top = layout.band.y + layout.band.h + 8;
+    return { x: 8, y: top, w: layout.w - 16, h: layout.h - 8 - top };
+  }
+  if (layout.h >= 640 || layout.w >= 640) return bounds;
+  const top = layout.band.y + layout.band.h + 8, bottom = layout.h - 8;
+  return { x: bounds.x, y: top, w: bounds.w, h: bottom - top };
+}
+
+/**
+ * Where a phone plate may spill when its head and main option would not fit whole beside its part (R16): first over
+ * the strip and the deck, then over the HUD too. Only such a plate spills; one that fits keeps `plateArea`.
+ */
+export function plateSpill(layout: ShellLayout, area: Rect | null): Rect[] | null {
+  if (!area || layout.kind !== 'phone') return null;
+  const landscape = layout.w >= 640 && layout.h < 480, x = landscape ? 8 : area.x, w = landscape ? layout.w - 16 : area.w;
+  const all = { x, y: 8, w, h: layout.h - 16 };
+  const top = layout.band.y + layout.band.h + 8;
+  return area.y > top ? [{ x, y: top, w, h: layout.h - 8 - top }, all] : [all];
+}
+
 /** The full plate for the selected target: opened from its callout (More), or at once for a save icon. */
 export function PlateLayer() {
   const view = useViewState();
   const t = view.selected;
   const focus = useGameSelector((s) => s.focus);
-  if (!t || (!view.plate && t.kind !== 'save') || focus.level !== t.owner.level) return null;
+  if (view.sheet || !t || (!view.plate && t.kind !== 'save') || focus.level !== t.owner.level) return null;
   return <TargetPlate key={t.id} target={t} focus={focus} />;
 }
 
 function TargetPlate({ target: t, focus }: { target: HitTarget; focus: LevelSnapshot }) {
   const shell = useShell();
   const { surface, view } = shell;
-  const [replaceNpu, setReplaceNpu] = useState(false);
   const bootMs = useGameSelector((s) => s.bootMs);
   const credits = useGameSelector((s) => s.hud.credits, Object.is, 500);
   const quotes = useQuote(plateRequest(t, focus));
@@ -147,16 +196,26 @@ function TargetPlate({ target: t, focus }: { target: HitTarget; focus: LevelSnap
   const netRack = focus.level === 'room' && (t.part?.slot.kind === 'roomSwitch' || (t.kind === 'port' && t.sw?.kind === 'room'));
   const roomLb = useQuote(netRack && focus.level === 'room' ? { kind: 'infra', unit: { kind: 'room', id: focus.roomId }, slot: 'lb' } : null);
   // The router queue's next slot (D25.7) for whichever load balancer this plate shows.
-  const lbUnit = routerOf(t, focus) ?? (netRack && focus.level === 'room' ? { kind: 'room', id: focus.roomId } as const : null);
+  const lbUnit = routerOf(t, focus) ?? (netRack && focus.level === 'room' ? { kind: 'room', id: focus.roomId } as const : null)
+    ?? (t.part?.slot.kind === 'dataPlane' && t.part.unit.kind === 'site' ? t.part.unit : null);
   const queueQuote = useQuote(lbUnit ? { kind: 'routerQueue', unit: lbUnit } : null)?.quotes[0] ?? null;
-  const readAnchor = useCallback((out: Rect) => surface.renderer?.anchor(t.id, out) ?? false, [surface, t.id]);
+  const selectedSiteId = t.part?.unit.kind === 'site' ? t.part.unit.id : null;
+  const siteRouter = focus.level === 'global' ? focus.sites.find(site => site.siteId === selectedSiteId)?.dataPlane?.router : undefined;
+  const rowQuote = useQuote(t.kind === 'unit' && focus.level === 'room' ? { kind: 'tray', at: t.owner } : null)?.quotes.find(q => q.action.type === 'addRow') ?? null;
+  // A cell tap moves the ghost inside this plate, without moving its frame.
+  const anchorId = useRef(t.id).current;
+  const readAnchor = useCallback((out: Rect) => surface.renderer?.anchor(anchorId, out) ?? false, [surface, anchorId]);
   const subscribeFrame = useCallback((update: () => void) => {
     const l = () => update(); surface.frameListeners.add(l); return () => { surface.frameListeners.delete(l); };
   }, [surface]);
   // Display names, never IDs (QA-07); the catalog doesn't change while a plate is open.
+  const b = surface.plateBounds;
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- plateBounds is updated in place; its values are the inputs
+  const area = useMemo(() => plateArea(surface.layout, b), [surface.layout, b.x, b.y, b.w, b.h]);
+  const spill = useMemo(() => plateSpill(surface.layout, area), [surface.layout, area]);
   const researchNames = useMemo(() => new Map<ResearchId, string>(selectResearchTree(shell.store.getState()).nodes.map(n => [n.id, n.name])), [shell.store]);
   const common: Omit<PlateCommon, 'quotes'> = {
-    readAnchor, subscribeFrame, bounds: surface.plateBounds, bootS: bootMs / 1000, beside: surface.layout.kind === 'desktop',
+    readAnchor, subscribeFrame, bounds: area, spill, bootS: bootMs / 1000, beside: surface.layout.kind === 'desktop',
     onAction: (a: GameAction) => { shell.dispatch(a); },
     // One level, as Back and Escape do: the plate closes to its callout.
     onClose: () => view.dispatch({ type: 'back' }),
@@ -170,7 +229,8 @@ function TargetPlate({ target: t, focus }: { target: HitTarget; focus: LevelSnap
   const gpuSlot = gpuPlateSlot(t, focus);
   if (gpuSlot !== undefined && focus.level === 'system') {
     const installed = gpuSlot === null ? undefined : focus.gpu.find(p => p.slot === gpuSlot);
-    if (installed?.kind !== 'npu' || replaceNpu) return <GpuPlate {...common} system={focus.systemId} index={gpuSlot}
+    // An NPU's plate is the bay's: its own keys and every GPU model that can take its place, each one tap away.
+    return <GpuPlate {...common} system={focus.systemId} index={gpuSlot}
       installed={installed} tasks={focus.running} />;
   }
 
@@ -178,21 +238,32 @@ function TargetPlate({ target: t, focus }: { target: HitTarget; focus: LevelSnap
     const researched = shell.store.getState().research.completed.includes(researchId('powerCtl'));
     return <PowerCtlPlate {...common} quotes={quotes} rack={focus.rackId} view={focus.powerCtl ?? null} research={researched ? null : researchId('powerCtl')} />;
   }
-  if (isCores(t) && focus.level === 'chip') return <CoresPlate {...common} quotes={quotes} focus={focus} />;
+  if (isCores(t) && focus.level==='chip') return <CoresPlate {...common} quotes={quotes} focus={focus} />;
+  if (isInbound(t)) {
+    // A zone's entry also reaches its network rack, the existing ports, uplinks and routing controls.
+    const net = focus.level === 'room' ? surface.renderer?.getTargets().find(x => x.part?.slot.kind === 'roomSwitch') ?? null : null;
+    const speedHz = focus.level === 'room' ? Math.min(...focus.network.switch.uplinks.map(u => u.speedHz)) : null;
+    return <LinkPlate {...common} quotes={quotes} speedHz={Number.isFinite(speedHz) ? speedHz : null} title={focus.level === 'room' ? 'Zone link' : focus.level === 'rack' ? 'Uplink' : focus.level === 'global' ? 'Backbone' : 'Pipe'}
+      onOpenNetwork={net ? () => view.dispatch({ type: 'select', target: { ...net, rect: { ...net.rect } }, plate: true }) : undefined} />;
+  }
   if (t.kind === 'slot' && !t.part && (focus.level === 'chip' || focus.level === 'system'))
-    return <SitePlate {...common} target={t} focus={focus} quotes={quotes} />;
+    return <SitePlate {...common} target={t} focus={focus} quotes={quotes}
+      onOpenCpu={focus.level === 'system' ? () => view.dispatch({ type: 'drill', ref: { level: 'chip', id: focus.systemId } }) : undefined} />;
   if (t.kind === 'save' && t.unit) {
     const unit = t.unit, taken = selectSavedConfigs(shell.store.getState(), unit.kind).names;
-    return <SavePrompt unit={unit} bounds={surface.plateBounds} defaultName={nextDefaultName(defaultBase(unit, focus), taken)} taken={taken}
+    return <SavePrompt unit={unit} bounds={area} defaultName={nextDefaultName(selectUnitLabel(shell.store.getState(), unit), taken)} taken={taken}
       onAction={common.onAction} onClose={common.onClose} />;
   }
   if (t.kind === 'slot' && t.slot !== null && focus.level !== 'chip' && focus.level !== 'system') {
     const parent = t.unit ?? focusUnit(focus), kind = configKind(focus.level, parent);
     if (!kind) return null;
-    const sub = focus.level === 'rack' ? `Rack ${rackLetter(focus.rackId)} · slot ${t.slot + 1}`
-      : focus.level === 'room' ? `AZ ${zoneLetter(focus.zone)} · slot ${t.slot + 1}` : `Slot ${t.slot + 1}`;
+    const sub = focus.level === 'rack' ? `${selectUnitLabel(shell.store.getState(), { kind: 'rack', id: focus.rackId })} · slot ${t.slot + 1}`
+      : focus.level === 'room' ? `Zone ${zoneLetter(focus.zone)} · slot ${t.slot + 1}`
+      // On the map a new site is its region, a new zone its site's region and letter (never a bare slot number).
+      : parent.kind === 'site' ? `${selectUnitLabel(shell.store.getState(), parent)} · Zone ${zoneLetter(t.slot)}` : regionName(REGION_IDS[t.slot] ?? '');
+    // Short screens may cover the task strip while choosing a build (plateArea), as research does.
     return <ConfigPlate {...common} quotes={quotes} kind={kind} sub={sub} credits={credits} landscape={surface.layout.kind === 'desktop'}
-      drawCopy={(from, g, w, h) => drawCopyMini(shell, focus, from, g, w, h)} />;
+      nameOf={from => selectUnitLabel(shell.store.getState(), from)} drawCopy={(from, g, w, h) => drawCopyMini(shell, focus, from, g, w, h)} />;
   }
   if (t.kind === 'port' && t.sw) {
     if (focus.level === 'rack' && t.sw.kind === 'rack') return <SwitchPlate {...common} quotes={quotes} sw={t.sw} view={focus.switch}
@@ -202,16 +273,18 @@ function TargetPlate({ target: t, focus }: { target: HitTarget; focus: LevelSnap
     return null;
   }
   const save = (unit: UnitRef) => view.dispatch({ type: 'select', target: { ...t, id: `${t.id}:save`, kind: 'save', unit, rect: { ...t.rect } } });
-  if (t.kind === 'unit' && t.unit) return unitPlate(t.unit, focus, { ...common, onSave: save, market: marketOf(shell.store.getState(), t.unit), power, select: target => view.dispatch({ type: 'select', target, plate: true }) }, (slot) => {
+  if (t.kind === 'unit' && t.unit) return unitPlate(t.unit, focus, { ...common, onSave: save, market: marketOf(shell.store.getState(), t.unit), power, rowQuote, select: target => view.dispatch({ type: 'select', target, plate: true }) }, (slot) => {
     const next = { ...t, id: `${t.id.replace(/\d+$/, '')}${slot}`, slot, unit: focus.level === 'rack' && focus.servers[slot].systemId !== null
       ? { kind: 'system', id: focus.servers[slot].systemId! } as UnitRef : t.unit };
     view.dispatch({ type: 'select', target: next });
-  }, () => { if (t.drill) view.dispatch({ type: 'drill', ref: t.drill }); });
+  }, () => { if (t.drill) view.dispatch({ type: 'drill', ref: t.drill }); }, selectUnitLabel(shell.store.getState(), t.unit));
   if ((t.kind === 'part' || t.kind === 'link') && t.part) {
     const s = t.part.slot;
     const psu: SupplyView | undefined = focus.level === 'system' || focus.level === 'chip' ? focus.psu : undefined;
-    if (s.kind === 'psu' && psu) return <SupplyPlate {...common} quotes={quotes} supply={psu} />;
-    if (s.kind === 'pdu' && focus.level === 'rack') return <SupplyPlate {...common} quotes={quotes} supply={focus.pdu} />;
+    if (s.kind === 'psu' && psu && t.part.unit.kind === 'system') return <SupplyPlate {...common} quotes={quotes} supply={psu}>
+      <SystemPower system={t.part.unit.id} />
+    </SupplyPlate>;
+    if (s.kind === 'pdu' && focus.level === 'rack') return <SupplyPlate {...common} quotes={quotes} supply={focus.pdu}></SupplyPlate>;
     if (s.kind === 'ups' && focus.level === 'room' && focus.ups[s.index]) return <SupplyPlate {...common} quotes={quotes} supply={focus.ups[s.index]}>
       {/* D31.2: the room start controller lives on the UPS: which racks are powered at round start. */}
       {focus.power?.start && <StartRow unit={{ kind: 'room', id: focus.roomId }} scope="room" view={focus.power.start} onAction={common.onAction} />}
@@ -236,13 +309,33 @@ function TargetPlate({ target: t, focus }: { target: HitTarget; focus: LevelSnap
       {focus.start && <StartRow unit={{ kind: 'global' }} scope="global" view={focus.start} onAction={common.onAction} />}
       {powerKeys(!!focus.start, focus.start?.level ?? 0, 'Start controller', true)}
     </LbPlate>;
-    const facts = partFacts(focus, s);
-    if (facts) return <PartPlate {...common} quotes={quotes} {...facts} unblocks={unblocks} unblock={unblock}>
-      {s.kind === 'gpu' && focus.level === 'system' && focus.gpu.find(p => p.slot === s.index)?.kind === 'npu'
-        && <button type="button" className="key ghost" onClick={() => setReplaceNpu(true)}>Replace with GPU model</button>}
+    const facts = partFacts(focus, s, t.part.unit.kind === 'site' ? t.part.unit.id : undefined);
+    // CPU, RAM and storage choose between Upgrade, Add and Replace; the CPU's own view opens only from its key.
+    if (facts && focus.level === 'system' && (s.kind === 'cpu' || s.kind === 'ram' || s.kind === 'drive')) {
+      const chip = { level: 'chip', id: focus.systemId } as const;
+      return <BoardPartPlate {...common} quotes={quotes} slot={s.kind} part={t.part} focus={focus} facts={facts} unblocks={unblocks} unblock={unblock}
+        onOpenCpu={s.kind === 'cpu' ? () => view.dispatch({ type: 'drill', ref: chip }) : undefined} />;
+    }
+    if (facts) return <PartPlate {...common} quotes={quotes} {...facts} compactStatus={s.kind === 'cpu'} unblocks={unblocks} unblock={unblock}>
+      {s.kind === 'dataPlane' && siteRouter && lbUnit && <section className="site-routing"><p className="cfg-lab">Routing</p><LbBody unit={lbUnit} view={siteRouter} child="zone"
+        quotes={quotes ? { ...quotes, quotes: quotes.quotes.filter(q => q.action.type === 'setStrategy' || q.action.type === 'setFilter') } : null}
+        queueQuote={queueQuote} onAction={common.onAction} onResearch={common.onResearch} researchName={common.researchName} /></section>}
     </PartPlate>;
   }
   return null;
+}
+
+/**
+ * A site's data-plane routing on the site's own plate (user, 26 Oct: one or two taps from play): tap the site, then
+ * a strategy or filter. The same controls and quotes as the data plane's plate.
+ */
+function SiteRouting({ site, router, onAction, onResearch, researchName }: { site: UnitRef & { kind: 'site' }; router: Parameters<typeof LbBody>[0]['view'] }
+  & Pick<PlateCommon, 'onAction' | 'onResearch' | 'researchName'>) {
+  const quotes = useQuote({ kind: 'part', part: { unit: site, slot: { kind: 'dataPlane' } } });
+  const queue = useQuote({ kind: 'routerQueue', unit: site })?.quotes[0] ?? null;
+  const routing = quotes ? { ...quotes, quotes: quotes.quotes.filter(q => q.action.type === 'setStrategy' || q.action.type === 'setFilter') } : null;
+  return <section className="site-routing"><p className="cfg-lab">Routing</p>
+    <LbBody unit={site} view={router} child="zone" quotes={routing} queueQuote={queue} onAction={onAction} onResearch={onResearch} researchName={researchName} /></section>;
 }
 
 /** A copy option's live mini, drawn by the level renderer from the parent's slot view. */
@@ -261,17 +354,12 @@ function drawCopyMini(shell: ReturnType<typeof useShell>, focus: LevelSnapshot, 
   } catch { /* A level mid-port: the well stays plain. */ }
 }
 
-function defaultBase(unit: UnitRef, focus: LevelSnapshot): string {
-  if (unit.kind === 'rack') return `Rack ${rackLetter(unit.id)}`;
-  if (unit.kind === 'room') return focus.level === 'room' ? `AZ ${zoneLetter(focus.zone)}` : 'Zone';
-  if (unit.kind === 'site') return 'Site';
-  return 'Server';
-}
-
-function unitPlate(unit: UnitRef, focus: LevelSnapshot, all: Omit<PlateCommon, 'quotes'> & { onSave: (u: UnitRef) => void; market: MarketState | null; power: QuoteResult | null; select: (t: HitTarget) => void },
-  step: (slot: number) => void, goInside: () => void) {
-  const { onSave, power, select: _select, ...common } = all;
+function unitPlate(unit: UnitRef, focus: LevelSnapshot, all: Omit<PlateCommon, 'quotes'> & { onSave: (u: UnitRef) => void; market: MarketState | null; power: QuoteResult | null; rowQuote: Quote | null; select: (t: HitTarget) => void },
+  step: (slot: number) => void, goInside: () => void, name: string) {
+  const { onSave, power, rowQuote, select: _select, ...common } = all;
   const saveKey = (saveable: boolean) => (saveable ? () => onSave(unit) : null);
+  const chooseBuild = (slot: number) => all.select({ id: `build-${unit.kind}-${slot}`, kind: 'slot', owner: { level: focus.level, id: 'id' in unit ? unit.id : 0 } as HitTarget['owner'],
+    drill: null, part: null, unit, sw: null, port: null, slot, rect: { x: 0, y: 0, w: 0, h: 0 } });
   if (unit.kind === 'system' && focus.level === 'rack') {
     const slot = focus.servers.findIndex((s) => s.systemId === unit.id);
     return <ServerPlate {...common} slot={slot} servers={focus.servers} onStep={step} onGoInside={goInside} />;
@@ -279,7 +367,7 @@ function unitPlate(unit: UnitRef, focus: LevelSnapshot, all: Omit<PlateCommon, '
   if (unit.kind === 'system' && (focus.level === 'system' || focus.level === 'chip')) {
     const mode = focus.online, timerS = focus.level === 'system' ? focus.timerS : null;
     const total = focus.level === 'system' ? focus.timerTotalS : null;
-    return <UnitPlate {...common} unit={unit} title={`System ${unit.id + 1}`} sub={focus.level === 'system' && focus.kind === 'storageNode' ? 'storage node' : 'one server'}
+    return <UnitPlate {...common} unit={unit} title={name} sub={focus.level === 'system' && focus.kind === 'storageNode' ? 'Storage node' : undefined}
       status={focus.level === 'system' ? `${focus.running.length} running · ${focus.queue.count} queued` : 'Chip'} mode={mode} timerS={timerS} bootS={total ?? common.bootS}
       onSave={saveKey(focus.level === 'system' && focus.saveable)} saveLabel="Save this server">
       {/* Never an empty plate (user, 26 Oct): what is in the box, each row opening its part, and Open CPU. */}
@@ -289,22 +377,34 @@ function unitPlate(unit: UnitRef, focus: LevelSnapshot, all: Omit<PlateCommon, '
   }
   if (unit.kind === 'rack' && focus.level === 'rack') {
     const n = focus.servers.filter((s) => s.systemId !== null).length;
-    return <UnitPlate {...common} unit={unit} title={`Rack ${rackLetter(unit.id)}`} sub={`${n} servers`}
+    const free = focus.servers.findIndex(s => s.systemId === null);
+    return <UnitPlate {...common} unit={unit} title={name} sub={`${n} servers`}
       status={`${fahrenheit(focus.tempF)} · PDU ${percent(focus.pdu.usage)}`} mode={focus.online} timerS={focus.timerS}
-      onSave={saveKey(focus.saveable)} saveLabel="Save this rack" />;
+      onSave={saveKey(focus.saveable)} saveLabel="Save this rack">
+      <button type="button" className="key ghost" disabled={free < 0} onClick={() => chooseBuild(free)}>Choose server build</button>
+    </UnitPlate>;
   }
   if (unit.kind === 'room' && focus.level === 'room') {
-    return <UnitPlate {...common} unit={unit} title={`Room · AZ ${zoneLetter(focus.zone)}`} sub={`${focus.rows} of ${focus.maxRows} rows`}
+    const free = focus.racks.findIndex(r => r.rackId === null);
+    return <UnitPlate {...common} unit={unit} title={`Zone ${zoneLetter(focus.zone)}`} sub={`${focus.rows} of ${focus.maxRows} rows`}
       status={`${fahrenheit(focus.tempF)} · outside ${fahrenheit(focus.outsideF)}`} statusTone={focus.tempF > 80 ? 'warn' : ''}
-      mode={focus.online} timerS={focus.timerS} onSave={saveKey(focus.saveable)} saveLabel="Save this zone" />;
+      mode={focus.online} timerS={focus.timerS} onSave={saveKey(focus.saveable)} saveLabel="Save this zone">
+      <button type="button" className="key ghost" disabled={free < 0} onClick={() => chooseBuild(free)}>Choose rack build</button>
+      {rowQuote && <QuoteKey quote={rowQuote} label="Add rack row" onAction={q => common.onAction(q.action)}
+        onResearch={common.onResearch} researchName={common.researchName} />}
+    </UnitPlate>;
   }
   if (unit.kind === 'site' && focus.level === 'global') {
     const site = focus.sites.find((s) => s.siteId === unit.id);
     if (!site) return null;
-    return <UnitPlate {...common} unit={unit} title={regionName(site.region)} sub={`${site.zones.length} ${site.zones.length === 1 ? 'zone' : 'zones'}`}
+    const zones = site.zones.filter(z => z.roomId !== null).length;
+    return <UnitPlate {...common} unit={unit} title={regionName(site.region)} sub={`${zones} ${zones === 1 ? 'zone' : 'zones'}`}
       status={`${fahrenheit(site.outsideF)} outside · hottest ${fahrenheit(site.hottestF)}`} mode={site.online} timerS={site.timerS} onSave={saveKey(site.open)} saveLabel="Save this site">
       <GenerationRow generation={site.generation ?? null} />
+      <SiteSummary site={site} onOpen={part => all.select({ id: `site-${unit.id}-${part.slot.kind}`, kind: 'part', owner: { level: 'global', id: 0 },
+        drill: null, part, unit: null, sw: null, port: null, slot: null, rect: { x: 0, y: 0, w: 0, h: 0 } })} />
       <PowerKeys quotes={power} installed={!!site.generation} level={site.generation?.level ?? 0} noun="Generation" onAction={common.onAction} onResearch={common.onResearch} researchName={common.researchName} />
+      {site.dataPlane?.router && <SiteRouting site={unit} router={site.dataPlane.router} onAction={common.onAction} onResearch={common.onResearch} researchName={common.researchName} />}
     </UnitPlate>;
   }
   return null;

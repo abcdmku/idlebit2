@@ -10,6 +10,15 @@ import { addTransit } from './fifo';
 import { forward } from './links';
 import { placeShard } from './hops';
 import { canTake } from './split';
+import { canRunOn, gateOnClass } from '../market/fleet';
+import { FAMILIES } from '../market/families';
+import { FILTER_BIT } from './filters';
+
+/** Routing guarantees also apply when a shard moves after its initial placement. */
+function checksCapability(w: World, s: number): boolean {
+  const c = w.compiled, rack = c.sys.rack[s]!, room = c.rack.room[rack]!, site = c.room.site[room]!;
+  return ((c.rack.lbFilters[rack]! | c.room.lbFilters[room]! | c.site.dpFilters[site]! | c.global.lbFilters[0]!) & FILTER_BIT.capability) !== 0;
+}
 
 /**
  * Start of the route phase's dispatch step (spec §7.6, §7.8 item 7, D25.9):
@@ -34,6 +43,7 @@ function replace(w: World): void {
     for (let k = 0; k < SERVERS_PER_RACK; k += 1) {
       const s = c.rack.servers[rack * SERVERS_PER_RACK + k]!;
       if (s < 0 || c.sys.alive[s] !== 1 || c.sys.kind[s] !== 0 || !canTake(w, s)) continue;
+      if (checksCapability(w, s) && gateOnClass(c, s, FAMILIES[par.family[p]!]!, par.replaceUnits[p]!) !== 0) continue;
       par.replaceDeadline[p] = -1;
       w.hot.g[G.replacing] = w.hot.g[G.replacing]! - 1;
       placeShard(w, p, s, par.replaceUnits[p]!, par.replaceShard[p]!);
@@ -43,11 +53,12 @@ function replace(w: World): void {
 }
 
 /** The newest not-started shard queued on system s, or -1. */
-function newestShard(w: World, s: number): number {
+function newestShard(w: World, s: number, receiver = -1): number {
   const rec = w.hot.rec;
   let best = -1;
   for (let r = w.hot.sys.queueHead[s]!; r >= 0; r = rec.next[r]!) {
     if (rec.parent[r]! < 0 || rec.count[r] !== 1) continue;
+    if (receiver >= 0 && canRunOn(w, receiver, r) !== 0) continue;
     if (best < 0 || rec.taken[r]! > rec.taken[best]! || (rec.taken[r] === rec.taken[best] && rec.taskId[r]! > rec.taskId[best]!)) best = r;
   }
   return best;
@@ -119,13 +130,16 @@ function stealIn(w: World): void {
     if (h.mode[s] !== MODE.onMarket || h.queueLen[s] !== 0) continue;
     if (h.running[s]! + h.reserved[s]! >= keffOf(w, s) || !canAdmit(w, s)) continue;
     let victim = -1, shard = -1;
-    for (; at >= 0; at -= 1) {
-      const v = group[at]!;
-      if (h.queueLen[v] === 0) continue;
-      const r = newestShard(w, v);
+    const capability = checksCapability(w, s);
+    for (let scan = at; scan >= 0; scan -= 1) {
+      const v = group[scan]!;
+      if (h.queueLen[v] === 0) { if (scan === at) at -= 1; continue; }
+      const r = newestShard(w, v, capability ? s : -1);
       if (r >= 0) { victim = v; shard = r; break; }
+      // An incompatible shard can still be taken by a later, differently equipped thief.
+      if (scan === at && (!capability || newestShard(w, v) < 0)) at -= 1;
     }
-    if (victim < 0) return;
+    if (victim < 0) continue;
     const before = canAdmit(w, victim);
     queueUnlink(w.hot, victim, shard);
     h.queueLen[victim] = h.queueLen[victim]! - 1;

@@ -2,7 +2,7 @@ import type { BuildState, CpuBuild, PartLevel, SystemSpec } from '../types/build
 import type { PartId } from '../types/catalog';
 import type { PartRef, UnitRef } from '../types/ids';
 import type { GpuBuild } from '../types/gpu';
-import { evaluateGpu } from './catalog/gpuModels';
+import { evaluateGpu, gpuAtTierIndex } from './catalog/gpuModels';
 
 /** A part as the catalog sees it. For the data plane and backbone `level` is the ladder index k; for a switch it is 0. */
 export interface PartAt { readonly id: PartId; readonly gen: number; readonly level: number; readonly gpu?: GpuBuild }
@@ -32,8 +32,8 @@ export function readPart(build: BuildState, ref: PartRef): PartAt | null {
         const a = sys.accels[slot.index];
         if (!a) return null;
         if (a.kind === 'npu') return at('npu', a);
-        const stats = evaluateGpu(a.model, a.upgrades);
-        return { id: 'gpu', gen: stats.generation - 1, level: a.upgrades + 1, gpu: a };
+        const stats = evaluateGpu(a.model);
+        return { id: 'gpu', gen: stats.generation - 1, level: stats.tierIndex + 1, gpu: a };
       }
       case 'drive': return at('storage', sys.drives[slot.index]);
       default: return null;
@@ -108,9 +108,10 @@ export function writePart(build: BuildState, ref: PartRef, gen: number, level: n
       const card = sys.accels[slot.index]!;
       if (card.kind === 'npu') next = { ...sys, accels: replaceAt(sys.accels, slot.index, setLevel(card, gen, level)) };
       else {
-        if (evaluateGpu(card.model, card.upgrades).generation - 1 !== gen) return null;
-        evaluateGpu(card.model, level - 1);
-        next = { ...sys, accels: replaceAt(sys.accels, slot.index, { ...card, upgrades: level - 1 }) };
+        if (evaluateGpu(card.model).generation - 1 !== gen) return null;
+        const model = gpuAtTierIndex(card.model, level - 1);
+        if (!model) return null;
+        next = { ...sys, accels: replaceAt(sys.accels, slot.index, { kind: 'gpu', model }) };
       }
     }
     else if (slot.kind === 'drive' && sys.drives[slot.index]) next = { ...sys, drives: replaceAt(sys.drives, slot.index, setLevel(sys.drives[slot.index]!, gen, level)) };

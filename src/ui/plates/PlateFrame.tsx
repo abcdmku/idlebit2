@@ -19,6 +19,11 @@ export interface PlatePosition {
   beside?: boolean;
   /** A small pointer up to the anchor when the plate sits under it (the task detail under its card). */
   tip?: boolean;
+  /**
+   * Larger areas, in order, a plate may take when its head and main option, with a usable body, would not fit in
+   * `bounds` beside its part (phone: over the strip and deck, then over the HUD). Only then: a plate that fits keeps `bounds`.
+   */
+  spill?: readonly Rect[] | null;
 }
 
 export interface PlateFrameProps extends PlatePosition {
@@ -28,6 +33,8 @@ export interface PlateFrameProps extends PlatePosition {
   pips?: readonly [number, number];
   /** Extra header content after the subtitle (a total price). */
   head?: ReactNode;
+  /** Primary actions that remain visible while a long body scrolls. */
+  footer?: ReactNode;
   className?: string;
   /** The 48 px close key in the header (A21: one close everywhere); on by default. Plates also close on Escape or a world tap. */
   closeKey?: boolean;
@@ -38,42 +45,104 @@ export interface PlateFrameProps extends PlatePosition {
   children: ReactNode;
 }
 
+/** The least scrolling body height that shows a row of choices and a line of what the picked one does. */
+const CRAMPED_BODY = 120;
+
 /** The plate body: a fixed-width dark slab with a paper rim. It never resizes while open. */
-export function PlateFrame({ title, sub, pips, head, className = '', closeKey = true, as = 'section', onSubmit, initialFocus,
-  onClose, children, readAnchor, bounds, subscribeFrame, pinTop, beside, tip }: PlateFrameProps) {
+export function PlateFrame({ title, sub, pips, head, footer, className = '', closeKey = true, as = 'section', onSubmit, initialFocus,
+  onClose, children, readAnchor, bounds, subscribeFrame, pinTop, beside, tip, spill }: PlateFrameProps) {
   const ref = useRef<HTMLElement>(null);
+  const contentRef = useRef<HTMLDivElement>(null);
   useDialogFocus(ref, onClose, initialFocus);
   useLayoutEffect(() => {
-    const root = ref.current;
-    if (!root) return;
+    const root = ref.current, content = contentRef.current;
+    if (!root || !content) return;
     const target: Rect = { x: 0, y: 0, w: 0, h: 0 };
-    // A plate that scrolls says so: a fade over its bottom edge while more lies below.
-    const more = () => { root.dataset.more = String(root.scrollHeight - root.scrollTop - root.clientHeight > 2); };
+    let natural = root.offsetWidth;
+    // One layout (R16): the plate is a grid of explicit height, head, body, a real "More ↓" row and the footer. The
+    // body is the only thing that scrolls and its own row clips it, so nothing paints under the cue or the footer.
+    // Cramped (the head and the main option alone fill the room), the whole plate scrolls, main option first.
+    const more = () => {
+      const box = root.dataset.cramped === 'true' ? root : content;
+      root.dataset.scrolls = String(content.scrollHeight - content.clientHeight > 2);
+      // (A whole-plate scroll counts only real content below, not its few px of padding.)
+      root.dataset.more = String(box.scrollHeight - box.scrollTop - box.clientHeight > (box === root ? 8 : 2));
+    };
+    content.addEventListener('scroll', more, { passive: true });
     root.addEventListener('scroll', more, { passive: true });
+    // Held (user, 26 Oct: buttons never shift a popup): once its part stands still the frame keeps its place and size
+    // for its life; a choice, a purchase, a quote, Details or a wallet change updates inside it (the body scrolls).
+    // Only a new target (a new plate) or a window resize places it again.
+    let held = false, stable = 0, lastAnchor = '';
+    /**
+     * The plate's own height with nothing limiting it: what it would take with room to spare. Its head, body and footer
+     * are read in the same pass, so content the plate only reserves (R17: an empty site holds the room of the part its
+     * Add installs, rendered only while measuring) counts the same way everywhere below.
+     */
+    let measured = { head: 40, footer: 0, content: 0 };
+    const naturalHeight = () => {
+      root.dataset.measure = 'true';
+      const h = root.offsetHeight;
+      measured = { head: root.querySelector<HTMLElement>('.p-head')?.offsetHeight ?? 40,
+        footer: root.querySelector<HTMLElement>(':scope > .plate-footer')?.offsetHeight ?? 0, content: content.scrollHeight };
+      delete root.dataset.measure;
+      return h;
+    };
     const position = () => {
+      if (held) { more(); return; }
       const parent = root.offsetParent as HTMLElement | null;
       const pw = parent?.clientWidth || innerWidth, ph = parent?.clientHeight || innerHeight;
-      const safe = bounds ?? { x: 8, y: 142, w: pw - 16, h: ph - 142 - 160 };
-      root.style.setProperty('--plate-safe-width', `${Math.max(0, safe.w)}px`);
+      const areas = [bounds ?? { x: 8, y: 142, w: pw - 16, h: ph - 142 - 160 }, ...(spill ?? [])];
       const a = !pinTop && readAnchor?.(target) ? target : null;
-      // Never over the tapped part (place.ts): the height it may take is set first, then the place.
-      const at = placePlate(a, root.offsetWidth, root.scrollHeight, safe, { beside, pinTop });
+      // A plate beside its part may be narrower than its own width (place.ts); its natural width is read unset.
+      if (!root.style.width) natural = root.offsetWidth;
+      let safe = areas[0]!, full = 0, at = placePlate(a, natural, 0, safe), headH = 40, footerH = 0;
+      for (const area of areas) {
+        safe = area;
+        root.style.setProperty('--plate-safe-width', `${Math.max(0, safe.w)}px`);
+        root.style.width = '';
+        // Never over the tapped part (place.ts): the natural height is measured first, then the place and its room.
+        full = naturalHeight();
+        at = placePlate(a, natural, full, safe, { beside, pinTop });
+        if (at.w < natural) { root.style.width = `${at.w}px`; full = naturalHeight(); at = placePlate(a, natural, full, safe, { beside, pinTop }); }
+        headH = measured.head; footerH = measured.footer;
+        // The head and the main option fit whole here with a usable body below them (a cramped body's least, and its More
+        // row), or all of it: this is the area. Else the next, larger one.
+        if (footerH === 0 || at.room >= full - measured.content + Math.min(CRAMPED_BODY + 24, measured.content)) break;
+      }
+      const height = Math.max(0, Math.min(full, at.room));
+      root.style.height = `${height}px`;
       root.style.setProperty('--plate-safe-height', `${Math.max(0, at.room)}px`);
+      const pad = full - headH - footerH - measured.content;
+      // Cramped: the head, the main option and the plate's padding leave too little body for what it holds.
+      const body = height - headH - footerH - Math.max(0, pad) - 24;
+      root.dataset.cramped = String(footerH > 0 && body < Math.min(CRAMPED_BODY, measured.content));
       root.style.left = `${Math.round(at.x)}px`;
-      root.style.top = `${Math.round(at.y)}px`;
+      // Above its part, the plate's foot sits 8 px over the part.
+      root.style.top = `${Math.round(a && at.y + at.h <= a.y ? Math.max(safe.y, a.y - 8 - height) : at.y)}px`;
       root.dataset.anchored = String(Boolean(a));
       const under = !!tip && !!a && at.y >= a.y + a.h;
       root.dataset.tip = under ? 'up' : 'none';
       if (under) root.style.setProperty('--tip-x', `${Math.round(Math.max(16, Math.min(at.w - 16, a!.x + a!.w / 2 - at.x)))}px`);
       more();
+      // The part has stood still for two frames (or there is none to follow): this is the frame.
+      const key = a ? `${Math.round(a.x)},${Math.round(a.y)},${Math.round(a.w)},${Math.round(a.h)}` : 'none';
+      stable = key === lastAnchor ? stable + 1 : 0; lastAnchor = key;
+      if (stable >= 2 || (!a && !subscribeFrame)) { held = true; root.dataset.held = 'true'; }
     };
     position();
     const observer = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(position);
     observer?.observe(root);
-    window.addEventListener('resize', position);
+    const resize = () => {
+      held = false; stable = 0; lastAnchor = '';
+      root.style.width = ''; root.style.height = ''; delete root.dataset.held;
+      position();
+    };
+    window.addEventListener('resize', resize);
     const stop = subscribeFrame?.(position);
-    return () => { stop?.(); observer?.disconnect(); window.removeEventListener('resize', position); root.removeEventListener('scroll', more); };
-  }, [bounds, readAnchor, subscribeFrame, pinTop, beside, tip]);
+    observer?.observe(content);
+    return () => { stop?.(); observer?.disconnect(); window.removeEventListener('resize', resize); content.removeEventListener('scroll', more); root.removeEventListener('scroll', more); };
+  }, [bounds, readAnchor, subscribeFrame, pinTop, beside, tip, spill]);
 
   const body = <>
     <header className="p-head">
@@ -84,7 +153,9 @@ export function PlateFrame({ title, sub, pips, head, className = '', closeKey = 
       {closeKey && <button type="button" className="p-x" aria-label="Close" onClick={onClose}>
         <i className="x-glyph" aria-hidden="true" style={{ width: 12, height: 12, '--x-w': '1px' } as CSSProperties} /></button>}
     </header>
-    {children}
+    <div ref={contentRef} className="plate-content">{children}</div>
+    <div className="plate-more" aria-hidden="true">More ↓</div>
+    {footer && <footer className="plate-footer">{footer}</footer>}
   </>;
   const common = {
     className: `v3-plate ${closeKey ? 'has-x ' : ''}${className}`, 'aria-label': title, tabIndex: -1,

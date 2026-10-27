@@ -15,6 +15,7 @@ export interface PartLabel {
   readonly key: LabelKey;
   readonly name: string;
   readonly value: string;
+  readonly phoneValue?: string;
   readonly side: 'L' | 'R';
   /** D26: the tier's use beside the name ("4.1 kb used"), and its spilled bits, which read as a warning. */
   readonly used?: string; readonly spilled?: string;
@@ -39,6 +40,7 @@ function union(sites: readonly Site[], b: Parameters<typeof siteRect>[0]): Rect 
 const times = (n: number) => (n > 1 ? ` ×${n}` : '');
 /** "16.4 + 8.19 kb" when the sizes share a unit, else "512 b + 8.19 kb" (formatSize). */
 export function sizes(bits: readonly number[]): string {
+  if (bits.every(n => n === bits[0])) return `${formatSize(bits[0]!)}${times(bits.length)}`;
   const parts = bits.map(formatSize), unit = parts[0]!.slice(parts[0]!.indexOf(' ') + 1);
   if (parts.every(p => p.endsWith(` ${unit}`))) return `${parts.map(p => p.slice(0, p.indexOf(' '))).join(' + ')} ${unit}`;
   return parts.join(' + ');
@@ -65,20 +67,31 @@ function values(s: SystemSnapshot): Omit<PartLabel, 'top' | 'mid' | 'lx' | 'end'
   if (ram.length) {
     let rate = Infinity;
     for (const q of ram) rate = Math.min(rate, q.part!.rateBits ?? 0);
-    out.push({ key: 'ram', name: 'RAM', value: `${sizes(ram.map(q => q.part!.capacityBits ?? 0))} · ${formatHertz(rate)}`, side: 'R', r: union(ram, b), ...tierNote(s, 'ram') });
+    const capacities = ram.map(q => q.part!.capacityBits ?? 0);
+    out.push({ key: 'ram', name: 'RAM', value: `${sizes(capacities)} · ${formatSize(rate)}/s`,
+      phoneValue: formatSize(capacities.reduce((sum, n) => sum + n, 0)), side: 'R', r: union(ram, b), ...tierNote(s, 'ram') });
   }
   if (drive.length) {
-    const d = drive[0]!.part!;
-    out.push({ key: 'drive', name: 'Drive', value: `${formatSize(d.capacityBits ?? 0)} · ${formatHertz(d.rateBits ?? 0)}${times(drive.length)}`, side: 'R', r: union(drive, b), ...tierNote(s, 'disk') });
+    const capacity = sizes(drive.map(q => q.part!.capacityBits ?? 0));
+    const rate = Math.min(...drive.map(q => q.part!.rateBits ?? 0));
+    out.push({ key: 'drive', name: 'Drive', value: `${capacity} · ${formatSize(rate)}/s`,
+      phoneValue: capacity, side: 'R', r: union(drive, b), ...tierNote(s, 'disk') });
   }
   if (gpu.length) {
-    const p = gpu[0]!.part!, stats = p.gpu;
-    const value = stats ? `G${stats.model} · ${whole(stats.cores)} cores · ${formatSize(stats.vramBits)}${times(gpu.length)}`
-      : `NPU · level ${whole(p.level)}${times(gpu.length)}`;
+    const cards = gpu.map(q => q.part!), stats = cards.flatMap(p => p.gpu ? [p.gpu] : []);
+    const models = cards.map(p => p.gpu?.model ?? `NPU L${whole(p.level)}`);
+    const same = models.every(model => model === models[0]);
+    const phoneValue = same ? `${models[0]}${times(cards.length)}` : models.join(' + ');
+    const value = stats.length === cards.length ? same
+      ? `${stats[0]!.model} · ${whole(stats[0]!.cores)} cores · ${formatSize(stats[0]!.vramBits)}${times(cards.length)}`
+      : `${models.join(' + ')} · ${stats.map(p => whole(p.cores)).join(' + ')} cores · ${sizes(stats.map(p => p.vramBits))}`
+      : phoneValue;
     // D26 unifiedMemory: VRAM need beyond the cards, placed in RAM and on disk.
     let spill = 0;
     for (const q of gpu) spill += q.part?.unifiedSpillBits ?? 0;
-    out.push({ key: 'gpu', name: 'GPU', value, side: 'L', r: union(gpu, b), ...(spill > 0 ? { spilled: formatSize(spill) } : {}) });
+    out.push({ key: 'gpu', name: stats.length === 0 ? 'NPU' : stats.length === cards.length ? 'GPU' : 'Accelerators', value,
+      phoneValue: stats.length === 0 ? phoneValue.replaceAll('NPU ', '') : phoneValue,
+      side: 'L', r: union(gpu, b), ...(spill > 0 ? { spilled: formatSize(spill) } : {}) });
   }
   return out;
 }
@@ -96,7 +109,8 @@ function place(list: PartLabel[], form: WorldForm | undefined, first: number): v
       const r = it.r;
       it.right = it.key === 'ram' || it.key === 'drive';
       it.tagX = q4(it.right ? r.x + r.w : r.x);
-      it.tagY = q4(it.key === 'psu' ? top : it.key === 'ram' ? r.y + r.h : it.key === 'gpu' ? r.y - 10 : r.y + r.h + 2);
+      it.tagY = q4(it.key === 'psu' ? top : it.key === 'ram' ? r.y + r.h : it.key === 'gpu' ? r.y - 10
+        : it.key === 'drive' ? BOARD.y + BOARD.h + 4 : r.y + r.h + 2);
     }
     return;
   }
@@ -108,7 +122,7 @@ function place(list: PartLabel[], form: WorldForm | undefined, first: number): v
       let mid = Math.round((it.r.y + it.r.h / 2) / LAT) * LAT;
       mid = Math.min(Math.max(mid, Math.ceil(it.r.y / LAT) * LAT), Math.floor((it.r.y + it.r.h) / LAT) * LAT);
       if (mid - ROW / 2 < next) mid = next + ROW / 2;
-      it.top = mid - ROW / 2; it.mid = mid; next = it.top + ROW;
+      it.top = mid - ROW / 2; it.mid = mid; next = it.top + ROW + LAT;
       it.lx = side === 'L' ? boardL - GAP : boardR + GAP;
       it.end = side === 'L' ? it.r.x : it.r.x + it.r.w;
     }
@@ -141,7 +155,7 @@ export function writeLabels(s: SystemSnapshot, frame: WorldFrame, out: LabelWrit
   const form = frame.form;
   for (const it of partLabels(s, form, firstRow(frame))) {
     if (form === 'phone') {
-      out.label(it.key, it.tagX, it.tagY, it.right ? 'right' : 'left', true).text(it.name, 'silk', true).text(it.value, 'value');
+      out.label(it.key, it.tagX, it.tagY, it.right ? 'right' : 'left', true).text(it.name, 'silk', true).text(it.phoneValue ?? it.value, 'value');
       if (it.spilled) out.text(`· ${it.spilled} spilled`, 'warn');
       continue;
     }

@@ -27,13 +27,13 @@ const TOP_SPEC: SystemSpec = {
   cpuCount: 2,
   scheduler: { gen: 3, level: 11, strategy: 'mlfq' },
   ram: Array.from({ length: 8 }, () => ({ gen: 5, level: 20, ecc: true })),
-  accels: Array.from({ length: 8 }, () => ({ kind: 'gpu' as const, model: '9990' as const, upgrades: 5 })),
+  accels: Array.from({ length: 8 }, () => ({ kind: 'gpu' as const, model: '9990' as const })),
   drives: Array.from({ length: 4 }, () => flowTop(3)),
   psu: { gen: 5, level: 16, capped: false },
-  settings: { dvfs: true, turbo: true, cStateLimit: 6 },
+    settings: { dvfs: true, turbo: true, cStateLimit: 1 },
 };
 
-/** Synthetic maximum population: existing GHz CPUs, 8 ECC DDR5, 8 G9990 u5 cards, 4 drives. */
+/** Synthetic maximum population: existing GHz CPUs, 8 ECC DDR5, 8 G9990 cards, 4 drives. */
 export const topSystem = (id: SystemId, rack: RackId, slot: number): SystemBuild => ({ id, rack, slot, online: true, spec: TOP_SPEC });
 
 const topRouter = { gen: 2, level: 13, strategy: 'leastWork', filters: ['capability', 'health'], queueLevel: 32 } as const;

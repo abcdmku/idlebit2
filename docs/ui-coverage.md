@@ -1,0 +1,87 @@
+# UI and interaction coverage
+
+Updated 26 October 2026. This is a coverage record, not a product-wide score.
+
+The user subsequently rated the actual hardware and research flows 3/10, rejecting the prior UI/UX assessment. Hardware clicks and empty sites must open choices without purchasing. All further UI/UX implementation is assigned to Claude Opus 5.5 at high effort. Earlier capture scores remain historical evidence only; they do not establish acceptance of the current product.
+
+The user also requires routine actions within one or two clicks from the relevant gameplay view, including the action itself. Game-level switches such as CPU to System are excluded. Verification must record click depth, not merely whether a control can eventually be reached after opening tabs or disclosures.
+
+Popup geometry must stay fixed during internal button clicks and live updates. Browser checks must compare the popup's position and size before and after option changes, purchases, settings and disclosures; opening a different target or resizing the viewport is a separate layout event.
+
+The R11 council unanimously rated UI and UX 9/10 for 21 selected states. Those states covered boot, blocked tasks, task details, CPU/RAM/PSU purchases, research and reports. They did not cover every view or interaction. Core gameplay and campaign pacing were unscored. The original Round 1 captures were an incomplete baseline; the later matched pre-cleanup captures are a separate baseline.
+
+Evidence is kept in git-ignored `artifacts/qa/`:
+
+- `ui-audit-r11/`: frozen 21-state review set.
+- `ui-flow-check.json` and `r7-browser-check.json`: the earlier native pointer/keyboard checks.
+- `view-coverage-r12/inventory.json`: broader opening sweep across Chip, System, Rack, Room and Global on desktop and phone. Programmatically opening a plate is presentation evidence, not proof that its controls work. `view-coverage-npu-current/` adds the NPU states.
+- `coverage-flows.json`, `coverage-flows-small.json`, `coverage-flows-desktop.json` and `coverage-flows-landscape.json`: native input checks for the expansion paths below, with viewport metadata. The scripts use isolated Chrome profiles and funded presentation fixtures. Their results do not establish earned affordability, balance or pacing.
+- `currency-check/`: current 320px, desktop and compact desktop captures after the user's currency-icon and board-label changes.
+- `ui-flow-r13/`: Opus's hardware-choice and research changes, with preserved before captures. The lead independently reran 24 native checks over 320px, 390px, desktop and landscape: opening hardware spends nothing, CPU Add preserves the installed generation and clock, CPU Upgrade changes the clock, RAM/storage Add preserves existing modules, keyboard activation opens choices, and PDU controls remain usable. Four additional native Ready Rack checks verify the exact research fees. These use explicitly funded fixtures and do not prove campaign pacing or exhaustive interaction coverage.
+- `ui-flow-r14/`: configuration, accelerator and inbound-link checks at all four sizes. The 32 native cases cover all barebones choices, storage-node installation, world names, GPU replacement, GPU/NPU selection without spending, matching primary purchases, pre-Rack research navigation and the zone-entry network route. `rack-pan/` adds seven single/multiple-rack reachability cases. Current broader captures are `view-coverage-r13/` (84), `view-coverage-npu-r13/` (22) and `ui-audit-r13/` (21). These are fresh evidence for a new council review, not a carried-forward score.
+- `ui-flow-r15b/root-native-phone/` and `root-native-wide/`: the lead's stricter native matrix covers 104 routine paths and 52 popup geometry checks across four viewports. Routing and power settings assert actual state changes; geometry compares position and size to three decimal places. All passed. Level navigation is excluded from the click count at the user's request. Scrolling remains necessary for some alternatives.
+- `ui-flow-r15b/root-fresh/`: 12 fresh-game Clock, Cache and Cores cases across the same four viewports. Opening spends nothing; Clock and Cache purchases use earned Credits and charge their exact quotes. The 844×390 Clock plate needs local scrolling before its purchase is visible. Its frame remains fixed, and the complete key receives input after scrolling. Cores at zero Credits shows its disabled purchase and price.
+- `ui-flow-r15b/catalog.json`: all four viewport sizes check quote-based consequences on direct GPU keys, including cold downtime, power and efficiency, named supply warnings, exact purchase cost and stable geometry. The late fixture still contains 191 direct model keys. Two-click reachability does not establish that this catalog is concise or easy to search.
+- Round 14 frozen presentation evidence is `view-coverage-r14/` (84), `view-coverage-npu-r14/` (22) and `ui-audit-r14/` (33, including 12 fresh-game part plates). All captures completed without application exceptions or layout-audit findings. `source-r14-fingerprint.json` identifies the 689 source files, including dirty changes. These counts do not establish exhaustive interaction coverage. Round 14 scores were Sol UI 8/UX 7, Opus UI 7/UX 6 and Grok UI 7/UX 6.5. All left core gameplay and overall unscored.
+
+Round 14 found defects outside the earlier passing matrix: a 14,271px GPU catalog buried its ordinary hot upgrade, phone research hid benefits before Start, a post-Add RAM popup retained the Add title while offering an upgrade to the first module, primary actions promoted downgrades or disabled maximums, and a fresh blocked card clipped its countdown and failure line. The small landscape Clock primary was not initially visible. Opus is correcting these findings. Passing two-click routes and fixed outer rectangles did not establish that the controls were well ordered, correctly identified or fully readable.
+
+`root-r14-wheel/checks.json` adds native wheel evidence. The compact Clock purchase becomes reachable at an intermediate scroll position, although scrolling to the end passes it. The phone PSU settings become fully hit-testable after body scrolling. These distinguish initial layout problems from controls that cannot be reached at all.
+
+The R16 implementation exposes shared purchase alternatives directly, gives phone research rows their benefit and duration, and keeps post-add actions on the newly installed part. The lead's `ui-flow-r16/root-native-phone/` and `root-native-wide/` checks passed 144 paths and 64 frame checks, including actual settings changes and repeat purchases. The full suite passed 199 files and 1,857 tests. `ui-flow-r16/root-ecc/` independently converts non-ECC RAM from an older earned save at four sizes, checking the exact charge, unchanged module levels and fixed frame.
+
+Integration still found issues beyond those passes: the standard capture flagged six fix-key targets below 44px, and pinning both GPU decisions left almost no body space. The final R16 correction reserves at least 44px for the fix key and uses one pinned GPU decision. Fresh captures and independent review must identify the source they assess; the prior passing counts are not a product-wide quality score.
+
+Final R16b integration passes 199 test files and 1,859 tests, typecheck and build. The lead reran the strengthened 144 paths, 64 frame checks, 56 alternate-key checks and four earned-save ECC conversions against this final source. The 37 standard captures now have no target-size errors or clipped targets. There are 36 remaining alignment warnings, all research-row Start/Queue top edges across eight frames. Current `view-coverage-r15/` (84), `view-coverage-npu-r15/` (22) and `ui-audit-r15/` (37) match `source-r15-fingerprint.json`; the initial captures are preserved under the corresponding `-pre-integration-fixes` names. Round 15 independent reviews assessed this frozen set. On the smallest screens, a popup may cover the HUD to preserve usable controls; this tradeoff remains part of the review rather than an assumed success.
+
+Round 15 reviews are complete: Sol UI 7.5/UX 7, Opus UI 7/UX 6.5, Grok UI 7.5/UX 7. All left core gameplay and overall unscored. They found detached supply warnings, off-screen shared GPU consequences, missing core/VRAM losses on compact GPU keys, cramped post-add CPU controls and a truncated failure cause. Power-setting labels can also be sliced at the body fold while their buttons still receive input. The lead reproduced the post-add CPU failure across two fixtures and four sizes in `root-r15-post-add/`: correct purchases and fixed frames, but partially hidden next primary actions and no visible body space. These are usability defects despite passing earlier price and outer-frame checks. Opus is correcting them in the R17 implementation pass. The 36 small research alignment offsets remain disclosed and were not considered material blockers by the reviewers.
+
+The R17 writer stopped for the user's broader upgrade-experience direction. Scoped supply warnings and cause-first failure text are implemented; all 24 post-add cases keep their identity, exact charge, frame and whole next primary, but four retain less than 120px of visible body. PSU layout was not started and GPU changes were held. Focused tests, the real `npm run typecheck` and build pass; the earlier full 1,859-test result is not a current full-suite result for R17. Evidence is in `ui-flow-r17/`. A fresh Opus 5.5 high product lead now owns the decision and first implementation for satisfying component upgrades, simpler GPU progression and visible processing changes, using idle-game benchmarks and before/after probes. The previous writer is no longer editing source.
+
+| Family | Recorded browser input | Remaining coverage |
+| --- | --- | --- |
+| Blocked tasks and task details | Cache fix, modal action ownership, ECC recovery | Dismiss, automatic task removal, research-front and outage paths |
+| CPU, RAM, storage and supplies | Cache/ECC purchases, RAM disclosure, nested PDU preparation, site-grid upgrade | Actual CPU/storage replacement and subsequent restart; more replacement states |
+| GPU and NPU | GPU series/tier selection, hot upgrade, replacement, empty-bay GPU/NPU selection and primary purchases, NPU → GPU replacement | GPU-generation research jump and more lock/maximum combinations |
+| Network switches | Match ports, refreshed per-port actions, extra port and uplink purchases | Per-port purchase, replacement and selected-port scrolling |
+| Routing | Site and global strategy/filter changes; room switch/LB navigation | Rack and room filter/queue purchases, locked and maximum states |
+| Cooling | Rack setpoint change | Bounds, room setpoint and fault states |
+| Start controllers | Rack starting-count change | Busy/head-wait/order, room/global controllers and battery states |
+| Units | Rack market participation | Parent-off, draining, boot/fault modes and all scopes |
+| Expansion | Third rack row, additional zone and regional site, barebones rack and saved-server purchases | Copy-source purchase, full and locked states |
+| Saved configurations | Native text entry, Enter submission, saved-server reuse in a new rack | Overwrite, cancellation, pagination, reload and mobile keyboard |
+| Research | Pause/resume, project/prerequisite links, disclosures, auto-return | Start/queue/full/insolvency and completion transitions |
+| Round lifecycle | HUD Return and two-tap End; report recovery and scroll | Confirmation expiry and automatic Return with another dialog open |
+| Navigation and focus | Native keyboard activation of hardware targets, system power switches, vertical rack pan and horizontal multi-rack pan, lowest-sled drill | Full Tab traversal, focus restoration, browser Back/Leave, all zoom routes, pinch and cancellation |
+| Persistence and offline recovery | Automated simulation/platform tests | Browser reload/storage-error/worker-error flows; background return |
+| Accessibility and performance | Earlier DOM contrast samples and selected keyboard checks | Screen reader, real touch/pinch, mobile keyboard and browser frame-time measurement |
+
+The expanded audit found missing expansion targets, unreachable network/site settings, stale quotes after free settings changes, overlapping per-port controls, a report/research modal conflict, mismatched cooling bounds and a terminal offline retry loop. These are addressed in source with focused regressions and browser checks where recorded. Current changes require a fresh council review; the R11 scores do not automatically apply to them.
+
+Do not claim exhaustive interaction coverage from screenshot counts, passing layout audits or tests that only inspect source. A practical full pass must account for each family above, use browser input for distinct state transitions, and label any states supported only by tests. Gameplay needs a separate current campaign run.
+
+## 26 Oct: upgrade-experience GPU slice
+
+The generation/type/tier design replaces the earlier GPU catalog and its selectors. Historical catalog matrices above do not validate this new interface. Opus checked card opening, explicit tier purchase and stable frames at 390×780, 1280×800 and 320×568 on an earned two-hour save in an isolated mouse-driven browser. Evidence is in `artifacts/qa/upgrade-experience-opus/browser/`.
+
+First-slice root integration passed all 1,846 tests, typecheck and build, with test workers capped at two for consistent fixture concurrency. An independent arithmetic probe checks 288 tier paths and exact value-difference pricing. Its below-fold second step and zero-price Remove were fixed in slice 2.
+
+After slice 2 and the Rack fee regeneration, root's `npm run verify` passes 197 files/1,850 tests, typecheck and build. `root-native.mjs` uses native mouse input without `scrollIntoView` at 320×568, 390×780, 1280×800 and 844×390: opening changes neither wallet nor build; both footer steps are whole and at least 44px; tier purchase charges the public quote, installs its model and keeps the exact frame. Four cases pass with stable relevant source hashes and no application exceptions. The earlier script failed because its old accessible-label prefix no longer matched “Upgrade to Tier”; that run is preserved in `checks-r1-old-label.json`, and no visibility criterion was weakened.
+
+Root also loads the five earned v17 probe saves and the broad coverage fixture through the v19 migration. Opus's `browser2/` records live skips, closing and the report fix; its overall bench passes. These checks do not certify every view, real touch, screen readers or the campaign. CPU/RAM presentation and quantitative wall-clearing choices remain open.
+
+## Slice 3, report implementation
+
+Root verification passes 198 files/1,859 tests, typecheck and build. `root-report3.mjs` uses an earned 24-minute save, public pure actions for expected results, native mouse clicks and native wheel scrolling. At 390×780, 320×568, 1280×800 and 844×390, two direct purchases debit 40,000 then 40 Credits and leave 74,398. The full resulting build matches the expected public action at each step. Step 2 starts locked and enables after step 1; the exact report frame stays fixed and one dot lights. Relevant source hashes are stable and there are no application exceptions.
+
+At 320 and short landscape the route is below the fold; one wheel scroll reveals it. This is recorded as incomplete initial visibility, not hidden by `scrollIntoView`. The 390 screenshot also exposes a clipped unaffordable-route note: it reads “Route 28.9M · needs” without the full shortfall. That remains a UI correction despite passing transaction checks. Evidence is in `artifacts/qa/upgrade-experience-opus/root-report3/`.
+
+Only the dominant logged gate is shown. The log is the first 64 skips, so it is a bounded sample in longer rounds. Dot lighting is resource-capacity comparison; route fit counts use all capability gates. Report information, sampling clarity and actual profitable progression need separate assessment. RAM/cache plate feedback, full accessibility/touch coverage and the core gratification goal remain open.
+
+## User correction: restore SLA, then stop
+
+The user rejects automatic skipping, outgrown/closing and the skip-based report UI. The report/skip evidence above is historical, not acceptance. Current behavior must preserve the 10 s head deadline, unsupported `cantRun` failures in SLA, and manual dismissal as a free intervention. The skip summary, plot, routes and “A fit, not pay” copy are removed from the visible game.
+
+Root's independent fresh seed-42 probe verifies that head 8 remains pending until its 10 s expiry, then adds exactly one rolling-SLA failure; manually dismissing it promotes the next head with no failure. An idle opening ends at 59 s from SLA with four `cantRun` failures. A loaded old closing flag does not prevent timed failures. Proof: `root-restore-sla.ts` and `root-restore-sla.json`.
+
+Root's isolated 390×780 and 320×568 browser checks also show an SLA-ended round with three actual failures, no skipped/wall/fit-copy report, and a native Return starting the next round with no closing flag. No application exceptions. `npm run verify` passes 197 files/1,855 tests, typecheck and build; `git diff --check` is clean. Proof is in `root-restore-ui/` and `verify-revert.log`. No further design or implementation is authorized after this correction.

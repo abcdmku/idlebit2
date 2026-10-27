@@ -1,7 +1,6 @@
 import { amount, ZERO_AMOUNT, type Amount } from '../amount';
-import { REGIONS } from '../core/constants';
+import { pausedResearchEnergy } from '../build/researchEnergy';
 import { MODE } from '../core/timers';
-import { RES_CLOCKS } from '../core/constants';
 import { rackId, roomId, systemId, type UnitRef } from '../types/ids';
 import type { GameState } from '../types/state';
 import type { LenderView } from '../types/views';
@@ -11,7 +10,6 @@ import { systemLoad } from './rack';
 
 /** The wafer shows at most this many fab-line gauges. */
 export const MAX_LENDERS = 24;
-const R = RES_CLOCKS;
 
 /** Task and lent fractions of one system (D27, spec §11.2): the share of its threads holding the research task. */
 function systemShares(state: GameState, s: number): { task: number; lent: number } {
@@ -56,18 +54,10 @@ export function researchLenders(state: GameState): LenderView[] {
 }
 
 /**
- * Whole Credits per minute the active project costs between rounds, when every system researches
- * at full load: Σ (CPU idle + load W) × the site's energy price × 60 s. An estimate for the plate;
- * the ledger bills real joules. TODO(S4): swap for a phys helper once one exists.
+ * Full-rate paused research estimate, including current infrastructure overhead. The ledger
+ * bills actual work, P-states and future cooling; this is explicitly labelled as an estimate.
  */
 export function researchCreditsPerMinute(state: GameState): Amount {
   if (state.research.active === null) return ZERO_AMOUNT;
-  const c = state.compiled;
-  let perS = 0;
-  for (let s = 0; s < c.sys.len; s += 1) {
-    if (c.sys.alive[s] !== 1) continue;
-    const price = REGIONS[c.site.region[c.sys.site[s] ?? 0] ?? 0]?.energyPrice ?? 0;
-    perS += ((c.sys.idleW[s * R] ?? 0) + (c.sys.loadW[s * R] ?? 0)) * price;
-  }
-  return amount(Math.floor(perS * 60));
+  return amount(Math.floor(pausedResearchEnergy(state) * 60));
 }

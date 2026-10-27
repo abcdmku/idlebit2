@@ -17,7 +17,7 @@ import { keffOf, runsTasks } from './slots';
 import { stealThreads } from './stealing';
 import { leaveStage, promoteIo, releaseRunning, enterStage } from './stages';
 import { CPU, GPU, IO, NRES, RAM, shapeOf } from './shape';
-import { diskRate, firstPart } from './memory';
+import { diskRate, firstLoadPart, firstPart, isLoadingPart } from './memory';
 
 /**
  * Run phase: allocate, then process completion events, stage transitions and in-tick chaining.
@@ -150,9 +150,13 @@ function runEvents(w: World, s: number, share: number): number {
     leaveStage(w, s, r, axisAt(span, GPU, tau));
     // D26.2: a stage runs its parts in order (main, RAM, disk), each on its own clock; then the next stage.
     const shape = shapeOf(rec.family[r]!);
-    const part = firstPart(w, r, shape, rec.stage[r]!, rec.part[r]! + 1);
+    const loading = isLoadingPart(rec.part[r]!);
+    const part = loading ? firstLoadPart(w, r, rec.part[r]! + 1) : firstPart(w, r, shape, rec.stage[r]!, rec.part[r]! + 1);
     if (part >= 0) {
       rec.part[r] = part;
+      enterStage(w, s, r, tau, span, res, doneW);
+    } else if (loading) {
+      rec.part[r] = firstPart(w, r, shape, rec.stage[r]!, 0);
       enterStage(w, s, r, tau, span, res, doneW);
     } else if (rec.stage[r]! + 1 < shape.stages) {
       rec.stage[r] = rec.stage[r]! + 1;
@@ -277,7 +281,7 @@ export function runPhase(w: World): void {
   const share = taskShare(w);
   const research = researchOn(w);
   const stamp = execStamp(w, research);
-  const all = w.visitAll === true || hot.g[G.execStamp] !== stamp;
+  const all = hot.g[G.execStamp] !== stamp;
   hot.g[G.execStamp] = stamp;
   // A full pass also clears meters of dead systems; otherwise each visit clears its own.
   if (all) resetAccelUsage(w);

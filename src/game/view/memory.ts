@@ -1,5 +1,7 @@
 import { LOC, type HotBuffers } from '../core/buffers';
 import { ACCEL_DOMAINS } from '../core/constants';
+import { isLoadingPart } from '../exec/memory';
+import { FAMILIES } from '../market/families';
 import type { MemTier } from '../types/catalog';
 import type { GameState } from '../types/state';
 import type { MemTierView } from '../types/views';
@@ -33,7 +35,8 @@ export function memoryTiers(state: GameState, s: number): MemTierView[] {
   const diskUsed = (h.usedDisk[s] ?? 0) + (node >= 0 ? onNode(state, s) : 0);
   const ioRate = (c.ioRate[s] ?? 0) + (node >= 0 ? c.ioRate[node] ?? 0 : 0);
   return [
-    { tier: 'cache', capacityBits: c.cacheBits[s] ?? 0, usedBits: h.usedCache[s] ?? 0, spilledBits: 0, rateBits: null },
+    { tier: 'cache', capacityBits: c.cacheBits[s] ?? 0, usedBits: h.usedCache[s] ?? 0, spilledBits: 0,
+      rateBits: (c.threadRate[s] ?? 0) * (c.threads[s] ?? 0) },
     { tier: 'ram', capacityBits: c.ramCap[s] ?? 0, usedBits: h.usedRam[s] ?? 0, spilledBits: h.usedRam[s] ?? 0, rateBits: c.ramBw[s] ?? 0 },
     { tier: 'disk', capacityBits: diskCap, usedBits: diskUsed, spilledBits: diskUsed, rateBits: ioRate },
   ];
@@ -49,11 +52,13 @@ export function unifiedSpill(state: GameState, s: number, domain: number): numbe
   return domain >= 0 && domain < ACCEL_DOMAINS ? bits : 0;
 }
 
-/** A record's placement (bits per task) and the tier its current part reads: clock RAM → ram, IO → disk. */
+/** A record's placement and the tier its current load or memory part reads. */
 export function placementOf(hot: HotBuffers, r: number, res: number): { placement: { cache: number; ram: number; disk: number }; memTier: MemTier | null } {
   const running = hot.rec.loc[r] === LOC.running;
+  const cache = res === 0 && (isLoadingPart(hot.rec.part[r] ?? 0)
+    || FAMILIES[hot.rec.family[r] ?? 0]?.stages[hot.rec.stage[r] ?? 0]?.resource === 'mem');
   return {
     placement: running ? { cache: hot.rec.memC[r] ?? 0, ram: hot.rec.memR[r] ?? 0, disk: hot.rec.memD[r] ?? 0 } : { cache: 0, ram: 0, disk: 0 },
-    memTier: !running ? null : res === 1 ? 'ram' : res === 3 ? 'disk' : null,
+    memTier: !running ? null : res === 1 ? 'ram' : res === 3 ? 'disk' : cache ? 'cache' : null,
   };
 }

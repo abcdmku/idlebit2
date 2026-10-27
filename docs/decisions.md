@@ -467,7 +467,7 @@ The user supplied `cpu_cost_spec.csv` and `ram_game_spec_sheet.csv` and asked to
 
 ### GPU progression and runtime, 24 Oct
 
-Accepted by the lead. This named ruling supersedes prior GPU catalog, count-gate and whole-tick sharing text, and D3's fee policy for GPU generation research only. It does not change the CPU/RAM progression ruling above. Numeric rules are in `docs/gpu-progression.md`; execution contracts are in `docs/gpu-runtime.md`.
+Accepted by the lead. This named ruling supersedes prior GPU catalog, count-gate and whole-tick sharing text, and D3's fee policy for GPU generation research only. It does not change the CPU/RAM progression ruling above. Numeric rules are in `docs/gpu-progression.md`; execution contracts are in `docs/gpu-runtime.md`. **Amended 26 Oct:** the upgrade-experience ruling at the end of this log replaces the push count, tier pricing, generation-replacement and save rules. Runtime sharing and task-fit rules remain.
 
 1. Buy preconfigured GSMT model IDs. Displayed generations 1..9 have clock classes 1 kHz, 10 kHz, 100 kHz, 1 MHz, 10 MHz, 100 MHz, 1 GHz, 10 GHz and 100 GHz. Series 3 emphasizes cores, 5 VRAM, 7 clock, 9 all specs. Tiers are 30, 50, 60, 70, 80 and 90. Higher tiers scale all specs. At comparable generation, tier and push, series 9 costs more than combined series 3+5+7. Native G990 has the generation's best performance and efficiency.
 2. Adopt the progression document's native, hot-upgrade, exact-price, energy and family core-floor formulas. Save `GpuBuild {kind:'gpu', model:GpuModelId, upgrades:number}`, with `upgrades=0..5`, and legacy `NpuBuild {kind:'npu', gen, level}`. One central evaluator validates model IDs and specs. Never store a GPU model object or infer a model from ops/s. Generic adapters may expose `gen=g-1`, `level=upgrades+1`.
@@ -493,14 +493,14 @@ Accepted latest rule. This overrides D5.1–2 and earlier arrival sampling, caps
 
 The CPU/RAM 36-level specialized ruling and its deferred runtime integration remain unchanged. This lifecycle change does not retune GPU models, progression, work, rewards, balance or performance limits.
 
-**D8, 25 Oct: GPU energy calibration.** Binding.
+**D8, 25 Oct: GPU energy calibration.** Era targets retained; push and supply assumptions amended by the 26 Oct upgrade-experience ruling below.
 
 1. **GPU energy follows the CPU's era targets.** Gross-to-energy ratios set the target. Native CPUs in the Hz/kHz/MHz/GHz eras run at 10/6/3/2 (`docs/hardware-progression.md`). Scale the GPU watts coefficient so a native X990 card lands at its clock era's CPU target:
    - generations 1–3 (kHz class) at about 6;
    - generations 4–6 (MHz class) at about 3;
    - generations 7–9 (GHz and up) at about 2.
 
-   The other native series and tiers sit somewhat below their generation's X990. A card pushed to u5 lands near break-even, roughly 1.0–1.3. This replaces "native GPU efficiency improves 10% per generation" and matches the CPU rule that native efficiency falls era by era. Pick the coefficient with `scripts/gpu-balance.ts`, run as a parameter sweep.
+   The other native series and tiers sit somewhat below their generation's X990. The original u5 break-even target and its parameter-sweep script are superseded by the 26 Oct tier ladder. Native efficiency still falls era by era, while tier steps improve efficiency. The current formulas and checks are in `docs/gpu-progression.md` and `src/game/build/catalog/gpuModels.test.ts`.
 2. **Supplies must fit.** Watts are game watts (D6.1). PSU and supply catalogs must hold every native card at u0, and a pushed card up to u1, on the PSU generation of its era. Raise supply capacities where the sweep shows they don't.
 3. **One `SAVE_VERSION` bump** covers the catalog change and the removal of the dead `gpuDevices` column.
 
@@ -657,7 +657,7 @@ Before Rack, income is capped by the 1 kHz pipe at about 700 Credits/s and about
 | First purchase | under 30 s |
 | First round ends | 4–8 min |
 | System | **20–30 min** (D19 amendment, 25 Oct) |
-| Rack | **5–7 h** (D19 amendment, 25 Oct) |
+| Rack | **about 3.5–5 h** (Opus incentive amendment, 26 Oct) |
 | First data center (Room) | **2–4 days** |
 | Data center tier (zones) | about 1–2 weeks |
 | Multiple data centers (a second site, Regions) | **2–4 weeks** |
@@ -675,6 +675,8 @@ Before Rack, income is capped by the 1 kHz pipe at about 700 Credits/s and about
 3. **Offline caps.** The offline cap and auto-return research must make a months-long idle game work: 8 h at base, extended by research. Offline catch-up must stay within the perf budget at every scale.
 
 **D20, 25 Oct: round 1 ends in about a minute without upgrades (user).** Binding.
+
+**Historical measurement for the withdrawn rule:** automatic skip-and-drain produced 57–147 s no-purchase openings without failures. The user rejected that rule and restored timed failures into SLA. The 45–75 s target below remains; the rejected run is not evidence for the restored source.
 
 > round one should end in about a minute if you dont upgrade.
 
@@ -1293,7 +1295,7 @@ The user's words:
 3. **Fix (constant):** cooler load watts ∝ `x^1.25` (`COOLER_LOAD_EXP`, `build/catalog/curves.ts`; spec §9.1). Levelled coolers still lose efficiency, as `x^0.25` per watt removed. Net per hour now rises with every size: 1.67e9, 3.05e9, 5.00e9, 6.62e9, 7.11e9 (energy share 43% → 70%). The D20 opening and the 3-seed pacing are unchanged.
 4. **Still open:** gross per server falls about 10–20% per doubling. The bigger fleet meets harder tasks (+1 `I`) on the same servers, so spill and the wall take a growing share; a player upgrades memory to answer it.
 
-**D33, 25 Oct: a round that completes nothing ends (user, via QA-26).** Binding. Dismissals don't count for SLA, and `autoSkip` dismisses on its own, so a round could sit at exactly 80% with no income for as long as the player kept dismissing.
+**D33, 25 Oct: a round that completes nothing ends (user, via QA-26).** Binding. Dismissals don't count for SLA, so a round could sit at exactly 80% with no income for as long as the player kept dismissing. The user subsequently rejected automatic skipping and closing/draining. The retired `autoSkip` node stays removed; the 120 s no-completion safeguard remains unchanged.
 
 1. **Rule.** A running round also ends when **no task has been met for 120 s** (`STALL_END_TICKS`, a named deadline). Research completing is not a met task; neither are dismissals.
 2. **Clock.** `G.lastMetTick` is the last tick a task was met this round; the round start counts as one. The SLA step checks it after the 80% check, so the round ends the same way as an SLA end (the same tick, everything paused, the next round prepared from `I = 0`).
@@ -1399,7 +1401,7 @@ D32 costs stay. The cost of a deleted node folds into the purchase price of what
 
    - **Quotes and planners.** Part, switch, infra and power quotes offer only generations above the installed one. `planReplace`, `planReplaceLadder` and `planPowerPart` refuse the same or a lower generation with "Only a newer generation". `planReplaceCpu` already refused them. An empty power slot still installs any generation.
    - **Order.** Tier order is catalog order everywhere, including site generation: solar, wind, fuel cell, own plant. That matches their research order and price.
-   - **GPUs.** A replacement card must be a strictly better model, compared native against native: more ops/s and no less VRAM. Hot pushes are not a tier, and comparing against a pushed card would block almost every replace. Cross-series sidegrades are not offered (1330 → 1530 trades ops for VRAM). The `gpuModels` picker into an occupied slot filters to those cards, and `planInstallGpu` refuses the rest.
+   - **GPUs (amended 26 Oct).** A generation replacement retains type and tier and moves to a later researched generation. Tier upgrades happen hot in place; there is no separate push count. Cross-type replacement is not offered. See the upgrade-experience ruling below for the pricing and save contract.
    - **meet.** `meet` lines already replace upward only.
    - **Test.** `build/replaceUp.test.ts` installs a mid generation in every slot and sweeps part, switch, infra, power, tray, meet and model-picker quotes. It finds no replace at or below the installed part, and it fails when the old loop is restored.
 
@@ -1412,6 +1414,44 @@ D32 costs stay. The cost of a deleted node folds into the purchase price of what
 
   The head that times out on a down fleet fails as `power`, `heat` or `swap` with that detail, the spec §9 taxonomy, instead of `cantRun · cache`. Auto-skip is unchanged: it still dismisses heads while the fleet is down.
 - **Test.** `market/fleetDown.test.ts` reproduces the report through real actions, with the sandbox refill between advances.
+
+**UX review fixes, 26 Oct.** The council review keeps the hardware rules and D30 task-count curve.
+- Pre-System upgrade previews use the same fixed draw as execution. C-state descriptions name when savings begin, and System research warns about the full power bill and PSU limits.
+- Queue entries publish Data contributions using the round's seeded ratio. Task details show whole Data with fractional carry, rather than recalculating a reward from the catalog.
+- CPU views distinguish task occupancy from research occupancy. Hardware presentation remains live while research runs between rounds. Core bars and their labels both show work remaining.
+- Hardware targets have native keyboard controls using the same actions as pointer input. Phone hardware fits a 320 px screen at 2×, with three core columns. Landscape keeps the bottom controls visible.
+- The HUD shows net Credits after energy. The opening names the cache upgrade and shows cache and clock prices. A blocked head offers Fix beside its requirements; an affordable single hot fix buys the sim's quoted action. Dismiss keeps its own place.
+- Long milestone estimates say to upgrade income, with the current-rate estimate available in project details. The round report shows peak intensity and only reports disk spill when present.
+- The campaign bot rejects purchases that warn of overloading a supply and buys PSU headroom against full load. The former seed-42 path ended seven days in debt; the corrected path reaches Room in 2 days 6 h 50 min, with System at 20 min 47 s and Rack at 6 h 12 min. These are measurements of the benchmark policy, not a change to progression prices.
+
+**Council recovery and pacing fixes, 26 Oct.**
+- GPU save validation accepts only floating-point roundoff in derived GPU columns. Campaign stages must survive serialize/load before the chain continues.
+- ECC is available on installed RAM. One cold conversion replaces every non-ECC module at its existing generation and level, with the existing full ECC replacement cost. Capacity and bandwidth remain unchanged. The RAM plate, task requirements and ECC round report quote that action. Full GPU slots offer model replacements when meeting a task requirement.
+- System power-supply controls expose the existing saved C-state, DVFS, Turbo and power-cap choices. Research descriptions point to the controls. Research does not silently enable a mode. The benchmark enables researched idle savings and prepares PSU headroom before a beneficial CPU replacement.
+- The task-count curve adds `0.35 max(0, I − 14)³` to the existing quadratic. This is a hardware-independent balance parameter, with the opening unchanged through I14 and the same authored family windows. Seed 42 reaches System at 20:51, Rack at 5:09:06 and Room at 3d 8:15; mean rounds are 5.2, 11.4 and 37.6 minutes in the first-hour, 1–8 h and 8–24 h bands. Long purchase gaps remain under review.
+- A short landscape uses the full width, putting the queue and deck beside the CPU at 2×. The report keeps its Energy/Net figures clear of Return. Between rounds, the HUD labels the last round's average net rate; the market veil stays visible while researched hardware runs beneath it.
+- The offline benchmark checks D24's approved fallback explicitly if the primary 10-second fleet target fails. Both workloads still require a worker and at least 70,000 active ticks. With the tuned curve, seed-42 fixtures run all 72,000 ticks actively: room 6.182 s, maximum fleet 13.325 s, within the fallback limits of 10/60 s.
+
+**Work and income accuracy, 26 Oct.**
+- CPU load power follows threads in the CPU stage and held research. A thread remains reserved while waiting on GPU, RAM or IO, but that reservation does not itself draw active core power. C-state accounting uses the same actual CPU work. This makes §6.7's busy-time utilization and §9.1's watts-follow-work rule agree. GPU work and thread admission rules are unchanged.
+- Rate-part payback is an estimate using recent paid work, pipe capacity and energy per unit of work at saved sleep settings. Faster cores finish work and sleep; their full-load watts are a separate supply-sizing figure. Research capacity is CPU-only and never priced as Credits. The bot holds the workload calibration fixed across a purchase comparison and limits market investments to four-hour paybacks. Capacity benefits without a return model say so, rather than claiming no payback. A marginal loss warning describes the purchase's extra energy and earnings, not the whole part's profitability.
+- Auto return can be switched off in research and the round report. Research shows both in-round and paused completion estimates at current clocks, with power and heat caveats. The campaign may stay paused for a funded project while preserving the previous round's operating bill; it prepares PDU capacity and cooling for sustained research first. CPU previews warn when that research load exceeds rack cooling.
+- Net/min history retains the sample before the actual 60-second query boundary, including when a save is restored between second boundaries.
+- Supply recovery must increase capacity enough for the requested load and cannot introduce another supply warning. A research lock points to the needed project; an unaffordable safe replacement shows its price.
+- Mixed CPU/GPU paid work does not establish a CPU income forecast. Those quotes leave market return unestimated and retain the separate CPU research capacity. GPU estimates price only accelerator-family work and require memory/IO headroom. A supply warning suppresses payback until the supply is prepared. The pre-Rack benchmark may rank CPU capacity as a heuristic within its physical-efficiency and investment bounds; this is not a player-facing earnings claim.
+- CPU replacement offers every newer researched generation, so GHz research does not erase an affordable MHz option. Supply recovery can buy the summed existing levels needed for the proposed load in one quote and follows nested PSU/PDU dependencies. Recovery selects the cheapest safe quote. Research energy estimates include current infrastructure overhead instead of reading the uncore column as the whole bill.
+- Core activity follows CPU-stage work plus research. Device-stage threads retain reservations, but their cores can sleep. Reservations remain visible in the core's facts. Desktop research has a separate row for its controls. Project reconfiguration is excluded from purchase/research choice-gap measurements.
+- Native upstream connectivity is included in a switch install under D13. Configuration copies pay for uplink steps above that upstream default, rather than charging for the default as steps above a downstream server port. This corrects a barebones rack from 10.25T to 12M Credits without changing hardware speeds or marginal step prices. The campaign evaluates copying a profitable rack, retains active supply projects, considers older unlocked GPUs, and buys useful parts during a research pause only while its completion budget remains funded.
+- A barebones system uses the cheapest researched PSU and level that can carry it. The former newest-only rule made a 1 Hz system inherit a mandatory 10B Platinum supply after that research, removing the entry choice. Supply generations and level prices are unchanged; better efficiency remains a separate replacement choice.
+
+**Visible UI review, 26 Oct.**
+- The initial council baseline covered only the opening and was insufficient for a consistent visual comparison. Subsequent source fixes and higher ratings did not establish a visual redesign. The current visual pass compares the same saved states and viewport sizes for research, purchases, power, blocked tasks and reports. Reviewers score those screens independently; simulation correctness and campaign pacing remain separate evidence.
+- Purchases lead with the relevant effect, consequence and action. Buttons carry an action and price rather than a paragraph. Alternate generations, estimates and technical explanations remain available in Details. ECC recovery has one primary conversion; ordinary alternatives remain accessible.
+- Power preparation identifies the actual next dependency, including a PDU before a PSU, and shows that preparation's capacity change, price and cold downtime before purchase. The proposed CPU's price remains visible. An unsafe original replacement is still available under Replace anyway with its own consequences.
+- Research shows a short benefit, state, completion estimates and action. Paid projects no longer repeat their cost. Estimates say Between rounds and During rounds; a paused project retains its identity. Desktop rows use their width for benefit comparisons. C-state controls show the selected idle factor and wake latency from the simulation.
+- On short screens, the research sheet can cover the task strip beneath the HUD. Its status and auto-return row scroll with the list; landscape uses the full sheet width. Paused research can resume directly from its status. Task dialogs own their buy and Dismiss controls while open; the background head card becomes a summary, preserving keyboard access without duplicate actions.
+- Part plates keep their header and scroll their body within the available space, with a visible More cue. The selected hardware stays uncovered. Small-phone pipe labels are omitted when no position clears the hardware; the physical pipe and its inspectable speed remain.
+- DVFS stays at full clock during held research. Capability filtering checks actual shard sizes on admission and stealing; reservations and task-count difficulty are unchanged. Campaign output records actual additional racks, zones and sites separately from research unlocks. Late progression and purchase gaps still require a clean measurement after these fixes.
 
 ## 16. Shared rules for agents
 
@@ -1568,3 +1608,150 @@ D32 costs stay. The cost of a deleted node folds into the purchase price of what
 > to get more zones (rooms) im a data center you have to unlock the datacenter tier, replace stoage at the data center tier for availability zones, a data center can have multiple az and has its own internal data plane. these then link to other global data centers. its cheaper to add az than new data centers but some taks will start to be region locked.
 >
 > Attached images: `cpu-ui-system-board.png` is the real game's System board at 22:45 into a run, with floating price labels. `data-center-zone-mockup.png` is the approved mockup's Data center room, where racks are bought by tapping the next room slot.
+
+### 26 Oct: coverage follow-up to the council UI review
+
+The R11 UI/UX scores apply to the 21 reviewed states. Whole-product approval requires the view and interaction inventory in `docs/ui-coverage.md`; screenshots and layout audits alone do not establish working controls.
+
+User follow-up: remove the board's non-actionable “Upgrade” price annotations. Keep the part name and its current value; the actual upgrade remains in the part plate. Show the appropriate currency icon beside every displayed currency amount, including canvas build prices, income, shortfalls, GPU prices and research costs.
+
+**User correction, 26 Oct: hardware choices before purchases.** This supersedes the earlier one-tap purchase behavior for `+` sites. Clicking hardware or an empty site opens its available choices and spends nothing. CPU, RAM and storage must expose the applicable Add, Upgrade and Replace actions, with prices and consequences before an explicit purchase. Opening a CPU's inner view is a separate navigation action. The user rates the current hardware and research flows 3/10; earlier council scores on selected captures are not acceptance of those flows. The user assigns all further UI/UX implementation to Claude Opus 5.5 at high effort, with the lead responsible for integration and verification.
+
+**User correction, 26 Oct: one or two clicks from gameplay.** Routine controls and actions must be reachable in one or two clicks from the relevant gameplay screen, counting the action itself. Switching game levels, such as CPU to System, does not count. For example, opening RAM and then adding RAM is two clicks; opening RAM, selecting an Add tab and then buying is three. The initial hardware tap still spends nothing. Prices and material consequences must be available before the explicit action without a required extra confirmation or disclosure step.
+
+**User correction, 26 Oct: stable popups.** Clicking controls inside an open popup must not shift or resize its frame. Contents update within the allocated body and footer. A different selected target or a viewport resize can establish a new placement; option changes, purchases, settings, disclosures and live status changes keep the current frame stable.
+
+- The global snapshot exposes researched, unbuilt regions and unlocked empty zone positions. The map opens the existing configuration purchase for each. Native room networking is included with Room; the global scheduler is included with Regions. No separate generation-zero research exists for those controllers.
+- Native upstream uplinks remain valid when copying or replacing a switch, including when that upstream native speed exceeds the downstream port ceiling (D13). Port overclocks retain their generation limits. Prices and progression work are unchanged.
+- The existing switch quote actions for extra ports and uplinks are reachable. Site nameplates open their grid and data-plane controls; site and global routing use their own scope. Room nameplates expose the existing rack-row purchase.
+- Free build settings invalidate quotes immediately. Report links close the report before opening research. Plate rows stay in document flow; cooling controls use the simulation's 55–80°F limits. Saved-name overwrite warnings compare names case-insensitively, matching the simulation.
+- If an offline runner fails after its fallback, the runtime keeps its last confirmed checkpoint, reports that unprocessed offline time was skipped, and resumes play. It must not loop indefinitely on the same failing absence.
+
+### 26 Oct: upgrade experience and incentives, user direction
+
+The user rejects the GPU catalog's "Within reach" wording and proposes a simpler path: research a generation, choose a type, then upgrade through the 30–90 tiers. The exact progression and treatment of the existing hot-push model are assigned to Opus to decide before implementation.
+
+The user identifies insufficient gratification and repetitive play as a core problem. Better upgrade states should apply across components, and actual changes in how work processes should be visible. Benchmark against idle games including The Tower, using documented progression and real before/after probes of idlebit2. Opus 5.5 high leads the improvement decision; the lead coordinates implementation and verification. This direction takes priority over further compliance-only GPU catalog patches. Existing explicit-purchase, concise-copy, currency-icon and stable-popup requirements remain in force.
+
+### 26 Oct: Opus upgrade-experience ruling, first slice
+
+Adopted from the assigned Opus lead's measured design decision. This amends the 24 Oct GPU progression ruling, D8's push calibration and D39.8's GPU replacement rule. CPU and RAM keep their 36-level ladders. Full formulas are in `gpu-progression.md`; evidence and remaining reward-loop work are summarized in `upgrade-experience.md`.
+
+1. **One card, visible states.** A GPU is its researched generation, chosen type (3 cores, 5 VRAM, 7 clock/efficiency, 9 all) and tier. Tier steps are 30 → 50 → 60 → 70 → 80 → 90. Save `{kind:'gpu', model:GpuModelId}`; remove the separate `upgrades` counter and u0–5 push.
+2. **Keep the investment.** A tier step is hot and preserves running work. It doubles cores and VRAM, raises clock and improves energy per operation. A generation replacement is cold and retains type and tier. It raises ordinary work 20× and VRAM 16×; native era efficiency retains its tradeoff. Both steps cost `V(after,n) - V(before,n)`, subtracting the two already-rounded whole card values at the same other-GPU count. At that count, tier paths and direct installation cost exactly the same.
+3. **Small choice set.** The plate shows the installed state, tier ladder and real duty, followed by tier and generation actions. An empty bay offers tier 30 of the newest researched generation, one option per type. Requirement/fix actions may install higher researched tiers directly. Type change currently requires removal. The large model catalog is removed; affordable-generation and type-change reachability remain integration concerns for the next slice.
+4. **Energy and art.** D8's 6/3/2 native era targets remain; the push penalty and u0/u1 supply assumptions do not. Use the model/tier formulas and quote the actual supply limits. Card chips represent tier; lit fraction reads executing duty, not decorative activity. No rate preview promises a guaranteed market return.
+5. **Version 18 migration.** A v17 card folds its explicit push count into tier index, capped at 90. Cores and VRAM stay identical below that cap; clocks change to the tier formula. Excess pushes above 90 are lost. Migrate builds and saved configurations, rebuild compiled stats and reconcile running accelerator work. Keep wallets and the remaining fleet. This is a pre-live mechanic change, not a full reset.
+6. **Evidence and limits.** An earned two-hour 1330 → 1350 comparison costs 2M Credits and improves net/min by about 16.7%. Once the pipe binds near five hours, GPU purchases still fail to improve earnings. The first slice does not resolve the incentive problem or establish campaign quality. Opus next addresses dead waiting, the pipe plateau and state-first component feedback, with rule changes recorded when adopted.
+
+### 26 Oct: Opus outgrown-round ruling, second-slice milestone
+
+Chosen by the assigned design lead after earned-save probes found 66–92% of early rounds spent waiting behind unsupported heads. This amends D10.3 and the later task-lifecycle pickup rule, removes D12's `autoSkip` research node, and adds an end reason alongside SLA, player and stall ends. Slice-2 verification and bounded comparisons are recorded below; this ruling is not a campaign-quality approval.
+
+1. An uncommitted head outside the static fleet capability set skips immediately at the market step, drawing its replacement. It pays no Credits or Data and affects neither SLA nor dismissals. A runnable head resets the consecutive-skip count. A sequence of ten skips (`OUTGROWN_SKIPS`, a count) closes the market: no new takes, while taken work finishes or fails by its own rules. Once it drains, the round ends as `outgrown`. SLA and D33's 120 s no-completion deadline still apply during closing.
+2. Busy, asleep, booting and cold-swapping systems remain in that capability set. Temporary lack of room retains the head's 10 s pickup clock. Power, heat and offline/down fleets retain their own diagnosis; committed returned work is not skipped. These cases must not be mislabeled as a permanent hardware gate.
+3. Reports store skipped `{count, work, detail}` separately. The missing capability and unpaid work connect the result to a useful hardware purchase. Skipping is not a successful completion or a reward.
+4. Save version 19 migrates v17 through the GPU tier fold and v18 through the skip-state addition. Global state grows to 60 entries, including skip counters and closing; earlier kept reports get an empty skipped line. Retired `autoSkip` leaves completed, queue, parked and rules. Stop an active retired project, release its holders and shift stored project indices after the old row 126. Root independently loaded all five earned probe saves and the coverage fixture with GPUs intact.
+5. The drain condition is required: ending immediately would pay 202k rather than 866k per round at 24 minutes, and 1.69M rather than 4.18M at two hours. Against the old blocked-head rule, the 24-minute fleet goes from 114 to 74 s and net/s from 833 to 3,999. At two hours pay rises 2.31M → 4.18M but net/s falls 8,740 → 6,446 because the pushed clock costs more when busy. Five/eight-hour pipe-bound results are unchanged. These are seeded comparisons, not proof of player enjoyment.
+
+### 26 Oct: Opus Rack timing and GPU follow-through
+
+The assigned design lead reduces Rack research from 27M to **9M Data**; its D32 fee becomes **90M Credits**. Work stays 25M ops. Regenerate `tree.data.ts` from `research.md`, never hand-edit the generated fee. D19's Rack target becomes **about 3.5–5 h**. The measured eight-hour policy comparison reaches Rack at 3:54; its after-first-hour choice gap falls 58 → 39 min and purchases rise 134 → 264. About 1.3 h of pipe plateau remains. Room/site/Regions targets are unchanged, and a full campaign still needs proof.
+
+D39.8's GPU sidegrade ban is amended: a **type change at the same generation and tier** is a cold replace. Pay any positive card-value difference, charge nothing between equal-value types, and never refund a fall in value. Type changes are direct keys. An empty bay defaults to the newest researched generation the wallet covers, or the newest if none is affordable. Both routine GPU steps are pinned; Remove has no price. Root's four-viewport check confirms explicit exact-price tier purchase, two whole footer steps and an unchanged frame.
+
+After Rack fee regeneration root independently passes 197 files/1,850 tests, typecheck and build; Opus reports an overall passing bench. Root's fresh seed-42 eight-hour run reaches System at 22:59.5 and Rack at 3:54:04, with four systems, 264 purchases and 1,662,415,751 Credits. Its active opening is still 9:36.8 and choice gaps 13.1/39.4 minutes: those gates fail. The report's old 5–7 h Rack comparison is stale against the adopted band; preserve the old report and update the probe's target separately.
+
+The no-purchase opening drifts to 57–147 s (D20); the two-hour drain lasts 3–4.5 minutes. Skipped work is nominal unpaid payout, not guaranteed recoverable earnings: clearing a fit gate can leave a network, compute or energy constraint. Quantifying how much memory a wall needs and showing a purchase that clears it are next, not completed by these changes.
+
+### 26 Oct: report requirements and explicit upgrade routes
+
+The assigned Opus lead implements the report portion of slice 3. Version 20 adds a bounded `hot.skipLog` of the first 64 skipped `(family, size)` pairs and copies them to `report.skipped.tasks`. Versions 17–19 migrate with an empty historical log; preserve the GPU fold and retired-research migration for the versions that need them. Total skipped count/work remain totals for the whole round; strip and route counts describe logged tasks.
+
+`{kind:'wall', system}` offers at most two routes searched from level-ups, adds and RAM/drive generation replacements. Route counts apply the market's capability check to the purchased state. A direct route buys once. A two-step route exposes both priced keys, each step's own fit, total and shortfall before purchase. Step 2 unlocks only after step 1 and stays in the same frame. Another route pauses while the chosen route is in progress. This is two explicit purchases on the report, not an undisclosed bundle. A normalized RAM energy ratio below one warns and ranks after non-loss routes. Fit is not paid work or net income.
+
+Root's four-viewport native check compares each purchase's exact wallet and full build with the public pure action, checks locked/enabled step 2 and exact frame stability, and sees one task light. Small phone and landscape require one wheel scroll. Root's full verification passes 198 files/1,859 tests, typecheck and build. A visible shortfall-note clipping issue remains for the next correction; successful transactions alone do not establish complete disclosure.
+
+The measured affordable routes remain weak: 40,040 Credits fits one of 45 at 24 minutes, and 58,394 fits one of 51 near two hours. The 29M DDR path fits 27 and improves reach/net per round, but net/s stays flat and it needs eleven rounds of saving. This is better information about the existing loop, not a resolved gratification problem. Rewarding affordable progression remains the product lead's next priority; RAM/cache plates are not part of this completed report handoff.
+
+### 26 Oct: user rejects automatic skipping, restore SLA and stop
+
+> tasks shouldnt auto skip thats how SLA drops. manually skipping gives meaning for active playing vs idle.
+>
+> ok revert the SLA blunder then full stop.
+>
+> sorry i didnt mean that skill i meant just stop.
+
+This supersedes the automatic skip, outgrown/closing end and skip-report directions above. Restore D10.3: the head waits for its 10 s pickup window; an unsupported head then fails as `cantRun` and affects SLA. A runnable head that is not taken times out. Manual dismissal stays free, outside SLA, and promotes the next task. Active manual dismissal must retain its advantage over idle play. Power/heat/swap diagnosis, the rolling SLA window and the existing stall safeguard remain.
+
+Remove the skip-based report line, wall plot/routes and “A fit, not pay” copy from the visible game. Preserve unrelated hardware-choice, currency-icon, stable-frame and GPU-tier work. The retired `autoSkip` node does not return. Earlier skip logs and end reasons may remain only for save compatibility; they must not keep a loaded round closed or produce automatic skips.
+
+The authorized work is limited to this correction and verification, then all agent implementation/design work stops. “Full stop” here is plain language, explicitly not the repository's PR workflow skill. No commits, PRs, pushes or further incentive work are requested. No claimed incentive redesign has been accepted.
+
+### D40, 26 Oct: show the frontier and the runway to the next era (user-approved mockups 1 and 3)
+
+Rounds restart at `I = 0` (D30), so a later round's report read the same as an earlier one, and era save-ups (about 1.3 h of pipe plateau before Rack at 3:54) looked like stalls. Both are now shown from real state only (spec §4.7, §16.3):
+
+- **Frontier, at round end only.** `round.frontier` saves the best tasks per round, best peak `I` and families ever taken. Each report freezes prior records, first-taken families and the milestone's runway marks at Return and round end. The lead heading is the task count, followed by a ruler from 0 with count labels on an endless ladder (10, 15, 20, 30, 50, 75, 100, then six per ×10). Best sits in its own row, followed by Next era and Round details. Auto return and Return to market sit in the footer. The user removed Next goal, the failure summary and the fix key on 26 Oct; causes remain in details. The task-count heading uses `--mid` as a header under D2.1. Tasks per round can grow to millions without exhausting the ladder.
+- **Runway, in Research.** `selectRunway` reads `MILESTONE_IDS`, tree names, costs, work and summaries, the wallet and the last three reports. The approved Research C layout has a running-project bar, a one-line Next era strip, level filters and ready rows. The era strip opens the milestone, Data/Credits meters, or work progress once paid, and the binding currency's pace. The three latest round earnings form the last blocks of each wallet meter, clamped honestly after spending. The CPU frequency-tier line is preserved. Locked and done projects share one compact fold. Auto return, duplicate estimates and Pays now were removed from Research. New milestones use their tree data; only fab abbreviations and the structure opening descriptions are supplied by the UI.
+
+**User corrections, 26 Oct:** "you only need to see that progress at the end of the round. it means nothing during. do not ever clutter the game." The in-round frontier track and reserved strip, frontier feed events and Research tile's era line were removed. Later review removed tier names, the best line crossing the bar, Next goal, the failure summary and the fix key. Net and Data comparisons and first-taken families live in Round details. Research uses the user's chosen mockup C.
+
+The rejected 26 Oct skip report stays out: no skipped-payout line, wall plot, fit-count routes or "A fit, not pay" copy. Its dead code (`WallFix`, wall quotes and view, `report.skipped`, the `outgrown` end, feed `closing`/`skipped`, the `skipped` event) is removed. Saves before v24 (which adds the best tasks per round) reset (pre-live policy, no migrations).
+
+**Tests, 26 Oct (user).** Nearly all tests, test fixtures, the test oracle, save migrations and the design probes (`scripts/market-model.ts`, `probe-hardware-progression.mjs`) were removed so agents work faster. Five core-invariant test files remain: `purity`, `amount`, `core/advance` (delta invariance), `core/owned` (D9) and `save/serialize`. New tests are added only when the user asks; AGENTS.md says how to verify instead. Mentions above of removed tests and probes are historical.
+
+**UI cleanup, 26 Oct.** The Opus audit and Sol implementation pass removed redundant subtitles and repeated research locks, standardized plate spacing to 4/8/12/16 px, and kept controls at least 44 px with 48 px footer actions. Mixed GPU/drive labels describe the installed hardware; routing and unit names are shared across views. Callouts use parent-relative unit slots through `selectUnitLabel`, rather than saved IDs. Research summaries name concrete costs, ceilings or behavior. No balance changes belong to this copy pass.
+
+Open: the optional next-container silhouette is not drawn. Runway pace counts round time only, not breaks between rounds. The second-RAM bandwidth quote flagged by the audit needs a separate simulation investigation.
+
+### D41 and D42, archived CPU experiments
+
+The die grid, process nodes, workbench, replacement artwork, routing effects and five small-pixel variants are preserved on branch `design/cpu-redesign-experiments`, commit `040c8d0c`. Their rules apply only on that branch.
+
+### D43, 27 Oct: restore the original CPU (user)
+
+The user chose the original stacked CPU shown in their screenshot. Main uses its queue, cache bar, clock row and purple core cards. The CPU model again has package, cores, clock and L1/L2/L3 parts, 32 core sites, tier fabs and Replace CPU. The pre-Rack pipe and System-era PSU activation return. D41 and D42 are not active decisions on main. GPU tier work, report/research improvements and other unrelated edits remain. Save version 26 resets older saves under the pre-live policy.
+
+### D44, 27 Oct: direct paths between upgrades and research
+
+The user found the upgrade and research popups clunky, with too many clicks to reach the intended location.
+
+- Opening research from an upgrade or task keeps that origin in UI state. The source dialog is hidden while Research owns focus; Back, Close and Escape return to the same target instead of making the player find it again.
+- Prerequisite navigation keeps a local history of the previous project, filter, search and scroll position. Back returns through that history before leaving Research.
+- Find research searches the whole tree by project name, part or summary. Locked projects can be found without opening levels and folds first; their existing prerequisite keys remain available.
+- Compact rows expose Start, Resume or Queue directly when the existing research state permits it. Prices remain visible. A fixed action column avoids shifting controls as balances or research status change. Projects waiting on another project say Waiting. Details do not duplicate an action already on the row.
+- Cache in the system summary opens L1 cache upgrades directly, rather than opening CPU and requiring another drill and cache selection. The plate reads the system's existing chip snapshot and the normal simulation quote.
+
+Navigation spends nothing. Purchases and research starts remain explicit actions with their existing prices and rules. No game rules, balance, save fields or save version change in this refinement.
+
+
+## D45: 27 Oct: concise research and repeatable purchases
+
+The user rejected the research panel clutter. Opening a row now shows the effect, exact currency cost, processing work and unmet prerequisite links together. Remove the extra Details disclosure, status/era strips, search, forecasts, counts and locked/done fold. Locked research uses the same row with its light off. Discovery follows installed hardware, current stage and the next container unlock; explicit project links retain their prerequisite path. Keep D44's origin return and prerequisite Back navigation.
+
+C-state replaces C1/C3/C6. C-state, Memory voltage and Boot loader each have 36 immediate purchase levels. Level 1 both unlocks and applies for 100,000 Credits; each later whole-Credit price is the previous price x 1.8, rounded up. No Data or processing work is required, and a purchase leaves processor research running. Use the CPU/RAM CSV level effects, not their former unlock or price columns. C-state and Memory voltage factors run from 0.72 to 0.02; Boot loader latency runs from 9.20 to 0.10 seconds, rounded to simulation ticks. Ignore manual/manualcost as test data. C-state is enabled by the first purchase and has one On/Off setting rather than C1/C3/C6 choices. It is discovered after System, where real component power begins. Package C-states retains the deepest-sleep prerequisite (now C-state 36); DVFS requires level 1.
+
+The research change resets obsolete pre-live research IDs and settings without migration. The combined working tree uses save version 28 with the concurrent memory-processing change.
+
+## D46, 27 Oct: loading and cache traffic consume hardware work
+
+The user requires loading to take time: four cache bits plus four processing ops on one 1 Hz thread take eight seconds. This supersedes D26.2's free-cache rule.
+
+Every shard loads its reserved working set before its authored stages, including compute-only tasks. Cache loading consumes one CPU op per bit on the shard's assigned threads. RAM and disk loading consume bits at their own bandwidth and IO rates. Loads run in cache, RAM, disk order. Unified-memory VRAM overflow also loads into its RAM and disk placement. Subsequent memory traffic pays for every tier, including CPU ops for cache hits. Loading is separate from network transfer, task payout and payload. There are no added fixed timers.
+
+Existing progression supplies the hardware differences: SDRAM through DDR5 each have a separate base bandwidth and 36 speed levels at 1.5× per level; HDD, SSD, NVMe and SCM have distinct IO rates and levels that double IO. These are scaled game rates, rather than literal real-world RAM MHz. No catalog prices or progression curves change in this ruling.
+
+Initial loads use `rec.part` 3–5 on the existing CPU, RAM and IO clocks. Memory stages retain parts 0–2. Scheduling estimates include loading and remaining work; split floors include finite memory work. Snapshots identify the loading tier, and spill totals include loads. Save version 28 resets older saves without migration because in-flight part meanings change.
+
+Visual follow-up: cache lights show loaded bits, including a partial fill within a one-bit light. Reserved capacity does not light immediately. Loaded bits stay lit through processing and turn off when released; CPU miniatures use the same value. Core cards name their current CPU work as Cache load, Cache read or Compute. Compact grids use Load, Cache and Compute, with a fixed activity line beneath the clock speed. Cache work uses the cache color. Both cache lights and core bars follow actual work-clock progress, with no decorative pulse or separate UI timer. These are snapshot and rendering changes; save version remains 28.
+
+## D47, 27 Oct: consistent close buttons and forward progress
+
+The user requires Research to match the other popups' close button. Research now shares the plate close-button style, size, border and icon color. Core and component progress bars fill from 0% to 100%. Large cores, core grids, CPU miniatures and GPU cards draw the completed stage fraction directly, replacing the inverse remaining-work display. Simulation progress and timing do not change.
+
+The user also requires task-popup details to stay visible. Description, processing work and capable-system count appear directly in the popup; the Details toggle is removed.
+
+## D48, 27 Oct: remove saving and progression forecasts
+
+The user rejected time frames for saving up and similar predictions. Unaffordable purchases say "Saving up" without an ETA. Remove upgrade/replacement payback times, research completion/affordability ETAs and era pace forecasts, including predicted round counts. Keep real prices, shortfalls, progress, measured income and gameplay clocks. This changes presentation only; simulation rates, costs and internal balance calculations stay in the simulation.

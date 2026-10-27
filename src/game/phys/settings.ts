@@ -2,7 +2,6 @@ import type { BuildState } from '../types/build';
 import type { RuleId } from '../types/catalog';
 import type { Unlocks } from '../types/state';
 import type { World } from '../core/world';
-import { CSTATES } from './constants';
 
 /** Per-system switch bits, after the matching research rule. */
 export const SYS_DVFS = 1;
@@ -33,24 +32,19 @@ export interface PhysSettings {
   readonly dualFeed: boolean;
   readonly rideThrough: boolean;
   /** The board PSU exists as a supply (System opened, spec §9.2). */
+  readonly realDraw: boolean;
   readonly psuLive: boolean;
 }
 
 /**
- * C1, C3 and C6 each grant `coreIdle` with their own factor (research tree). Prerequisites force
- * C1 → C3 → C6, so the merged params hold the deepest one; its factor names the state.
+ * One idle sleep mode uses the factor of the highest purchased C-state level.
  */
 const deepestResearched = (rules: readonly RuleId[], params: Unlocks['ruleParams']): number => {
   if (!rules.includes('coreIdle')) return 0;
-  const factor = params.coreIdle?.factor ?? CSTATES[0].factor;
-  let index = 1;
-  CSTATES.forEach((c, i) => { if (factor <= c.factor) index = i + 1; });
-  return index;
+  return (params.coreIdle?.level ?? 0) > 0 ? 1 : 0;
 };
 const limitIndex = (limit: number): number => {
-  let index = 0;
-  CSTATES.forEach((c, i) => { if (c.depth <= limit) index = i + 1; });
-  return index;
+  return limit > 0 ? 1 : 0;
 };
 
 export function deriveSettings(build: BuildState, unlocks: Unlocks, nSys: number, nRack: number, nRoom: number): PhysSettings {
@@ -82,7 +76,7 @@ export function deriveSettings(build: BuildState, unlocks: Unlocks, nSys: number
     sys, cmax, pduCapped, rackSetpointF, roomSetpointF, upsCount, upsRide,
     packageIdle: has('packageIdle'), s3Sleep: has('s3Sleep'), throttle: has('thermalThrottle'),
     rackSetpoint: has('rackSetpoint'), roomSetpoint: has('roomSetpoint'), economizer: has('economizer'),
-    dualFeed: has('dualFeed'), rideThrough: has('upsRideThrough'), psuLive: unlocks.levels.system,
+    dualFeed: has('dualFeed'), rideThrough: has('upsRideThrough'), realDraw: unlocks.levels.system, psuLive: unlocks.levels.system,
   };
 }
 

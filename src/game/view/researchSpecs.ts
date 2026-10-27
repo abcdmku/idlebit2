@@ -1,10 +1,9 @@
 import { viewW } from '../core/constants';
 import { capacity, ladderSpeed, partName, PARTS } from '../build/catalog';
-import { gpuModel } from '../build/catalog/gpuModels';
+import { ROUTE_NAMES } from './labels';
 import { LEVEL_NAMES } from '../core/constants';
 import { formatHertz, formatSize, formatWatts } from '../format';
 import type { RouterBuild, SwitchBuild } from '../types/build';
-import type { RouteStrategyId } from '../types/catalog';
 import type { NodeRef } from '../types/ids';
 import type { GameState } from '../types/state';
 import type { ResearchPartId, ResearchPartView } from '../types/views';
@@ -15,13 +14,9 @@ import type { ResearchPartId, ResearchPartView } from '../types/views';
  * part not owned yet (no such slot filled, or its level not opened).
  */
 
-const NONE = 'none';
+const NONE = '—';
 const plural = (n: number, one: string, many = `${one}s`): string => `${n} ${n === 1 ? one : many}`;
-const STRATEGY: Readonly<Record<RouteStrategyId, string>> = {
-  firstFit: 'FIFO', roundRobin: 'Round robin', leastConn: 'Least conn', weighted: 'Weighted', leastWork: 'Least work',
-  binPack: 'Bin packing', latency: 'Latency', price: 'Price', affinity: 'Affinity', linkAware: 'Link-aware',
-};
-const routerSpec = (r: RouterBuild): string => `${STRATEGY[r.strategy] ?? r.strategy} · queue ${r.queueLevel}`;
+const routerSpec = (r: RouterBuild): string => `${ROUTE_NAMES[r.strategy].name} · queue ${r.queueLevel}`;
 const switchSpec = (sw: SwitchBuild): string =>
   sw.ports.length ? `${formatHertz(ladderSpeed(Math.max(...sw.ports)))} · ${plural(sw.ports.length, 'port')}` : NONE;
 const psuName = (gen: number): string => partName('psu', gen);
@@ -50,7 +45,8 @@ export function researchPartSpecs(state: GameState, at: NodeRef | null = null): 
   const cacheBits = cpu ? capacity(PARTS.l1, cpu.l1.gen, cpu.l1.level) + (cpu.l2 ? capacity(PARTS.l2, cpu.l2.gen, cpu.l2.level) : 0)
     + (cpu.l3 ? capacity(PARTS.l3, cpu.l3.gen, cpu.l3.level) : 0) : 0;
   const gpus = spec?.accels.filter((a) => a.kind === 'gpu') ?? [], npus = spec?.accels.filter((a) => a.kind === 'npu') ?? [];
-  const gpuGen = gpus[0]?.kind === 'gpu' ? gpuModel(gpus[0].model)?.generation : undefined;
+  const models = gpus.map(g => g.model);
+  const gpuText = models.every(m => m === models[0]) ? `${models[0]}${models.length > 1 ? ` ×${models.length}` : ''}` : models.join(' + ');
   const backbones = b.sites.filter((x) => x?.opened && x.backbone);
   const top = (['global', 'room', 'rack', 'system', 'chip'] as const).find((l) => state.research.unlocks.levels[l]) ?? 'chip';
   const line = (spec: string): ResearchPartView => ({ spec });
@@ -64,7 +60,7 @@ export function researchPartSpecs(state: GameState, at: NodeRef | null = null): 
     cpu: line(cpu ? `${partName('cpu', cpu.cpu.gen)} · ${plural(spec!.cpuCount, 'CPU')}` : NONE),
     ram: line(spec?.ram[0] ? `${partName('ram', spec.ram[0].gen)} · ${plural(spec.ram.length, 'stick')}` : NONE),
     drive: line(spec?.drives[0] && s >= 0 ? `${partName('storage', spec.drives[0].gen)} · ${formatSize(c.sys.storageCap[s] ?? 0)}` : NONE),
-    gpu: line(gpuGen !== undefined ? `GPU gen ${gpuGen}${gpus.length > 1 ? ` · ${gpus.length} cards` : ''}`
+    gpu: line(models.length ? `GPU ${gpuText}`
       : npus[0]?.kind === 'npu' ? partName('npu', npus[0].gen) : NONE),
     psu: line(spec ? psuName(spec.psu.gen) : NONE),
     board: line(spec ? (spec.board === 'accelerator' ? 'Accelerator board' : 'General board') : NONE),

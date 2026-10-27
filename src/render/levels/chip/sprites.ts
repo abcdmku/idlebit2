@@ -107,13 +107,13 @@ export function clockBlock(g: G, r: Rect, tick: boolean): void {
   R(g, lx - 1, ly - 1, 4, 4, P.ink); R(g, lx, ly, 2, 2, tick ? P.amber : '#3b2a12');
   if (tick) { g.globalAlpha = 0.35; R(g, lx - 2, ly - 2, 6, 6, P.amber); g.globalAlpha = 1; }
 }
-/** Shared cache: one cell per bit up to 32 bits, then a fill bar. Lit = held by running work. */
+/** Shared cache: each bit's light fills during its load; larger caches use one continuous bar. */
 /**
  * `spilled` (D26 `cache.spilledOutBits`): bits of running shards that didn't fit and went on to RAM.
  * They show as a hatched overflow block in the RAM colour at the bar's right end, up to a third of it,
  * in proportion to the spill against the cache size.
  */
-export function cacheBlock(g: G, r: Rect, bits: number, used: number, spilled = 0): void {
+export function cacheBlock(g: G, r: Rect, bits: number, loaded: number, spilled = 0): void {
   const top = prism(g, r.x, r.y + 3, r.w, r.h - 3, 3, { top: P.sram, front: P.sramLo });
   const cy = top.y + top.h - 9, x0 = top.x + 4, w = top.w - 8;
   if (bits >= 1 && bits <= 32) {
@@ -121,12 +121,13 @@ export function cacheBlock(g: G, r: Rect, bits: number, used: number, spilled = 
     const step = cell + (bits <= 16 ? 2 : 1);
     for (let i = 0; i < bits; i++) {
       const x = x0 + i * step;
-      R(g, x - 1, cy - 1, cell + 2, 8, P.ink); R(g, x, cy, cell, 6, i < used ? P.cacheOn : P.sramLo);
-      if (i < used) R(g, x, cy, cell, 1, '#ffffff');
+      const fill = Math.round(cell * Math.max(0, Math.min(1, loaded - i)));
+      R(g, x - 1, cy - 1, cell + 2, 8, P.ink); R(g, x, cy, cell, 6, P.sramLo);
+      if (fill > 0) { R(g, x, cy, fill, 6, P.cacheOn); R(g, x, cy, fill, 1, P.paper); }
     }
   } else {
     R(g, x0 - 1, cy - 1, w + 2, 8, P.ink); R(g, x0, cy, w, 6, P.sramLo);
-    if (bits > 0) R(g, x0, cy, Math.round((w * Math.min(used, bits)) / bits), 6, P.cacheOn);
+    if (bits > 0) R(g, x0, cy, Math.round((w * Math.max(0, Math.min(loaded, bits))) / bits), 6, P.cacheOn);
   }
   if (spilled > 0) {
     const k = Math.max(3, Math.round((w / 3) * Math.min(1, spilled / Math.max(1, bits))));

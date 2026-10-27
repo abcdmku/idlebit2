@@ -7,20 +7,8 @@ import type { Layout } from '../core/table';
 /** Retains the v3 envelope; earlier layouts reset without migration (AGENTS.md). */
 export const SAVE_SCHEMA = 'bitrouge-v3' as const;
 /** Bumps on any layout or plain-state shape change; a different version is rejected. */
-// Pre-live reset: v4 saves hold the D9 arrival plan and pending feed; D10 replaced both with the endless queue.
-// Pre-live reset: v6 adds saved per-family round work and dismissal counters.
-// Pre-live reset: v7 is D25 (divisible tasks): record units/shard/parent, the parent pool and router queues.
-// Pre-live reset: v8 is D26 (memory hierarchy, windows): record placement and parts, parent windows, the deadline ring.
-// Pre-live reset: v9 is D27 (research is a task that cuts the line): research holders in hot, the research modes removed.
-// Pre-live reset: v10 adopts the CSV clock and RAM progression (36 levels, ×1.5 per level): saved levels change meaning.
-// Pre-live reset: v11 is D28 (SLA is a count ratio over the last 50 resolved tasks): the window in hot.g.
-// Pre-live reset: v12 is D31 (start controllers, rack batteries, site generation): build parts, start hot state, the standby mode.
-// Pre-live reset: v13 adds the D31 runtime's back-to-standby clock (offSinceTick).
-// Pre-live reset: v14 is D33 (stall end): the last met tick in hot.g.
-// Pre-live reset: v15 is D34 (one Multi-core node, no lanes): core levels and lane research are gone.
-// Pre-live reset: v16 binds running records to hardware threads (rec.thread0): cores keep their tasks.
-// Pre-live reset: v17 is D39 (research never unlocks a part type or count; 141 nodes).
-export const SAVE_VERSION = 17;
+// Pre-live reset: v28 adds initial memory loads and charges cache traffic as CPU work.
+export const SAVE_VERSION = 28;
 
 export interface SaveEnvelope {
   readonly schema: typeof SAVE_SCHEMA;

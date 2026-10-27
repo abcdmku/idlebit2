@@ -1,3 +1,4 @@
+import { chipScene } from '../levels/chip/scenes';
 // Development and test fixture: two plain box levels (system board, chip) and a minimal
 // RenderSnapshot. No sim code runs. Real levels come from R2 and R3.
 import type { ChipSnapshot, GameEvent, RenderSnapshot, SupplyView, SystemSnapshot } from '../../game';
@@ -20,12 +21,7 @@ const SUPPLY: SupplyView = { kind: 'psu', generation: 0, level: 1, capacityW: 4,
   overloadS: 0, failed: false, rebootMs: null, loss: 0, lossW: 0, capped: false, capFactor: 1, creditsPerMinute: 0 };
 
 export function fixtureChip(online: ChipSnapshot['online'] = 'onMarket'): ChipSnapshot {
-  return {
-    level: 'chip', parent: { level: 'system', id: systemId(0) }, systemId: systemId(0), cpuCount: 1, online, tier: 0, psu: SUPPLY,
-    clock: { hz: 1, effectiveHz: 1, generation: 0, level: 1 }, coreSites: 4,
-    cores: [], cache: { levels: [], usedBits: 0, capacityBits: 0, spilledOutBits: 0 }, scheduler: null, queue: [], researchShare: 0, slots: [],
-    pipe: { speed: 1000, transfer: null, waiting: false },
-  };
+  return { ...chipScene('boot'), online };
 }
 export function fixtureSystem(online: SystemSnapshot['online'] = 'onMarket'): SystemSnapshot {
   const part = { slot: 0, kind: 'cpu' as const, generation: 0, level: 1, active: false, resourceBusy: 0 };
@@ -54,7 +50,7 @@ export function fixtureSnapshot(focus: LevelSnapshot, partner: LevelSnapshot | n
     research: { active: null, name: null, progress: 0, stoppedInsolvent: false, needsData: false, queued: 0, opsPerSec: 0 },
     unlocked: { chip: true, system: true, rack: true, room: true, global: true },
     home: { chip: { level: 'chip', id: systemId(0) }, system: { level: 'system', id: systemId(0) } },
-    round: { index: 1, state: round, lastReport: null, canReturn: false, autoReturn: { available: false, on: false, inMs: null } },
+    round: { index: 1, state: round, lastReport: null, frontier: { bestI: 0, bestRound: 0, reaches: [] }, canReturn: false, autoReturn: { available: false, on: false, inMs: null } },
     focus, partner, events, firstSeq: events[0]?.seq ?? 0, lastSeq: events.at(-1)?.seq ?? 0,
   };
 }

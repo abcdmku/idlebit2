@@ -1,8 +1,13 @@
 import { useEffect, useRef } from 'react';
 
-/** Static card art ported from the approved GPU plate. Idle fans do not animate. */
-export function GpuCard() {
+/**
+ * Card art ported from the approved GPU plate. One memory chip per tier (tier 30 = 1 … tier 90 = 6); the chips
+ * light in proportion to the card's real duty last tick, so a busier card lights more of them. Idle fans do not
+ * animate. Without a card (a catalog preview), no chips light.
+ */
+export function GpuCard({ tier = 0, busy = 0 }: { tier?: number; busy?: number }) {
   const ref = useRef<HTMLCanvasElement>(null);
+  const chips = Math.max(1, Math.min(6, tier + 1)), lit = Math.round(Math.max(0, Math.min(1, busy)) * chips);
   useEffect(() => {
     const g = ref.current?.getContext('2d');
     if (!g) return;
@@ -15,9 +20,9 @@ export function GpuCard() {
       r(x - 7, 16, 14, 7, '#5b5f7c'); r(x - 4, 14, 8, 11, '#5b5f7c');
       r(x - 5, 16, 5, 3, '#8c90ad'); r(x, 19, 5, 3, '#8c90ad'); r(x - 2, 17, 4, 4, '#24203a');
     }
-    for (let x = 13; x < 72; x += 6) r(x, 29, 3, 2, '#0e0b1c');
+    for (let i = 0; i < chips; i++) { r(12 + i * 10, 28, 8, 4, '#0e0b1c'); r(13 + i * 10, 29, 6, 2, i < lit ? '#ff7ad9' : '#3d3858'); }
     r(77, 28, 8, 4, '#5b5f7c'); r(11, 32, 64, 1, '#7a2a6e'); r(17, 35, 58, 3, '#7d5a24');
     for (let x = 19; x < 74; x += 4) r(x, 35, 2, 2, '#e8ae45');
-  }, []);
-  return <canvas ref={ref} width={96} height={42} aria-hidden="true" />;
+  }, [chips, lit]);
+  return <canvas ref={ref} width={96} height={42} aria-hidden="true" data-chips={chips} data-lit={lit} />;
 }

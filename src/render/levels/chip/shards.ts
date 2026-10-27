@@ -1,7 +1,7 @@
 // D25 pieces on the CPU: a shard runs on `shardThreads` cores at once, so the cores holding one
 // shard (equal taskId and shard) are outlined in its task type's colour as one group, joined across
-// the gaps between neighbours. Each core's piece is the work it still holds (1 − progress), so it
-// empties as the shard finishes. Real state only: nothing moves unless the core's progress does.
+// the gaps between neighbours. Each core's piece fills from empty to full as the shard progresses.
+// Real state only: nothing moves unless the core's progress does.
 import { familyId } from '../../../game';
 import type { CoreView } from '../../../game';
 import { P, R, drawTypeMini, frame as outline, typeColor, typeOf } from '../../core';
@@ -10,25 +10,23 @@ import type { Rect } from '../../core';
 type G = CanvasRenderingContext2D;
 
 /** The task type colour of the shard a core runs (D23), or null when it runs none. */
-export const coreColor = (c: CoreView): string | null => (c.family === null ? null : typeColor(typeOf(familyId(c.family))));
+export const coreColor = (c: CoreView): string | null => c.activity === 'cacheLoad' || c.activity === 'cacheAccess'
+  ? P.cacheOn : c.family === null ? null : typeColor(typeOf(familyId(c.family)));
 /** Two cores run one shard: the same task and shard index. */
 export const sameShard = (a: CoreView, b: CoreView): boolean => a.taskId !== null && a.taskId === b.taskId && a.shard === b.shard;
-/** The work a piece still holds, 0..1. */
-export const remaining = (progress: number): number => 1 - Math.max(0, Math.min(1, progress));
-
-/** A piece gauge: an ink well and the remaining work in `colour`, draining right to left. */
-export function drawPiece(g: G, x: number, y: number, w: number, h: number, left: number, colour: string): void {
+/** A progress gauge: an ink well filling left to right in the task's colour. */
+export function drawPiece(g: G, x: number, y: number, w: number, h: number, progress: number, colour: string): void {
   R(g, x, y, w, h, P.ink); R(g, x + 1, y + 1, w - 2, h - 2, P.logicLo);
-  const fw = Math.round((w - 2) * Math.max(0, Math.min(1, left)));
+  const fw = Math.round((w - 2) * Math.max(0, Math.min(1, progress)));
   if (fw > 0) R(g, x + 1, y + 1, fw, h - 2, colour);
 }
 /** The piece inside a small grid core site: a 4 art tall gauge at the foot of its top face. */
-export function drawGridPiece(g: G, r: Rect, left: number, colour: string, family: number | null = null): void {
+export function drawGridPiece(g: G, r: Rect, progress: number, colour: string, family: number | null = null): void {
   if (r.w < 6 || r.h < 10) return;
-  // Under the speed label: the running task's type mini at the foot, then its piece draining beside it.
+  // Under the speed label: the running task's type mini at the foot, then its progress beside it.
   const type = family !== null ? typeOf(familyId(family)) : null, by = r.y + r.h - 8;
-  if (type && r.w >= 20) { drawTypeMini(g, type, r.x + 3, by - 1); drawPiece(g, r.x + 10, by, r.w - 13, 4, left, colour); return; }
-  drawPiece(g, r.x + 1, by, r.w - 2, 4, left, colour);
+  if (type && r.w >= 20) { drawTypeMini(g, type, r.x + 3, by - 1); drawPiece(g, r.x + 10, by, r.w - 13, 4, progress, colour); return; }
+  drawPiece(g, r.x + 1, by, r.w - 2, 4, progress, colour);
 }
 
 /**

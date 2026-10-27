@@ -14,9 +14,10 @@ import { inboundTransfer, shardOf } from './flows';
 import { forEachRunning, stageProgress } from './tasks';
 import { coreOccupancy } from './common';
 import { spilledOutOfCache } from './memory';
+import { PART_LOAD_CACHE } from '../exec/memory';
+import { FAMILIES } from '../market/families';
 
-const CSTATES = [0, 1, 3, 6] as const;
-const cstateOf = (v: number | undefined): CoreView['cstate'] => (CSTATES.includes(v as 0) ? (v as CoreView['cstate']) : 0);
+const cstateOf = (v: number | undefined): CoreView['cstate'] => v === 1 ? 1 : 0;
 const genOpen = (state: GameState, part: PartId, gen = 0): boolean => ((state.research.unlocks.gens[part] ?? 0) & (1 << gen)) !== 0;
 
 /** Fraction of system s's threads held by the research task (D27, spec §11.2). 0 when it is not a holder. */
@@ -87,14 +88,20 @@ export function chipSnapshot(state: GameState, id: SystemId, parent: NodeRef | n
   const fam = new Int32Array(nCores).fill(-1);
   const taskIds: (number | null)[] = Array(nCores).fill(null);
   const prog = new Float64Array(nCores);
+  const activity: CoreView['activity'][] = Array(nCores).fill(null);
   const shardIx = new Int32Array(nCores).fill(-1), group = new Int32Array(nCores);
   const rack = c.rack[id] ?? 0;
   const show = (r: number, core: number, held: number) => {
     fam[core] = rec.family[r] ?? 0; taskIds[core] = rec.taskId[r]!; prog[core] = stageProgress(state.hot, state.clock.tick, r, rack, id, 0);
+    activity[core] = rec.part[r] === PART_LOAD_CACHE ? 'cacheLoad'
+      : FAMILIES[rec.family[r] ?? 0]?.stages[rec.stage[r] ?? 0]?.resource === 'mem' ? 'cacheAccess' : 'compute';
     shardIx[core] = shardOf(state.hot, r).shard; group[core] = held;
   };
   const unbound: number[] = [];
+  let loadedBits = 0;
   forEachRunning(state, id, (r, res) => {
+    const loaded = rec.part[r] === PART_LOAD_CACHE ? stageProgress(state.hot, state.clock.tick, r, rack, id, 0) : 1;
+    loadedBits += (rec.memC[r] ?? 0) * (rec.count[r] ?? 1) * loaded;
     if (res !== 0) return;
     const held = (rec.threads[r] ?? 1) * (rec.count[r] ?? 1), t0 = rec.thread0[r] ?? -1;
     if (t0 < 0) { unbound.push(r); return; }
@@ -118,11 +125,11 @@ export function chipSnapshot(state: GameState, id: SystemId, parent: NodeRef | n
   const liveHz = paused ? hz : draw === DRAW_NONE || draw === DRAW_SLEEP ? 0 : hz * (h.clockFactor[id] ?? 1);
   const cores: CoreView[] = parts.map((part, i) => {
     const busy = occ[i]!;
-    const sleep: CoreSleep | null = paused ? null : draw === DRAW_SLEEP ? 'S3' : draw !== DRAW_NONE && busy === 0 && cstate > 0 ? `C${cstate as 1 | 3 | 6}` : null;
+    const sleep: CoreSleep | null = paused ? null : draw === DRAW_SLEEP ? 'S3' : draw !== DRAW_NONE && busy === 0 && cstate > 0 ? 'C-state' : null;
     return {
       socket: 0, rate: hz, generation: part.gen, level: part.level, busy,
       hz: sleep === null ? liveHz : 0, sleep,
-      taskId: taskIds[i]!, family: fam[i]! >= 0 ? familyId(fam[i]!) : null, progress: prog[i]!, threads: tpc,
+      taskId: taskIds[i]!, family: fam[i]! >= 0 ? familyId(fam[i]!) : null, activity: activity[i]!, progress: prog[i]!, threads: tpc,
       shard: shardIx[i]! >= 0 ? shardIx[i]! : null, shardThreads: group[i]!,
       research: share > 0 ? Math.min(1 - busy, share) : 0, cstate: busy > 0 ? 0 : cstate,
     };
@@ -145,6 +152,7 @@ export function chipSnapshot(state: GameState, id: SystemId, parent: NodeRef | n
     coreSites: Math.min(state.research.unlocks.ceilings.coreSites, MAX_CORES_PER_CPU), cores,
     cache: {
       levels: st.levels, usedBits: Math.min(capacityBits, (h.usedCache[id] ?? 0) / Math.max(1, cpus)), capacityBits,
+      loadedBits: Math.min(capacityBits, loadedBits / Math.max(1, cpus)),
       spilledOutBits: spilledOutOfCache(state, id),
     },
     scheduler, queue: queued.slice(0, scheduler?.q ?? 0).map((r) => ({ taskId: rec.taskId[r]!, family: familyId(rec.family[r]!) })),

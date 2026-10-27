@@ -204,24 +204,3 @@ export const summarized = (kind: number): boolean => routeSummary.on && (kind ==
 /** The D24 rank of child u of a router of `kind` (SITE: a zone; GLOBAL: a site). */
 export const summaryRank = (w: World, kind: number, u: number, r: number): number =>
   kind === SITE ? zoneRank(w, u, r) : siteRank(w, u, r);
-
-/** Brute force for tests: the lowest backlog per class over room m's systems that can admit now. */
-export function bruteRoomMin(w: World, m: number): number[] {
-  const c = w.compiled, b = backlogFor(w, memo.phase), cls = classIndex(c);
-  const out = Array.from({ length: Math.max(1, classesOf(c).length) }, () => Infinity);
-  for (let k = 0; k < RACKS_PER_ROOM; k += 1) {
-    const r = c.room.racks[m * RACKS_PER_ROOM + k]!;
-    for (let j = 0; r >= 0 && j < SERVERS_PER_RACK; j += 1) {
-      const sys = c.rack.servers[r * SERVERS_PER_RACK + j]!;
-      if (sys < 0 || c.sys.alive[sys] !== 1 || (cls[sys] ?? -1) < 0 || !canAdmit(w, sys)) continue;
-      out[cls[sys]!] = Math.min(out[cls[sys]!]!, b.units[sys]!);
-    }
-  }
-  return out;
-}
-
-/** The maintained per-class minima of room m (tests). */
-export function roomMinOf(w: World, m: number): number[] {
-  const s = current(w);
-  return Array.from(s.roomMin.subarray(m * s.classes, m * s.classes + s.classes));
-}

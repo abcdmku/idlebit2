@@ -1,5 +1,5 @@
 // One meet line as a key (user, 26 Oct): "Buy Cache 2 → 16 b · 9" buys every level in one tap; "Install …";
-// or "Research X", which opens the research. A line you can't afford yet says how long the saving takes.
+// or "Research X", which opens the research. An unaffordable line says "Saving up".
 import type { GameAction, Quote, ResearchId } from '../../game';
 import { CurrencyIcon } from '../Hud';
 import { useSavingUp } from '../deck/SavingUp';

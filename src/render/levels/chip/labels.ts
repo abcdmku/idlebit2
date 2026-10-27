@@ -11,7 +11,7 @@ import type { LabelWriter, ViewPresentation, WorldFrame, WorldForm } from '../..
 import { PHONE_TYPE, typeForScale } from '../../core';
 import { addMarkY } from './sprites';
 import { arrangementOf, coreSites, coreText } from './layout';
-import { coreSleep, labelFits, readySpeedText, tileLabelFits } from './speed';
+import { coreActivityText, coreSleep, labelFits, readySpeedText, tileLabelFits } from './speed';
 import { chipFloor, isLive, lentCore, queueOpen, siteCount, spilledOut } from './world';
 
 const LEVEL_NAMES: Readonly<Record<'l1' | 'l2' | 'l3', string>> = { l1: 'L1', l2: 'L2', l3: 'L3' };
@@ -67,6 +67,8 @@ export function chipLabels(chip: ChipSnapshot, frame: WorldFrame, out: LabelWrit
       const r = sites[i]!, core = chip.cores[i]!;
       if (!tileLabelFits(core, r, frame)) continue;
       out.label(LABEL_IDS[i]!, r.x + r.w / 2, r.y + 2, 'center').text(readySpeedText(core, chip, live), coreSleep(core) || !live ? 'dim' : 'value');
+      if (live) out.label(`${LABEL_IDS[i]}a`, r.x + r.w / 2, r.y + 10, 'center')
+        .text(coreActivityText(core, true), core.activity === 'cacheLoad' || core.activity === 'cacheAccess' ? 'cyan' : core.activity ? 'value' : 'dim');
     }
     return;
   }
@@ -81,15 +83,19 @@ export function chipLabels(chip: ChipSnapshot, frame: WorldFrame, out: LabelWrit
     }
     // A18: "Core 1 · 1 Hz" on one line, or name then Hz on their own lines, never "Core 11 Hz".
     out.label(LABEL_IDS[i]!, x, r.y + c.pad, 'left').text(CORE_NAMES[i]!, 'name', true);
+    if (!wide && live && core.activity) out.text(`· ${coreActivityText(core, r.w < 70)}`,
+      core.activity === 'cacheLoad' || core.activity === 'cacheAccess' ? 'cyan' : 'value');
     // A core shows its own live speed (user), or its C-state asleep.
     const sp = readySpeedText(core, chip, live), spTone = coreSleep(core) || !live ? 'dim' : 'mute';
     if (wide) out.text(`· ${sp}`, spTone); else out.br().text(sp, spTone);
     const busy = live && core.busy > 0, lent = live && lentCore(core), idle = !busy && !lent;
     // The running task: its family icon and name, and its progress (task numbers are never shown).
     if (busy && core.family !== null) {
-      const name = familyName(familyId(core.family)), pct = `${Math.floor(core.progress * 100)}%`;
-      if (wide) { out.label(`${LABEL_IDS[i]}s`, c.id.x, c.id.y, 'left').text(name, 'value'); out.label(`${LABEL_IDS[i]}f`, c.line.x, c.line.y, 'left').text(pct, 'mute'); }
-      else out.label(`${LABEL_IDS[i]}s`, c.line.x, c.line.y, 'left').text(name, 'value');
+      const phase = coreActivityText(core), tone = core.activity === 'cacheLoad' || core.activity === 'cacheAccess' ? 'cyan' : 'value';
+      if (wide) {
+        out.label(`${LABEL_IDS[i]}s`, c.id.x, c.id.y, 'left').text(familyName(familyId(core.family)), 'value');
+        out.label(`${LABEL_IDS[i]}f`, x, r.y + 32, 'left').text(phase, tone);
+      } else out.label(`${LABEL_IDS[i]}s`, c.line.x, c.line.y, 'left').text(familyName(familyId(core.family)), 'value');
       continue;
     }
     const status = busy ? 'running' : lent ? 'research' : landing && idle ? 'landing' : 'idle';

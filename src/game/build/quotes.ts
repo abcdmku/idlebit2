@@ -1,3 +1,4 @@
+import { newestGen } from './research/unlocks';
 import { POWER_SCALE, viewW } from '../core/constants';
 import type { GpuPowerPoint, GpuPowerPreview } from '../types/quotes';
 import { meetLines } from './meet';
@@ -9,15 +10,15 @@ import { MAX_ACCELS, TICK_MS } from '../core/constants';
 import type { GameAction } from '../types/actions';
 import { FILTER_IDS, ROUTE_STRATEGY_IDS } from '../types/catalog';
 import type { NodeRef, PartRef, PartSlot, ResearchId, ScopeRef, SwitchRef, SystemId } from '../types/ids';
-import type { GpuModelId } from '../types/gpu';
+import type { GpuGeneration, GpuModelId } from '../types/gpu';
 import type { Currency, EffectPreview, Quote, QuoteRequest, QuoteResult } from '../types/quotes';
 import type { GameState } from '../types/state';
 import { genCount, isLadder } from './catalog';
 import { partEffect } from './effect';
 import { readPart } from './partAccess';
-import { planAdd, planRemove, planReplace, planUpgrade } from './partPlans';
+import { planAdd, planRemove, planReplace, planReplaceCpu, planUpgrade } from './partPlans';
+import { supplyPlans } from './supplyPlans';
 import { PARTS } from './catalog';
-import { newestGen } from './research/unlocks';
 import { isCold, planPrice, type Plan } from './plan';
 import { quoteEffect } from './quotesEffect';
 import { planAddPort, planAddUplink, planReplaceLadder, planSameSpeed, planUpgradePort, planUpgradeUplink, switchAt } from './ports';
@@ -26,11 +27,12 @@ import { researchDef } from './research/tree';
 import { addQuotes } from './quotesAdd';
 import { backboneOptions, trayQuotes } from './quotesTray';
 import { planFilter, planRouterQueue, planSetpoint, planStrategy } from './settings';
-import { GPU_MODEL_IDS, gpuModel } from './catalog/gpuModels';
+import { gpuAsType, gpuAtGeneration, gpuModel } from './catalog/gpuModels';
 import { installedGpuStats } from './gpu';
-import { gpuBetter, planInstallGpu } from './gpuPlans';
+import { planInstallGpu } from './gpuPlans';
 import { gpuPowerPreview } from './gpuPower';
 import { overSupply } from './overSupply';
+import { planRamEcc } from './eccPlans';
 
 /**
  * Lazy quotes (architecture §3.3). Every quote comes from the same planner its action runs, so the
@@ -42,27 +44,36 @@ export function quote(state: GameState, request: QuoteRequest): QuoteResult {
 
 function quotesFor(state: GameState, r: QuoteRequest): Quote[] {
   switch (r.kind) {
-    case 'gpuModels': return GPU_MODEL_IDS.filter((model) => gpuModel(model)!.generation === r.generation && gpuReplaceable(state, r.system, r.index, model)).map((model) =>
+    case 'gpuModels': return gpuOffers(state, r.system, r.index, r.generation).map((model) =>
       toQuote(state, { type: 'installGpu', system: r.system, index: r.index, model }, planInstallGpu(state, r.system, model, r.index)));
-    case 'part': return partQuotes(state, r.part);
+    case 'part': return r.minimumCapacity ? supplyPlans(state, r.part, r.minimumCapacity).map(({ action, plan }) => toQuote(state, action, plan, effectOf(state, r.part, plan))) : partQuotes(state, r.part);
     case 'switch': return switchQuotes(state, r.sw);
     case 'infra': return infraQuotes(state, r.unit, r.slot);
     case 'add': return addQuotes(state, r.parent, r.slot);
     case 'tray': return trayQuotes(state, r.at);
     case 'research': return [researchQuote(state, r.project)];
     case 'pipe': return pipeQuotes(state, r.system);
-    case 'meet': return meetLines(state, r.system, r.need).map(({ action, plan }) => toQuote(state, action, plan));
+    case 'meet': return meetLines(state,r.system,r.need).map(({action,plan})=>toQuote(state,action,plan));
     case 'inbound': return inboundQuotes(state, r.at);
     case 'routerQueue': return routerQueueQuotes(state, r.unit);
     case 'power': return powerQuotes(state, r.unit);
   }
 }
 
-/** The model picker into an occupied slot lists only cards strictly better than the installed one. */
-function gpuReplaceable(state: GameState, system: SystemId, index: number | null, model: GpuModelId): boolean {
+/**
+ * The GPU tier ruling: an empty slot (or one holding an NPU) offers one card per type at tier 30 of the generation.
+ * A GPU offers, at a later generation, its own type and tier; at its own generation, the other types at its tier
+ * (a type change). Tiers step on the part quote.
+ */
+function gpuOffers(state: GameState, system: SystemId, index: number | null, generation: GpuGeneration): GpuModelId[] {
   const card = index === null ? undefined : state.build.systems[system]?.spec.accels[index];
-  return !card || gpuBetter(card, model);
+  if (card?.kind === 'gpu') {
+    if (gpuModel(card.model)?.generation === generation) return GPU_SERIES.flatMap((series) => gpuAsType(card.model, series) ?? []);
+    const next = gpuAtGeneration(card.model, generation); return next ? [next] : [];
+  }
+  return GPU_SERIES.map((series): GpuModelId => `${generation}${series}30`);
 }
+const GPU_SERIES = [3, 5, 7, 9] as const;
 
 /** D31: the scope's optional power part (Power control, room or global start control, site generation). */
 function powerQuotes(state: GameState, unit: ScopeRef): Quote[] {
@@ -138,11 +149,14 @@ export function toQuote(state: GameState, action: GameAction, plan: Plan, effect
     unit: { kind: 'system', id: action.system },
     slot: { kind: 'gpu', index: action.index ?? state.build.systems[action.system]!.spec.accels.length },
   }, plan.change.build, plan.change.price) : null;
+  const warning = supplyWarning(state, plan), rawEffect = effect ?? gpuEffect;
+  const shownEffect = warning.overSupply && rawEffect?.marketEstimate
+    ? { ...rawEffect, paybackS: null, paybackBlockedBySupply: true } : rawEffect;
   return {
     action, label: plan.label, cost, currency, affordable: amountCompare(wallet, cost) >= 0,
     locked: plan.ok ? null : plan.lock ?? { code: plan.code === 'occupied' ? 'occupied' : plan.code === 'roundState' ? 'roundState' : 'fit', node: null, text: plan.reason },
     cold, downtimeMs: cold && state.round.phase === 'running' ? state.research.unlocks.bootTicks * TICK_MS : 0,
-    effect: effect ?? gpuEffect, workOps: null, ...gpuMetadata(state, action, plan), ...supplyWarning(state, plan),
+    effect: shownEffect, workOps: null, ...gpuMetadata(state, action, plan), ...warning,
   };
 }
 
@@ -164,7 +178,7 @@ function gpuMetadata(state: GameState, action: GameAction, plan: Plan): Pick<Quo
     const spec = state.build.systems[action.system]?.spec;
     if (!gpuModel(action.model) || !spec) return {};
     const card = action.index === null ? undefined : spec.accels[action.index];
-    const native = { kind: 'gpu' as const, model: action.model, upgrades: 0 };
+    const native = { kind: 'gpu' as const, model: action.model };
     const proposed = plan.ok ? plan.change.build.systems[action.system]!.spec
       : action.index === null && spec.accels.length < MAX_ACCELS ? { ...spec, accels: [...spec.accels, native] }
         : card ? { ...spec, accels: spec.accels.map((old, index) => index === action.index ? native : old) } : null;
@@ -189,16 +203,49 @@ const effectOf = (state: GameState, ref: PartRef, plan: Plan): EffectPreview | n
 
 /** Part plate: upgrade, then replace (L1 and capacity-preserving) per other generation, then remove. */
 export function partQuotes(state: GameState, ref: PartRef): Quote[] {
+  if (ref.unit.kind === 'system' && ref.slot.kind === 'cpu') {
+    const spec = state.build.systems[ref.unit.id]?.spec, current = spec?.cpu?.cpu.gen;
+    if (!spec || current === undefined) return [];
+    // An empty socket offers only its own add (a copy of CPU 1, D7.3), never a replace of the installed ones.
+    if (ref.slot.socket >= spec.cpuCount) {
+      const action = { type: 'addPart' as const, system: ref.unit.id, kind: 'socket' as const, generation: current };
+      const plan = planAdd(state, ref.unit.id, 'socket', current);
+      // What another CPU adds to the system: its work rate, power and research, as a clock or core step reads.
+      const all = plan.ok ? partEffect(state, { unit: ref.unit, slot: { kind: 'core', socket: 0, index: 0 } }, plan.change.build, plan.change.price, true) : null;
+      return [toQuote(state, action, plan, all ?? quoteEffect(state, action, plan))];
+    }
+    return [toQuote(state,{type:'replaceCpu',system:ref.unit.id},planReplaceCpu(state,ref.unit.id))];
+  }
   const part = readPart(state.build, ref);
   if (!part) {
     // An empty L2 / L3 chip slot offers its part (the slot the chip view shows).
     const k = ref.slot.kind;
     // D31: an empty power slot offers each generation's install.
     if (POWER_SLOTS.includes(k)) return powerInstallPlans(state, ref).map(({ action, plan }) => toQuote(state, action, plan, effectOf(state, ref, plan)));
-    if (ref.unit.kind !== 'system' || (k !== 'l2' && k !== 'l3')) return [];
-    const g = Math.max(0, newestGen(state.research.unlocks, k, PARTS[k].base.length));
-    const action = { type: 'addPart' as const, system: ref.unit.id, kind: k, generation: g };
-    return [toQuote(state, action, planAdd(state, ref.unit.id, k, g))];
+    if (ref.unit.kind === 'system' && (k === 'ram' || k === 'drive')) {
+      const system = ref.unit.id, spec = state.build.systems[system]?.spec;
+      if (!spec || ref.slot.kind !== k || !('index' in ref.slot) || ref.slot.index !== (k === 'ram' ? spec.ram.length : spec.drives.length)) return [];
+      const row = PARTS[k === 'ram' ? 'ram' : 'storage'];
+      return row.base.map((_, generation) => {
+        const action = { type: 'addPart' as const, system, kind: k, generation };
+        const plan = planAdd(state, system, k, generation);
+        // The system's totals: all RAM (or storage) and its pooled bandwidth (or IO), before and after.
+        return toQuote(state, action, plan, plan.ok ? partEffect(state, ref, plan.change.build, plan.change.price, true) : null);
+      });
+    }
+    // An empty accelerator bay offers each NPU generation's add (a GPU model comes from the 'gpuModels' request).
+    if (ref.unit.kind === 'system' && k === 'gpu') {
+      const system = ref.unit.id, spec = state.build.systems[system]?.spec;
+      if (!spec || ref.slot.kind !== 'gpu' || ref.slot.index !== spec.accels.length) return [];
+      return PARTS.npu.base.map((_, generation) => {
+        const action = { type: 'addPart' as const, system, kind: 'npu' as const, generation };
+        const plan = planAdd(state, system, 'npu', generation);
+        return toQuote(state, action, plan, effectOf(state, ref, plan));
+      });
+    }
+    if(ref.unit.kind==='system'&&(k==='l2'||k==='l3')){const g=Math.max(0,newestGen(state.research.unlocks,k,PARTS[k].base.length)),action={type:'addPart' as const,system:ref.unit.id,kind:k,generation:g};return [toQuote(state,action,planAdd(state,ref.unit.id,k,g))];}
+    if(ref.unit.kind==='system'&&k==='scheduler'){const g=Math.max(0,newestGen(state.research.unlocks,'scheduler',4)),action={type:'addPart' as const,system:ref.unit.id,kind:'scheduler' as const,generation:g};return [toQuote(state,action,planAdd(state,ref.unit.id,'scheduler',g))];}
+    return [];
   }
   const out: Quote[] = [];
   const ladder = isLadder(part.id);
@@ -211,14 +258,36 @@ export function partQuotes(state: GameState, ref: PartRef): Quote[] {
   for (let g = part.gen + 1; part.id !== 'gpu' && g < genCount(part.id); g += 1) {
     if (ladder) { out.push(toQuote(state, { type: 'replacePart', part: ref, generation: g, preserveCapacity: false }, planReplaceLadder(state, ref, g))); continue; }
     // A CPU package and the D31 parts have one replace per generation (no capacity-preserving level).
+    let plainLock: string | null = null;
     for (const preserveCapacity of part.id === 'cpu' || POWER_SLOTS.includes(ref.slot.kind) ? [false] : [false, true]) {
       const plan = planReplace(state, ref, g, preserveCapacity);
+      if (!preserveCapacity && !plan.ok) plainLock = plan.lock?.text ?? null;
+      if (preserveCapacity && !plan.ok && plainLock !== null && plan.lock?.text === plainLock) continue;
       out.push(toQuote(state, { type: 'replacePart', part: ref, generation: g, preserveCapacity }, plan, effectOf(state, ref, plan)));
     }
   }
   const remove = planRemove(state, ref);
+  if (ref.unit.kind === 'system' && ref.slot.kind === 'ram' && state.build.systems[ref.unit.id]?.spec.ram.some(m => !m.ecc))
+    out.push(toQuote(state, { type: 'convertRamToEcc', system: ref.unit.id }, planRamEcc(state, ref.unit.id)));
   if (remove.ok) out.push(toQuote(state, { type: 'removePart', part: ref }, remove));
+  if (ref.slot.kind === 'globalScheduler' || ref.slot.kind === 'dataPlane') out.push(...routingQuotes(state, ref.unit));
   return out;
+}
+
+/** Free routing controls belong to the same scope as the selected network part. */
+function routingQuotes(state: GameState, unit: ScopeRef): Quote[] {
+  const router = unit.kind === 'rack' ? state.build.racks[unit.id]?.lb
+    : unit.kind === 'room' ? state.build.rooms[unit.id]?.lb
+      : unit.kind === 'site' ? state.build.sites[unit.id]?.dataPlane.router
+        : unit.kind === 'global' ? state.build.global.scheduler : null;
+  if (!router) return [];
+  return [
+    ...ROUTE_STRATEGY_IDS.map(strategy => toQuote(state, { type: 'setStrategy', unit, strategy }, planStrategy(state, unit, strategy))),
+    ...FILTER_IDS.map(filter => {
+      const on = !router.filters.includes(filter);
+      return toQuote(state, { type: 'setFilter', unit, filter, on }, planFilter(state, unit, filter, on));
+    }),
+  ];
 }
 
 /** Switch plate: each port, all ports (same speed), add port, each uplink, add uplink, replace, same-speed toggle. */
@@ -265,12 +334,7 @@ export function infraQuotes(state: GameState, unit: { kind: 'rack' | 'room'; id:
     return out;
   }
   const out = [toQuote(state, { type: 'upgradePart', part: ref }, planUpgrade(state, ref))];
-  const lb = unit.kind === 'rack' ? state.build.racks[unit.id]?.lb : state.build.rooms[unit.id]?.lb;
-  for (const strategy of ROUTE_STRATEGY_IDS) out.push(toQuote(state, { type: 'setStrategy', unit: scope, strategy }, planStrategy(state, scope, strategy)));
-  for (const filter of FILTER_IDS) {
-    const on = !(lb?.filters.includes(filter) ?? false);
-    out.push(toQuote(state, { type: 'setFilter', unit: scope, filter, on }, planFilter(state, scope, filter, on)));
-  }
+  out.push(...routingQuotes(state, scope));
   return out;
 }
 

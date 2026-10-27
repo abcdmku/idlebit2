@@ -1,7 +1,8 @@
 // Local headless Chrome/CDP capture of the game (dev server), driven through the DEV bridge.
 // Cases come from a manifest; each one boots the game fresh with a seeded, controlled clock.
 //
-// Manifest: [{ id, width, height, dpr, seed, fresh?, query?, steps?: string[], tickMs? }]
+// Manifest: [{ id, width, height, dpr, seed, fresh?, stage?, query?, steps?: string[], tickMs? }]
+// `stage` loads an existing campaign stage save before boot, for legal later-era captures.
 // `steps` are page expressions run after `__br.ready()`, for example
 // "__br.dispatch({ type: 'returnToMarket' })" or "__br.advance(60000)".
 // Every case also runs the live alignment audit (audit-live.mjs): its findings go to
@@ -45,10 +46,13 @@ try {
     try {
       if (!/^[a-zA-Z0-9_.-]+$/.test(test.id)) throw new Error('Unsafe case ID');
       const url = new URL(option('game-path', '/'), base);
-      if (test.fresh !== false) url.searchParams.set('fresh', '');
+      if (test.fresh !== false && !test.stage) url.searchParams.set('fresh', '');
       for (const [key, value] of Object.entries(test.query ?? {})) url.searchParams.set(key, value);
       if (scriptId) await browser.send('Page.removeScriptToEvaluateOnNewDocument', { identifier: scriptId });
-      scriptId = (await browser.send('Page.addScriptToEvaluateOnNewDocument', { source: controlledClock(test.seed ?? 42) })).identifier;
+      const saved = test.stage ? JSON.parse(readFileSync(test.stage, 'utf8')).save : null;
+      if (test.stage && typeof saved !== 'string') throw new Error('Stage has no serialized save');
+      const restore = saved ? `localStorage.setItem('idlebit2:save-v3', JSON.stringify({ savedAtMs: Date.now(), save: ${JSON.stringify(saved)} }));` : '';
+      scriptId = (await browser.send('Page.addScriptToEvaluateOnNewDocument', { source: controlledClock(test.seed ?? 42) + restore })).identifier;
       await browser.send('Emulation.setDeviceMetricsOverride', { width: test.width, height: test.height, deviceScaleFactor: test.dpr ?? 1, mobile: false });
       const navigation = await browser.send('Page.navigate', { url: url.href });
       if (navigation.errorText) throw new Error(navigation.errorText);
@@ -67,8 +71,19 @@ try {
       }
       await browser.evaluate('window.__br.ready().then(() => true)');
       await browser.evaluate('document.fonts.ready.then(() => true)');
+      // Hydration can finish before the shell's first draw. Wait for the actual
+      // hit targets before scripts select a part, without advancing the saved game.
+      const wasPaused = await browser.evaluate('window.__br.isPaused()');
+      await browser.evaluate('window.__br.pause()');
+      let drawn = false;
+      for (let attempt = 0; attempt < 100 && !drawn; attempt++) {
+        drawn = await browser.evaluate('window.__qaTick(50), Boolean(window.__brShell?.surface.renderer?.getTargets().length)');
+      }
+      if (!drawn) throw new Error('Shell did not publish hardware targets');
+      if (!wasPaused) await browser.evaluate('window.__br.resume()');
       for (const step of test.steps ?? []) await browser.evaluate(`Promise.resolve(${step}).then(() => true)`);
-      await browser.evaluate(`window.__qaTick(${Math.max(0, test.tickMs ?? 100)})`);
+      // Let 500 ms selector cadences settle after scripted actions before auditing their painted state.
+      await browser.evaluate(`window.__qaTick(${Math.max(0, test.tickMs ?? 600)})`);
       const geometry = await browser.evaluate(`(() => {
         const root = document.querySelector(${JSON.stringify(option('root', '#root'))});
         if (!root) throw new Error('Missing content root');
@@ -91,7 +106,11 @@ try {
           if (el.scrollWidth > el.clientWidth + 1) failures.push('Text overflow: ' + el.textContent);
         }
         for (const el of document.querySelectorAll('[data-qa-target]')) {
-          const r = el.getBoundingClientRect(); if (r.width < 44 || r.height < 44) failures.push('Target under 44 px: ' + el.textContent);
+          const r = el.getBoundingClientRect();
+          // Closed native disclosures have no rendered targets. Audit them after opening,
+          // rather than reporting their intentionally hidden descendants as zero-size buttons.
+          if (r.width === 0 || r.height === 0) continue;
+          if (r.width < 44 || r.height < 44) failures.push('Target under 44 px: ' + el.textContent);
         }
         return { failures, labeled: document.querySelectorAll('[data-qa-label]').length, targets: document.querySelectorAll('[data-qa-target]').length };
       })()`);

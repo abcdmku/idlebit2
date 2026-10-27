@@ -1,3 +1,4 @@
+// @vitest-environment node
 import {
   ZERO_AMOUNT,
   amount,
@@ -7,6 +8,7 @@ import {
   amountFloor,
   amountMultiply,
   amountPow,
+  amountSubtract,
   sumAmounts,
 } from "./amount";
 
@@ -21,6 +23,8 @@ describe("amount", () => {
     expect(amountAdd("1.5", "2.5")).toBe("4");
     expect(amountMultiply("0.1", 3)).toBe("0.3");
     expect(sumAmounts([1, "2", "3.5"])).toBe("6.5");
+    expect(amountSubtract("0.1", "0.3")).toBe("-0.2");
+    expect(amountAdd("1000000000000000000000", "1")).toBe("1000000000000000000001");
   });
 
   it("supports integer powers and floor", () => {

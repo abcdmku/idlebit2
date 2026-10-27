@@ -8,7 +8,7 @@ import type { RuleId } from '../types/catalog';
 import { rackId, systemId } from '../types/ids';
 import type { LockReason } from '../types/quotes';
 import type { Unlocks } from '../types/state';
-import { capacity, LADDERS, PARTS } from './catalog';
+import { capacity, installPrice, upgradesBetween, LADDERS, PARTS } from './catalog';
 import { compileSystem } from './compile';
 import { ceilingLock, genLock, levelLock, optionLock, ruleLock } from './locks';
 import { boardLimit } from './partPlans';
@@ -42,23 +42,37 @@ export function siteConfig(build: BuildState, id: number): SiteConfig | null {
 
 /* ---------- Barebones (spec §13.2) ---------- */
 
+const fullLoadMemo=new WeakMap<SystemSpec,WeakMap<Unlocks,number>>();
 /** Full-load watts of a spec: every part's idle + load at full use (§9.1). */
 export function fullLoadWatts(spec: SystemSpec, u: Unlocks): number {
+  let byUnlocks=fullLoadMemo.get(spec);if(!byUnlocks)fullLoadMemo.set(spec,byUnlocks=new WeakMap());
+  const hit=byUnlocks.get(u);if(hit!==undefined)return hit;
   const c = allocCompiled({ systems: 1, racks: 0, rooms: 0, sites: 0, links: 0 });
   compileSystem(c, { id: systemId(0), rack: rackId(0), slot: 0, online: true, spec }, u);
   let watts = c.sys.coreIdleW[0]! + c.sys.coreLoadW[0]! + c.sys.clockIdleW[0]! + c.sys.clockLoadW[0]!;
   for (let r = 0; r < 4; r += 1) watts += c.sys.idleW[r]! + c.sys.loadW[r]!;
+  byUnlocks.set(u,watts);
   return watts;
 }
 
-/** The newest researched PSU at the lowest level that covers full load (its top level if none does). */
+/** Cheapest researched supply that covers full load. Unlocking a luxury PSU must not make entry hardware unaffordable. */
 export function sizedPsu(spec: SystemSpec, u: Unlocks): SupplyBuild {
-  const g = Math.max(0, newestGen(u, 'psu', PARTS.psu.base.length));
   const need = fullLoadWatts(spec, u);
-  const top = 11 + g;
-  let level = 1;
-  while (level < top && capacity(PARTS.psu, g, level) < need) level += 1;
-  return { gen: g, level, capped: false };
+  let best: SupplyBuild = { gen: 0, level: 11, capped: false }, price: bigint | null = null;
+  for (let gen = 0; gen < PARTS.psu.base.length; gen += 1) {
+    if ((u.gens.psu & (1 << gen)) === 0) continue;
+    const top = 11 + gen;
+    let level = 1;
+    while (level < top && capacity(PARTS.psu, gen, level) < need) level += 1;
+    const cap = capacity(PARTS.psu, gen, level);
+    if (cap < need) {
+      if (price === null && cap > capacity(PARTS.psu, best.gen, best.level)) best = { gen, level, capped: false };
+      continue;
+    }
+    const cost = installPrice(PARTS.psu, gen) + upgradesBetween(PARTS.psu, gen, 1, level);
+    if (price === null || cost < price) { best = { gen, level, capped: false }; price = cost; }
+  }
+  return best;
 }
 
 const SIZED = new Map<string, SystemSpec>();
@@ -116,8 +130,8 @@ export function systemLock(u: Unlocks, spec: SystemSpec): LockReason | null {
       checks.push(() => {
         const native = gpuModel(a.model);
         if (!native) return { code: 'fit', node: null, text: 'Unknown GPU model' };
-        try { evaluateGpu(a.model, a.upgrades); }
-        catch { return { code: 'fit', node: null, text: 'Invalid GPU upgrades' }; }
+        try { evaluateGpu(a.model); }
+        catch { return { code: 'fit', node: null, text: 'Unknown GPU model' }; }
         return genLock(u, 'gpu', native.generation - 1);
       });
     }
@@ -125,7 +139,7 @@ export function systemLock(u: Unlocks, spec: SystemSpec): LockReason | null {
   for (const d of spec.drives) checks.push(...partOk(u, 'storage', d));
   checks.push(slots(u, spec.ram.length, boardLimit(spec, u, 'ram'), 'ramSlots'), slots(u, spec.accels.length, boardLimit(spec, u, 'gpu'), 'gpuSlots'), slots(u, spec.drives.length, boardLimit(spec, u, 'drive'), 'driveSlots'));
   checks.push(...partOk(u, 'psu', spec.psu), () => (spec.psu.capped ? ruleLock(u, 'powerCap') : null));
-  checks.push(() => (spec.settings.dvfs ? ruleLock(u, 'dvfs') : null), () => (spec.settings.turbo ? ruleLock(u, 'turbo') : null), () => (spec.settings.cStateLimit > 0 ? ruleLock(u, 'coreIdle') : null));
+  checks.push(() => (spec.settings.dvfs ? ruleLock(u, 'dvfs') : null), () => (spec.settings.turbo ? ruleLock(u, 'turbo') : null));
   return first(checks);
 }
 
@@ -137,11 +151,14 @@ function routerChecks(u: Unlocks, r: RouterBuild): Check[] {
 }
 function switchChecks(u: Unlocks, sw: SwitchBuild, room: boolean): Check[] {
   const row = room ? LADDERS.roomSwitch : LADDERS.switch;
+  const upstream = room ? LADDERS.dataPlane : LADDERS.roomSwitch;
+  const nativeUplink = upstream.baseK[Math.max(0, newestGen(u, upstream.id, upstream.baseK.length))]!;
   return [
     () => genLock(u, row.id, sw.gen),
     () => ceilingLock(u, room ? 'roomPorts' : 'rackPorts', sw.ports.length),
     () => ceilingLock(u, 'uplinks', sw.uplinks.length),
-    () => ([...sw.ports, ...sw.uplinks].some((k) => k > row.topK[sw.gen]!) ? { code: 'ceiling', node: null, text: 'Port too fast for this switch' } : null),
+    () => (sw.ports.some(k => k > row.topK[sw.gen]!) || sw.uplinks.some(k => k > Math.max(row.topK[sw.gen]!, nativeUplink))
+      ? { code: 'ceiling', node: null, text: 'Port too fast for this switch' } : null),
   ];
 }
 

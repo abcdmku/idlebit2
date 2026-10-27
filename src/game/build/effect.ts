@@ -2,26 +2,29 @@ import { viewW } from '../core/constants';
 import { amount } from '../amount';
 import { allocCompiled } from '../core/buffers';
 import { DT_S, MAX_ACCELS, REGIONS } from '../core/constants';
+import { PRE_SYSTEM_CPU_W } from '../phys/draw';
 import type { BuildState, SystemSpec } from '../types/build';
 import { REGION_IDS } from '../types/catalog';
 import { rackId, systemId, type PartRef } from '../types/ids';
 import type { CapacityUnit, EffectPreview } from '../types/quotes';
 import type { GameState, Unlocks } from '../types/state';
-import { capacity, isLeveled, partWatts, PARTS, type LeveledPartId } from './catalog';
+import { capacity, capacity2, isLeveled, partWatts, PARTS, type LeveledPartId } from './catalog';
 import { compileSystem } from './compile';
 import { lossFraction } from './catalog/curves';
 import { supplyLossW } from '../phys/supplies';
 import { POWER_SLOTS, readPart } from './partAccess';
 import { installedGpuStats } from './gpu';
 import type { AccelBuild } from '../types/gpu';
+import { cpuMarketKnown, gpuMarketKnown, gpuMarketShare, paidWorkScale, researchRackHeat, workEnergyChange } from './workloadValue';
+import { workProfile, type WorkProfile } from './workEnergy';
 
 /**
- * Upgrade-versus-replace preview (spec §12.4): capacity before and after, watts at the current
- * utilization, energy cost change per minute, and payback = price / net gain per second. Gain is
- * the extra rate the part adds at the current load (1 Credit per unit of work, D2) minus the
- * extra energy; null means "No payback at this load".
+ * Upgrade-versus-replace preview (spec §12.4): capacity, full-load input watts for rate parts,
+ * and payback from recent paid work minus energy per unit of work at saved sleep settings.
+ * Research earns no Credits. A nonpositive estimated return differs from an unestimated benefit.
  */
-interface SysFigures { rate: number; mem: number; cache: number; gpu: number; store: number; psu: number; queue: number; idle: number; load: number }
+interface SysValues { rate: number; mem: number; cache: number; gpu: number; store: number; psu: number; queue: number; idle: number; load: number; ramBw: number; io: number }
+interface SysFigures extends SysValues { work: WorkProfile }
 
 /** Figures are pure in (spec, unlocks), both immutable, and a tray re-asks them every frame. */
 const figureMemo = new WeakMap<SystemSpec, WeakMap<Unlocks, SysFigures>>();
@@ -41,11 +44,11 @@ function compileFigures(spec: SystemSpec, u: Unlocks): SysFigures {
   for (let r = 0; r < 4; r += 1) { idle += c.idleW[r]!; load += c.loadW[r]!; }
   return {
     rate: c.threadRate[0]! * c.cores[0]! * c.etaCfg[0]!, mem: c.ramCap[0]!, cache: c.cacheBits[0]!, gpu: c.gpuOps[0]!,
-    store: c.storageCap[0]!, psu: c.psuCapW[0]!, queue: c.Q[0]!, idle, load,
+    store: c.storageCap[0]!, psu: c.psuCapW[0]!, queue: c.Q[0]!, idle, load, ramBw: c.ramBw[0]!, io: c.ioRate[0]!, work: workProfile(c, 0, spec, u),
   };
 }
 
-const CAPACITY: Record<string, [keyof SysFigures, CapacityUnit, boolean]> = {
+const CAPACITY: Record<string, [keyof SysValues, CapacityUnit, boolean]> = {
   cpu: ['rate', 'Hz', true], core: ['rate', 'ops/s', true], clock: ['rate', 'Hz', true],
   l1: ['cache', 'bits', false], l2: ['cache', 'bits', false], l3: ['cache', 'bits', false], scheduler: ['queue', 'slots', false],
   ram: ['mem', 'bits', false], gpu: ['gpu', 'ops/s', true], npu: ['gpu', 'ops/s', true], drive: ['store', 'bits', false], psu: ['psu', 'W', false],
@@ -53,8 +56,8 @@ const CAPACITY: Record<string, [keyof SysFigures, CapacityUnit, boolean]> = {
 /**
  * A part's shown x → y is the number the board prints on that part (coordinator rule): the clock's
  * Hz and, for the package, the CPU's headline clock (ChipSnapshot.clock.hz, the System board's CPU
- * label); a core's own rate, lanes × its socket clock (CoreView.rate); a cache level's, RAM stick's
- * or drive's own bits (CacheLevelView.bits, PartView.capacityBits). Payback still uses the
+ * label); a core's clock rate (CoreView.rate); a RAM stick's
+ * or drive's own bits (PartView.capacityBits). Payback still uses the
  * system figures: an upgrade's gain is the rate it adds.
  */
 const OWN_VALUE = new Set(['cpu', 'clock', 'core', 'l1', 'l2', 'l3', 'ram', 'drive']);
@@ -78,8 +81,6 @@ export function energyPrice(state: GameState, ref: PartRef): number {
   return REGIONS[REGION_IDS.indexOf(region)]!.energyPrice;
 }
 
-const perMinute = (watts: number, price: number) => amount(Math.round(watts * 60 * price));
-
 const cardFigures = (card: AccelBuild | undefined, u: Unlocks): { rate: number; idle: number; load: number } => {
   if (!card) return { rate: 0, idle: 0, load: 0 };
   if (card.kind === 'gpu') {
@@ -90,15 +91,17 @@ const cardFigures = (card: AccelBuild | undefined, u: Unlocks): { rate: number; 
   return { rate: capacity(PARTS.npu, card.gen, card.level) * PARTS.npu.tensorFactor![card.gen]!, ...watts };
 };
 
-export function preview(before: number, after: number, unit: CapacityUnit, wBefore: number, wAfter: number, price: number, cost: bigint, rateGain: number | null): EffectPreview {
-  const energyDelta = (wAfter - wBefore) * price;
+export function preview(before: number, after: number, unit: CapacityUnit, wBefore: number, wAfter: number, price: number, cost: bigint, rateGain: number | null, workEnergyDelta?: number): EffectPreview {
+  const energyDelta = workEnergyDelta ?? (wAfter - wBefore) * price;
   const gain = rateGain === null ? null : rateGain - energyDelta;
   return {
     // D36: watts, joules and W/J capacities leave the sim at the view scale.
     capacityBefore: unit === 'W' || unit === 'J' ? viewW(before) : before, capacityAfter: unit === 'W' || unit === 'J' ? viewW(after) : after, unit,
     wattsBefore: viewW(wBefore), wattsAfter: viewW(wAfter),
-    energyPerMinuteDelta: perMinute(wAfter - wBefore, price),
+    energyPerMinuteDelta: amount(Math.round(energyDelta * 60)),
     paybackS: gain !== null && gain > 0 ? Number(cost) / gain : null,
+    paybackEvaluated: rateGain !== null,
+    ...(rateGain !== null && energyDelta > 0 && rateGain <= energyDelta ? { marginalLoss: true } : {}),
   };
 }
 
@@ -114,8 +117,12 @@ function psuEffect(state: GameState, id: number, a: SystemSpec, b: SystemSpec, c
   return { ...preview(capA, capB, 'W', wa, wb, price, cost, 0), lossPctBefore: lossA * 100, lossPctAfter: lossB * 100 };
 }
 
-/** Preview of a part change already applied in `after` (same system or infra unit). */
-export function partEffect(state: GameState, ref: PartRef, after: BuildState, cost: bigint): EffectPreview | null {
+/**
+ * Preview of a part change already applied in `after` (same system or infra unit). `total`: the system's own
+ * totals instead of the part's printed value (an Add: all RAM and its pooled bandwidth, all storage and its IO,
+ * the CPUs' work rate), so a new module reads as what the system gains.
+ */
+export function partEffect(state: GameState, ref: PartRef, after: BuildState, cost: bigint, total = false): EffectPreview | null {
   const u = state.research.unlocks;
   const price = energyPrice(state, ref);
   if (ref.unit.kind === 'system') {
@@ -126,20 +133,51 @@ export function partEffect(state: GameState, ref: PartRef, after: BuildState, co
     if (!a || !b || !key) return null;
     if (ref.slot.kind === 'gpu') {
       const slot = ref.slot.index, at = id * MAX_ACCELS + slot;
-      const use = Math.min(1, Math.max(0, ((state.hot.sys.accelTaskS[at] ?? 0) + (state.hot.sys.accelResearchS[at] ?? 0)) / DT_S));
+      const use = Math.min(1, Math.max(0, (state.hot.sys.accelTaskS[at] ?? 0) / DT_S));
       const before = cardFigures(a.accels[slot], u), afterCard = cardFigures(b.accels[slot], u);
-      return preview(before.rate, afterCard.rate, 'ops/s', before.idle + before.load * use,
-        afterCard.idle + afterCard.load * use, price, cost, (afterCard.rate - before.rate) * use);
+      const fa = figures(a, u), fb = figures(b, u), pipe = state.compiled.sys.pipeSpeed[id] ?? 0;
+      const scale = state.round.reports.length ? paidWorkScale(state) : use;
+      const gain = gpuMarketKnown(state) ? (Math.min(fb.rate + fb.gpu, pipe) - Math.min(fa.rate + fa.gpu, pipe)) * scale * gpuMarketShare(state) : null;
+      const energy = workEnergyChange(state, id, fb.work, Math.min(fb.rate + fb.gpu, pipe));
+      const wa = fa.idle + fa.load, wb = fb.idle + fb.load;
+      return { ...preview(before.rate, afterCard.rate, 'ops/s', wa + supplyLossW(wa, fa.psu, state.compiled.sys.psuLoss[id] ?? 0),
+        wb + supplyLossW(wb, fb.psu, state.compiled.sys.psuLoss[id] ?? 0), price, cost, gain, energy), marketEstimate: true };
     }
     const cores = Math.max(1, state.compiled.sys.cores[id] ?? 1);
     const use = Math.min(1, Math.max(0, (state.hot.sys.busy[id] ?? 0) / cores));
+    const threads = Math.max(1, state.compiled.sys.threads[id] ?? 1);
+    const paidUse = Math.min(1, Math.max(0, (state.hot.sys.active[id * 4] ?? 0) / threads));
     const fa = figures(a, u), fb = figures(b, u);
     if (ref.slot.kind === 'psu') return psuEffect(state, id, a, b, fa.psu, fb.psu, price, cost);
     const [field, unit, isRate] = key;
-    const wa = fa.idle + fa.load * use, wb = fb.idle + fb.load * use;
-    const gain = isRate ? (fb[field] - fa[field]) * use : null;
-    if (OWN_VALUE.has(ref.slot.kind)) return preview(ownValue(state.build, ref), ownValue(after, ref), unit, wa, wb, price, cost, gain);
-    return preview(fa[field], fb[field], unit, wa, wb, price, cost, gain);
+    const fixed = !u.levels.system;
+    const demand = isRate ? 1 : use;
+    const wa = fixed ? PRE_SYSTEM_CPU_W : fa.idle + fa.load * demand, wb = fixed ? PRE_SYSTEM_CPU_W : fb.idle + fb.load * demand;
+    const inputA = fixed ? wa : wa + supplyLossW(wa, fa.psu, state.compiled.sys.psuLoss[id] ?? 0);
+    const inputB = fixed ? wb : wb + supplyLossW(wb, fb.psu, state.compiled.sys.psuLoss[id] ?? 0);
+    const pipe = state.compiled.sys.pipeSpeed[id] ?? 0;
+    const scale = state.round.reports.length ? paidWorkScale(state) : paidUse;
+    const gain = isRate && cpuMarketKnown(state) ? (Math.min(fb.rate + fb.gpu, pipe) - Math.min(fa.rate + fa.gpu, pipe)) * scale : null;
+    const rack = state.build.systems[id]!.rack, heat = isRate ? researchRackHeat(state, rack, { id, profile: fb.work }) : 0;
+    const cooling = state.compiled.rack.coolerQc[rack] ?? 0;
+    const warning = state.compiled.rack.opened[rack] === 1 && heat > cooling
+      ? { researchCooling: { rack, heatW: viewW(heat), capacityW: viewW(cooling) } } : {};
+    const estimate = isRate ? { marketEstimate: true, researchOpsBefore: fa.work.researchRate, researchOpsAfter: fb.work.researchRate, ...warning } : {};
+    const energy = isRate ? workEnergyChange(state, id, fb.work, Math.min(fb.rate + fb.gpu, pipe)) : undefined;
+    if (total) {
+      const t = { ...preview(fa[field], fb[field], unit, inputA, inputB, price, cost, gain, energy), ...estimate };
+      return ref.slot.kind === 'ram' ? { ...t, throughputBefore: fa.ramBw, throughputAfter: fb.ramBw }
+        : ref.slot.kind === 'drive' ? { ...t, throughputBefore: fa.io, throughputAfter: fb.io } : t;
+    }
+    if (OWN_VALUE.has(ref.slot.kind)) {
+      const effect = { ...preview(ownValue(state.build, ref), ownValue(after, ref), unit, inputA, inputB, price, cost, gain, energy), ...estimate };
+      if (ref.slot.kind === 'ram' || ref.slot.kind === 'drive') {
+        const pa = readPart(state.build, ref), pb = readPart(after, ref), row = PARTS[ref.slot.kind === 'ram' ? 'ram' : 'storage'];
+        if (pb) return { ...effect, throughputBefore: pa ? capacity2(row, pa.gen, pa.level) : 0, throughputAfter: capacity2(row, pb.gen, pb.level) };
+      }
+      return effect;
+    }
+    return { ...preview(fa[field], fb[field], unit, inputA, inputB, price, cost, gain, energy), ...estimate };
   }
   const pa = readPart(state.build, ref), pb = readPart(after, ref);
   // An optional D31 part may be installed into an empty slot: it starts from nothing.

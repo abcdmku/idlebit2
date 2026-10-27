@@ -1,5 +1,5 @@
 ﻿// The CPU world (L2, D15/D17): only the CPU. Every mark is a part, a route or a real state:
-// queue wells fill with waiting tasks, cache cells with held bits, cores with the piece of their
+// queue wells fill with waiting tasks, cache cells with loaded bits, cores with the piece of their
 // shard still to run (D25: it drains; cores of one shard are outlined as one group), the clock lamp
 // ticks with real cycles, the IN pad lights while a transfer lands. Payouts pop on the core that ran
 // the task's last shard (core/pops.ts).
@@ -9,7 +9,7 @@ import { P, brackets, createRateAnimation, drawFamilyIcon, rateAnimation, transf
 import type { Rect, ViewPresentation, WorldFrame, WorldForm } from '../../core';
 import { MAX_CORES, arrangementOf, coreSites, coreText, floorOf, queueWells } from './layout';
 import type { CoreArrangement, Floor } from './layout';
-import { coreColor, drawGridPiece, drawShardGroups, remaining } from './shards';
+import { coreColor, drawGridPiece, drawShardGroups } from './shards';
 import { CLOCK_TRACE, addSite, bar, cacheBlock, clockBlock, coreBlock, drawMetal, lockedSite, pad, queueBlock, queueGhost, staticCpu } from './sprites';
 import type { Incoming } from './sprites';
 import { dimIfAsleep } from './speed';
@@ -108,7 +108,7 @@ export function drawWorld(g: G, chip: ChipSnapshot, frame: WorldFrame, form: Wor
     queueBlock(g, f.queue, queueWells(f, sc.q, form), live ? chip.queue : NONE, incoming);
   }
   else if (qOpen) queueGhost(g, f.queue); else lockedSite(g, f.queue);
-  cacheBlock(g, f.cache, chip.cache.capacityBits, live ? chip.cache.usedBits : 0, live ? spilledOut(chip) : 0);
+  cacheBlock(g, f.cache, chip.cache.capacityBits, live ? chip.cache.loadedBits : 0, live ? spilledOut(chip) : 0);
 
   let working = false;
   for (const c of chip.cores) if (c.busy > 0 || c.research > 0) working = true;
@@ -149,7 +149,7 @@ function drawCore(g: G, r: Rect, core: CoreView | undefined, live: boolean, chip
   coreBlock(g, r, busy, lent);
   dimIfAsleep(g, r, core, live);
   if (n > 2) {
-    if (busy) drawGridPiece(g, r, remaining(core.progress), colour, core.family);
+    if (busy) drawGridPiece(g, r, core.progress, colour, core.family);
     return;
   }
   // Big sites (L2): the task's family icon under the name, its piece gauge near the foot.
@@ -157,6 +157,6 @@ function drawCore(g: G, r: Rect, core: CoreView | undefined, live: boolean, chip
   if (busy && core.family !== null) drawFamilyIcon(g, familyId(core.family), c.icon.x, c.icon.y);
   const ix = c.icon.x, by = c.bar;
   const t = chip.pipe.transfer, s = frame.snapshot;
-  const fill = busy ? remaining(core.progress) : lent ? s.research?.progress ?? 0 : landing && t ? transferProgress(t, s.simTimeMs, frame.timeMs) : 0;
+  const fill = busy ? core.progress : lent ? s.research?.progress ?? 0 : landing && t ? transferProgress(t, s.simTimeMs, frame.timeMs) : 0;
   bar(g, ix, by, bw, fill, busy ? colour : lent ? P.rnd : landing ? P.net : P.op);
 }

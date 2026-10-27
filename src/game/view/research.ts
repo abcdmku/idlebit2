@@ -13,6 +13,7 @@ import { researchRoot } from './researchParts';
 import { researchPartSpecs } from './researchSpecs';
 import { researchCreditsPerMinute, researchLenders } from './lenders';
 import { answerTypes } from '../market/taskTypes';
+import { DVFS_CLOCK } from '../phys/constants';
 
 /** The trailing window of the recent income rate (round time). */
 const RECENT_MS = 30_000;
@@ -92,8 +93,24 @@ export function takenOpsPerSec(state: GameState): number {
   return heldOpsPerSec(state, false);
 }
 
+function modeRates(state: GameState): { roundOpsPerSec: number; pausedOpsPerSec: number } {
+  const c = state.compiled.sys, h = state.hot.sys;
+  let roundOpsPerSec = 0, pausedOpsPerSec = 0;
+  for (let s = 0; s < c.len; s += 1) {
+    if (c.alive[s] !== 1 || c.kind[s] !== 0 || c.intent[s] !== 1) continue;
+    if (state.compiled.rack.opened[c.rack[s]!] === 1 && c.port[s]! < 0) continue;
+    if (h.mode[s] !== MODE.onMarket && h.mode[s] !== MODE.paused && h.mode[s] !== MODE.asleep) continue;
+    const rate = c.threadRate[s]! * researchClock(state, s) * c.etaCfg[s]!;
+    roundOpsPerSec += rate * Math.min(1, c.threads[s]!);
+    pausedOpsPerSec += rate * c.threads[s]!;
+  }
+  return { roundOpsPerSec, pausedOpsPerSec };
+}
+
 /** exec/researchTask: a holder keeps one thread during a round (D27 amendment), all of them between rounds. */
 const ROUND_THREADS = 1;
+/** Taking research wakes DVFS on the next physical tick; retain current caps and thermal limits. */
+const researchClock = (state: GameState, s: number) => state.hot.sys.clockFactor[s]! / (state.hot.sys.dvfsOn[s] === 1 ? DVFS_CLOCK : 1);
 
 /**
  * exec/researchTask's take rule, read only. A live, linked server switched online can hold research:
@@ -118,7 +135,7 @@ function heldOpsPerSec(state: GameState, roomNow: boolean): number {
         take = Math.min(take, threads - h.busyThreads[s]!);
       }
     } else if (mode !== MODE.paused) continue;
-    if (take > 0) ops += c.threadRate[s]! * h.clockFactor[s]! * c.etaCfg[s]! * take;
+    if (take > 0) ops += c.threadRate[s]! * researchClock(state, s) * c.etaCfg[s]! * take;
   }
   return ops;
 }
@@ -164,16 +181,26 @@ export function researchTree(state: GameState, at: NodeRef | null = null): Resea
   const r = state.research;
   const done = new Set<string>(r.completed);
   const nodes: ResearchNodeView[] = [];
+  const levels = new Map<string, number>();
+  for (const def of RESEARCH) if (def.purchase && done.has(def.id)) levels.set(def.purchase.series, Math.max(levels.get(def.purchase.series) ?? 0, def.purchase.level));
   for (const def of RESEARCH) {
     if (!def.implemented) continue;
+    if (def.purchase && def.purchase.level !== Math.min(def.purchase.maxLevel, (levels.get(def.purchase.series) ?? 0) + 1)) continue;
     const st = nodeState(r, done, def);
     const ops = st === 'active' ? r.activeProgress : st === 'parked' ? (r.parked[def.id] ?? 0) : st === 'done' ? def.work : 0;
     const cost = dataCost(def);
     const creditCost = def.creditCost ?? ZERO_AMOUNT;
     const feePending = st === 'available' || st === 'queued' || st === 'locked';
     nodes.push({
-      id: def.id, name: def.name, category: def.category, state: st, progress: progressOf(def, ops),
+      id: def.id, name: def.name, category: def.category, state: st, progress: progressOf(def, ops), purchase: def.purchase,
       dataCost: cost, workOps: def.work, requires: def.requires,
+      requiredResearch: def.requires.filter(id => !done.has(id)).map(id => {
+        const required = researchDef(id)!;
+        const purchase = required.purchase;
+        const next = purchase && RESEARCH.find(d => d.purchase?.series === purchase.series
+          && d.purchase.level === Math.min(purchase.maxLevel, (levels.get(purchase.series) ?? 0) + 1));
+        return { id: next?.id ?? id, name: required.name + (purchase ? ` · Level ${purchase.level}` : '') };
+      }),
       creditCost, needsCredits: feePending && amountCompare(creditCost, state.wallet.credits) > 0,
       lockedBy: st === 'locked' ? (def.requires.find((p) => !done.has(p)) ?? null) : null,
       level: def.level, era: def.era, tier: def.tier,
@@ -185,7 +212,7 @@ export function researchTree(state: GameState, at: NodeRef | null = null): Resea
   const slots = r.unlocks.ceilings.researchQueue;
   return {
     nodes, parts: researchPartSpecs(state, at), income: recentIncome(state), active: r.active, opsPerSec: researchOpsPerSec(state), holdOpsPerSec: holdOpsPerSec(state), takenOpsPerSec: takenOpsPerSec(state), queue: r.queue,
-    queueSlots: slots > 1 ? slots : 0, horizon: researchHorizon(state),
+    ...modeRates(state), queueSlots: slots > 1 ? slots : 0, horizon: researchHorizon(state),
     lenders: researchLenders(state), creditsPerMinute: researchCreditsPerMinute(state),
   };
 }

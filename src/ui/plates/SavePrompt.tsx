@@ -7,8 +7,8 @@ export const SAVE_NAME_MAX = 24;
 
 /** "Rack A 1", "Rack A 2": the first base name not already saved. */
 export function nextDefaultName(base: string, taken: readonly string[]): string {
-  const names = new Set(taken);
-  for (let i = 1; ; i++) { const n = `${base} ${i}`; if (!names.has(n)) return n; }
+  const names = new Set(taken.map(n => n.toLowerCase()));
+  for (let i = 1; ; i++) { const n = `${base} ${i}`; if (!names.has(n.toLowerCase())) return n; }
 }
 
 export interface SavePromptProps extends Omit<PlatePosition, 'pinTop' | 'readAnchor'> {
@@ -29,7 +29,7 @@ export interface SavePromptProps extends Omit<PlatePosition, 'pinTop' | 'readAnc
 export function SavePrompt({ unit, defaultName, sub, taken = [], onAction, onClose, ...position }: SavePromptProps) {
   const [name, setName] = useState(defaultName.slice(0, SAVE_NAME_MAX));
   const input = useRef<HTMLInputElement>(null);
-  const noun = UNIT_NOUN[unit.kind], trimmed = name.trim(), replaces = taken.includes(trimmed);
+  const noun = UNIT_NOUN[unit.kind], trimmed = name.trim(), replaces = taken.some(n => n.toLowerCase() === trimmed.toLowerCase());
   const submit = () => { if (!trimmed) return; onAction({ type: 'saveConfig', unit, name: trimmed }); onClose(); };
   return <PlateFrame {...position} pinTop as="form" onSubmit={submit} closeKey initialFocus={input}
     title={`Save ${noun}`} sub={sub} className="save" onClose={onClose}>
@@ -38,10 +38,8 @@ export function SavePrompt({ unit, defaultName, sub, taken = [], onAction, onClo
       <input ref={input} type="text" value={name} maxLength={SAVE_NAME_MAX} autoComplete="off" spellCheck={false} enterKeyHint="done"
         onFocus={(e) => e.currentTarget.select()} onChange={(e) => setName(e.currentTarget.value)} />
     </label>
-    <p className="p-line muted">{replaces ? `Replaces the saved “${trimmed}”.` : `Shows only when you add a new ${noun}.`}</p>
     <div className="save-keys">
       <button type="submit" className="key go" disabled={!trimmed}>{replaces ? 'Replace' : 'Save'}</button>
-      <button type="button" className="key ghost" onClick={onClose}>Cancel</button>
     </div>
   </PlateFrame>;
 }

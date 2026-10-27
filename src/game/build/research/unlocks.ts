@@ -7,6 +7,10 @@ export const ruleParam = (unlocks: Unlocks, rule: RuleId, key: string, fallback:
   unlocks.ruleParams[rule]?.[key] ?? fallback;
 /** Generation g needs its own bit and generation zero's. NPU bits come from its explicit AND gates. */
 export function genUnlocked(unlocks: Unlocks, part: PartId, g: number): boolean {
+  // These native controllers are included with their container; no separate
+  // generation research exists for them in the tree.
+  if (g === 0 && (part === 'roomLb' || part === 'roomSwitch') && unlocks.levels.room) return true;
+  if (g === 0 && part === 'globalScheduler' && (unlocks.gens.site & 1) !== 0) return true;
   const bits = unlocks.gens[part] ?? 0;
   return (bits & (1 << g)) !== 0 && (bits & 1) !== 0;
 }

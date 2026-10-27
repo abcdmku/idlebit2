@@ -26,6 +26,7 @@ const hms = (s: number | null) => (s === null ? '-' : `${Math.floor(s / 86400)}d
 
 const rows: string[] = ['| Stage | Game span | Wall | Speedup | Reached in stage |', '|---:|---|---:|---:|---|'];
 let prev: string | null = null, hours = 24, last: StageFile | null = null, n = 0;
+const choices: number[] = [], rounds: { startS: number; lengthS: number }[] = [];
 for (;;) {
   n += 1;
   const out = path.join(dir, `stage-${n}.json`);
@@ -33,6 +34,7 @@ for (;;) {
   if (prev) args.push(`--from=${prev}`);
   execFileSync(process.execPath, args, { stdio: ['ignore', 'ignore', 'inherit'] });
   const stage = JSON.parse(readFileSync(out, 'utf8')) as StageFile;
+  choices.push(...(stage.review?.choices ?? [])); rounds.push(...(stage.review?.rounds ?? []));
   const before = last?.carry.milestones;
   const reached = (Object.entries(stage.carry.milestones) as [keyof Milestones, number | null][])
     .filter(([k, v]) => v !== null && (!before || before[k] === null)).map(([k, v]) => `${k} ${hms(v)}`);
@@ -46,7 +48,20 @@ for (;;) {
 }
 
 const m = last!.carry.milestones;
+const phases = [['0–1 h', 0, 3600], ['1–8 h', 3600, 28800], ['8–24 h', 28800, 86400], ['After 24 h', 86400, Infinity]] as const;
+const pacing = phases.flatMap(([name, from, until]) => {
+  const end = Math.min(last!.stage.endTick / 10, until);
+  if (end <= from) return [];
+  let at: number = from, gap = 0;
+  for (const choice of choices) if (choice >= from && choice < end) { gap = Math.max(gap, choice - at); at = choice; }
+  gap = Math.max(gap, end - at);
+  const inEra = rounds.filter(r => r.startS >= from && r.startS < end);
+  const mean = inEra.length ? (inEra.reduce((sum, r) => sum + r.lengthS, 0) / inEra.length / 60).toFixed(1) : '-';
+  return [`| ${name} | ${mean} min | ${(gap / 60).toFixed(1)} min | ${inEra.length} |`];
+});
 const md = [`# Stage chain, seed ${seed}, until ${until}`, '', ...rows, '',
-  '| Milestone | Reached |', '|---|---|', ...(Object.entries(m) as [string, number | null][]).map(([k, v]) => `| ${k} | ${hms(v)} |`), ''].join('\n');
+  '| Milestone | Reached |', '|---|---|', ...(Object.entries(m) as [string, number | null][]).map(([k, v]) => `| ${k} | ${hms(v)} |`), '',
+  'Every stage save was serialized and reloaded before continuing.', '',
+  '| Era | Mean round length | Largest choice gap | Rounds |', '|---|---:|---:|---:|', ...pacing, ''].join('\n');
 writeFileSync(path.join(dir, 'chain.md'), md);
 console.log(`\n${md}\nChain: ${dir}`);

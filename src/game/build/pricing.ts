@@ -3,7 +3,7 @@ import {
   ECC_PRICE_FACTOR, EXTRA_CORE_GROWTH, EXTRA_UNIT_GROWTH, installPrice, ladderInstall, LADDERS, portAddPrice, networkStepsBetween,
   PARTS, scalePrice, SHELLS, upgradePrice, upgradesBetween, type CatalogRow, type LadderDef,
 } from './catalog';
-import { gpuInstallPrice, gpuNativePrice, gpuPriceToLevel } from './catalog/gpuModels';
+import { gpuInstallPrice } from './catalog/gpuModels';
 import { lbQueueStepsTo } from './catalog/network';
 
 /**
@@ -42,7 +42,7 @@ export function systemSpecPrice(spec: SystemSpec): bigint {
   const seen = { gpu: 0, npu: 0 };
   for (const a of spec.accels) {
     total += a.kind === 'gpu'
-      ? gpuInstallPrice(a.model, seen.gpu) + gpuPriceToLevel(a.model, a.upgrades) - gpuNativePrice(a.model)
+      ? gpuInstallPrice(a.model, seen.gpu)
       : partFromNothing(PARTS.npu, a, seen.npu);
     seen[a.kind] += 1;
   }

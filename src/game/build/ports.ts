@@ -1,3 +1,4 @@
+import { formatHertz } from '../format';
 import { MAX_RACK_PORTS, MAX_ROOM_PORTS, MAX_UPLINKS } from '../core/constants';
 import type { BuildState, SwitchBuild } from '../types/build';
 import type { PartRef, SwitchRef } from '../types/ids';
@@ -13,11 +14,7 @@ import { researchDef } from './research/tree';
  * Switch ports on the 1-2-5 ladder (spec §7.3, §12.5). Each port and uplink steps alone; with the
  * same-speed toggle one action raises every port below the target, priced as the sum of its steps.
  */
-const speedLabel = (k: number): string => {
-  const hz = ladderSpeed(k);
-  const [unit, div] = hz >= 1e9 ? ['GHz', 1e9] : hz >= 1e6 ? ['MHz', 1e6] : ['kHz', 1e3];
-  return `${hz / div} ${unit}`;
-};
+const speedLabel = (k: number): string => formatHertz(ladderSpeed(k));
 
 interface SwitchAt { readonly sw: SwitchBuild; readonly row: LadderDef; readonly opened: boolean; readonly ceiling: 'rackPorts' | 'roomPorts'; readonly max: number }
 export function switchAt(build: BuildState, ref: SwitchRef): SwitchAt | null {
@@ -34,7 +31,8 @@ function withSwitch(build: BuildState, ref: SwitchRef, sw: SwitchBuild): BuildSt
   return { ...build, rooms: build.rooms.map((z, i) => (i === ref.id && z ? { ...z, switch: sw } : z)) };
 }
 
-const closed = (): Plan => fail('locked', 'Opens with its level');
+export const PIPE_LOCK_TEXT = 'Upgrade at the Rack switch';
+const closed = (ref: SwitchRef): Plan => locked(structureLock(ref.kind, `Needs ${ref.kind === 'rack' ? 'Rack' : 'Room'}`));
 
 /** The same-speed target (spec §12.5): kmax, or kmax + 1 when every port is already at kmax. */
 export const sameSpeedTarget = (ports: readonly number[]): number => {
@@ -51,7 +49,6 @@ const structureLock = (level: 'rack' | 'room' | 'global', text: string): LockRea
   const node = researchDef(level === 'global' ? 'dataCenter' : level);
   return { code: 'research', node: node?.id ?? null, text };
 };
-export const PIPE_LOCK_TEXT = 'Upgrade at the Rack switch';
 
 /** A port or uplink step to k on an open switch: the generation's top. */
 const stepLock = (at: SwitchAt, k: number): LockReason | null =>
@@ -61,16 +58,16 @@ const stepLock = (at: SwitchAt, k: number): LockReason | null =>
 function uplinkLock(build: BuildState, ref: SwitchRef): LockReason | null {
   if (ref.kind === 'rack') {
     const room = build.rooms[build.racks[ref.id]?.room ?? -1];
-    return room?.opened ? null : structureLock('room', 'Upgrade at the Room network rack');
+    return room?.opened ? null : structureLock('room', 'Needs Room');
   }
   const site = build.sites[build.rooms[ref.id]?.site ?? -1];
-  return site?.opened ? null : structureLock('global', 'Upgrade at Global');
+  return site?.opened ? null : structureLock('global', 'Needs Data center');
 }
 
 export function planUpgradePort(state: GameState, ref: SwitchRef, port: number | 'all'): Plan {
   const at = switchAt(state.build, ref);
   if (!at) return fail('invalid', 'No such switch');
-  if (!at.opened && (ref.kind !== 'rack' || port === 'all')) return closed();
+  if (!at.opened && (ref.kind !== 'rack' || port === 'all')) return closed(ref);
   const { sw, row } = at;
   if (!at.opened && port !== 'all') {
     const k = sw.ports[port];
@@ -98,7 +95,7 @@ export function planUpgradePort(state: GameState, ref: SwitchRef, port: number |
 export function planUpgradeUplink(state: GameState, ref: SwitchRef, uplink: number): Plan {
   const at = switchAt(state.build, ref);
   if (!at) return fail('invalid', 'No such switch');
-  if (!at.opened) return closed();
+  if (!at.opened) return closed(ref);
   const { sw, row } = at;
   const k = sw.uplinks[uplink];
   if (k === undefined) return fail('invalid', 'No such uplink');
@@ -112,7 +109,7 @@ export function planUpgradeUplink(state: GameState, ref: SwitchRef, uplink: numb
 export function planAddPort(state: GameState, ref: SwitchRef): Plan {
   const at = switchAt(state.build, ref);
   if (!at) return fail('invalid', 'No such switch');
-  if (!at.opened) return closed();
+  if (!at.opened) return closed(ref);
   const { sw, row } = at;
   const n = sw.ports.length + 1;
   const base = row.baseK[sw.gen]!;
@@ -137,7 +134,7 @@ function upstreamDefaultK(build: BuildState, ref: SwitchRef): number {
 export function planAddUplink(state: GameState, ref: SwitchRef): Plan {
   const at = switchAt(state.build, ref);
   if (!at) return fail('invalid', 'No such switch');
-  if (!at.opened) return closed();
+  if (!at.opened) return closed(ref);
   const { sw, row } = at;
   const n = sw.uplinks.length + 1;
   const price = portAddPrice(row, sw.gen, n - 1);
@@ -150,7 +147,7 @@ export function planAddUplink(state: GameState, ref: SwitchRef): Plan {
 export function planSameSpeed(state: GameState, ref: SwitchRef, on: boolean): Plan {
   const at = switchAt(state.build, ref);
   if (!at) return fail('invalid', 'No such switch');
-  return planned({ build: withSwitch(state.build, ref, { ...at.sw, sameSpeed: on }), price: 0n }, on ? 'Same speed on' : 'Same speed off');
+  return planned({ build: withSwitch(state.build, ref, { ...at.sw, sameSpeed: on }), price: 0n }, 'All ports one speed');
 }
 
 /**
@@ -174,7 +171,9 @@ export function planReplaceLadder(state: GameState, ref: PartRef, g: number): Pl
     const sw = switchAt(state.build, sref)!.sw;
     for (let j = 1; j <= sw.ports.length - row.minPorts; j += 1) price += portAddPrice(row, g, j);
     for (let j = 1; j < sw.uplinks.length; j += 1) price += portAddPrice(row, g, j);
-    build = withSwitch(state.build, sref, { ...sw, gen: g, ports: sw.ports.map(clamp), uplinks: sw.uplinks.map(clamp) });
+    const native = upstreamDefaultK(state.build, sref);
+    const clampUplink = (k: number) => Math.min(Math.max(row.topK[g]!, native), Math.max(native, k));
+    build = withSwitch(state.build, sref, { ...sw, gen: g, ports: sw.ports.map(clamp), uplinks: sw.uplinks.map(clampUplink) });
   } else {
     build = writePart(state.build, ref, g, clamp(part.level))!;
   }

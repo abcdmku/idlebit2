@@ -9,7 +9,7 @@ export type { PathNode, ZoomOptions, ZoomSegment, ZoomState } from './transition
 export { ZoomChain, CHAIN_GAP_S } from './chain';
 export { createZoomLink, hallDim, keyOf, siteSink, sledOut, zoomLink } from './choreo';
 export type { ZoomLink } from './choreo';
-export { DESKTOP_TYPE, PHONE_TYPE, LabelBuffer, TONE, drawLabels, MAX_LABELS, typeForScale } from './labels';
+export { DESKTOP_TYPE, PHONE_TYPE, LabelBuffer, TONE, drawLabels, labelTextWidth, MAX_LABELS, typeForScale } from './labels';
 export type { LabelAlign, LabelTone, LabelWriter, Typography } from './labels';
 export * from './format';
 export { BAND, BAND_ORDER, BAND_TYPE, FAMILY, FAMILY_CELL, FAMILY_ICON, TASK_TYPES, TYPE, bandColor, drawFamilyIcon,

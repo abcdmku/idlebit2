@@ -9,7 +9,7 @@ export type QuoteRequest =
   /** The 4 primary tray items, followed by per-core upgrade quotes at chip level. */
   | { readonly kind: 'tray'; readonly at: NodeRef }
   /** Upgrade, replace options, add/remove for one part. */
-  | { readonly kind: 'part'; readonly part: PartRef }
+  | { readonly kind: 'part'; readonly part: PartRef; readonly minimumCapacity?: number }
   /** Configuration plate: barebones tiers, copies, saved names. */
   | { readonly kind: 'add'; readonly parent: ScopeRef; readonly slot: number }
   /** Per-port and all-port speed, port count, uplinks. */
@@ -75,6 +75,22 @@ export interface EffectPreview {
   readonly energyPerMinuteDelta: Amount;
   /** price / net gain per second at current load; null = "No payback at this load". */
   readonly paybackS: number | null;
+  /** Market estimate: recent paid work and energy per unit at the saved sleep settings. */
+  readonly marketEstimate?: boolean;
+  /** False means no return model applies, rather than a computed nonpositive return. */
+  readonly paybackEvaluated?: boolean;
+  /** A supply warning invalidates a market forecast until the supply is prepared. */
+  readonly paybackBlockedBySupply?: boolean;
+  /** The purchase's added energy exceeds its added task earnings in the estimate. */
+  readonly marginalLoss?: boolean;
+  /** Research capacity is shown separately and never valued as Credit income. */
+  readonly researchOpsBefore?: number;
+  readonly researchOpsAfter?: number;
+  /** Sustained CPU research after this buy exceeds the rack cooler's rated heat removal. View W. */
+  readonly researchCooling?: { readonly rack: RackId; readonly heatW: number; readonly capacityW: number };
+  /** RAM bandwidth or drive IO for this part, bit/s, when capacity alone would hide a trade-off. */
+  readonly throughputBefore?: number;
+  readonly throughputAfter?: number;
   /**
    * A power supply change only: its loss before and after, in percent of delivered watts at
    * typical load (×1 up to 90% usage; exact, the UI rounds). wattsBefore/After are then the

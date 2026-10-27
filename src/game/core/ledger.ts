@@ -37,10 +37,15 @@ export function ledgerPhase(w: World): void {
     const watts = bill[r]!;
     if (watts !== 0) { energyMeter += watts * DT_S * REGIONS[r]!.energyPrice; bill[r] = 0; }
   }
-  const wholeEnergy = Math.floor(energyMeter);
-  l.energyMeter = energyMeter - wholeEnergy;
+  l.energyMeter = energyMeter;
+  settleLedger(w, gross, BigInt(wholeData));
+}
 
-  const data = BigInt(wholeData);
+/** Settles accumulated energy and tick earnings, or a between-tick battery refill, immediately. */
+export function settleLedger(w: World, gross = 0n, data = 0n): void {
+  const l = w.ledger;
+  const wholeEnergy = Math.floor(l.energyMeter);
+  l.energyMeter -= wholeEnergy;
   const energy = BigInt(wholeEnergy);
   if (gross !== 0n || data !== 0n || energy !== 0n) {
     l.credits += gross - energy;
@@ -74,7 +79,9 @@ function recordNet(w: World): void {
   const sample = { tick: stamp, gross: toAmount(l.gross), energy: toAmount(l.energy) };
   if (ring.length > 0 && ring[ring.length - 1]!.tick === stamp) { ring[ring.length - 1] = sample; return; }
   ring.push(sample);
-  const windowStart = stamp - NET_WINDOW_TICKS;
+  // The rounded stamp may be up to a second ahead of the simulation. Keep the predecessor
+  // of the actual query boundary, or netAt can find no base and report lifetime net as /min.
+  const windowStart = w.tick - NET_WINDOW_TICKS;
   let keepFrom = 0;
   for (let i = 0; i < ring.length; i += 1) if (ring[i]!.tick <= windowStart) keepFrom = i;
   if (keepFrom > 0) ring.splice(0, keepFrom);

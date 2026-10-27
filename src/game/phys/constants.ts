@@ -9,9 +9,7 @@ export const SUPPLY_MULT = [1, 1.5, 3] as const;
 
 /** C-states (spec §9.3): idle factor, ticks idle before it applies, wake latency in ticks. */
 export const CSTATES = [
-  { depth: 1, factor: 0.5, afterTicks: 0, wakeTicks: 0 },
-  { depth: 3, factor: 0.15, afterTicks: secondsToTicks(1), wakeTicks: secondsToTicks(0.2) },
-  { depth: 6, factor: 0.02, afterTicks: secondsToTicks(1), wakeTicks: secondsToTicks(1) },
+  { depth: 1, factor: 0.72, afterTicks: 0, wakeTicks: 0 },
 ] as const;
 export const PACKAGE_IDLE_FACTOR = 0.2;
 export const S3_AFTER_TICKS = secondsToTicks(10);
@@ -35,7 +33,6 @@ export const CAP_STEPS_MIN = 1;
 export const CAP_HEADROOM = 0.9;
 
 export const UPS_RIDE_TICKS = secondsToTicks(30);
-export const UPS_RIDE_MIN_GEN = 2;
 
 /* Heat (spec §10). */
 export const COOLER_DELTA_F = 20;

@@ -59,7 +59,7 @@ const report = {
   preparedAt: new Date().toISOString(), scope: 'one-server smoke only',
   passed: ['input immutability', 'structural validation', 'uneven delta partitions including RNG/events/Amount',
     'structured clone equality', 'save round-trip and continuation', 'real worker session continuation equality'],
-  profile: { model: card.model, upgrades: card.upgrades, scale, cores: stats.cores, clockHz: stats.clockHz,
+  profile: { model: card.model, scale, cores: stats.cores, clockHz: stats.clockHz,
     vramBits: stats.vramBits, opsPerS: stats.opsPerS, workOps: work, taskSecondsAtCatalogRate: work / stats.opsPerS,
     measuredSpanMs: 63_100, fullSystemW, psuCapW: c.psuCapW[0],
     psuHeadroomW: c.psuCapW[0]! - fullSystemW, rackCoolerQcW: source.compiled.rack.coolerQc[0],

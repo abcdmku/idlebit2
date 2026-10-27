@@ -54,5 +54,5 @@ export function globalStartTag(s: GlobalSnapshot, gateway: number, out: LabelWri
   const st = s.start ?? null;
   if (!st) return;
   hubRect(gateway, hub);
-  out.label('start', hub.x + (hub.w >> 1), SIZE.h + 3, 'center', true).text('Start', 'name', true).text(`${whole(st.awake)}/${whole(st.total)} sites on`, 'value');
+  out.label('start', hub.x + (hub.w >> 1), SIZE.h + 3, 'center', true).text(`${whole(st.awake)}/${whole(st.total)} sites on`, 'value');
 }

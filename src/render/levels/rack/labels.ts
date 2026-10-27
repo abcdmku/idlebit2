@@ -19,7 +19,7 @@ export function speedText(lo: number, hi: number): string {
 export function rackLabels(s: RackSnapshot, frame: WorldFrame, out: LabelWriter): void {
   switchSpeeds(s, sp);
   if (sp.hi <= 0) return;
-  const ax = colX(rackCol(s)), x = ax + CAB.x - 4, y = SWITCH_RECT.y + 1;
+  const ax = colX(rackCol(s)), x = ax + CAB.x - (frame.form === 'phone' ? 8 : 4), y = SWITCH_RECT.y + 1;
   const tag = out.label('switch', x, y, 'right', true).text('Switch', 'name', true);
   (frame.form === 'phone' ? tag.br() : tag).text(speedText(sp.lo, sp.hi), 'net');
   out.leader(ax + SWITCH_RECT.x, SWITCH_RECT.y + 6);

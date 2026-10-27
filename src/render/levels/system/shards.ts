@@ -2,12 +2,12 @@
 // port's shard (`SystemSnapshot.inbound`, before Rack the pipe's transfer) rides the cable and the
 // trace into CPU 1 at its real progress. At the CPU its threads light as lanes on the package mini
 // (the chip level draws them); a GPU-stage shard lights a piece on the card(s) of its domain. Every
-// piece is the shard's remaining work in its task type's colour, so it empties as the shard runs.
+// piece fills from empty to full with the shard's progress in its task type's colour.
 import { FAMILIES, POOL_DOMAIN } from '../../../game';
 import type { SystemSnapshot, TaskView, TransferView } from '../../../game';
 import { drawFlow, flowColor } from '../../core';
 import type { FlowPhase, WorldFrame } from '../../core';
-import { drawPiece, remaining } from '../chip/shards';
+import { drawPiece } from '../chip/shards';
 import { BOARD, CABLE_X, CONNECTOR } from './layout';
 import type { BoardLayout } from './layout';
 import type { BoardModel, Site } from './model';
@@ -15,7 +15,7 @@ import type { BoardModel, Site } from './model';
 type G = CanvasRenderingContext2D;
 
 /** The system's inbound shard on the pipe: its own transfer, else (before Rack) the pipe's. */
-export const inboundOf = (s: SystemSnapshot): TransferView | null => s.inbound ?? s.chip.pipe.transfer;
+export const inboundOf = (s: SystemSnapshot): TransferView | null => s.inbound ?? s.chip.pipe?.transfer ?? null;
 
 const link: [number, number][] = [[CABLE_X, CONNECTOR.y], [CABLE_X, BOARD.y], [CABLE_X, 0]];
 /** Draw the inbound shard on from the edge connector (the core's pipe carries it to the pad) into CPU 1 (a short one is a landing flash). */
@@ -49,14 +49,14 @@ function faceOf(b: BoardLayout, f: Site['f']): { x: number; y: number; w: number
   face.w = b.dimm === 'h' ? f.w - 2 : f.w; face.h = b.dimm === 'h' ? f.h - 9 : f.h - 6;
   return face;
 }
-/** The shard's piece on each card serving it: a gauge on the card face, draining as the stage runs. */
+/** The shard's progress on each card serving it, filling as the stage runs. */
 export function drawGpuPiece(g: G, m: BoardModel, t: TaskView): number {
-  const list = servingCards(m, t), colour = flowColor(t), left = remaining(t.progress);
+  const list = servingCards(m, t), colour = flowColor(t), progress = t.progress;
   for (const site of list) {
     const r = faceOf(m.b, site.f);
     // General cards keep their heatsink block (right 12 px) clear; modules use the face's foot.
-    if (m.b.dimm === 'h') drawPiece(g, r.x + 2, r.y + (r.h >> 1) - 2, r.w - 14, 4, left, colour);
-    else drawPiece(g, r.x + 2, r.y + r.h - 8, r.w - 4, 4, left, colour);
+    if (m.b.dimm === 'h') drawPiece(g, r.x + 2, r.y + (r.h >> 1) - 2, r.w - 14, 4, progress, colour);
+    else drawPiece(g, r.x + 2, r.y + r.h - 8, r.w - 4, 4, progress, colour);
   }
   return list.length;
 }

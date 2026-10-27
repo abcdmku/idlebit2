@@ -22,7 +22,7 @@ export const TAB_PARTS: Readonly<Record<ResearchTabId, readonly Part[]>> = {
 };
 export const PART_NAMES: Readonly<Record<ResearchPartId, string>> = {
   cores: 'Cores', clock: 'Clock', cache: 'Cache', queue: 'Scheduler', fab: 'Fab',
-  cpu: 'CPU', ram: 'RAM', drive: 'Storage', gpu: 'GPU', psu: 'PSU', board: 'Board',
+  cpu: 'CPU', ram: 'RAM', drive: 'Drive', gpu: 'GPU', psu: 'Power supply', board: 'Board',
   switch: 'Switch', lb: 'Load balancer', rackCooling: 'Rack cooling', rackPower: 'Rack power',
   netRack: 'Room network', roomCooling: 'Room cooling', ups: 'UPS',
   dataPlane: 'Data plane', backbone: 'Backbone', site: 'Site power', globalScheduler: 'Global scheduler',
@@ -63,7 +63,6 @@ export function tabList(unlocked: Readonly<Record<LevelId, boolean>>): { owned: 
   return { owned, teaser: TABS[TABS.indexOf(owned[owned.length - 1]!) + 1] ?? null };
 }
 
-const OPEN = new Set<ResearchNodeView['state']>(['active', 'parked', 'queued', 'available']);
 const cost = (n: ResearchNodeView) => { const p = priceOf(n); return [Number(p.data ?? 0), Number(p.credits ?? 0), n.workOps] as const; };
 const byPrice = (a: ResearchNodeView, b: ResearchNodeView) => {
   const x = cost(a), y = cost(b);
@@ -71,19 +70,18 @@ const byPrice = (a: ResearchNodeView, b: ResearchNodeView) => {
 };
 
 /**
- * The board. Shown: every open project the hardware can use (`visible`, the contextual tree), one
- * next locked project per part whose prerequisites are done or shown, what opens the next level,
- * `focus`, and every unmet prerequisite of anything shown.
+ * The board includes contextual open projects and the owned levels' locked projects, plus the next
+ * level, `focus`, and every unmet prerequisite. Done and locked projects live in the screen's fold.
  */
 export function buildBoard(tree: ResearchTreeView, visible: ReadonlySet<ResearchId>, unlocked: Readonly<Record<LevelId, boolean>>,
   focus: ResearchId | null = null): Board {
   const { owned, teaser } = tabList(unlocked);
   const byId = new Map(tree.nodes.map(n => [n.id, n]));
-  const shown = new Set<ResearchId>(tree.nodes.filter(n => OPEN.has(n.state) && visible.has(n.id)).map(n => n.id));
+  const shown = new Set<ResearchId>(tree.nodes.filter(n => n.state !== 'done' && visible.has(n.id)).map(n => n.id));
   const settled = (id: ResearchId) => shown.has(id) || byId.get(id)?.state === 'done';
   // One next locked project per part (and per tab's structure), its prerequisites all done or shown.
   const parts = new Map<string, ResearchNodeView[]>();
-  for (const n of tree.nodes) {
+  for (const n of tree.nodes.filter(n => visible.has(n.id))) {
     const k = n.part === 'structure' ? `structure:${n.tab}` : n.part;
     parts.set(k, [...(parts.get(k) ?? []), n]);
   }
@@ -125,7 +123,7 @@ export function buildBoard(tree: ResearchTreeView, visible: ReadonlySet<Research
     const nextNodes = tree.nodes.filter(n => shown.has(n.id) && home(n).tab === tab && home(n).next);
     const nextRows = rowsOf(nextNodes);
     const next = nextRows.length ? { part: 'structure' as const, done: [], rows: nextRows, total: nextRows.length } : null;
-    for (const g of next ? [...groups, next] : groups) for (const n of g.rows) where.set(n.id, tab);
+    for (const g of next ? [...groups, next] : groups) for (const n of [...g.done, ...g.rows]) where.set(n.id, tab);
     tabs.set(tab, { tab, parts: groups, next });
   }
   return { owned, teaser, tabs, where };
@@ -157,7 +155,7 @@ export function projectKey(n: ResearchNodeView, tree: Pick<ResearchTreeView, 'ac
       const price = priceOf(n);
       if (n.needsData || shortBy(data, price.data) > 0n) return { label: 'Needs Data', action: null };
       if (n.needsCredits || shortBy(credits, price.credits) > 0n) return { label: 'Needs Credits', action: null };
-      if (!tree.active) return { label: 'Start', action: { type: 'startResearch', project: n.id } };
+      if (n.purchase || !tree.active) return { label: n.purchase ? 'Buy' : 'Start', action: { type: 'startResearch', project: n.id } };
       if (tree.queue.length + 1 < tree.queueSlots) return { label: 'Queue', action: { type: 'queueResearch', project: n.id } };
       return { label: tree.queueSlots ? 'Queue full' : 'One at a time', action: null };
     }

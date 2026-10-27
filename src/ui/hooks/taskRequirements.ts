@@ -1,5 +1,5 @@
 ﻿import type { FailDetail, QueueEntryView, TaskRequirementsView } from '../../game';
-import { formatOps, formatSize } from '../../game';
+import { formatOps, formatSize, regionName } from '../../game';
 
 /** Sizes print through the shared formatter: "2 b", "21.4 kb" (one string everywhere). */
 export const taskBits = (n: number): string => formatSize(n);
@@ -21,9 +21,9 @@ export function requirementText(task: TaskRequirementsView): string {
   const accel = accelRequirements(task);
   if (accel) facts.push(accel);
   // D25.6: a distributed task's minimum split, worded as what it needs (lead: no grain on cards).
-  if (task.members > 1) facts.push(`${task.members} systems`);
+  if (task.members > 1) facts.push(`${task.members} servers`);
   if (task.minZones > 1) facts.push(`${task.minZones} zones`);
-  if (task.region !== null) facts.push(`Region ${task.region}`);
+  if (task.region !== null) facts.push(regionName(task.region));
   if (task.ecc) facts.push('ECC');
   if (task.tensor) facts.push('Tensor');
   return facts.join(' · ');
@@ -34,8 +34,8 @@ export function requirementText(task: TaskRequirementsView): string {
  * task status, the head card, the report and the platform line alike.
  */
 export const OUTAGE_TEXT: Readonly<Partial<Record<FailDetail, string>>> = {
-  psu: 'Power supply down', pdu: 'Rack PDU down', ups: 'UPS down', grid: 'Grid down',
-  rack: 'Rack overheated', room: 'Room overheated', offline: 'No system online',
+  psu: 'Power supply down', pdu: 'PDU down', ups: 'UPS down', grid: 'Grid down',
+  rack: 'Rack overheated', room: 'Zone overheated', offline: 'No server online',
 };
 
 export function blockedText(task: QueueEntryView): string | null {
@@ -43,14 +43,14 @@ export function blockedText(task: QueueEntryView): string | null {
     case null: return null;
     case 'cache': return `Needs ${taskBits(task.workingSetBits)} cache`;
     // The detail names the deepest tier the system has (D26.1): cache only, RAM with no drive, or the whole hierarchy.
-    case 'ram': return `Needs ${taskBits(task.workingSetBits)} memory · add RAM`;
+    case 'ram': return `Needs ${taskBits(task.workingSetBits)} memory`;
     case 'disk': return `Needs ${taskBits(task.workingSetBits)} memory`;
     case 'vram': return `Needs ${taskBits(task.vramBits)} VRAM`;
     case 'gpuCores': return `Needs ${task.gpuCoresMin} GPU cores`;
     case 'gpu': return task.tensor ? 'Needs tensor compute' : 'Needs GPU compute';
-    case 'members': return `Needs ${task.members} systems`;
+    case 'members': return `Needs ${task.members} servers`;
     case 'zones': return `Needs ${task.minZones} zones`;
-    case 'region': return `Needs region ${task.region}`;
+    case 'region': return `Needs ${regionName(task.region ?? '')}`;
     case 'ecc': return 'Needs ECC';
     default: return OUTAGE_TEXT[task.blockedBy] ?? `Needs ${task.blockedBy}`;
   }

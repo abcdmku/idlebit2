@@ -7,7 +7,7 @@ import { BUDGETS, parseGate, type Gate } from './budgets';
 import { benchCampaign } from './campaign';
 import { describeEnvironment } from './environment';
 import { benchBoot, benchFleet } from './frames';
-import { benchOffline } from './offline';
+import { benchOfflineGate } from './offline';
 import { benchPoweredGpu } from './gpu';
 import { isPassing, toMarkdown, writeReport, type BenchReport, type CaseResult } from './report';
 
@@ -22,7 +22,7 @@ const CASES: readonly { id: string; run(): CaseResult | Promise<CaseResult> }[] 
   { id: 'fleetMax', run: () => benchFleet(gate, ['fleetMax', 'fleetMaxHot'], BUDGETS.fleetMax) },
   // Informational, never gating: fleetMax with top-tier links at I 42 (testkit/fleets MAX_LINK_FLEET), global scope.
   { id: 'fleetMaxLinks', run: () => informational(benchFleet(gate, ['fleetMaxLinks'], BUDGETS.fleetMax, ['global'])) },
-  { id: 'offline', run: () => benchOffline(gate) },
+  { id: 'offline', run: () => benchOfflineGate(gate) },
   { id: 'campaign', run: () => benchCampaign(gate, root) },
   // Explicit --only=gpuPowered opts into the populated GPU workload after integration approval.
   { id: 'gpuPowered', run: () => benchPoweredGpu(gate, arg('max-wall-ms') === undefined ? 30_000 : Number(arg('max-wall-ms'))) },

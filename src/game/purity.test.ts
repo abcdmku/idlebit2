@@ -1,3 +1,4 @@
+// @vitest-environment node
 import { readdirSync, readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
 
@@ -26,18 +27,13 @@ const FORBIDDEN_GLOBALS = [
   /\brequestAnimationFrame\(/,
 ];
 
-describe("src/game purity", () => {
+it("keeps src/game free of framework imports and browser/time/random globals", () => {
   const files = collect(GAME_DIR);
 
-  it("has files to scan", () => {
-    expect(files.length).toBeGreaterThan(10);
-  });
+  expect(files.length).toBeGreaterThan(10);
 
   for (const file of files) {
-    it(`${file.slice(GAME_DIR.length + 1)} has no framework imports or browser/time/random globals`, () => {
-      const source = readFileSync(file, "utf8");
-      for (const pattern of FORBIDDEN_IMPORTS) expect(source).not.toMatch(pattern);
-      for (const pattern of FORBIDDEN_GLOBALS) expect(source).not.toMatch(pattern);
-    });
+    const source = readFileSync(file, "utf8"), name = file.slice(GAME_DIR.length + 1);
+    for (const pattern of [...FORBIDDEN_IMPORTS, ...FORBIDDEN_GLOBALS]) expect(source, name).not.toMatch(pattern);
   }
 });

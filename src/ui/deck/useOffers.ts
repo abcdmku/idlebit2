@@ -4,7 +4,7 @@ import type { RenderSnapshot } from '../../game';
 import { buildOffers, EXTRA_ROWS, extraOffer, extraRequest, linkRequest, WALL_ROWS, type Offers } from './offers';
 
 /** A timeout is too little speed: the clock on a CPU, the CPU on a system. */
-const SLOW_ROWS = ['clock', 'cpu', 'core'];
+const SLOW_ROWS = ['clock', 'core', 'port', 'cpu'];
 /** Draw at or above this share of a supply's capacity (or a lump this hot) makes it worth featuring. */
 const NEAR = 0.8, HOT_F = 85;
 
@@ -34,21 +34,21 @@ export function useOffers(): Offers {
   const at = useViewState().focus;
   const tray = useQuote({ kind: 'tray', at });
   const quotes = tray?.quotes ?? null;
-  const link = useQuote(linkRequest(at));
+  const rackOpen = useGameSelector(s => s.unlocked.rack);
+  const link = useQuote(at.level === 'chip' || at.level === 'system' || rackOpen ? linkRequest(at) : null);
   // At most two extra rows per level; two hook calls keep the hook order fixed.
   const defs = EXTRA_ROWS[at.level] ?? [];
   const extra0 = useQuote(defs[0] ? extraRequest(at, defs[0]) : null), extra1 = useQuote(defs[1] ? extraRequest(at, defs[1]) : null);
-  const cacheLevels = useGameSelector(s => (s.focus.level === 'chip' ? s.focus.cache.levels.length : 1));
   const wk = useGameSelector(wallKey, Object.is, 500);
   useEffect(() => { surface.buildQuotes = tray; }, [surface, tray]);
   useEffect(() => () => { surface.buildQuotes = null; }, [surface]);
   return useMemo(() => buildOffers(at.level, quotes, link?.quotes[0] ?? null,
-    [extraOffer(extra0?.quotes), extraOffer(extra1?.quotes)], wallContext(cacheLevels, wk)), [at.level, quotes, link, extra0, extra1, cacheLevels, wk]);
+    [extraOffer(extra0?.quotes), extraOffer(extra1?.quotes)], wallContext(wk)), [at.level, quotes, link, extra0, extra1, wk]);
 }
 
-function wallContext(cacheLevels: number, key: string) {
+function wallContext(key: string) {
   const [wall = '', near = ''] = key.split('|');
-  return { cacheLevels, wall: wall ? wall.split(',') : [], supplyNear: new Set(near ? near.split(',') : []) };
+  return { wall: wall ? wall.split(',') : [], supplyNear: new Set(near ? near.split(',') : []) };
 }
 
 /** One set of offers for the deck and the callout; the shell provides it. */

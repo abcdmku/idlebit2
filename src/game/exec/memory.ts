@@ -19,6 +19,11 @@ import { CPU, GPU, IO, RAM, shapeOf, stageWorkAt, workingSetOf, type Shape } fro
 export const PART_MAIN = 0;
 export const PART_RAM = 1;
 export const PART_DISK = 2;
+/** Initial placement loads precede the family's first stage, on the same resource clocks. */
+export const PART_LOAD_CACHE = 3;
+export const PART_LOAD_RAM = 4;
+export const PART_LOAD_DISK = 5;
+export const isLoadingPart = (part: number): boolean => part >= PART_LOAD_CACHE;
 
 const nodeOf = (w: World, s: number): number => w.compiled.sys.diskNode[s]!;
 export const freeCache = (w: World, s: number): number => Math.max(0, w.compiled.sys.cacheBits[s]! - w.hot.sys.usedCache[s]!);
@@ -122,14 +127,14 @@ export function releaseMemory(w: World, s: number, r: number): void {
       if (o >= 0 && o !== s) dirtySystem(w, o);
     }
   }
-  // The traffic fractions and VRAM overflow stay: completion reads them for the spill sums (outcome.ts).
-  rec.memC[r] = 0; rec.memR[r] = 0; rec.memD[r] = 0; rec.memN[r] = 0; rec.vramN[r] = 0;
+  // Keep placement and traffic until the row is reused: completion tallies loads and stage traffic.
 }
 
-/** The clock a stage part runs on: a mem stage's main part (the free cache part) is a zero-work CPU step. */
+/** Cache loads and cache traffic consume CPU ops; RAM and disk use their own bandwidth. */
 export function partClock(shape: Shape, stage: number, part: number): number {
-  if (part === PART_RAM) return RAM;
-  if (part === PART_DISK) return IO;
+  if (part === PART_RAM || part === PART_LOAD_RAM) return RAM;
+  if (part === PART_DISK || part === PART_LOAD_DISK) return IO;
+  if (part === PART_LOAD_CACHE) return CPU;
   const res = shape.res[stage]!;
   return res === RAM ? CPU : res;
 }
@@ -137,8 +142,11 @@ export function partClock(shape: Shape, stage: number, part: number): number {
 /** Work of record r's stage part per task: ops, or bits touched in that tier (D26.2, D26.4). */
 export function partWork(w: World, r: number, shape: Shape, stage: number, part: number): number {
   const rec = w.hot.rec, res = shape.res[stage]!;
+  if (part === PART_LOAD_CACHE) return rec.memC[r]!;
+  if (part === PART_LOAD_RAM) return rec.memR[r]! + rec.vramR[r]!;
+  if (part === PART_LOAD_DISK) return rec.memD[r]! + rec.vramD[r]!;
   const work = stageWorkAt(shape, stage, rec.units[r]!);
-  if (part === PART_MAIN) return res === RAM ? 0 : work;
+  if (part === PART_MAIN) return res === RAM ? work * Math.max(0, 1 - rec.trafR[r]! - rec.trafD[r]!) : work;
   if (res === RAM) return work * (part === PART_RAM ? rec.trafR[r]! : rec.trafD[r]!);
   if (res === GPU) {
     const need = accelNeed(shape.def, rec.units[r]!).vramBits;
@@ -148,25 +156,31 @@ export function partWork(w: World, r: number, shape: Shape, stage: number, part:
   return 0;
 }
 
-/** The first part ≥ `from` of record r's stage with work (mem stages and spilled GPU stages), or -1. A mem stage with no traffic runs its main part. */
+/** First initial load with work, or -1 once the placement has loaded. */
+export function firstLoadPart(w: World, r: number, from = PART_LOAD_CACHE): number {
+  const rec = w.hot.rec;
+  if (from <= PART_LOAD_CACHE && rec.memC[r]! > 0) return PART_LOAD_CACHE;
+  if (from <= PART_LOAD_RAM && rec.memR[r]! + rec.vramR[r]! > 0) return PART_LOAD_RAM;
+  if (from <= PART_LOAD_DISK && rec.memD[r]! + rec.vramD[r]! > 0) return PART_LOAD_DISK;
+  return -1;
+}
+
+/** First stage part with work, or -1. A zero-work stage still enters its main part. */
 export function firstPart(w: World, r: number, shape: Shape, stage: number, from: number): number {
   const res = shape.res[stage]!;
-  if (from === PART_MAIN && res !== RAM) return PART_MAIN;
+  if (from === PART_MAIN && (res !== RAM || partWork(w, r, shape, stage, PART_MAIN) > 0)) return PART_MAIN;
   for (let p = Math.max(PART_RAM, from); p <= PART_DISK; p += 1) if (partWork(w, r, shape, stage, p) > 0) return p;
   return from === PART_MAIN ? PART_MAIN : -1;
 }
 
-/** The clock record r is on now. */
-export const recordClock = (w: World, r: number): number =>
-  partClock(shapeOf(w.hot.rec.family[r]!), w.hot.rec.stage[r]!, w.hot.rec.part[r]!);
-
 /**
- * Bits of record r's whole run (per task) touched in RAM and on disk, for the round's spill sums and
- * the late detail (D26.5, D26.7): Σ over its mem stages and spilled GPU stages.
+ * Bits loaded or touched in RAM and on disk, for the round's spill sums and late detail:
+ * initial loads plus mem stages and spilled GPU stages.
  */
 export function tierTraffic(w: World, r: number, out: Float64Array): Float64Array {
   const shape = shapeOf(w.hot.rec.family[r]!);
-  out[0] = 0; out[1] = 0;
+  out[0] = partWork(w, r, shape, 0, PART_LOAD_RAM);
+  out[1] = partWork(w, r, shape, 0, PART_LOAD_DISK);
   for (let i = 0; i < shape.stages; i += 1) {
     out[0] += partWork(w, r, shape, i, PART_RAM);
     out[1] += partWork(w, r, shape, i, PART_DISK);

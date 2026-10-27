@@ -14,7 +14,7 @@ The lead approved one narrow exception to the current execution policy. Hardware
 
 ## Constraints carried into implementation
 
-- The player buys a preconfigured GPU model. Hot upgrades scale its specs and worsen efficiency. Replacing a model is a cold change under existing rules.
+- The player buys a generation/type/tier model. A hot tier upgrade improves work, cores, VRAM and efficiency. A cold generation replacement retains type and tier; native era efficiency can worsen. This is the 26 Oct upgrade-experience amendment.
 - Model names are four digits GSMT. Generations 1 through 9 have clock classes 1 kHz, 10 kHz, 100 kHz, 1 MHz, 10 MHz, 100 MHz, 1 GHz, 10 GHz and 100 GHz. Series 3 emphasizes cores, 5 VRAM, 7 clock, and 9 all three. Tiers are 30, 50, 60, 70, 80 and 90. Thus 3350 is generation 3, series 3, tier 50.
 - Higher tiers raise all specs, with series emphasis. Comparable X9XX costs strictly more than X3XX + X5XX + X7XX combined and has the generation's best performance and efficiency. Large generation price jumps must preserve the X990 versus next-generation research and purchase choice. The accepted progression document supplies these numbers and local arithmetic checks; campaign evidence remains required.
 - Accelerator task gates are only VRAM and GPU cores. Remove `FamilyDef.gpus`; add no clock, ops/s or device-count minimum. Work volume still sets execution duration. Other existing system, placement and memory gates stay in force.
@@ -50,7 +50,6 @@ type GpuModelId = string & { readonly __gpuModelId: unique symbol };
 interface GpuBuild {
   readonly kind: 'gpu';
   readonly model: GpuModelId;
-  readonly upgrades: number;
 }
 interface NpuBuild extends PartLevel { readonly kind: 'npu' }
 type AccelBuild = GpuBuild | NpuBuild;
@@ -70,11 +69,11 @@ declare function evaluateAccel(a: AccelBuild, u: Unlocks): AccelStats;
 
 `FamilyDef.gpuCoresMin: number` replaces `gpus`. It is the fixed nonnegative integer in the accepted progression table, copied unchanged to each member. It is not a `SizeTerm` and does not scale with task size. Zero means no core minimum. `vramAt` keeps its existing bits semantics. Authoring validation rejects negative, nonfinite or noninteger core gates and requires a GPU stage for accelerator requirements. All family literals and generated task sources must change together.
 
-For a GPU, `plainOps = gpuCores * clockHz`; `tensorOps` is the same GPU's tensor-capable rate. The central evaluator validates the model ID and integer `upgrades=0..5` and applies model, upgrades and research effects exactly once. Parse the GSMT digits; never infer a model from ops/s. Generic adapters may expose `gen = displayedGeneration - 1` and `level = upgrades + 1`; those are derived values, never the saved GPU build. It returns finite nonnegative values, positive clock and rates for installed GPUs, safe integer core counts, and catalog-bounded integral VRAM. It returns watts at full hardware utilization. It does not apply rack efficiency, configuration efficiency, CPU DVFS or CPU turbo.
+For a GPU, `plainOps = gpuCores * clockHz`; `tensorOps` is the same GPU's tensor-capable rate. The central evaluator validates the model ID and applies its generation, type, tier and research effects exactly once. Parse the GSMT digits; never infer a model from ops/s. Generic adapters expose `gen = displayedGeneration - 1` and `level = tierIndex + 1`; those are derived values, never the saved GPU build. Tier upgrades change the model ID, with no separate push count. It returns finite nonnegative values, positive clock and rates for installed GPUs, safe integer core counts, and catalog-bounded integral VRAM. It returns watts at full hardware utilization. It does not apply rack efficiency, configuration efficiency, CPU DVFS or CPU turbo.
 
 For the existing NPU design, `gpuCores = 0`, `plainOps = 0`, and `tensorOps` and local memory come from the NPU catalog. An NPU can independently host a tensor task with a zero GPU-core minimum and enough local memory. It cannot satisfy a positive GPU-core minimum. This is the accepted NPU boundary. Keep its four explicit catalog rows and AND gates from the progression document. Never invent GPU-equivalent NPU cores from ops/s.
 
-Purchase and upgrade quotes remain separate and return whole-credit `Amount` values. Do not put prices through float64 runtime columns. Shared configurations save GPU model IDs and hot-upgrade counts, plus legacy NPU gen/level; evaluated rates and runtime assignments are not configuration fields.
+Purchase and upgrade quotes remain separate and return whole-credit `Amount` values. A tier or generation step costs the difference between the two rounded card values at the same other-GPU count; complete tier paths equal direct installation exactly. Do not put prices through float64 runtime columns. Shared configurations save GPU model IDs, plus legacy NPU gen/level; evaluated rates and runtime assignments are not configuration fields.
 
 ## Exact buffer additions
 
@@ -164,17 +163,17 @@ At tick start, allocate as today, then anchor accelerator rates with start-of-ti
 
 ## Research and power integration
 
-Research uses each physical accelerator exactly once. GPU research base is that card's ordinary rate; NPU research base is its tensor rate. GPU link changes task eligibility and pooling, not the sum of research hardware. Never sum an NPU into a GPU pool and then count it again independently.
+**D27 amendment:** research is a CPU task that holds threads on the systems that take it. GPUs and NPUs do not research. Background/Shared/Focus shares in the original GPU design are retired; task execution uses the full available accelerator rate.
 
-For each interval between events, enabled task execution gives a busy domain utilization `uTask = taskShare` when n is positive, otherwise zero. Research is zero when inactive, insolvent or disallowed by the system mode. Accelerator research also requires `DRAW_FULL` from the existing `drawKind`; boot is idle-only, and dark, crash, cold and sleep modes do no accelerator research. When research is allowed, `uResearch = 1 - uTask`. Offline systems and systems between rounds have `uTask = 0`, `uResearch = 1`. Background tasks take 100%, Shared tasks 75%, Focus tasks 0%. Leave CPU research behavior outside this GPU change.
+For each interval between events, enabled task execution gives a busy domain utilization `uTask = 1` when its active count is positive, otherwise zero. A card with no executing GPU stage has no task load, even when a task reserves its VRAM while using another resource. `uResearch = 0` on every accelerator.
 
-Integrate each physical card's `uTask * intervalSeconds` and `uResearch * intervalSeconds` in increasing tau order. A linked GPU pool gives all participating GPUs the same utilization fractions. VRAM can stripe proportionally across linked GPUs; `usedPoolVram * cardVram / poolVram` is the derived per-card reservation for display. NPU memory is separate. Research is a streaming kernel with no task-sized persistent VRAM allocation; a task's VRAM hold alone does not make its idle compute unavailable to research.
+Integrate each physical card's `uTask * intervalSeconds` in increasing tau order. A linked GPU pool gives all participating GPUs the same utilization fractions. VRAM can stripe proportionally across linked GPUs; `usedPoolVram * cardVram / poolVram` is the derived per-card reservation for display. NPU memory is separate.
 
-Accumulate accelerator research work for the interval as `sum(cardResearchBase * uResearch) * etaCfg * deltaE`. Add it to `accelResearchOps`, then to the existing research total once. Refactor only the GPU term out of `researchRateOf`; leave its CPU formula and busy-core reporting unchanged. Do not also add the old `gpuBase` research term or multiply the accelerator work by efficiency a second time. Flush the final interval through tau = 1 even when no task event occurs.
+Do not add accelerator capacity to research work or upgrade estimates. CPU research advances at the held threads' hardware rate. Flush the final accelerator task interval through tau = 1 even when no task event occurs.
 
 Reset card usage meters at the start of each run phase, not each advance call. Scratch event cursors can stay local because a save never interrupts a tick. Persist the resulting meters so phys and snapshots read the same completed tick. During phases after run, failure cleanup must not erase usage already consumed and awaiting that tick's power bill.
 
-`systemDraw` retains the current idle, sleep and power-mode logic. Replace only the aggregate GPU load term with `sum(accelLoadW[i] * (accelTaskS[i] + accelResearchS[i]) / DT_S)`. Every powered installed card still contributes its own idle watts. Unused cards incur no load, research-only cards incur real load, and a card completing halfway through a tick incurs half a tick of task load unless research fills the rest. Assert each card's total equivalent busy seconds is in [0, DT_S], allowing only arithmetic roundoff in assertions.
+`systemDraw` retains the current idle, sleep and power-mode logic. Accelerator load uses each card's executing duty: `sum(accelLoadW[i] * accelTaskS[i] / DT_S)`. Every powered installed card still contributes its own idle watts. Unused cards incur no load; a card completing halfway through a tick incurs half a tick of task load. Assert each card's total equivalent busy seconds is in [0, DT_S], allowing only arithmetic roundoff in assertions.
 
 Keep GPU idle watts in `idleW[GPU]` if existing summaries need them, but never count those watts twice. Supply loss, heat, billing and whole-credit energy-meter rules stay in their existing phases. This contract supplies average watts for the existing per-tick physical model; it does not add sub-tick overload timers or change crash timing.
 
@@ -193,9 +192,9 @@ The GPU-link conversion is a rare recompile pass over live records, not a per-ti
 
 ## Save and validation contract
 
-Bump `SAVE_VERSION` to the next unused version at integration, currently 2. Retain the `bitrouge-v3` envelope. Pre-live saves from the earlier layout reset with a clear version-mismatch reason. No migration invents a model from old throughput maxima.
+`SAVE_VERSION` is 20. The user has reverted automatic skipping and its report UI; skip/closing/log fields remain only for compatibility and do not govern current gameplay. Retain the `bitrouge-v3` envelope. Version 17 saves migrate by folding the explicit old push count into the model's tier, capped at tier 90; both v17 and v18 then receive the skip counters and an empty skipped line on older reports. Version 20 also gives v17–v19 state an empty bounded skip log and `skipped.tasks` on earlier kept reports. No migration invents a model from old throughput maxima. This supersedes the original version-2 reset plan below.
 
-Save `{kind: 'gpu', model: GpuModelId, upgrades: number}` in builds and saved configurations. Reset old v3 GPU builds, configurations, accelerator research and pool state together; do not guess a migration from old gen/level. Save every new hot column, including work anchors, holds and record assignments. Extend the existing schema layouts and model validators. Existing generic typed-array encoding handles the extra columns; do not replace it with JSON float arrays. Compiled encodings remain memoized by immutable array identity.
+Save `{kind: 'gpu', model: GpuModelId}` in builds and saved configurations. The v17 migration retains cores and VRAM where the folded tier stays at or below 90, changes clocks to the new tier formula, and loses any excess pushes beyond 90. Rebuild compiled stats and reconcile running accelerator work on that migration; keep wallets and the remaining fleet. Older unsupported layouts retain their existing reset behavior. Save every hot column, including work anchors, holds and record assignments. Existing generic typed-array encoding handles these columns; do not replace it with JSON float arrays. Compiled encodings remain memoized by immutable array identity.
 
 On load, validate model digits and unlock constraints, at most eight slots, finite nonnegative physical stats, domain ranges and enabled domain kinds. For running accelerator tasks, validate paired core and VRAM compatibility, record assignment, list ownership, and holder counts and reservation totals rebuilt in deterministic record order. Queued and transit records must have no accelerator hold. Validate active task counts against both clock lists. Disabled domains must be empty. Allow Infinity only in existing clock sentinel positions; anchors, rates, holds and usage must be finite. A save must not load a GPU stage under the obsolete system GPU head.
 
@@ -213,7 +212,7 @@ Reservation sums may differ in the last bits from subtraction history. Use a bou
 | Mixed stages | A CPU-to-GPU entrant midway through a tick reduces the incumbent's GPU share immediately. Total ordinary/tensor time shares remain bounded. Short same-card tasks chain within a tick. GPU-stage exits keep VRAM until task completion. |
 | Cohorts | A cohort splits across cards only into separate records, respects each card's memory, and completes at each card's own rate. Running IO splits preserve aggregate GPU holds; each piece releases its share. |
 | All exits | Completion, explicit abort, gang loss, power failure, heat crash, cold replacement, offline transition and round end leave no leaked hold. Failure payouts remain zero, gang losses count once, and card slot reuse starts cleanly. |
-| Power and research | Only used cards draw task load; idle installed cards draw idle watts. Research uses every available card once, including an NPU alongside GPUs. Background, Shared, Focus, offline and between-round research have matching per-card duty, work, energy and heat. Mid-tick completion retains already-used energy. |
+| Power and research | Only used cards draw task load; idle installed cards draw idle watts. Research is CPU-only and cannot add accelerator load or work. Mid-tick completion retains already-used energy. |
 | Recompile and save | Hot upgrades preserve completed work, alter only future speed and expand memory. Cold changes clean old slots. Save/load during mixed-domain work and mid-carry continues identically, including all new buffers and exact wallet strings. Invalid holds, domains, models and old versions are rejected. |
 | Determinism | Compare full state, events, RNG words and draw counts, Credits, Data and energy meters across one advance and uneven partitions, including 1 ms + 99 ms, multi-tick calls, research completion and failures. Repeat with a save/load between pieces. |
 
@@ -226,7 +225,7 @@ Run focused tests, `npm run typecheck`, `npm run verify`, then the existing maxi
 | Owner | Work |
 | --- | --- |
 | Lead and shared-contract owner | Apply the accepted event-sharing exception and NPU rule. Own `types/**`, `core/buffers.ts`, constants, pool contract, save schema/validation and final documentation consistency. Keep CPU changes outside this GPU handoff. |
-| GPU progression and catalog owner | Implement model IDs, evaluator, exact quotes, buy/upgrade/config validation and paired compiled columns. Prove series-9 price and efficiency inequalities, hot-upgrade loss and generation tradeoffs. |
+| GPU progression and catalog owner | Implement model IDs, evaluator, exact quotes, buy/upgrade/config validation and paired compiled columns. Prove monotone tier steps, exact path pricing, series-9 inequalities and generation tradeoffs. |
 | Execution owner | Own assignment, holds, clocks, lists, event integration, estimates, release paths, reconciliation and per-card usage/research publication. Adapt tests and oracle with the shared owner. |
 | Market and routing owner | Replace task GPU-count gates with core gates, regenerate family sources, update failure details, capability-class signatures and estimates. Include all eight ordered physical entries and link state in class keys; aggregate equality is insufficient. |
 | Physics owner | Consume the per-card duty meters in GPU load, keep existing power/heat timing, and test research-only draw and overload behavior. Avoid CPU power-policy changes. |

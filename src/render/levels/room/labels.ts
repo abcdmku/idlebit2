@@ -22,7 +22,7 @@ function gutterTags(s: RoomSnapshot, out: LabelWriter): void {
   // QA-25: the room switch's port speed, the value the deck's Net rack row upgrades (the slowest port).
   // The uplink is the pipe's own tag at this level (Fiber), as the rack's is (Uplink).
   const net = NET_RECT, speed = portSpeed(s);
-  out.label('net', left, net.y + 2, 'right', true).text('Net rack', 'name', true).text(formatHertz(speed), 'net')
+  out.label('net', left, net.y + 2, 'right', true).text('Network rack', 'name', true).text(formatHertz(speed), 'net')
     .leader(net.x, net.y + 6);
   const crac = CRAC_HITS[0]!;
   out.label('cooling', left, crac.y + 8, 'right', true).text('Cooling', 'name', true).text(`${whole(Math.round(s.tempF))}°F`, 'cyan')
@@ -44,7 +44,6 @@ function upsTag(s: RoomSnapshot, frame: WorldFrame, out: LabelWriter): void {
   out.label('ups', x, focus.y - 12, 'center', true).text('UPS', 'name', true).text(`${whole(Math.round(usage * 100))}%`, usage > 0.9 ? 'warn' : 'value');
   // D31: the room start controller on the UPS: racks powered now of those it controls
   const st = s.power?.start ?? null;
-  // a phone keeps the tag narrow: the Start line goes under the UPS line
-  if (st) (frame.form === 'phone' ? out.br().text('Start', 'mute') : out.text('· Start', 'mute')).text(`${whole(st.awake)}/${whole(st.total)} racks`, 'value');
+  if (st) (frame.form === 'phone' ? out.br() : out.text('·', 'mute')).text(`${whole(st.awake)}/${whole(st.total)} racks on`, 'value');
   out.leader(x, first.y);
 }

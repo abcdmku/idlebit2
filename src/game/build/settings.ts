@@ -1,3 +1,4 @@
+import { FILTER_NAMES, QUEUE_NAMES, ROUTE_NAMES } from '../view/labels';
 import type { BuildState, RouterBuild, SystemSettings } from '../types/build';
 import { QUEUE_STRATEGY_IDS, type FilterId, type QueueStrategyId, type RouteStrategyId } from '../types/catalog';
 import type { PartRef, RackId, RoomId, ScopeRef, SystemId } from '../types/ids';
@@ -43,20 +44,23 @@ export function planStrategy(state: GameState, unit: ScopeRef, strategy: QueueSt
     const spec = state.build.systems[unit.id]?.spec;
     if (!spec?.scheduler) return fail('invalid', 'Needs a scheduler');
     if (!(QUEUE_STRATEGY_IDS as readonly string[]).includes(strategy)) return fail('invalid', 'Not a system strategy');
+    const name = QUEUE_NAMES[strategy as QueueStrategyId];
     const lock = strategy === 'fifo' ? null : optionLock(u, strategy, 'queue');
-    if (lock) return locked(lock, strategy, 0n);
-    return planned({ build: withSpec(state.build, unit.id, { ...spec, scheduler: { ...spec.scheduler, strategy: strategy as QueueStrategyId } }), price: 0n }, strategy);
+    if (lock) return locked(lock, name, 0n);
+    return planned({ build: withSpec(state.build, unit.id, { ...spec, scheduler: { ...spec.scheduler, strategy: strategy as QueueStrategyId } }), price: 0n }, name);
   }
   if ((QUEUE_STRATEGY_IDS as readonly string[]).includes(strategy)) return fail('invalid', 'Not a network strategy');
+  const name = ROUTE_NAMES[strategy as RouteStrategyId].name;
   const lock = strategy === 'firstFit' ? null : optionLock(u, strategy, 'route');
-  if (lock) return locked(lock, strategy, 0n);
-  return editRouter(state, unit, (lb) => ({ ...lb, strategy: strategy as RouteStrategyId }), strategy);
+  if (lock) return locked(lock, name, 0n);
+  return editRouter(state, unit, (lb) => ({ ...lb, strategy: strategy as RouteStrategyId }), name);
 }
 
 export function planFilter(state: GameState, unit: ScopeRef, filter: FilterId, on: boolean): Plan {
+  const name = FILTER_NAMES[filter].name;
   const lock = on ? optionLock(state.research.unlocks, filter, 'filter') : null;
-  if (lock) return locked(lock, filter, 0n);
-  return editRouter(state, unit, (lb) => ({ ...lb, filters: toggle(lb.filters, filter, on) }), filter);
+  if (lock) return locked(lock, name, 0n);
+  return editRouter(state, unit, (lb) => ({ ...lb, filters: toggle(lb.filters, filter, on) }), name);
 }
 
 /** D25.7: the router's queue one slot larger, L → L + 1 (at most 32). Hot; never research-gated (spec §12.7). */
@@ -65,7 +69,7 @@ export function planRouterQueue(state: GameState, unit: ScopeRef): Plan {
   if (!lb || unit.kind === 'system') return fail('invalid', 'No router here');
   const level = lb.queueLevel;
   const label = `Queue ${level} → ${level + 1}`;
-  if (level >= ROUTER_QUEUE_MAX) return fail('cap', `Queue at ${ROUTER_QUEUE_MAX}/${ROUTER_QUEUE_MAX}`, `Queue ${level}`);
+  if (level >= ROUTER_QUEUE_MAX) return fail('cap', 'Max', `Queue ${level}`);
   const price = lbQueueStep(unit.kind, level);
   return planned({ build: withRouter(state.build, unit, { ...lb, queueLevel: level + 1 }), price }, label);
 }
@@ -112,16 +116,14 @@ export function planSystemSetting(state: GameState, system: SystemId, setting: '
   return editSettings(state, system, { [setting]: on }, setting);
 }
 
-/** Deepest researched C-state (C1, C3, C6), 0 before any. */
-export const deepestCState = (state: GameState): 0 | 1 | 3 | 6 => {
-  const done = state.research.completed as readonly string[];
-  return done.includes('cstateC6') ? 6 : done.includes('cstateC3') ? 3 : done.includes('cstateC1') ? 1 : 0;
-};
+/** C-state is available after its first level is purchased. */
+export const deepestCState = (state: GameState): 0 | 1 => (state.research.unlocks.ruleParams.coreIdle?.level ?? 0) > 0 ? 1 : 0;
 
-export function planCStateLimit(state: GameState, system: SystemId, limit: 0 | 1 | 3 | 6): Plan {
+export function planCStateLimit(state: GameState, system: SystemId, limit: 0 | 1): Plan {
+  if (limit !== 0 && limit !== 1) return fail('invalid', 'C-state must be on or off');
   if (limit > deepestCState(state)) {
-    const lock = ruleLock(state.research.unlocks, 'coreIdle') ?? { code: 'research' as const, node: null, text: `Needs C${limit}` };
-    return locked(lock, `C${limit}`, 0n);
+    const lock = ruleLock(state.research.unlocks, 'coreIdle') ?? { code: 'research' as const, node: null, text: 'Needs C-state' };
+    return locked(lock, 'C-state', 0n);
   }
-  return editSettings(state, system, { cStateLimit: limit }, `C${limit}`);
+  return editSettings(state, system, { cStateLimit: limit }, `C-state ${limit ? 'on' : 'off'}`);
 }

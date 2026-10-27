@@ -59,7 +59,7 @@ export function drawBoard(g: G, s: SystemSnapshot, view: ViewPresentation, frame
     const p = site.part!, on = live && (p.active || p.resourceBusy > 0 || stageOn.has(site.type));
     if (site.type === 'cpu') drawCpu(g, s, site, live, frame, registry);
     else if (site.type === 'ram') drawRamPart(g, b, site.f, p.level, live && p.active);
-    else if (site.type === 'gpu') drawGpuPart(g, b, site.f, p.level, live && (p.active || p.resourceBusy > 0), p.kind === 'npu' ? P.rnd : P.gpu);
+    else if (site.type === 'gpu') drawGpuPart(g, b, site.f, p.level, live && (p.active || p.resourceBusy > 0), p.kind === 'npu' ? P.rnd : P.gpu, live ? p.resourceBusy : 0);
     else drawDrivePart(g, b, site.f, p.level, on && p.active);
   }
   if (pick) {
@@ -133,6 +133,7 @@ function drawCpu(g: G, s: SystemSnapshot, site: Site, live: boolean, frame: Worl
   drawCpuSocket(g, site.f);
   packageRect(b, site.index, pkg);
   drawPackageBody(g, pkg, live && (s.cpuBusy[site.index] ?? 0) > 0);
+  // Draw the same CPU parts as the CPU level.
   if (registry.has('chip')) registry.level('chip').drawMini(g, s, pkg, frame);
   drawPackageFront(g, pkg);
 }

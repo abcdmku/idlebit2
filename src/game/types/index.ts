@@ -5,6 +5,7 @@ export type * from './state';
 export type * from './actions';
 export type * from './events';
 export type * from './report';
+export type * from './frontier';
 export type * from './views';
 export type * from './snapshot';
 export type * from './quotes';

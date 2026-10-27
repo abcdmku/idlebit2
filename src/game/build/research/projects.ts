@@ -52,7 +52,7 @@ function complete(w: World, id: ResearchId): void {
   const hadSystem = r.unlocks.levels.system;
   r.unlocks = deriveUnlocks(r.completed);
   let opened = openContainers(w.build, r.unlocks);
-  // QA-02: the board PSU's limit starts with System; every PSU is raised, free, to cover its system.
+  // System activates supplies; size the existing fleet for its full load.
   if (!hadSystem && r.unlocks.levels.system) opened = sizePsusForSystem(opened, r.unlocks);
   w.build = { ...opened, revision: w.build.revision + 1 };
   w.compiled = compileAll(w.build, r);

@@ -14,6 +14,13 @@ export const coreHz = (c: CoreView): number => c.hz;
 export const coreSleep = (c: CoreView): string | null => c.sleep;
 /** The text a core tile shows: its C-state asleep, else its Hz. */
 export const coreSpeedText = (c: CoreView): string => coreSleep(c) ?? formatHertz(coreHz(c));
+/** Small grid cores use the short cache phase names; big cards spell out the operation. */
+export function coreActivityText(c: CoreView, compact = false): string {
+  if (c.activity === 'cacheLoad') return compact ? 'Load' : 'Cache load';
+  if (c.activity === 'cacheAccess') return compact ? 'Cache' : 'Cache read';
+  if (c.activity === 'compute') return 'Compute';
+  return c.research > 0 ? 'Research' : c.busy > 0 ? 'Waiting' : 'Idle';
+}
 /** QA-24: between rounds (not live) a core that reports 0 Hz shows the clock it is ready to run at. */
 export const readySpeedText = (c: CoreView, chip: ChipSnapshot, live: boolean): string =>
   !live && !coreSleep(c) && coreHz(c) <= 0 ? formatHertz(chip.clock.hz) : coreSpeedText(c);

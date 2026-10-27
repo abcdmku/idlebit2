@@ -22,7 +22,6 @@ export const roomId = (n: number) => n as RoomId;
 export const siteId = (n: number) => n as SiteId;
 export const familyId = (n: number) => n as FamilyId;
 export const researchId = (s: string) => s as ResearchId;
-export const linkId = (n: number) => n as LinkId;
 
 export type UnitKind = 'system' | 'rack' | 'room' | 'site';
 export type UnitRef =

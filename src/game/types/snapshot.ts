@@ -4,12 +4,15 @@ import type { QueueStrategyId, RegionId } from './catalog';
 import type { FailCause, FailCounts, FailDetail, GameEvent } from './events';
 import type { LevelId, NodeRef, RackId, ResearchId, RoomId, SiteId, SystemId } from './ids';
 import type { RoundReport } from './report';
+import type { FrontierView } from './frontier';
 import type { RoundPhase } from './state';
 import type {
   PowerCtlView, StartCtlView,
   BuildSlotView, ChipQueueEntryView, ResearchQueueEntryView, CompletionView, CoolerView, FailureView, LbView, LinkView, MemTierView, OutcomeView, PartView, QueueEntryView, RackSlotView,
   ServerSlotView, ShardDoneView, SiteView, SupplyView, SwitchView, TaskView, TransferView, UnitMode,
 } from './views';
+
+export interface CacheLevelView { readonly kind: 'l1' | 'l2' | 'l3'; readonly bits: number; readonly generation: number; readonly level: number }
 
 /** What is on screen: the focus level and, during a zoom transition, its partner. */
 export interface SnapshotScope { readonly focus: NodeRef; readonly partner: NodeRef | null }
@@ -89,6 +92,7 @@ export interface FeedSnapshot {
   readonly research: ResearchQueueEntryView | null;
   /** The head may be taken through the end of this tick (headTick + 99); null between rounds or while research is the head. */
   readonly headDeadlineTick: number | null;
+  /** Outgrown: the market took nothing more this round; work already taken is finishing before the round ends. */
   /** The head's first missing requirement on the static capability set; null when it can run. */
   readonly blockedBy: FailDetail | null;
   /** Tasks moving over links: the lone system's pipe and each link's sending transfer, at most 16. */
@@ -116,6 +120,8 @@ export interface RoundSnapshot {
   readonly index: number;
   readonly state: RoundPhase;
   readonly lastReport: RoundReport | null;
+  /** D40: the best reach and every kept round's reach, for the report; the same reference until a round ends. */
+  readonly frontier: FrontierView;
   readonly canReturn: boolean;
   readonly autoReturn: { readonly available: boolean; readonly on: boolean; readonly inMs: number | null };
 }
@@ -132,7 +138,7 @@ export interface ResearchBadge {
 
 export type LevelSnapshot = ChipSnapshot | SystemSnapshot | RackSnapshot | RoomSnapshot | GlobalSnapshot;
 
-export type CoreSleep = 'C1' | 'C3' | 'C6' | 'S3';
+export type CoreSleep = 'C-state' | 'S3';
 export interface CoreView {
   readonly socket: number;
   /** This core's own rate in ops/s: its socket's clock (D34: one thread per core, no lanes). */
@@ -151,6 +157,8 @@ export interface CoreView {
   /** CPU-stage task assigned here, oldest taken first then taskId; null when idle. */
   readonly taskId: number | null;
   readonly family: number | null;
+  /** CPU work on this core; null while it has no CPU-stage task. */
+  readonly activity: 'cacheLoad' | 'cacheAccess' | 'compute' | null;
   readonly progress: number;
   readonly threads: number;
   /** D25: the shard index of that task (null when idle); cores with equal taskId and shard run one shard. */
@@ -158,9 +166,8 @@ export interface CoreView {
   /** Threads that shard holds in total (its group size); 0 when idle. */
   readonly shardThreads: number;
   readonly research: number;
-  readonly cstate: 0 | 1 | 3 | 6;
+  readonly cstate: 0 | 1;
 }
-export interface CacheLevelView { readonly kind: 'l1' | 'l2' | 'l3'; readonly bits: number; readonly generation: number; readonly level: number }
 export interface SchedulerView {
   readonly generation: number; readonly level: number; readonly strategy: QueueStrategyId;
   readonly q: number; readonly queued: number; readonly k: number; readonly running: number; readonly reserved: number;
@@ -182,8 +189,8 @@ export interface ChipSnapshot {
   readonly clock: { readonly hz: number; readonly effectiveHz: number; readonly generation: number; readonly level: number };
   readonly coreSites: number;
   readonly cores: readonly CoreView[];
-  /** usedBits: bits of running shards placed in cache; spilledOutBits: bits of running shards that didn't fit cache (D26.7). */
-  readonly cache: { readonly levels: readonly CacheLevelView[]; readonly usedBits: number; readonly capacityBits: number; readonly spilledOutBits: number };
+  /** usedBits reserves capacity; loadedBits fills as actual loading completes, then stays held until release. */
+  readonly cache: { readonly levels: readonly CacheLevelView[]; readonly usedBits: number; readonly loadedBits: number; readonly capacityBits: number; readonly spilledOutBits: number };
   readonly scheduler: SchedulerView | null;
   /** Occupied scheduler wells, oldest taken first then taskId; remaining wells are empty. */
   readonly queue: readonly ChipQueueEntryView[];

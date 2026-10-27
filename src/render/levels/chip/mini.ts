@@ -4,7 +4,7 @@ import type { ChipSnapshot, SystemSnapshot } from '../../../game';
 import { P, R, containMap, contain, frame as outline, mix } from '../../core';
 import type { Rect, WorldFrame } from '../../core';
 import { coreSites } from './layout';
-import { coreColor, remaining } from './shards';
+import { coreColor } from './shards';
 import { PKG, PKG_HI } from './sprites';
 import { chipFloor, isLive, siteCount } from './world';
 
@@ -30,18 +30,18 @@ export function drawChipMini(g: CanvasRenderingContext2D, system: SystemSnapshot
   box(f.die, P.wafer);
   box(f.queue, chip.scheduler ? P.logicLo : mix(P.wafer, P.ink, 0.2));
   const cache = box(f.cache, P.sram);
-  const cap = chip.cache.capacityBits, used = live ? Math.min(chip.cache.usedBits, cap) : 0;
-  if (cap > 0 && used > 0) R(g, cache.x, cache.y, Math.max(1, Math.round(cache.w * used / cap)), cache.h, P.cacheOn);
+  const cap = chip.cache.capacityBits, loaded = live ? Math.min(chip.cache.loadedBits, cap) : 0;
+  if (cap > 0 && loaded > 0) R(g, cache.x, cache.y, Math.round(cache.w * loaded / cap), cache.h, P.cacheOn);
   box(f.clock, P.waferHi);
   const sites = coreSites(f, siteCount(chip));
   // D25: each core is one thread. A core running a shard lights in its task type's colour, filled
-  // to the work its piece still holds, so it empties from the top as the shard finishes.
+  // to its completed work, filling from bottom to top as the shard progresses.
   for (let i = 0; i < sites.length; i++) {
     const c = chip.cores[i], busy = live && !!c && c.busy > 0;
     const r = box(sites[i]!, !c ? mix(P.wafer, P.ink, 0.25) : busy ? P.logicLo : live && c.research > 0 ? mix(P.logic, P.rnd, 0.3) : P.logic);
     const colour = busy ? coreColor(c) : null;
     if (!colour) continue;
-    const h = Math.round(r.h * remaining(c!.progress));
+    const h = Math.round(r.h * Math.max(0, Math.min(1, c!.progress)));
     if (h > 0) R(g, r.x, r.y + r.h - h, r.w, h, colour);
   }
 }

@@ -5,6 +5,13 @@ import type { EffectPreview, FailDetail, LevelId, NodeRef, PartSlotKind, Quote, 
 import type { PartIconKind } from '../art/deckArt';
 import { measureUnit } from '../plates/format';
 
+function cacheRow(def: RowDef, q: Quote | undefined, levels: number): RowDef {
+  const slot = slotOf(q);
+  return slot ? { ...def, slot, name: levels > 1 ? `${slot.toUpperCase()} cache` : def.name } : def;
+}
+
+const slotOf = (q: Quote | undefined): PartSlotKind | null => (q?.action.type === 'upgradePart' ? q.action.part.slot.kind : null);
+
 /** The right column of a row: what a tap does, or why it can't. */
 export type OfferRight =
   | { readonly kind: 'price' }
@@ -28,7 +35,7 @@ export interface Offer {
   /** Whole Credits, or null when locked or not for sale. */
   readonly price: number | null;
   readonly affordable: boolean;
-  /** The sim's lock copy: "Needs Dual core", "Max", "Upgrade at the Rack switch". */
+  /** The sim's lock copy, including research and fit reasons. */
   readonly lock: string | null;
   /** A link fixed until a structure exists: the lock says where it upgrades (D15.5). */
   readonly where: boolean;
@@ -39,10 +46,10 @@ export interface RowDef { readonly key: string; readonly icon: PartIconKind; rea
 const row = (key: string, icon: PartIconKind, name: string, slot: PartSlotKind | null = null): RowDef => ({ key, icon, name, slot });
 
 /** The four tray rows in `quote({ kind: 'tray' })` order (R13), then the level's inbound link. */
-export const ROWS: Readonly<Record<LevelId, readonly [RowDef, RowDef, RowDef, RowDef, RowDef]>> = {
-  chip: [row('core', 'core', 'Cores', 'core'), row('cache', 'cache', 'Cache', 'l1'), row('clock', 'clock', 'Clock', 'clock'),
-    row('scheduler', 'queue', 'Queue', 'scheduler'), row('link', 'pipe', 'Pipe')],
-  system: [row('cpu', 'cpu', 'CPU'), row('ram', 'ram', 'RAM'), row('gpu', 'gpu', 'GPU'), row('storage', 'stor', 'Storage'), row('link', 'pipe', 'Pipe')],
+export const ROWS: Readonly<Record<LevelId, readonly RowDef[]>> = {
+  chip: [row('core', 'core', 'Core', 'core'), row('cache', 'cache', 'Cache'), row('clock', 'clock', 'Clock', 'clock'),
+    row('scheduler', 'queue', 'Scheduler', 'scheduler')],
+  system: [row('cpu', 'cpu', 'CPU'), row('ram', 'ram', 'RAM'), row('gpu', 'gpu', 'GPU'), row('storage', 'stor', 'Storage')],
   rack: [row('rackCooler', 'cool', 'Cooling', 'rackCooler'), row('pdu', 'power', 'Power', 'pdu'), row('lb', 'lb', 'Balancer'),
     row('switch', 'switch', 'Switch'), row('link', 'pipe', 'Uplink')],
   room: [row('roomSwitch', 'switch', 'Net rack'), row('row', 'rack', 'Rows'), row('roomCooler', 'cool', 'Cooling', 'roomCooler'),
@@ -140,12 +147,6 @@ export function offerOf(def: RowDef, q: Quote | undefined, link = def.key === 'l
   // A start controller's upgrade has no capacity effect (D31): its level step, from the quote's "… · L3".
   const step = !e && q.action.type === 'upgradePart' ? /· L([0-9]+)$/.exec(q.label) : null;
   const maxed = q.locked?.code === 'ceiling' || q.locked?.code === 'cap';
-  // D34: the Cores row counts cores ("3 → 4"). D39: cores are never research-locked; a lock here is the cap.
-  if (def.key === 'core' && e && !maxed) {
-    const change = q.locked?.code === 'research' ? '' : `${e.capacityBefore} → ${e.capacityAfter}`;
-    const credits = q.currency === 'credits', price = q.locked || !credits ? null : whole(q.cost);
-    return { ...def, change, quote: q, price, affordable: !q.locked && credits && q.affordable, lock: q.locked?.text ?? null, where: false, right: rightOf(q, price, false) };
-  }
   // At Max a row says only where it stands (QA-08): never a next level beside "Max".
   const change = maxed ? (e ? measure(e.capacityBefore, e.unit) : '')
     : step ? `L${Number(step[1]) - 1} → L${step[1]}` : !e ? q.label : e.capacityBefore === e.capacityAfter ? measure(e.capacityBefore, e.unit) : changeText(e);
@@ -164,9 +165,9 @@ export interface Offers {
   readonly unlock: Offer | null;
 }
 
-/** What the deck needs from the level beyond quotes: the chip's cache level count (to name the level). */
+/** Context for the deck's featured offer. */
 export interface OfferContext {
-  readonly cacheLevels: number;
+  readonly cacheLevels?: number;
   /** Row keys that answer the current wall (the head's block, else last round's top failure), best first (QA-05). */
   readonly wall?: readonly string[];
   /** Supply rows drawing near their limit; other supply upgrades are never featured (QA-05). */
@@ -175,7 +176,7 @@ export interface OfferContext {
 
 /** What answers a failure or a block: the rows that would let the work run (A02, QA-05). */
 export const WALL_ROWS: Readonly<Partial<Record<FailDetail, readonly string[]>>> = {
-  cache: ['cache'], ram: ['ram', 'storage'], disk: ['ram', 'storage'], gpu: ['gpu'], gpuCores: ['gpu'], vram: ['gpu'], link: ['link'],
+  cache: ['cache'], ram: ['ram', 'storage'], disk: ['ram', 'storage'], ecc: ['ram'], gpu: ['gpu'], gpuCores: ['gpu'], vram: ['gpu'], link: ['link'],
   psu: ['psu'], pdu: ['pdu'], ups: ['ups'], rack: ['rackCooler'], room: ['roomCooler'],
 };
 /** Supplies and coolers: worth buying only near their limit. */
@@ -183,22 +184,14 @@ export const SUPPLY_ROWS: ReadonlySet<string> = new Set(['psu', 'pdu', 'ups', 'r
 /** A row a suggestion may point at: something to buy, or research that opens it; never Max or a dead lock. */
 export const actionable = (o: Offer) => !!o.quote && (o.right.kind === 'price' || o.right.kind === 'research') && !(o.price !== null && o.price <= 0);
 
-/** The quote's part slot, when it upgrades a part. */
-const slotOf = (q: Quote | undefined): PartSlotKind | null => (q?.action.type === 'upgradePart' ? q.action.part.slot.kind : null);
-/** "Cache" on a one-level CPU; with more levels the row names the level its quote upgrades: "L2 cache". */
-function cacheRow(def: RowDef, q: Quote | undefined, levels: number): RowDef {
-  const slot = slotOf(q);
-  return slot ? { ...def, slot, name: levels > 1 ? `${slot.toUpperCase()} cache` : def.name } : def;
-}
-
 /**
  * Build the rows from tray quotes (4, R13 order), the inbound link quote and any extra part quotes.
  * Every effect comes from the quote that supplies the price and action (R42/R43).
  */
 export function buildOffers(level: LevelId, tray: readonly Quote[] | null, link: Quote | null, extras: readonly (Quote | null)[] = [],
-  ctx: OfferContext = { cacheLevels: 1 }): Offers {
+  ctx: OfferContext = {}): Offers {
   const defs = ROWS[level], more = EXTRA_ROWS[level] ?? [];
-  const def = (d: RowDef, i: number) => (d.key === 'cache' ? cacheRow(d, tray?.[i], ctx.cacheLevels) : d);
+  const def = (d: RowDef, i: number) => (d.key === 'cache' ? cacheRow(d, tray?.[i], ctx.cacheLevels ?? 1) : d);
   const rows = [...defs.map((d, i) => offerOf(def(d, i), i < 4 ? tray?.[i] : link ?? undefined)), ...more.map((d, i) => offerOf(d, extras[i] ?? undefined))]
     .filter((o): o is Offer => o !== null);
   // The featured buy (QA-05): what answers the wall first (saving up for it if need be), then the cheapest

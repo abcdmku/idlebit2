@@ -2,9 +2,7 @@
 // D27: Start pays the price and puts the project at the front of the market line; one project is in
 // line or running at a time; Pause keeps its progress, and Resume is free.
 import type { GameAction, ResearchId, ResearchNodeView, ResearchTreeView } from '../../game';
-import { etaSpan } from '../hooks/format';
-import { holdSeconds } from './estimate';
-import { CURRENCY_NAME, priceOf, shortfalls, type Income, type Shortfall, type Wallet } from './money';
+import { CURRENCY_NAME, priceOf, shortfalls, type Shortfall, type Wallet } from './money';
 import { wholeText } from '../plates/format';
 
 /** The project in the line: waiting at the front, running on a system, or stopped for Credits. */
@@ -36,7 +34,6 @@ export interface StatusContext {
   readonly byId: ReadonlyMap<ResearchId, ResearchNodeView>;
   readonly line: LineState;
   readonly wallet: Wallet;
-  readonly income: Income;
 }
 
 const unmet = (n: ResearchNodeView, byId: StatusContext['byId']) => n.requires.filter(id => byId.get(id)?.state !== 'done');
@@ -65,9 +62,9 @@ export function nodeStatus(n: ResearchNodeView, c: StatusContext): NodeStatus {
       return { kind: 'locked', needs, first: firstStep(n, c.byId) ?? needs };
     }
     case 'available': {
-      const short = shortfalls(priceOf(n), c.wallet, c.income);
+      const short = shortfalls(priceOf(n), c.wallet);
       if (short.length) return { kind: 'short', short };
-      return c.line.id && c.line.id !== n.id ? { kind: 'after', line: c.line.name } : { kind: 'ready' };
+      return !n.purchase && c.line.id && c.line.id !== n.id ? { kind: 'after', line: c.line.name } : { kind: 'ready' };
     }
   }
 }
@@ -90,21 +87,6 @@ export function statusText(s: NodeStatus, byId: StatusContext['byId']): string {
     case 'short': return `Need ${amountText(s.short[0]!)}`;
     case 'locked': return `Needs ${nameOf(s.needs, byId)}`;
   }
-}
-
-/** Seconds left on the running project at its current rate. */
-export function secondsLeft(n: ResearchNodeView, line: LineState): number | null {
-  return line.id === n.id && line.running ? holdSeconds(n.workOps * (1 - n.progress), line.opsPerSec ?? null) : null;
-}
-
-/** Said in place of an ETA while the income rate is zero or negative (the 30 s recent net rate). */
-export const NO_INCOME = 'no income right now';
-
-/** The row's second word: the ETA of a shortfall, or the time left while it runs. */
-export function statusAside(n: ResearchNodeView, s: NodeStatus, line: LineState): string {
-  if (s.kind === 'short') { const eta = s.short[0]!.etaS; return eta === null ? NO_INCOME : `in ${etaSpan(eta)}`; }
-  if (s.kind === 'running') { const left = secondsLeft(n, line); return left === null ? '' : `${etaSpan(left)} left`; }
-  return '';
 }
 
 export type KeyTone = 'go' | 'jump' | 'run' | 'wait' | 'off';
@@ -135,8 +117,7 @@ export function keyFor(n: ResearchNodeView, s: NodeStatus, c: KeyContext): KeyMo
   switch (s.kind) {
     case 'done': return key('Done', 'off');
     case 'running': {
-      const left = secondsLeft(n, c.line);
-      return key(`Running ${pct(s.progress)}${left === null ? '' : ` · ${etaSpan(left)} left`}`, 'run', { progress: s.progress, aside: pause });
+      return key(`Running ${pct(s.progress)}`, 'run', { progress: s.progress, aside: pause });
     }
     case 'next': return key('Next in line', 'wait', { progress: s.progress, aside: pause });
     case 'stopped': return key('Resume', 'go', { action: { type: 'resumeResearch' }, progress: s.progress, aside: pause });
@@ -149,13 +130,14 @@ export function keyFor(n: ResearchNodeView, s: NodeStatus, c: KeyContext): KeyMo
     }
     case 'short': {
       const top = s.short[0]!;
-      return key(`Need ${wholeText(top.need)} more ${CURRENCY_NAME[top.currency]}${top.etaS === null ? '' : ` · ${etaSpan(top.etaS)}`}`, 'off');
+      return key(`Need ${wholeText(top.need)} more ${CURRENCY_NAME[top.currency]}`, 'off');
     }
     case 'after':
       return c.tree.queueSlots > 0 && c.tree.queue.length + 1 < c.tree.queueSlots
         ? key(`Queue after ${s.line}`, 'go', { action: { type: 'queueResearch', project: n.id } })
         : key(`Wait for ${s.line}`, 'off');
     case 'ready':
-      return key(c.between ? 'Start · runs now' : 'Start · goes next in line', 'go', { action: { type: 'startResearch', project: n.id } });
+      // Between rounds it runs at once; in a round it goes to the front of the line. The tile header shows the price.
+      return key(n.purchase ? 'Buy' : c.between ? 'Start' : 'Start next', 'go', { action: { type: 'startResearch', project: n.id } });
   }
 }

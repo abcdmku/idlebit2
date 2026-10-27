@@ -2,7 +2,7 @@ import { applyStart, refillBatteries, resetPower } from '../phys/start';
 import { G } from '../core/buffers';
 import { ROUND_REPORTS_KEPT, STALL_END_TICKS, TICK_MS } from '../core/constants';
 import { pushEvent, roundDetails } from '../core/events';
-import { energyBreakdown, resetRoundTotals, roundTotals } from '../core/ledger';
+import { energyBreakdown, resetRoundTotals, roundTotals, settleLedger } from '../core/ledger';
 import { MODE, restingMode, setUnitMode } from '../core/timers';
 import type { World } from '../core/world';
 import type { RoundEndedBy, RoundReport } from '../types/report';
@@ -11,6 +11,7 @@ import { clearFront, graceOf, prepareQueue } from './queue';
 import { countOutcomes, failCounts, resetCounters, slaBelowThreshold } from './sla';
 import { familyType, TASK_TYPE_IDS } from './taskTypes';
 import { FAMILIES } from './families';
+import { closeFrontier, openFrontier } from './frontier';
 
 function roundTypes(w: World): RoundReport['byType'] {
   const fam = w.hot.fam;
@@ -64,7 +65,8 @@ export function startRound(w: World): void {
   const refill = refillBatteries(w);
   w.ledger.energyMeter += refill;
   w.hot.g[G.roundBatteryRefill] = refill;
-  w.research.stoppedInsolvent = false;
+  settleLedger(w);
+  openFrontier(w);
   pushEvent(w, { kind: 'roundStarted', round: r.index });
 }
 
@@ -75,6 +77,7 @@ function freezeReport(w: World, endTick: number, endedBy: RoundEndedBy): RoundRe
     index: r.index, startTick: r.startTick, durationTicks, durationMs: durationTicks * TICK_MS, endedBy,
     byType: roundTypes(w),
     met: g[G.met]!, failedByCause: failCounts(w), ...roundDetails(w.hot.detailRound), peakIntensity: r.peakIntensity,
+    frontier: closeFrontier(w, g[G.met]!),
     dismissed: g[G.dismissed]!, deliveredWork: g[G.deliveredWork]!, failedWork: g[G.failedWork]!,
     spill: { ramWork: g[G.ramWork]!, diskWork: g[G.diskWork]! },
     ...roundTotals(w), researchOps: r.researchOps, energyBreakdown: energyBreakdown(w),

@@ -5,12 +5,13 @@
 import { toScreen } from './camera';
 import type { Camera, PixelRatio } from './camera';
 import type { Point, Rect } from './geom';
+import { SPR } from './sprites';
 
-export type LabelTone = 'name' | 'silk' | 'value' | 'mute' | 'dim' | 'net' | 'cyan' | 'gold' | 'data' | 'warn' | 'ok' | 'rnd';
+export type LabelTone = 'name' | 'silk' | 'value' | 'mute' | 'dim' | 'net' | 'cyan' | 'gold' | 'data' | 'warn' | 'ok' | 'rnd' | 'power';
 export type LabelAlign = 'left' | 'right' | 'center';
 export const TONE: Readonly<Record<LabelTone, string>> = {
-  name: '#efeaff', silk: '#a99be6', value: '#e6dcff', mute: '#a99be6', dim: '#6e6698', net: '#7be38f',
-  cyan: '#a6f6ff', gold: '#ffcc3d', data: '#27d9a0', warn: '#ffb03b', ok: '#7dff9a', rnd: '#ff6bd6',
+  name: '#efeaff', silk: '#a99be6', value: '#e6dcff', mute: '#a99be6', dim: '#a49cd2', net: '#7be38f',
+  cyan: '#a6f6ff', gold: '#ffcc3d', data: '#27d9a0', warn: '#ffb03b', ok: '#7dff9a', rnd: '#ff6bd6', power: '#ffcf9a',
 };
 export const TAG_FILL = 'rgba(14, 11, 28, 0.85)';
 /** CSS px. One body size and one line height per layout (L2: 16/24 desktop, 13/16 phone). */
@@ -20,24 +21,42 @@ export const PHONE_TYPE: Typography = { body: 13, line: 16, grid: 8 };
 /** World labels follow the world's rest scale (A01): the desktop type at 3 and up, the phone type at 2 and below. */
 export const typeForScale = (scale: number): Typography => (scale >= 3 ? DESKTOP_TYPE : PHONE_TYPE);
 
+let measure: CanvasRenderingContext2D | null = null;
+const widths = new Map<string, number>();
+/** Fit values at the shared body size, using the loaded face rather than character counts. */
+export function labelTextWidth(text: string, type: Typography, bold = false): number {
+  const face = font(type, bold), key = `${face}:${text}`;
+  const old = widths.get(key);
+  if (old !== undefined) return old;
+  measure ??= document.createElement('canvas').getContext('2d');
+  if (!measure) return text.length * type.body * 0.6;
+  measure.font = face;
+  const width = measure.measureText(text).width;
+  if (widths.size >= 2048) widths.clear();
+  widths.set(key, width);
+  return width;
+}
+
 export interface LabelWriter {
   /** Start a label. (x, y) is in the level's art px: the top of its first line, at its left, right or centre edge. */
   label(id: string, x: number, y: number, align?: LabelAlign, tag?: boolean): LabelWriter;
   /** Append a run to the current line. `bold` is the name weight (700); body text is 500. */
   text(text: string, tone?: LabelTone, bold?: boolean): LabelWriter;
+  /** Currency sprite, inline with the amount that follows it. */
+  icon(currency: 'credits' | 'data'): LabelWriter;
   /** Continue on the next line, one line height down. */
   br(): LabelWriter;
   /** A 1·N leader from the label's first line to (x, y) in art px: across, then up or down. */
   leader(x: number, y: number): LabelWriter;
 }
-interface Run { text: string; tone: LabelTone; bold: boolean; line: number }
+interface Run { text: string; tone: LabelTone; bold: boolean; line: number; icon: 'credits' | 'data' | null }
 interface Label { id: string; x: number; y: number; align: LabelAlign; tag: boolean; first: number; end: number; lines: number; lead: boolean; lx: number; ly: number }
 export const MAX_LABELS = 64, MAX_RUNS = 192;
 
 /** A reusable label list. Never allocates after warm-up except the strings levels pass in. */
 export class LabelBuffer implements LabelWriter {
   readonly labels: Label[] = Array.from({ length: MAX_LABELS }, () => ({ id: '', x: 0, y: 0, align: 'left' as LabelAlign, tag: false, first: 0, end: 0, lines: 1, lead: false, lx: 0, ly: 0 }));
-  readonly runs: Run[] = Array.from({ length: MAX_RUNS }, () => ({ text: '', tone: 'name' as LabelTone, bold: false, line: 0 }));
+  readonly runs: Run[] = Array.from({ length: MAX_RUNS }, () => ({ text: '', tone: 'name' as LabelTone, bold: false, line: 0, icon: null }));
   count = 0;
   private runCount = 0;
   private current: Label | null = null;
@@ -63,7 +82,15 @@ export class LabelBuffer implements LabelWriter {
     const l = this.current;
     if (!l || this.runCount >= MAX_RUNS || !text) return this;
     const r = this.runs[this.runCount++];
-    r.text = text; r.tone = tone; r.bold = bold; r.line = l.lines - 1; l.end = this.runCount;
+    r.text = text; r.tone = tone; r.bold = bold; r.line = l.lines - 1; r.icon = null; l.end = this.runCount;
+    return this;
+  }
+  icon(currency: 'credits' | 'data'): LabelWriter {
+    const l = this.current;
+    if (!l || this.runCount >= MAX_RUNS) return this;
+    const r = this.runs[this.runCount++];
+    r.text = ''; r.tone = currency === 'credits' ? 'gold' : 'data'; r.bold = false; r.line = l.lines - 1; r.icon = currency;
+    l.end = this.runCount;
     return this;
   }
   br(): LabelWriter { if (this.current) this.current.lines++; return this; }
@@ -82,13 +109,14 @@ const at: Point = { x: 0, y: 0 }, end: Point = { x: 0, y: 0 };
 const LEADER = '#a99be6';
 const GAP = ' ';
 function font(t: Typography, bold: boolean): string { return `${bold ? 700 : 500} ${t.body}px "Chakra Petch"`; }
+const iconSize = (t: Typography) => Math.max(1, Math.floor(t.body / 8)) * 8;
 function lineWidth(g: CanvasRenderingContext2D, b: LabelBuffer, l: Label, line: number, t: Typography): number {
   let w = 0, any = false;
   for (let i = l.first; i < l.end; i++) {
     const r = b.runs[i];
     if (r.line !== line) continue;
     g.font = font(t, r.bold);
-    w += g.measureText(any ? GAP + r.text : r.text).width; any = true;
+    w += r.icon ? iconSize(t) + (any ? g.measureText(GAP).width : 0) : g.measureText(any ? GAP + r.text : r.text).width; any = true;
   }
   return w;
 }
@@ -142,6 +170,13 @@ export function drawLabels(g: CanvasRenderingContext2D, b: LabelBuffer, cam: Cam
         const r = b.runs[k];
         if (r.line !== line) continue;
         g.font = font(t, r.bold); g.fillStyle = TONE[r.tone];
+        if (r.icon) {
+          if (any) x += g.measureText(GAP).width;
+          const size = iconSize(t);
+          g.drawImage(r.icon === 'credits' ? SPR.coin8 : SPR.gem8, Math.round(x), Math.round(y + (t.line - size) / 2), size, size);
+          x += size; any = true;
+          continue;
+        }
         const s = any ? GAP + r.text : r.text;
         g.fillText(s, x, y + t.line / 2);
         x += g.measureText(s).width; any = true;

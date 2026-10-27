@@ -1,54 +1,46 @@
-/* The model picker uses the same plate rim and keys as the board. Only the inner body scrolls. */
-.v3-plate.gpu-picker { width: 670px; max-width: min(calc(100% - 16px), var(--plate-safe-width, 670px)); max-height: var(--plate-safe-height, 476px); display: flex; flex-direction: column; padding-bottom: 8px; }
-.l-desktop .v3-plate.gpu-picker { width: 670px; }
-.gpu-picker .p-head { flex: none; min-height: 34px; }
-.gpu-scroll { min-height: 0; overflow-y: auto; overflow-x: hidden; overscroll-behavior: contain; scrollbar-color: #6853b6 #120d28; padding: 4px 3px; }
-.gpu-body { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 18px; }
-.gpu-generation { display: grid; grid-template-columns: 83px minmax(0, 1fr); gap: 6px; align-items: center; min-height: 44px; color: #a99be6; }
-.gpu-generation select { width: 100%; min-height: 44px; background: #29234b; color: #efeaff; border: 2px solid #0e0b1c; border-radius: 0; font: inherit; padding: 0 5px; color-scheme: dark; }
-.gpu-picker select:focus-visible, .gpu-scroll:focus-visible, .gpu-options button:focus-visible, .gpu-research-link:focus-visible { outline: 2px solid #8ef5ff; outline-offset: -2px; }
-.gpu-choice-label { color: #a99be6; margin: 6px 0 4px; }
-.gpu-options { display: grid; gap: 6px; }
-.gpu-series { grid-template-columns: repeat(4, minmax(44px, 1fr)); }
-.gpu-tiers { grid-template-columns: repeat(6, minmax(44px, 1fr)); }
-.gpu-options button { border: 0; border-radius: 0; min-height: 44px; min-width: 44px; padding: 3px 2px; color: #efeaff; background: #120d28; cursor: pointer; box-shadow: inset 2px 2px #07050f, inset -2px -2px #3a2f6e; display: flex; flex-direction: column; align-items: center; justify-content: center; }
-.gpu-options button[aria-pressed=true] { background: #2a2052; box-shadow: inset 0 0 0 2px #efeaff, inset 0 0 0 4px #0e0b1c; }
-.gpu-options b, .gpu-model b { color: #ff7ad9; }
-.gpu-emphasis { height: 36px; overflow: auto; color: #a99be6; }
-.gpu-cap { min-height: 18px; color: #a99be6; }
-.gpu-model { display: flex; align-items: center; gap: 9px; min-height: 44px; }
-.gpu-model canvas { width: 80px; height: 35px; flex: none; image-rendering: pixelated; }
-.gpu-model > div { display: flex; flex-direction: column; }
-.gpu-model span { color: #a99be6; }
-.gpu-comparison { width: 100%; border-collapse: collapse; table-layout: fixed; }
-.gpu-comparison th, .gpu-comparison td { height: 23px; text-align: right; font-weight: 400; padding: 0; white-space: nowrap; }
-.gpu-comparison th:first-child { text-align: left; color: #a99be6; width: 30%; }
-.gpu-comparison caption { text-align: left; color: #efeaff; height: 24px; padding-top: 6px; }
-.gpu-power .gpu-comparison th:first-child { width: 36%; }
-.gpu-power { margin-top: 6px; }
-.gpu-power-warning { height: 36px; color: #a99be6; }
-.gpu-picker .gpu-over { color: #ffab98 !important; }
-.gpu-comparison thead th { height: 27px; border-bottom: 2px solid #332767; color: #a99be6; }
-.gpu-comparison td:last-child { color: #8ef5ff; }
-.gpu-picker .key { justify-content: space-between; gap: 6px; min-height: 44px; margin-top: 8px; overflow-wrap: anywhere; }
-.gpu-price { color: #ffcc3d; margin-left: auto; font-variant-numeric: tabular-nums; }
-.gpu-buy .gpu-price { color: #2a1700; }
+/* GPU tier ruling: the card's state first, then at most two buys. Same plate rim and keys as the board. */
+.v3-plate.gpu-picker { width: 440px; max-width: min(calc(100% - 16px), var(--plate-safe-width, 440px)); }
+.l-desktop .v3-plate.gpu-picker { width: 440px; }
+.gpu-picker .key { justify-content: space-between; gap: var(--s2); min-height: 44px; margin-top: 0; overflow-wrap: anywhere; }
 .gpu-picker .key:disabled .gpu-price { color: inherit; }
-.gpu-note { height: 64px; overflow-y: auto; color: #a99be6; }
-.gpu-note.warn { color: #ffab98; }
-.gpu-research-link { min-height: 44px; width: 100%; border: 0; color: #8ef5ff; background: #29234b; font: inherit; cursor: pointer; }
-.gpu-research-link:disabled { color: #a99be6; background: transparent; cursor: default; }
-.gpu-alternatives { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 18px; border-top: 2px solid #332767; padding-top: 8px; margin-top: 8px; }
-.gpu-alt-title { min-height: 24px; display: flex; align-items: center; justify-content: space-between; gap: 4px; }
-.gpu-research-price { display: flex; flex-direction: column; align-items: flex-end; margin-left: auto; color: #27d9a0; }
-.gpu-research-price span:last-child { color: #ffcc3d; }
-.gpu-status { border-top: 2px solid #332767; padding-top: 7px; min-height: 36px; color: #a99be6; }
-.gpu-shortfall { min-height: 18px; color: #ffab98; }
-.gpu-tasks { margin: 5px 0; padding-left: 16px; color: #a99be6; }
-.gpu-tasks li { display: grid; gap: 8px; padding: 8px 0; }
+.v3-plate .gpu-note { min-height: var(--lh); margin: 0; color: #a99be6; }
+.v3-plate .gpu-note.warn { color: #ffab98; }
+
+/* The card as it is: art, model and type, generation, the tier ladder and live duty (fixed height: updates in place). */
+.gpu-state { padding-bottom: var(--s2); border-bottom: 2px solid #332767; }
+.gpu-model { display: flex; align-items: center; gap: var(--s2); min-height: 44px; }
+.gpu-model canvas { width: 96px; height: 42px; flex: none; image-rendering: pixelated; }
+.gpu-model > div { display: flex; flex-direction: column; }
+.gpu-model b { color: #ff7ad9; }
+.gpu-model span { color: #a99be6; }
+.gpu-ladder { list-style: none; margin: var(--s2) 0 0; padding: 0; display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: var(--s1); }
+.gpu-ladder li { min-height: var(--lh); display: flex; align-items: center; justify-content: center; color: #6f64a8; background: #1f1a3a; }
+.gpu-ladder li.done { color: #efeaff; background: #3a2f70; }
+.gpu-ladder li.now { color: #171127; background: #ff7ad9; font-weight: 600; }
+.v3-plate .gpu-live { min-height: var(--lh); margin: 0; color: #c9c1e5; font-variant-numeric: tabular-nums; }
+
+/* One buy: what it is, before → after, what it costs in time, its key. */
+.gpu-step { padding: var(--s2) 0; border-bottom: 2px solid #332767; }
+.v3-plate .gpu-step-title { min-height: var(--lh); margin: 0; }
+.v3-plate .gpu-step-title b { color: #efeaff; }
+.gpu-delta { list-style: none; margin: var(--s1) 0 0; padding: 0; display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--s1); }
+.gpu-delta li { display: flex; justify-content: space-between; gap: var(--s2); min-width: 0; }
+.gpu-delta li span { color: #a99be6; }
+.gpu-delta li b { font-weight: 600; white-space: nowrap; }
+.gpu-delta li.up b { color: #8ef5ff; }
+.gpu-research-price { display: flex; flex-wrap: wrap; align-items: center; gap: var(--s2); margin-top: var(--s1); }
+.gpu-research-price .px-ic { margin-right: var(--s1); vertical-align: -1px; }
+.gpu-remove { padding-top: var(--s2); }
+.gpu-picker .gpu-npu { padding: var(--s2) 0; border-bottom: 2px solid #332767; }
+
+.gpu-tasks { margin: var(--s2) 0 0; padding: 0; list-style: none; display: grid; gap: var(--s1); color: #a99be6; }
+.gpu-tasks li { display: flex; align-items: center; gap: var(--s2); min-height: var(--lh); }
 .gpu-task-family { color: var(--paper); }
-@container (max-width: 600px) { .gpu-body, .gpu-alternatives { grid-template-columns: minmax(0, 1fr); gap: 8px; } }
-@container (max-width: 320px) { .gpu-tiers { grid-template-columns: repeat(3, minmax(44px, 1fr)); } }
-.gpu-picker { container-type: inline-size; }
-@media (max-width: 600px) { .gpu-body, .gpu-alternatives { grid-template-columns: minmax(0, 1fr); gap: 8px; } }
-@media (max-width: 340px) { .gpu-tiers { grid-template-columns: repeat(3, minmax(44px, 1fr)); } }
+/* The two pinned steps: equal halves, fixed height, always in view. */
+.gpu-picker .gpu-keys { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: var(--s2); }
+.gpu-picker .gpu-keys .key { margin-top: 0; }
+.v3-plate .gpu-why { min-height: var(--lh); margin: 0; }
+.gpu-type-keys { margin-top: var(--s2); display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: var(--s2); }
+.gpu-type-keys .key { margin-top: 0; }
+
+.v3-plate .gpu-keys .key .kl { white-space: nowrap; }

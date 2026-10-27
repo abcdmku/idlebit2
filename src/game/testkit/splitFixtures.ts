@@ -28,7 +28,7 @@ const MID_SPEC: SystemSpec = {
   cpuCount: 1,
   scheduler: { gen: 1, level: 4, strategy: 'fifo' },
   ram: [{ gen: 1, level: 8, ecc: false }, { gen: 1, level: 8, ecc: false }],
-  accels: [{ kind: 'gpu', model: '1330', upgrades: 0 }],
+  accels: [{ kind: 'gpu', model: '1330' }],
   drives: [lvl(1, 2)],
   psu: { gen: 1, level: 8, capped: false },
   settings: { dvfs: false, turbo: false, cStateLimit: 0 },

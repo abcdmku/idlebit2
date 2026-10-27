@@ -6,25 +6,21 @@ import { wholeText } from './format';
 import { OUTAGE_TEXT, taskBits } from './taskRequirements';
 
 export const CAUSE_NAME: Readonly<Record<FailCause, string>> = {
-  timeout: 'Timed out', cantRun: "Can't run", misroute: 'Misrouted', power: 'Power', heat: 'Heat', swap: 'Swap', late: 'Late',
+  timeout: 'Timed out', cantRun: "Can't run", misroute: 'Misrouted', power: 'Power', heat: 'Heat', swap: 'Interrupted', late: 'Late',
 };
 const DETAIL_WORD: Readonly<Partial<Record<FailDetail, string>>> = {
-  ram: 'RAM', gpu: 'GPU', gpuCores: 'GPU cores', vram: 'VRAM', ecc: 'ECC', psu: 'Power supply', pdu: 'PDU', ups: 'UPS', cold: 'Cold change',
+  ram: 'RAM', gpu: 'GPU', gpuCores: 'GPU cores', vram: 'VRAM', ecc: 'ECC', psu: 'Power supply', pdu: 'PDU', ups: 'UPS', cold: 'hardware change', offline: 'taken offline',
+  members: 'too few servers', zones: 'too few zones', region: 'wrong region',
 };
 export const detailName = (d: FailDetail): string => DETAIL_WORD[d] ?? d[0]!.toUpperCase() + d.slice(1);
-export function causeText(cause: FailCause, detail: FailDetail | null): string {
-  const outage = detail ? OUTAGE_TEXT[detail] : undefined;
-  if (outage) return outage;
-  return detail ? `${CAUSE_NAME[cause]} · ${detailName(detail)}` : CAUSE_NAME[cause];
-}
 export function familyName(family: FamilyId): string { return FAMILIES[family]?.name ?? 'Task'; }
 export const taskKey = (task: TaskRef): string => `${task.epoch}:${task.roundIndex}:${task.taskId}`;
 /** The head may be taken through the end of `deadlineTick`. */
 export const deadlineMs = (deadlineTick: number) => (deadlineTick + 1) * TICK_MS;
 
-/** Transfer time at the current link speed (L2): "1 ms", "250 ms", "1.25 s", "12.5 s". */
+/** Transfer time at the current link speed (L2): "1 ms", "250 ms", "1.3 s", "12.5 s". */
 export function transferText(s: number): string {
-  return s < 0.1 ? `${Math.max(1, Math.round(s * 1000))} ms` : `${s.toFixed(s < 10 ? 2 : 1)} s`;
+  return s < 0.1 ? `${Math.max(1, Math.round(s * 1000))} ms` : `${s.toFixed(1)} s`;
 }
 
 /** Payout: 1 Credit per op or bit of work (D2.2). */
@@ -74,7 +70,7 @@ export function causeLine(cause: FailCause, detail: FailDetail | null): string {
   if (!detail) return CAUSE_NAME[cause];
   // An outage reads as what is down ("Power supply down ×3"), the same words as the task's status.
   const outage = OUTAGE_TEXT[detail];
-  if (outage) return outage;
+  if (outage && !(cause === 'swap' && detail === 'offline')) return outage;
   const word = detailName(detail);
   return `${CAUSE_NAME[cause]} · ${/^[A-Z][a-z]/.test(word) ? word.toLowerCase() : word}`;
 }

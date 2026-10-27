@@ -1,6 +1,6 @@
 import { FAMILIES, type LevelSnapshot, type PartId, type PartSlot, type PartView } from '../../game';
 import { genName, QUEUE_NAMES, SLOT_TITLE } from './copy';
-import { bits, hertz, percent } from './format';
+import { bitRate, bits, hertz, percent } from './format';
 import type { Line } from './widgets';
 
 /** What a generic part plate shows, read from the focus snapshot. Null when the part is not on screen. */
@@ -12,7 +12,10 @@ const PART_ID: Partial<Record<PartSlot['kind'], PartId>> = {
 };
 const busy = (p: PartView) => (p.active ? `${percent(p.resourceBusy)} busy` : 'Idle');
 
-export function partFacts(focus: LevelSnapshot, slot: PartSlot): PartFacts | null {
+export function partFacts(focus: LevelSnapshot, slot: PartSlot, siteId?: number): PartFacts | null {
+  // A system summary can open a CPU component directly without drilling into the CPU view first.
+  if (focus.level === 'system' && ['clock', 'l1', 'l2', 'l3', 'scheduler', 'core'].includes(slot.kind))
+    return partFacts(focus.chip, slot);
   const id = PART_ID[slot.kind];
   const gen = (g: number) => (id ? genName(id, g) : `Gen ${g}`);
   if (focus.level === 'chip') {
@@ -45,7 +48,8 @@ export function partFacts(focus: LevelSnapshot, slot: PartSlot): PartFacts | nul
     return null;
   }
   if (focus.level === 'system') {
-    if (slot.kind === 'cpu') return { title: 'CPU', sub: gen(focus.cpu.generation), level: focus.cpu.level, status: busy(focus.cpu), lines: [] };
+    // Each socket by its number, as RAM and Storage are, so a CPU just added reads as the one it is (R16).
+    if (slot.kind === 'cpu') return { title: `CPU ${slot.socket + 1}`, sub: gen(focus.cpu.generation), level: focus.cpu.level, status: busy(focus.cpu), lines: [] };
     if (slot.kind === 'ram' || slot.kind === 'gpu' || slot.kind === 'drive') {
       const list = slot.kind === 'ram' ? focus.ram : slot.kind === 'gpu' ? focus.gpu : focus.storage;
       const p = slot.kind === 'gpu' ? list.find(p => p.slot === slot.index) : list[slot.index];
@@ -54,15 +58,21 @@ export function partFacts(focus: LevelSnapshot, slot: PartSlot): PartFacts | nul
       const tier = focus.memory.tiers.find(t => t.tier === (slot.kind === 'ram' ? 'ram' : 'disk'));
       // RAM reads plainly as used; every bit on disk spilled from RAM, so a drive reads what it holds as spilled (lead ruling).
       const cap = slot.kind === 'ram' ? (tier ? `${bits(tier.usedBits)} of ${bits(tier.capacityBits)} used` : '')
-        : slot.kind === 'gpu' ? `${bits(p.vramUsedBits ?? 0)} VRAM held · tensor tasks with no GPU core minimum`
-        : `${tier ? (tier.usedBits > 0 ? `${bits(tier.usedBits)} spilled` : `${bits(tier.capacityBits)} free`) : ''}${tier?.rateBits ? ` · spill speed ${hertz(tier.rateBits)}` : ''}`;
+        : slot.kind === 'gpu' ? `${bits(p.vramUsedBits ?? 0)} VRAM held`
+        : `${tier ? (tier.usedBits > 0 ? `${bits(tier.usedBits)} spilled` : `${bits(tier.capacityBits)} free`) : ''}${tier?.rateBits ? ` · spill speed ${bitRate(tier.rateBits)}` : ''}`;
       return { title: `${p.kind === 'npu' ? 'NPU' : SLOT_TITLE[slot.kind]} ${slot.index + 1}`, sub: `${p.kind === 'npu' ? `Gen ${p.generation + 1}` : gen(p.generation)}${p.ecc ? ' · ECC' : ''}`, level: p.level,
-        status: busy(p), lines: [{ text: cap, tone: 'muted' }] };
+        status: busy(p), lines: [{ text: cap, tone: 'muted' },
+          ...(slot.kind === 'ram' && p.rateBits !== undefined ? [{ text: `Bandwidth ${bitRate(p.rateBits)}`, tone: 'muted' as const }] : [])] };
     }
     return null;
   }
   if (focus.level === 'global' && (slot.kind === 'dataPlane' || slot.kind === 'backbone')) {
-    const link = focus.backbone.links[0];
+    if (slot.kind === 'dataPlane') {
+      const dp = focus.sites.find(s => s.siteId === siteId)?.dataPlane;
+      return dp ? { title: SLOT_TITLE[slot.kind], sub: gen(dp.generation), level: 1,
+        status: `${bitRate(dp.bitsPerSec)} · ${Math.round(dp.latencyMs)} ms`, lines: [] } : null;
+    }
+    const link = focus.backbone.links.find(l => l.siteId === siteId);
     return { title: SLOT_TITLE[slot.kind], sub: link ? gen(link.generation) : '', level: 1,
       status: link ? `${hertz(link.speedHz)} · ${Math.round(link.latencyMs)} ms` : 'No link yet', lines: [] };
   }

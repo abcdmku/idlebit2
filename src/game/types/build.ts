@@ -29,8 +29,8 @@ export interface RamModuleBuild extends PartLevel { readonly ecc: boolean }
 export interface SystemSettings {
   readonly dvfs: boolean;
   readonly turbo: boolean;
-  /** Deepest C-state allowed: 0 none, 1 C1, 3 C3, 6 C6. */
-  readonly cStateLimit: 0 | 1 | 3 | 6;
+  /** C-state enabled (1) or disabled (0); research supplies the idle-power factor. */
+  readonly cStateLimit: 0 | 1;
 }
 /**
  * A system's hardware and settings, without identity. Immutable and shared by reference: a copied

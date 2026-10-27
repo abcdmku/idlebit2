@@ -25,9 +25,9 @@ D26 (memory hierarchy, completion windows) and D25.11 (split floor) are also the
 - The market is an **endless, ordered queue** per round (D10). The player sees the next five, head first.
 - **Nothing throttles it.** Hardware takes the head as soon as it has room. There is no arrival rate, warm-up, burst or cap.
 - **Only the head has a clock.** It must be taken within 10 s of becoming the head, or it fails and the next task becomes the head.
-- **Every machine pulls over a pipe.** The inbound pipe starts at 1 kHz. A task's transfer size is its work, so a 1,000-op task takes 1 s to land.
+- **Every machine pulls over a pipe.** The inbound pipe starts at 100 kHz (D29). A task's transfer size is its work, so a 1,000-op task takes 0.01 s to land.
 - **Tasks are divisible (D25).** A router cuts each task into equal whole-unit **shards** over every child with room, at most 256 and never below the family's **grain**. A system runs its shard on `floor(units / grain)` threads. A task pays its full work once, when its last shard completes. A bigger fleet therefore runs bigger tasks: it finishes them in time, and their per-shard working sets fit.
-- **Memory is a hierarchy (D26).** A shard's working set sits in cache, then RAM, then disk. Cache-resident traffic is free, RAM traffic runs at RAM bandwidth, disk traffic at drive IO (1/16 to 1/2 of RAM speed). Nothing needs a drive; the only memory wall is the whole hierarchy. Spill never fails a task, it slows it.
+- **Memory is a hierarchy (D26, D46).** Every shard loads its working set into cache, then RAM, then disk before processing. Cache loading and traffic consume one CPU op per bit. RAM loading and traffic use RAM bandwidth; disk loading and traffic use drive IO. The only memory wall is the whole hierarchy. Spill slows work and can cause a completion deadline to be missed.
 - **Late tasks have a deadline (D26.5).** From `rackDist` on, a task must be met within its window from take (1–4 min) or it fails `late`. Slow memory, deep queues and under-built fleets miss it.
 - **Throughput = min(compute, pipe).** Before Rack the pipe is fixed at 1 kHz (D15), so after round 1 income is capped at 1,000 ops/s. Tasks above 10,000 ops can't be taken in time and fail. That wall, at `I` ≈ 13–14, is the push to the Rack, where ports can step at clock-parity prices (D14).
 - **Difficulty grows only through task size and requirements**, which rise with round age through `I`. A round ends when the hardware can't take each next head inside 10 s, or can't run it.
@@ -69,7 +69,7 @@ This keeps a distributed task's total work as before: the old rule drew `m` memb
 
 All post-Rack sizes (`U` ≥ 1e5) are far above every grain except Serial, so from Rack on almost every task splits as wide as the fleet allows, up to 256.
 
-**Memory traffic and working sets (D26.3).** The old `ram` stream and `storage` IO stage coefficients are one **memory** coefficient: bits the task touches, which still pay 1 Credit each. Where those bits sit sets their time: free in cache, RAM bandwidth in RAM, drive IO on disk. The old `disk b/u` storage-capacity gates join the working set (`wsPerUnit` = old `wsPerUnit` + old `diskPerUnit`). So the Storage type is now data-heavy work: big working sets and many bits touched, which a drive lets a small machine take, slowly. No family needs a drive.
+**Memory traffic and working sets (D26.3, D46).** The old `ram` stream and `storage` IO stage coefficients are one **memory** coefficient: bits the task touches, which still pay 1 Credit each. Cache traffic consumes CPU ops, RAM traffic uses RAM bandwidth, and disk traffic uses drive IO. Every shard first loads its whole working set at those same tier rates, even when it has no `mem` stages. Loading is separate work and does not increase payout or inbound payload. The old disk-capacity gates join the working set. A drive lets a small machine hold larger tasks, with loading and traffic limited by its IO rate.
 
 `ecc`, `tensor`, `gpuCoresMin`, `affinity`, `members`, `minZones` and `region` copy straight from the family. `gpuCoresMin` is a fixed nonnegative integer per shard, never a size term. GPU work requires a compatible accelerator; its only hardware gates are GPU cores and VRAM. `affinity` is `accelerator` for GPU-heavy families (GPU work at least half the stage work), tensor families and big-memory families (`wsPerUnit >= 4`), and `general` otherwise. Stage resources stay `compute`, `ram`, `gpu` and `storage`.
 
@@ -86,15 +86,15 @@ Without GPU link, one actual GPU must meet both gates. Linked GPUs sum cores, VR
 Every round starts at `I = 0`, and `I` advances one step per task drawn into the queue (D30), never with time:
 
 ```text
-I ← I + 1 / k(I)        k(I) = 9 + 0.3 I + 0.03 I²  tasks per unit of I      (s)
+I ← I + 1 / k(I)        k(I) = 9 + 0.3 I + 0.03 I² + 0.35 max(0, I − 14)³  tasks per unit of I (s)
 ```
 
 | I | 0 | 5 | 10 | 15 | 20 | 25 |
 |---|---:|---:|---:|---:|---:|---:|
-| k(I), tasks per unit | 9 | 11.3 | 15 | 20.3 | 27 | 35.3 |
-| Tasks drawn to reach I | 0 | 52 | 117 | 204 | 321 | 476 |
+| k(I), tasks per unit | 9 | 11.3 | 15 | 20.6 | 102.6 | 501.1 |
+| Tasks drawn to reach I | 0 | 50 | 115 | 203 | 433 | 1755 |
 
-Each task is about `2^(0.85 / k)` times bigger than the last (8% at I = 0, 2–3% near the Rack-era wall at I 20–25). Hardware moves along the same curve at its own speed: fast systems blast through the small early tasks in seconds and meet their own wall; a slow one crawls. Near the wall a take costs up to 10 s, so a round lasts about the climb's tail plus the SLA window (D28), minutes at any fleet size.
+Each task is about `2^(0.85 / k)` times bigger than the last, about 8% at I0 and under 1% near I20–25. The 26 Oct tune leaves I0–14 unchanged and adds more draws in later bands so fast fleets have longer rounds. Hardware moves along the same curve at its own speed; no family window depends on installed hardware. Near the wall a take costs up to 10 s, so a round lasts the climb's tail plus the SLA window (D28).
 
 D20 in the real sim (`scripts/balance/opening.ts`, 8 seeds): round 1 with no purchases ends at 0:36–1:16 (median 0:55) on Can't run · cache, with AND Mask (2 bits) in the mix from I 0.6 and Compare from 1.6; an active round 1 lasts 7:39–9:03 and peaks near I 13. Superseded: the time ramps `T(I)` (D12.1, D20, D28) and the offset start (previous peak − 6).
 
@@ -162,7 +162,7 @@ The codes are the research tree's (§2). Each band starts with the families that
 |---|---|---:|---|---|---|
 | `bits` | Bits | 0 | cache 2–3 bits | 1 core, clock 1–16 Hz, L1 1–4 bits | none needed; `fifoSched`, `pipelining` help |
 | `ints` | Integers | 4 | cache 8–128 bits | clock 64–1024 Hz, L1 levels, FIFO queue | `fifoSched`, `pipelining`, `l2Cache` |
-| `threads` | Threads | 10 | cache 512–768 bits (L2); 4–8 threads | 2–4 cores, scheduler K; the 1 kHz pipe caps them until Rack | `dualCore`, `quadCore`, `l2Cache` |
+| `threads` | Threads | 10 | cache 512–768 bits (L2); 4–8 threads | 2–4 cores, scheduler K; the 100 kHz pipe caps them until Rack | `dualCore`, `quadCore`, `l2Cache` |
 | `ram` | Memory | 12.5 | cache, then the hierarchy (working set grows with size); RAM traffic needs fast RAM | System board, RAM modules | `systemBoard`, `memController`, then `ddr`, `dualChannel` |
 | `gpu` | GPU | 15 | GPU cores, VRAM | a compatible GPU model; optional tensor technology | `gpuGen1` through `gpuGen9`; `tensorCores`, `gddr6` |
 | `storage` | Data-heavy (D26) | 16.5 | the hierarchy (8–16 b/u working sets); spill makes them slow, not unrunnable | big RAM, or a drive to hold the overflow; kHz fab for scale | `memController` levels, `storageCtl`, `ssd`, `raid0`, `hotPages`, `fabKhz` |

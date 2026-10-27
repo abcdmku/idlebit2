@@ -99,6 +99,8 @@ Replacement restores efficiency relative to pushed old hardware. A native part m
 
 Keep the six existing RAM technologies and their gates. They are independent of CPU fab purchases. Their capacity and bandwidth bases in game-spec A.1 remain starting values. The source's one-bit RAM does not add RAM to the one-bit-cache boot state.
 
+D46 makes bandwidth apply to initial loading as well as later memory traffic. SDRAM, DDR, DDR2, DDR3, DDR4 and DDR5 each have their own base rate and 36 levels of speed upgrades within the generation. Rates are the game's scaled bit/s, not real-world DIMM MHz ratings. A cache load consumes CPU operations. HDD, SSD, NVMe and SCM load at their own drive IO rates and retain their existing level upgrades.
+
 Every RAM generation has 36 levels, with or without ECC or registered DIMMs. Registered DIMM research grants **2× capacity to ECC modules** **(s)** instead of adding levels beyond the common ceiling. It changes neither bandwidth nor the saved level. This replaces the old `ramLevelBonus = 4` effect. The saved module level is shared by capacity, bandwidth, price and efficiency, but those properties use different curves:
 
 ```text

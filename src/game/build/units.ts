@@ -1,3 +1,4 @@
+import { unitLabel } from '../view/labels';
 import { RACK_SLOTS_PER_ROW, REGIONS, SERVERS_PER_RACK } from '../core/constants';
 import type { ConfigSource } from '../types/actions';
 import type { BuildState, RackConfig, RoomBuild, RoomConfig, SiteConfig, SystemConfig } from '../types/build';
@@ -49,13 +50,13 @@ function resolve(state: GameState, parent: ScopeRef, source: ConfigSource): { cf
       : kind === 'room' ? b.rooms[from.id]?.site === pid : true;
     const cfg = kind === 'system' ? systemConfig(b, from.id) : kind === 'rack' ? rackConfig(b, from.id) : kind === 'room' ? roomConfig(b, from.id) : siteConfig(b, from.id);
     if (!cfg || !sameParent) return fail('invalid', 'Copy a sibling');
-    const label = kind === 'system' ? `Server ${(b.systems[from.id]?.slot ?? 0) + 1}` : `${kind[0]!.toUpperCase()}${kind.slice(1)} ${from.id}`;
+    const label = unitLabel(state, from);
     return { cfg, label };
   }
   if (kind === 'system') {
     const board = source.board ?? 'general';
-    const label = source.storageNode ? 'Storage node' : board === 'accelerator' ? `${tierName(source.tier)} accelerator` : tierName(source.tier);
-    return { cfg: { online: true, spec: barebonesSystemSpec(source.tier, u, board, source.storageNode ?? false) }, label };
+    const label = source.storageNode ? 'Storage node' : board === 'accelerator' ? `${tierName(source.tier ?? 0)} accelerator` : tierName(source.tier ?? 0);
+    return { cfg: { online: true, spec: barebonesSystemSpec(source.tier ?? 0, u, board, source.storageNode ?? false) }, label };
   }
   if (kind === 'rack') return { cfg: barebonesRackConfig(), label: 'Barebones rack' };
   if (kind === 'room') return { cfg: barebonesRoomConfig(), label: 'Barebones zone' };
@@ -116,7 +117,7 @@ export function planAddUnit(state: GameState, parent: ScopeRef, slot: number, so
       if (slot < 0 || slot >= SERVERS_PER_RACK) return fail('invalid', 'No such slot');
       if (rack.servers[slot] !== null) return fail('occupied', 'Slot is taken', label);
       const sys = cfg as SystemConfig;
-      const lock = rack.opened ? (source.kind === 'barebones' ? genLock(u, 'cpu', source.tier) : null) ?? systemLock(u, sys.spec) : viewLock('rack');
+      const lock = rack.opened ? systemLock(u, sys.spec) : viewLock('rack');
       return done(systemSpecPrice(sys.spec), lock, () => addSystem(b, rack.id, slot, sys, added));
     }
     case 'room': {

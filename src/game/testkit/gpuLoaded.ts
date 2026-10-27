@@ -11,7 +11,7 @@ import type { GameState } from '../types/state';
 import { buildState } from './builders';
 
 /** Synthetic pre-admitted work, not a campaign. Actual catalog specs, no compiled overrides.
- * Each ray-trace task fills one G1530 u5 card's HBM VRAM and lasts about 1,203 seconds.
+ * Each ray-trace task fills one G1590 card's HBM VRAM.
  * Eight independent cards/system keep all 18-clock scans and all physical duty columns relevant.
  */
 export function gpuLoadedState(fullFleet = false): GameState {
@@ -22,13 +22,13 @@ export function gpuLoadedState(fullFleet = false): GameState {
     system: (id, rack, slot) => {
       const bare = barebonesSystem(id, rack, slot);
       return { ...bare, spec: { ...bare.spec, board: 'accelerator',
-        cpu: { ...bare.spec.cpu!, cores: Array.from({ length: 8 }, () => ({ gen: 0, level: 1 })) },
+        cpu: { ...bare.spec.cpu!, cores: Array.from({length:8},()=>({gen:0,level:1})) },
         scheduler: { gen: 1, level: 4, strategy: 'fifo' },
-        accels: Array.from({ length: MAX_ACCELS }, () => ({ kind: 'gpu', model: '1530', upgrades: 5 })),
+        accels: Array.from({ length: MAX_ACCELS }, () => ({ kind: 'gpu', model: '1590' })),
         psu: { gen: 4, level: 1, capped: false },
       } };
     },
-    // D8 card watts: one u5 G1530 server draws about 73 MW, a full rack about 0.88 GW. These real
+    // D8 card watts: one G1590 server draws about 14 MW, a full rack about 0.17 GW. These real
     // catalog tiers leave headroom, so every card stays powered and every lump stays cool.
     rack: (r) => ({ ...r, cooler: { gen: 2, level: 1, setpointF: 70 }, pdu: { gen: 2, level: 1, capped: false } }),
     room: (m) => ({ ...m, cooler: { gen: 2, level: 1, setpointF: 70 }, ups: [{ gen: 2, level: 1, capped: false }] }),

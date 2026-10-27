@@ -13,21 +13,21 @@ export function genLock(u: Unlocks, part: PartId, g: number): LockReason | null 
   if (genUnlocked(u, part, g)) return null;
   const bits = u.gens[part] ?? 0;
   const missing = (bits & 1) === 0 && g > 0 ? 0 : g;
-  return needs(nodeForGen(part, missing), `${part} gen ${missing}`);
+  return needs(nodeForGen(part, missing), 'research');
 }
 
 export function ceilingLock(u: Unlocks, key: CeilingId, value: number): LockReason | null {
   if (value <= u.ceilings[key]) return null;
   const node = nodeForCeiling(key, value);
-  return node ? needs(node, key) : { code: 'cap', node: null, text: 'At the limit' };
+  return node ? needs(node, key) : { code: 'cap', node: null, text: 'Max' };
 }
 
-export const ruleLock = (u: Unlocks, rule: RuleId): LockReason | null => (hasRule(u, rule) ? null : needs(nodeForRule(rule), rule));
+export const ruleLock = (u: Unlocks, rule: RuleId): LockReason | null => (hasRule(u, rule) ? null : needs(nodeForRule(rule), 'research'));
 
 export function optionLock(u: Unlocks, id: StrategyId | FilterId, kind: 'queue' | 'route' | 'filter'): LockReason | null {
   const have = kind === 'queue' ? (u.queueStrategies as readonly string[]) : kind === 'route' ? (u.routeStrategies as readonly string[])
     : (u.filters as readonly string[]);
-  return have.includes(id) ? null : needs(nodeForOption(id), id);
+  return have.includes(id) ? null : needs(nodeForOption(id), 'research');
 }
 
 /** Highest level a leveled part may reach: the curve range plus research bonuses (spec §12.1). */

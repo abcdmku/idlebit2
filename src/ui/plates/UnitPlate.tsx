@@ -3,16 +3,15 @@ import type { ServerSlotView, UnitMode, UnitRef } from '../../game';
 import type { MarketState } from './market';
 import { OnlineRow } from './OnlineRow';
 import { PlateFrame } from './PlateFrame';
-import { Key, Lines, Status, type Line, type Tone } from './widgets';
+import { Key, Status, type Tone } from './widgets';
 import type { PlateCommon } from './types';
 
 export interface UnitPlateProps extends Omit<PlateCommon, 'quotes'> {
   unit: UnitRef;
   title: string;
-  sub: string;
+  sub?: string;
   status: string;
   statusTone?: Tone;
-  lines?: readonly Line[];
   mode: UnitMode;
   timerS: number | null;
   /** The On market toggle; null before Rack (the lone system has none). */
@@ -25,11 +24,10 @@ export interface UnitPlateProps extends Omit<PlateCommon, 'quotes'> {
 }
 
 /** A unit's plate: what it is doing, its market row, and its keys. */
-export function UnitPlate({ unit, title, sub, status, statusTone = '', lines = [], mode, timerS, market, onSave, saveLabel = 'Save configuration',
+export function UnitPlate({ unit, title, sub, status, statusTone = '', mode, timerS, market, onSave, saveLabel = 'Save configuration',
   className = '', children, onAction, bootS, onResearch: _r, researchName: _n, ...frame }: UnitPlateProps) {
   return <PlateFrame {...frame} title={title} sub={sub} className={`unit ${className}`}>
     <Status text={status} tone={statusTone} />
-    <Lines lines={lines} slots={Math.max(1, lines.length)} />
     {market && <OnlineRow mode={mode} timerS={timerS} bootS={bootS} market={market} onToggle={(online) => onAction({ type: 'setOnline', unit, online })} />}
     <div className="keys">
       {children}
@@ -62,7 +60,7 @@ export function ServerPlate({ slot, servers, onGoInside, onStep, ...common }: Se
   const nb = neighbours(servers, slot);
   const status = s.running > 0 ? `Running ${s.running} ${s.running === 1 ? 'task' : 'tasks'}` : 'Idle';
   return <UnitPlate {...common} bootS={s.timerTotalS ?? common.bootS} className="server" unit={{ kind: 'system', id: s.systemId }} title={`Server ${slot + 1}`}
-    sub={s.kind === 'storageNode' ? 'Storage node' : 'Server'} status={status}
+    sub={s.kind === 'storageNode' ? 'Storage node' : undefined} status={status}
     mode={s.state} timerS={s.timerS}>
     <div className="key-pair">
       <Key tone="row" label={`‹ Server ${(nb?.[0] ?? slot) + 1}`} ariaLabel="Previous server" disabled={!nb} onPress={() => nb && onStep(nb[0])} />

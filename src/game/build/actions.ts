@@ -12,18 +12,20 @@ import {
 import { planAddRow, planAddUnit, planRemoveUnit } from './units';
 import { planInstallGpu } from './gpuPlans';
 import { planStartConfig } from './startCtl';
+import { planRamEcc } from './eccPlans';
 
 /** Part, unit, configuration, port, setting and research actions (architecture §4). Every handler re-plans and re-prices. */
 export const buildHandlers: HandlerMap = {
+  convertRamToEcc: (s, a) => commitPlan(s, planRamEcc(s, a.system)),
   installGpu: (s, a) => commitPlan(s, planInstallGpu(s, a.system, a.model, a.index)),
   upgradePart: (s, a) => commitPlan(s, planUpgrade(s, a.part)),
   upgradePartTo: (s, a) => commitPlan(s, planUpgradeTo(s, a.part, a.level)),
   upgradeAll: (s, a) => commitPlan(s, planUpgradeAll(s, a.system, a.kind, a.gen)),
   replacePart: (s, a) => {
     const part = readPart(s.build, a.part);
-    return commitPlan(s, part && isLadder(part.id) ? planReplaceLadder(s, a.part, a.generation) : planReplace(s, a.part, a.generation, a.preserveCapacity));
+    return commitPlan(s, part && isLadder(part.id) ? planReplaceLadder(s, a.part, a.generation) : planReplace(s, a.part, a.generation, a.preserveCapacity, a.minimumCapacity));
   },
-  replaceCpu: (s, a) => commitPlan(s, planReplaceCpu(s, a.system)),
+  replaceCpu: (s,a)=>commitPlan(s,planReplaceCpu(s,a.system)),
   addPart: (s, a) => commitPlan(s, planAdd(s, a.system, a.kind, a.generation, a.ecc ?? false)),
   removePart: (s, a) => commitPlan(s, planRemove(s, a.part)),
   addUnit: (s, a) => commitPlan(s, planAddUnit(s, a.parent, a.slot, a.source)),

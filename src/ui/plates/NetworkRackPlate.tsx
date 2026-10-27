@@ -26,21 +26,21 @@ export interface NetworkRackPlateProps extends PlateCommon {
 export function NetworkRackPlate({ room, zone, network, racks, lbQuotes, queueQuote, initialView = 'ports', initialPort = null,
   quotes, onAction, onResearch, researchName, ...frame }: NetworkRackPlateProps) {
   const [view, setView] = useState(initialView);
-  const sw = { kind: 'room', id: room } as const, az = `AZ ${zoneLetter(zone)}`;
+  const sw = { kind: 'room', id: room } as const, az = `Zone ${zoneLetter(zone)}`;
   if (view === 'lb') {
     const st = lbStatus(network.lb);
-    return <PlateFrame {...frame} title="Room load balancer" sub={`${az} · in the network rack`} className="lb netrack">
+    return <PlateFrame {...frame} title="Room load balancer" sub={az} className="lb netrack">
       <Status text={st.text} progress={st.progress} />
-      <Lines lines={lbLines(network.lb, 'rack')} slots={2} />
+      <Lines lines={lbLines(network.lb, 'rack')} slots={1} />
       <LbBody unit={{ kind: 'room', id: room }} view={network.lb} child="rack" quotes={lbQuotes} queueQuote={queueQuote}
         onAction={onAction} onResearch={onResearch} researchName={researchName} />
-      <div className="keys"><Key tone="go" label="Switch speed" onPress={() => setView('ports')} /></div>
+      <div className="keys"><Key tone="ghost" label="Back to ports" onPress={() => setView('ports')} /></div>
     </PlateFrame>;
   }
-  return <PlateFrame {...frame} title="Network rack" sub={`${az} · switch and LB`} className="switch netrack">
-    <Status text={`${hertz(speedOf(network.switch))} to every rack port · ${racks} racks`} />
+  return <PlateFrame {...frame} title="Network rack" sub={az} className="switch netrack">
+    <Status text={`${hertz(speedOf(network.switch))} to every rack port · ${racks} ${racks === 1 ? 'rack' : 'racks'}`} />
     <SwitchBody sw={sw} view={network.switch} selected={initialPort}
-      lead={<Key tone="go" label={`Load balancer · ${ROUTE_NAMES[network.lb.strategy].short}`} onPress={() => setView('lb')} />}
+      lead={<Key tone="ghost" label={`Load balancer · ${ROUTE_NAMES[network.lb.strategy].name}`} onPress={() => setView('lb')} />}
       quotes={quotes} onAction={onAction} onResearch={onResearch} researchName={researchName} />
   </PlateFrame>;
 }

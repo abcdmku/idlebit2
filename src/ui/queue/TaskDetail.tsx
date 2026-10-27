@@ -3,7 +3,7 @@
 // bottom of the world. Back and Escape close it (viewState 'back'). No task numbers (D22).
 import { FAMILIES, formatHertz, formatOps, type QueueEntryView } from '../../game';
 import { typeColor, typeName, typeOf, type Rect } from '../../render/core';
-import { CurrencyIcon } from '../Hud';
+import { CoinIcon, GemIcon } from '../plates/icons';
 import { useShellOffers } from '../deck/useOffers';
 import { actionable, WALL_ROWS, type Offer, type Offers } from '../deck/offers';
 import { offerAction, useTapOffer } from '../deck/offerUi';
@@ -24,13 +24,13 @@ export const keepUnits = (s: string): string => s.replace(/([0-9][kMGTPEZY]?) (?
 /** What the task needs, one plain line each: memory, GPU, shards, zones. */
 export function needLines(t: QueueEntryView): string[] {
   const out: string[] = [];
-  if (t.workingSetBits > 0) out.push(`${taskBits(t.workingSetBits)} working memory (cache, then RAM, then disk)`);
-  if (t.gpuCoresMin > 0 || t.stages.some(s => s.resource === 'gpu')) out.push(t.gpuCoresMin > 0 ? `A GPU with ${t.gpuCoresMin} cores` : t.tensor ? 'A GPU with tensor cores' : 'A GPU');
+  if (t.workingSetBits > 0) out.push(`${taskBits(t.workingSetBits)} memory`);
+  if (t.gpuCoresMin > 0 || t.stages.some(s => s.resource === 'gpu')) out.push(t.gpuCoresMin > 0 ? `GPU · ${t.gpuCoresMin} cores` : t.tensor ? 'Tensor GPU' : 'GPU');
   if (t.vramBits > 0) out.push(`${taskBits(t.vramBits)} VRAM`);
   if (t.ecc) out.push('ECC RAM');
-  if (t.members > 1) out.push(`${t.members} systems at once (it splits into shards)`);
-  if (t.minZones > 1) out.push(`Systems in ${t.minZones} zones`);
-  return (out.length ? out : ['Nothing beyond a free CPU']).map(keepUnits);
+  if (t.members > 1) out.push(`${t.members} systems`);
+  if (t.minZones > 1) out.push(`${t.minZones} zones`);
+  return (out.length ? out : ['CPU']).map(keepUnits);
 }
 
 /** "1,000 ops · lands in 1 s on 1 kHz": its work, and its input over the current first link. */
@@ -40,25 +40,22 @@ export function workLine(t: QueueEntryView): string {
   return keepUnits(`${work} · lands in ${transferText(t.transferS)} on ${formatHertz(t.work / t.transferS)}`);
 }
 
-/** Data a task pays: its Credits over the family's Data ratio (spec §9.8, D2.2). */
-export const dataOf = (t: QueueEntryView): number => {
-  const ratio = FAMILIES[t.family]?.dataRatio ?? 0;
-  return ratio > 0 ? Math.floor(t.work / ratio) : 0;
-};
+/** Whole Data contribution; fractions carry across tasks in the simulation's meter. */
+export const dataOf = (t: QueueEntryView): number => Math.floor(t.dataReward);
 
 /** How many online systems could run it at all (its fixed hardware, ignoring load). */
 export const capableText = (n: number): string =>
-  n === 0 ? 'none of your systems can run it' : `${n} of your systems can run it`;
+  n === 0 ? 'No system can run it' : `${n} of your systems can run it`;
 
 /** "Needs …" → "needs …", "Power supply down" → "power supply down"; "UPS down" keeps its capitals. */
 const lowerFirst = (s: string) => (/^[A-Z][a-z]/.test(s) ? s[0]!.toLowerCase() + s.slice(1) : s);
 
 /** Status in plain words. */
-export function statusLine(t: QueueEntryView, head: boolean, running: boolean): { text: string; tone: '' | 'warn' | 'mute' } {
-  if (!running) return { text: 'Starts after Return', tone: 'mute' };
+export function statusLine(t: QueueEntryView, running: boolean): { text: string; tone: '' | 'warn' | 'mute' } | null {
+  if (!running) return { text: 'Next round', tone: 'mute' };
   if (t.blockedBy) return { text: keepUnits(`Blocked: ${lowerFirst(blockedText(t) ?? '')}`), tone: 'warn' };
   if (t.committed) return { text: 'Waiting for a free system', tone: '' };
-  return { text: head ? 'Ready' : 'Ready when it reaches the front', tone: '' };
+  return null;
 }
 
 /**
@@ -88,7 +85,7 @@ export function fixFor(t: QueueEntryView, offers: Offers | null): Offer | null {
 /** The connected detail: null unless a card's task is open and still in the line. */
 export function TaskDetail() {
   const v = useViewState();
-  if (!v.task) return null;
+  if (!v.task || v.sheet) return null;
   return <OpenTask taskKey={v.task} />;
 }
 
@@ -101,40 +98,47 @@ function OpenTask({ taskKey: key }: { taskKey: string }) {
   }, shallowEqual, 250);
   // One line per missing component, each at its minimal level (the sim's meet quote).
   const meet = useMeet(f.t);
+  const primaryMeet = meet.find(q => !q.locked && q.affordable) ?? meet[0];
   // A task that left the line (taken, met or dismissed) closes its detail.
   if (!f.t) { queueMicrotask(() => { if (shell.view.getState().task === key) shell.view.dispatch({ type: 'back' }); }); return null; }
   const t = f.t, head = f.slot === 0, color = typeColor(typeOf(t.family));
   // The meet lines; when the sim has none for this gate (a link, zones), the Fix line's own rule.
   // A down power supply or a hot rack is a part to look at: its plate, not a row to buy (lead, 26 Oct).
   const point = pointFix(t.blockedBy);
-  const status = statusLine(t, head, f.running), fixes = t.blockedBy && !meet.length && !point ? fixLines(t, offers) : [];
+  const status = statusLine(t, f.running), fixes = t.blockedBy && !meet.length && !point ? fixLines(t, offers) : [];
+  const needs = needLines(t).filter((_, i) => !(i === 0 && t.workingSetBits > 0 && ['cache', 'ram', 'disk'].includes(t.blockedBy ?? '')));
   const card = f.slot === 0 ? L.headSlot : L.cards[f.slot - 1] ?? L.headSlot;
   const close = () => shell.view.dispatch({ type: 'back' });
   return <PlateFrame title={familyName(t.family)} sub={<span style={{ color }}>{typeName(typeOf(t.family))}</span>}
     className="task-detail" bounds={L.view} readAnchor={anchorOf(card)} tip onClose={close}
     head={<span className="td-ic"><TaskIcon task={t} n={L.N} /></span>}>
-    <p className="p-line muted td-note">{FAMILIES[t.family]?.note ?? ''}</p>
+    {status && <p className={`p-line td-status ${status.tone}`} data-testid="td-status">{status.text}</p>}
     <dl className="td-facts">
-      <dt>Work</dt><dd data-testid="td-work">{workLine(t)}</dd>
-      <dt>Needs</dt><dd data-testid="td-needs">{needLines(t).map(l => <span key={l}>{l}</span>)}</dd>
-      <dt>Pays</dt><dd data-testid="td-pays"><span className="gold"><CurrencyIcon kind="credits" n={L.N} />{wholeText(t.work)}</span>
-        {dataOf(t) > 0 && <span className="data"><CurrencyIcon kind="data" n={L.N} />{wholeText(dataOf(t))}</span>}</dd>
+      <dt>Pays</dt><dd data-testid="td-pays"><span className="gold"><CoinIcon />{wholeText(t.work)}</span>
+        {dataOf(t) > 0 && <span className="data" title="Whole Data contribution. Partial Data adds up across tasks."><GemIcon />{wholeText(dataOf(t))}</span>}</dd>
+      {needs.length > 0 && <><dt>Needs</dt><dd data-testid="td-needs">{needs.map(l => <span key={l}>{l}</span>)}</dd></>}
       {head && f.running && !t.committed && <><dt>Pickup</dt><dd><HeadClock blocked={t.blockedBy !== null} risk={false} /></dd></>}
       {head && f.running && t.committed && <><dt>Taken</dt><dd><InQueue task={t} /></dd></>}
     </dl>
-    <p className={`p-line td-status ${status.tone}`} data-testid="td-status">{status.text}
-      {t.blockedBy && <span className="mute" data-testid="td-capable"> · {capableText(t.capableSystems)}</span>}</p>
     {(t.blockedBy || (head && f.running && t.dismissible)) && <div className="keys">
       {/* One line per missing component or research; each buys every level it needs in one tap. */}
-      {meet.map((q, i) => <MeetKey key={i} quote={q} n={L.N} onAction={a => shell.dispatch(a)}
-        onResearch={id => shell.view.dispatch({ type: 'openResearch', project: id })} />)}
+      {primaryMeet && <MeetKey quote={primaryMeet} n={L.N} onAction={a => shell.dispatch(a)}
+        onResearch={id => shell.view.dispatch({ type: 'openResearch', project: id })} />}
       {fixes.map(o => <button key={o.key} type="button" className="key" data-qa-target data-testid="td-fix" disabled={!offerAction(o)} onClick={() => tap(o)}>
-        {fixLabel(o)}{o.right.kind !== 'research' && o.price !== null && <span className="pz"> <CurrencyIcon kind="credits" n={L.N} />{wholeText(o.price)}</span>}</button>)}
+        {fixLabel(o)}{o.right.kind !== 'research' && o.price !== null && <span className="pz"> <CoinIcon />{wholeText(o.price)}</span>}</button>)}
       {point && !meet.length && <button type="button" className="key" data-qa-target data-testid="td-point" onClick={() => pointAt(shell, point.kind)}>Open {point.name}</button>}
-      {t.blockedBy && !fixes.length && !meet.length && !point && <p className="key-slot">No upgrade here fixes it yet</p>}
+      {t.blockedBy && !fixes.length && !meet.length && !point && <p className="key-slot">No fix yet</p>}
+      {/* Every way to fix it is its own key here (R16: two taps from play), not behind Details. */}
+      {meet.filter(q => q !== primaryMeet).map((q, i) => <MeetKey key={i} quote={q} n={L.N} onAction={a => shell.dispatch(a)}
+        onResearch={id => shell.view.dispatch({ type: 'openResearch', project: id })} />)}
       {head && f.running && t.dismissible && <button type="button" className="key quiet" data-qa-target data-testid="td-dismiss"
-        onClick={() => { shell.dispatch({ type: 'dismissTask', task: t.task }); close(); }}>Dismiss <span className="mute">· No SLA cost</span></button>}
+        onClick={() => { shell.dispatch({ type: 'dismissTask', task: t.task }); close(); }}>Dismiss</button>}
     </div>}
+    <div className="task-notes" data-testid="td-details">
+      <p className="p-line muted td-note">{FAMILIES[t.family]?.note ?? ''}</p>
+      <p data-testid="td-work">{workLine(t)}</p>
+      <p className="mute" data-testid="td-capable">{capableText(t.capableSystems)}</p>
+    </div>
   </PlateFrame>;
 }
 

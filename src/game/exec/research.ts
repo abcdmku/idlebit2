@@ -24,13 +24,17 @@ export const researchesInMode = (mode: number): boolean => RESEARCH_MODE[mode] =
 
 /**
  * Research ops/s of system s at e = 1, plus busy cores for phys (sys.busy, R16). Pure read except
- * sys.busy. busyThreads already counts the threads held for research.
+ * sys.busy. Reservations persist through GPU, RAM and IO stages, but only CPU-stage
+ * threads and research consume core load power. Waiting for a device is not CPU work.
  */
 export function researchRateOf(w: World, s: number, _share: number): number {
   const c = w.compiled.sys, h = w.hot.sys;
   const threads = hwThreads(w, s);
-  h.busy[s] = threads > 0 ? (Math.min(threads, h.busyThreads[s]!) / threads) * c.cores[s]! : 0;
   const held = h.researchThreads[s]!;
+  let working = held;
+  const rec = w.hot.rec;
+  for (let r = h.head[s * 4]!; r >= 0; r = rec.next[r]!) working += rec.count[r]! * rec.threads[r]!;
+  h.busy[s] = threads > 0 ? (Math.min(threads, working) / threads) * c.cores[s]! : 0;
   if (held === 0 || RESEARCH_MODE[h.mode[s]!] !== 1) return 0;
   // QA-03: a holder that took research while every thread ran a task researches only on threads tasks have freed.
   const ready = Math.min(held, Math.max(0, threads - (h.busyThreads[s]! - held)));

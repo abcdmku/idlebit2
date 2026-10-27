@@ -1,3 +1,4 @@
+import { formatHertz } from '../format';
 import { planPowerPart } from './powerParts';
 import type { BoardPartKind } from '../types/actions';
 import { GENERAL_MAX_GPUS, MAX_ACCELS } from '../core/constants';
@@ -6,7 +7,7 @@ import type { PartRef, SystemId } from '../types/ids';
 import type { GameState, Unlocks } from '../types/state';
 import {
   capacity, ECC_PRICE_FACTOR, EXTRA_CORE_GROWTH, installPrice, isLadder, LADDERS, partName, PARTS, networkStepPrice,
-  scalePrice, upgradePrice, upgradesBetween, gpuModel, type LeveledPartId,
+  scalePrice, upgradePrice, upgradesBetween, gpuModel, ladderSpeed, type LeveledPartId,
 } from './catalog';
 import { ceilingLock, genLock, levelLock, maxLevel, ruleLock } from './locks';
 import { coldScope, cpuCount, readPart, withSpec, writePart, POWER_SLOTS } from './partAccess';
@@ -14,6 +15,31 @@ import { coldScopes, fail, locked, planned, type Plan } from './plan';
 import { cpuCores, cpuPrice, extraFactor } from './pricing';
 import { newestGen } from './research/unlocks';
 import { planGpuUpgrade } from './gpuPlans';
+
+export function planReplaceCpu(state: GameState, system: SystemId): Plan {
+  const spec = specOf(state, system);
+  const cpu = spec?.cpu;
+  if (!spec || !cpu) return fail('invalid', 'No CPU');
+  const u = state.research.unlocks;
+  const g = newestGen(u, 'cpu', PARTS.cpu.base.length);
+  const label = `Replace CPU · ${partName('cpu', g)}`;
+  if (g <= cpu.cpu.gen) return fail('invalid', 'Already the newest CPU', label);
+  const keep = (id: LeveledPartId, p: PartLevel): PartLevel | null => {
+    const row = PARTS[id];
+    const need = capacity(row, p.gen, p.level);
+    const top = maxLevel(u, id, g);
+    for (let level = 1; level <= top; level += 1) if (capacity(row, g, level) >= need) return { gen: g, level };
+    return null;
+  };
+  const cores = cpu.cores.map((c) => keep('core', c));
+  const l1 = keep('l1', cpu.l1);
+  const l2 = cpu.l2 ? keep('l2', cpu.l2) : null;
+  const l3 = cpu.l3 ? keep('l3', cpu.l3) : null;
+  if (cores.some((c) => !c) || !l1 || (cpu.l2 && !l2) || (cpu.l3 && !l3)) return fail('cap', 'A part would lose capacity', label);
+  const next: CpuBuild = { cpu: { gen: g, level: 1 }, cores: cores as PartLevel[], clock: { gen: g, level: 1 }, l1, l2, l3 };
+  const price = cpuPrice(next, 1) * BigInt(spec.cpuCount);
+  return planned({ build: withSpec(state.build, system, { ...spec, cpu: next }), price, cold: coldScopes(state, { kind: 'system', id: system }) }, label);
+}
 
 const specOf = (state: GameState, id: SystemId): SystemSpec | null => state.build.systems[id]?.spec ?? null;
 const eccOf = (state: GameState, ref: PartRef): boolean =>
@@ -47,7 +73,7 @@ export function planUpgrade(state: GameState, ref: PartRef): Plan {
     if (part.id === 'switch' || part.id === 'roomSwitch') return fail('invalid', 'Use the switch plate');
     const row = LADDERS[part.id];
     const k = part.level + 1;
-    const label = `${partName(part.id, part.gen)} · step ${k}`;
+    const label = `${partName(part.id, part.gen)} · ${formatHertz(ladderSpeed(k))}`;
     const price = networkStepPrice(row, part.level, false, zonesOf(state, ref));
     if (k > row.topK[part.gen]!) return locked({ code: 'ceiling', node: null, text: 'Max' }, label);
     const build = writePart(state.build, ref, part.gen, k)!;
@@ -90,7 +116,8 @@ export function planUpgradeTo(state: GameState, ref: PartRef, level: number): Pl
  * Cold replace with generation g (spec §12.4): L1, or with `preserveCapacity` the lowest native
  * level whose primary capacity holds the current one, priced as install plus the upgrades to it.
  */
-export function planReplace(state: GameState, ref: PartRef, g: number, preserveCapacity: boolean): Plan {
+export function planReplace(state: GameState, ref: PartRef, g: number, preserveCapacity: boolean, minimumCapacity = 0): Plan {
+  if (!Number.isFinite(minimumCapacity) || minimumCapacity < 0) return fail('invalid', 'Invalid capacity');
   if (POWER_SLOTS.includes(ref.slot.kind)) return planPowerPart(state, ref, g);
   const part = readPart(state.build, ref);
   if (!part) return fail('invalid', 'No such part');
@@ -104,11 +131,11 @@ export function planReplace(state: GameState, ref: PartRef, g: number, preserveC
   if (g <= part.gen || g >= row.base.length) return fail('invalid', 'Only a newer generation', label);
   const ecc = eccOf(state, ref);
   let level = 1;
-  if (preserveCapacity && row.curve !== 'fixed') {
-    const need = capacity(row, part.gen, part.level);
+  if ((preserveCapacity || minimumCapacity > 0) && row.curve !== 'fixed') {
+    const need = Math.max(minimumCapacity, preserveCapacity ? capacity(row, part.gen, part.level) : 0);
     const top = maxLevel(u, id, g, ecc);
     while (level <= top && capacity(row, g, level) < need) level += 1;
-    if (level > top) return fail('cap', `Can't hold ${need} at ${label}`, label);
+    if (level > top) return fail('cap', 'Too small even at max level', label);
   }
   const driven = drivenBy(state, ref);
   const price = scalePrice((installPrice(row, g) + upgradesBetween(row, g, 1, level, driven)) * BigInt(cpuCount(state.build, ref)), ecc ? ECC_PRICE_FACTOR : 1);
@@ -208,35 +235,5 @@ export function planUpgradeAll(state: GameState, system: SystemId, kind: 'ram' |
   }
   if (count === 0) return fail('invalid', 'Nothing of that generation');
   return planned({ build, price }, `Upgrade all ${count}`);
-}
-
-/**
- * Replace CPU (spec §12.4): every package, core, clock and cache to the newest researched CPU
- * generation; cores and caches at the lowest level that keeps their capacity, the clock at L1.
- * One cold change; price = the sum × CPU count.
- */
-export function planReplaceCpu(state: GameState, system: SystemId): Plan {
-  const spec = specOf(state, system);
-  const cpu = spec?.cpu;
-  if (!spec || !cpu) return fail('invalid', 'No CPU');
-  const u = state.research.unlocks;
-  const g = newestGen(u, 'cpu', PARTS.cpu.base.length);
-  const label = `Replace CPU · ${partName('cpu', g)}`;
-  if (g <= cpu.cpu.gen) return fail('invalid', 'Already the newest CPU', label);
-  const keep = (id: LeveledPartId, p: PartLevel): PartLevel | null => {
-    const row = PARTS[id];
-    const need = capacity(row, p.gen, p.level);
-    const top = maxLevel(u, id, g);
-    for (let level = 1; level <= top; level += 1) if (capacity(row, g, level) >= need) return { gen: g, level };
-    return null;
-  };
-  const cores = cpu.cores.map((c) => keep('core', c));
-  const l1 = keep('l1', cpu.l1);
-  const l2 = cpu.l2 ? keep('l2', cpu.l2) : null;
-  const l3 = cpu.l3 ? keep('l3', cpu.l3) : null;
-  if (cores.some((c) => !c) || !l1 || (cpu.l2 && !l2) || (cpu.l3 && !l3)) return fail('cap', 'A part would lose capacity', label);
-  const next: CpuBuild = { cpu: { gen: g, level: 1 }, cores: cores as PartLevel[], clock: { gen: g, level: 1 }, l1, l2, l3 };
-  const price = cpuPrice(next, 1) * BigInt(spec.cpuCount);
-  return planned({ build: withSpec(state.build, system, { ...spec, cpu: next }), price, cold: coldScopes(state, { kind: 'system', id: system }) }, label);
 }
 

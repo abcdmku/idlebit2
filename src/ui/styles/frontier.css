@@ -1,0 +1,58 @@
+/* D40: progress at round end (the report's reach bar) and the runway at the top of Research.
+   Built on the plate and research tokens: pixel edges (lit top, shaded bottom), gold for money and the fill. */
+
+/* the report: the reach, one bar over the bands, then what is next */
+.round-plate .rp-badge { margin-left: auto; align-self: center; padding: 0 8px; line-height: 20px; font-weight: 700;
+  background: var(--gold); color: var(--ink); box-shadow: inset 0 -2px #c4861c; }
+.round-plate .rp-reach { display: flex; align-items: baseline; gap: 8px; margin: 8px 0 0; }
+.v3-plate.round-plate .rp-big { font-size: var(--mid); line-height: 1; font-weight: 700; }
+.round-plate .mute { color: var(--muted); }
+
+/* The goal ruler: counts above their marks, an unbroken bevelled gold fill, thin seams where goals fall. */
+.rb { margin-top: 8px; }
+.rb-marks { position: relative; height: calc(var(--lh) + 8px); }
+.rb-mark { position: absolute; bottom: 8px; transform: translateX(-50%); white-space: nowrap; line-height: var(--lh); color: var(--muted); }
+.rb-mark.end { transform: translateX(-100%); }
+.rb-mark.on { color: var(--ok); font-weight: 600; }
+.rb-mark::after { content: ''; position: absolute; left: 50%; bottom: -8px; width: 2px; height: 4px; margin-left: -1px; background: currentColor; }
+.rb-mark.end::after { left: auto; right: 0; margin: 0; }
+.rb-bar { position: relative; height: 12px; margin: 0 4px 8px; background: #120d26; box-shadow: 0 0 0 2px #3a2f6e, 0 0 0 4px var(--ink); }
+.rb-fill { position: absolute; left: 0; top: 0; bottom: 0; background: var(--gold); box-shadow: inset 0 -3px #c4861c, inset 0 2px #fff1a6; }
+.rb-seam { position: absolute; top: 0; bottom: 0; width: 2px; margin-left: -1px; background: #2a2350; }
+.rb-seam.on { background: #c4861c; }
+
+.round-plate .rp-next { margin-top: 8px; }
+.v3-plate.round-plate .rp-next .v { color: var(--paper); text-align: right; }
+.round-plate .rp-next .gold { color: var(--gold); }
+.v3-plate.round-plate .rp-vs .v { color: var(--paper); display: inline-flex; align-items: center; gap: 4px; }
+.round-plate .rp-chg { margin-left: 8px; min-width: 56px; text-align: right; }
+.round-plate .rp-chg.ok { color: var(--ok); } .round-plate .rp-chg.bad { color: var(--fault-text); } .round-plate .rp-chg.mute { color: var(--muted); }
+
+/* the runway: research's own rows (.rw .lr), a chip per era, wallet rows whose meter shows the last three rounds */
+.runway { margin-bottom: 8px; }
+.runway .lp-rule { margin-top: 0; }
+.rn-eras { list-style: none; margin: 0 0 8px; padding: 0; display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.rn-eras li { padding: 0 8px; line-height: 24px; white-space: nowrap; color: var(--muted); background: var(--well); box-shadow: inset 0 0 0 2px var(--hi); }
+.rn-eras li.done { color: var(--data); box-shadow: inset 0 0 0 2px #2a8f68; }
+.rn-eras li.now { color: var(--ink); font-weight: 700; background: var(--gold); box-shadow: inset 0 -2px #c4861c; }
+.rn-eras li { max-width: 100%; box-sizing: border-box; white-space: normal; }
+.rn-nodes { font-variant-numeric: tabular-nums; color: var(--muted); font-weight: 400; }
+.rn-nodes > span { white-space: nowrap; }
+.rn-nodes > .done { color: var(--data); }
+.rn-eras li.now .rn-nodes { color: var(--ink); }
+.rn-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.rn-list .lr:disabled { cursor: default; }
+.rn-cost .lr-nm { gap: 8px; }
+.rn-track { position: absolute; left: 0; right: 0; bottom: 0; height: 8px; background: #1c1838; }
+.rn-track b { position: absolute; top: 0; bottom: 0; }
+.rn-fill { left: 0; }
+.rn-meter.rn-data .rn-fill { background: #1d6b4f; } .rn-meter.rn-credits .rn-fill { background: #8a5d14; }
+.rn-meter.rn-data .rn-block.s0 { background: #3ee0a0; } .rn-meter.rn-data .rn-block.s1 { background: #2fb784; } .rn-meter.rn-data .rn-block.s2 { background: #248f68; }
+.rn-meter.rn-credits .rn-block.s0 { background: #ffcc3d; } .rn-meter.rn-credits .rn-block.s1 { background: #dca22c; } .rn-meter.rn-credits .rn-block.s2 { background: #b07c1d; }
+.rn-block + .rn-block { box-shadow: inset -2px 0 #1c1838; }
+.rn-pace { margin: 0; padding: 8px 12px 0; color: var(--paper); }
+.lab.phone .rn-pace { padding: 8px 8px 0; }
+.runway .rn-pace + .lp-rule, .runway .rn-list + .lp-rule { margin-top: 8px; }
+.rn-gain { color: var(--data); }
+.rn-nodes { margin: -2px 0 8px; color: var(--paper); }
+.rn-nodes .done { color: var(--data); } .rn-nodes .next { color: var(--gold); font-weight: 600; }

@@ -71,10 +71,15 @@ export function snapScroll(offset: number, viewW: number): number {
   const base = viewW > 0 ? viewW / 2 - FOCUS.w / 2 : 0;
   return base + Math.round((offset - base) / ROW_PITCH) * ROW_PITCH;
 }
-/** The rack's rest art scale in `area`: the shell's N, or lower when the cabinet doesn't fit whole (A05). */
+/**
+ * The rack's rest art scale in `area`: the shell's N, or lower when the cabinet doesn't fit whole (A05), but
+ * never below the core's fixed rest minimum of 2 (frameRest): where even 2 crops the cabinet (a 320 px phone,
+ * a short landscape) the core pans the cabinet at 2, so the row's view width and drag scale must be read at 2.
+ */
 export function rackScale(area: RestArea): number {
+  const min = Math.min(2, area.scale);
   let n = area.scale;
-  while (n > 1 && (FOCUS.w * n > area.w || FOCUS.h * n > area.h)) n--;
+  while (n > min && (FOCUS.w * n > area.w || FOCUS.h * n > area.h)) n--;
   return n;
 }
 

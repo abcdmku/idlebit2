@@ -20,7 +20,7 @@ export function acceleratorView(state: GameState, system: number, slot: number, 
   const gpu = card.kind === 'gpu' ? installedGpuStats(card, state.research.unlocks) : undefined;
   return {
     slot, kind: card.kind, generation: gpu ? gpu.generation - 1 : card.kind === 'npu' ? card.gen : 0,
-    level: gpu ? gpu.upgrades + 1 : card.kind === 'npu' ? card.level : 1,
+    level: gpu ? gpu.tierIndex + 1 : card.kind === 'npu' ? card.level : 1,
     active: busy > 0, resourceBusy: busy, vramUsedBits,
     ...(card.kind === 'gpu' ? { unifiedSpillBits: unifiedSpill(state, system, linked ? POOL_DOMAIN : slot) } : {}),
     ...(gpu ? { gpu } : {}),

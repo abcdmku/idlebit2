@@ -104,6 +104,7 @@ Program §1 and v2 program §7 apply:
 - While `frame.paused`, draw steady power LEDs only. The core draws a light veil (`VEIL_ALPHA` 0.28) so the world stays readable for between-round choices.
 - No idle twinkles, breathing pulses, sheens or decorative blinks.
 
+
 ## Payouts
 
 Work pays on the component that ran it. Nothing flows out to the deck or the HUD; no level draws an output trace. Tasks still enter every level from the top, over the inbound pipe.

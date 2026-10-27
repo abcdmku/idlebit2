@@ -1,6 +1,6 @@
 // D34: the Cores plate sells the next core first (the deck's Cores row, so they always agree, A08):
 // "Add core · 2 → 3" with its price, "Max" at the cap (D39: cores are never research-locked). A core you
-// can't afford yet says how long the saving takes, so a tap never looks like nothing happened.
+// can't afford yet says "Saving up", so a tap never looks like nothing happened.
 import { useShellOffers } from '../deck/useOffers';
 import type { Offer } from '../deck/offers';
 import { useSavingUp } from '../deck/SavingUp';

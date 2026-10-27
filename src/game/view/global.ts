@@ -1,4 +1,5 @@
 import { viewPricePerJ } from '../core/constants';
+import { regionOpen } from '../build/units';
 import { G } from '../core/buffers';
 import { MAX_UPS, MAX_ZONES_PER_SITE, RACKS_PER_ROOM, REGIONS, TICK_MS } from '../core/constants';
 import { REGION_IDS } from '../types/catalog';
@@ -41,16 +42,15 @@ function zoneView(state: GameState, room: number, zone: number): ZoneView & { ho
 function siteView(state: GameState, regionIndex: number, site: number): SiteView {
   const region = REGIONS[regionIndex]!;
   if (site < 0) {
-    return { siteId: null, region: region.id, open: false, online: 'empty', zones: [], grid: null, dataPlane: null,
+    return { siteId: null, region: region.id, open: regionOpen(state.research.unlocks, region.id), online: 'empty', zones: [], grid: null, dataPlane: null,
       energyPrice: viewPricePerJ(region.energyPrice), outsideF: region.outsideF, hottestF: region.outsideF, timerS: null, powered: false, wakeMs: null, generation: null };
   }
   const b = state.build.sites[site]!;
   const c = state.compiled.site, h = state.hot.site;
   const zones: ZoneView[] = [];
   let hottest = region.outsideF, dpActive = false;
-  for (let z = 0; z < MAX_ZONES_PER_SITE; z += 1) {
+  for (let z = 0; z < Math.min(MAX_ZONES_PER_SITE, state.research.unlocks.ceilings.siteZones); z += 1) {
     const room = c.zones[site * MAX_ZONES_PER_SITE + z] ?? -1;
-    if (room < 0) continue;
     const { hottestF, ...zv } = zoneView(state, room, z);
     zones.push(zv);
     hottest = Math.max(hottest, hottestF);
@@ -68,6 +68,8 @@ function siteView(state: GameState, regionIndex: number, site: number): SiteView
     dataPlane: {
       generation: b.dataPlane.gen, bitsPerSec: c.dpSpeed[site] || ladderHz(b.dataPlane.k),
       latencyMs: (c.dpLatencyTicks[site] ?? 0) * TICK_MS, active: dpActive,
+      router: lbView(state, b.dataPlane.router, { kind: 2, id: site, strategy: c.dpStrategy[site] ?? 0,
+        filters: c.dpFilters[site] ?? 0, routed: h.lbRouted[site] ?? 0, last: h.lbLast[site] ?? -1 }),
     },
     energyPrice: viewPricePerJ(region.energyPrice), outsideF: region.outsideF, hottestF: hottest,
     ...sitePowerFields(state, site), generation: generationView(state, site),

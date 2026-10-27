@@ -65,7 +65,7 @@ export function systemSnapshot(state: GameState, id: SystemId, parent: NodeRef |
   const spec = state.build.systems[id]?.spec ?? null;
   const c = state.compiled.sys, h = state.hot.sys;
   const threads = c.threads[id] ?? 0;
-  const cpuBusy = threads > 0 ? Math.min(1, (h.busyThreads[id] ?? 0) / threads) : 0;
+  const cpuBusy = (c.cores[id] ?? 0) > 0 ? Math.min(1, (h.busy[id] ?? 0) / c.cores[id]!) : 0;
   const cpuCount = cpuCountOf(spec);
   const { cores, busyCores } = systemCoreActivity(state, id);
   const coresPerCpu = cpuCount > 0 ? cores / cpuCount : 0;

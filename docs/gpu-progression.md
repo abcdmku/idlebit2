@@ -1,6 +1,78 @@
 # GPU progression
 
-Accepted by the lead, 24 October 2026, with the Credit fees and boundaries below. These catalog, upgrade, energy and core-floor formulas are binding. Local arithmetic checks do not establish campaign balance. This file covers the latest GPU request only. The CPU remains cores, clock, cache and queue. No CPU rule, view or implementation changes belong to this work.
+Current contract adopted 26 October 2026 from the Opus upgrade-experience decision, following the user's generation/type/tier direction. This replaces the native-model-plus-hot-push progression. The older design is retained below as history. CPU and RAM keep their existing 36-level ladders.
+
+## Current generation, type and tier ladder
+
+A card is one stable item: generation 1–9, a type, and a tier. Its saved build is `GpuBuild { kind: 'gpu', model: GpuModelId }`. The validated four-digit model contains generation, type and tier; no evaluated stats or separate push count are saved.
+
+| Type digit | Role |
+|---|---|
+| 3 | Cores |
+| 5 | VRAM |
+| 7 | Clock and efficiency |
+| 9 | All |
+
+Tiers are **30 → 50 → 60 → 70 → 80 → 90**. `3350` means generation 3, core type, tier 50.
+
+- **Tier up** changes the card in place to the next rung. It is hot and preserves running work. Cores and VRAM double, clock rises, and efficiency improves. Tier 90 is the top.
+- **Generation replacement** keeps type and tier, for example `1390 → 2390`. It is cold under the existing system restart/work-loss rules. Cores double, VRAM rises 16× and ordinary work rises 20×. Native energy efficiency retains its era tradeoff; it is not promised to improve at an era boundary.
+- **An empty bay** offers one tier-30 card per type in the newest researched generation the wallet covers, or the newest if none is affordable. Existing requirement/fix quotes may directly install a researched higher tier. Generation research controls availability.
+- **Type changes** at the same generation and tier are cold replaces. Pay any rise in card value, charge nothing for equal value, and never refund a fall. NPU remains a separate accelerator kind.
+
+The u0–5 push, its efficiency penalty and the full model-picker matrix are removed. Upgrading a card no longer throws away earlier tier purchases.
+
+### Native specifications
+
+For tier index `k = 0..5`, use `a = 2^k`. Core/VRAM/clock type multipliers are respectively `4/1/1` for type 3, `1/4/1` for type 5, `1/1/2` for type 7 and `4/4/2` for type 9.
+
+```text
+cores   = 2^(g-1) × coreType × a
+VRAM    = 2^(13 + 4(g-1)) × vramType × a × vramMultiplier
+clockHz = 10^(g+2) × clockType × (10+k)/10
+ops/s   = cores × clockHz
+```
+
+Ordinary and tensor execution, same-pool requirements, lifetime VRAM holds and GPU/NPU isolation retain the contracts in `gpu-runtime.md`. Research remains CPU-only. Catalog evaluation applies technology multipliers once.
+
+### Exact value and upgrade prices
+
+Generation 1 has base value 1,000,000 Credits. Later bases are `4,000,000 × 10^(g-1)`. Type 9 multiplies value by 4; the other types use 1. Tier value multipliers are `1, 3, 7, 16, 36, 80`.
+
+With `n` other GPUs, exclude NPUs and the target card, and let `e = max(0, n-1)`:
+
+```text
+V(model, n) = ceil(nativeValue(model) × 5^e / 4^e)
+install    = V(model, n)
+tier step  = V(nextTier, n) - V(current, n)
+generation = V(newGenerationSameTypeAndTier, n) - V(current, n)
+```
+
+Subtract the already-rounded whole card values. Rounding each incremental difference separately would charge extra Credits across the ladder. At a fixed other-card count, stepping from tier 30 to a target tier costs exactly the same as installing that target directly. All arithmetic uses bigint and `Amount`, never float currency. Configuration copies pay the current model's install value at each position; no obsolete push surcharge remains.
+
+### Energy
+
+There is no push exponent. Let `era = floor((g-1)/3)` and type energy factor be `0.88` for type 9, `0.96` for type 7, otherwise `1`:
+
+```text
+coefficient = 18 × [1,2,3][era] × typeEnergy × 100/(100+k)
+loadW       = coefficient × ops/s
+idleHalf    = 0.05 × coefficient × ops/s
+idleW       = idleHalf × (1 + hbmIdleFactor)
+```
+
+These are simulation watts. D36's view scale applies at the presentation boundary. Native flagship gross-to-energy targets remain approximately 6/3/2 by era at the home reference price. Tier steps improve energy per operation; supply and cooling still have to support the higher full-load draw.
+
+### Presentation and saves
+
+The plate leads with the installed generation, type, tier and actual duty. It exposes the next tier and generation with exact prices and consequences, rather than a catalog of model combinations. The board art has one chip per tier, 1–6, with lit chips derived from real execution duty. Runtime state must not be replaced with decorative processing.
+
+Version 18 introduced the GPU fold; current version 19 also adds the skip-state migration. Version 17 cards and saved configurations migrate as follows: old tier index `k` plus push count `u` becomes `min(5, k+u)`. Cores and VRAM are preserved when `k+u ≤ 5`; clocks change to the tier formula, and excess pushes above tier 90 are lost. This is a pre-live rules migration, not a claim of unchanged hardware performance. Compiled stats are rebuilt and in-flight accelerator work is reconciled. Wallets and the rest of the fleet are not reset.
+
+Acceptance includes all-model monotonic tier gains, exact path-independent prices at every legal install position, hot-work continuity, cold generation replacement, save/config migration, delta invariance and per-card accounting. Local catalog checks do not establish campaign balance or player gratification. The measured reward-loop problems and subsequent slices are recorded in `upgrade-experience.md`.
+
+<details>
+<summary>Historical 24 October design, superseded where it conflicts with the current contract</summary>
 
 ## Superseded baseline
 
@@ -249,3 +321,5 @@ The lead adopted the series-7 energy coefficient, nine-generation catalog, same-
 Native 1330 has 125 times the old first GPU's rate and 128 times its VRAM at the same 4,000,000-Credit price. That changes both task and research capacity. Existing milestone targets need fresh legal campaign evidence, including exact research fees, purchases, research energy, supplies and cooling. Require per-card progress, occupancy and draw evidence, plus executor/performance checks at 6,912 systems with eight-device boards. Neither the local arithmetic checks nor the old homogeneous market model proves campaign balance.
 
 The CPU/RAM specialized curves and hardware-ratio power requirements in `hardware-progression.md` remain binding. This GPU wave does not implement CPU/RAM runtime changes or route those parts back through generic flow math.
+
+</details>

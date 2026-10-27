@@ -1,5 +1,5 @@
 import { advanceGameOwned, createInitialState, researchId, TICK_MS, type FailCause, type GameState, type RoundReport } from '../index';
-import { decide, type BotEvent } from './bot';
+import { decide, type BotEvent, type BotNeeds } from './bot';
 import { POLICIES, type PolicyId } from './policies';
 
 /**
@@ -22,6 +22,10 @@ export interface Milestones {
   readonly roomS: number | null;
   readonly dataCenterS: number | null;
   readonly regionsS: number | null;
+  /** Actual additional infrastructure, separate from research unlocks. */
+  readonly secondRackS: number | null;
+  readonly additionalZoneS: number | null;
+  readonly secondSiteS: number | null;
   readonly firstGpuS: number | null;
   readonly gpuGen2StartedS: number | null;
   readonly gpuGen2CompletedS: number | null;
@@ -31,12 +35,15 @@ type MutableMilestones = { -readonly [K in keyof Milestones]: number | null };
 export const NO_MILESTONES: Milestones = {
   firstPurchaseS: null, firstDataS: null, firstRoundEndS: null, systemS: null, rackS: null, roomS: null, dataCenterS: null, regionsS: null,
   firstGpuS: null, gpuGen2StartedS: null, gpuGen2CompletedS: null,
+  secondRackS: null, additionalZoneS: null, secondSiteS: null,
 };
 
 /** What a stage hands the next one besides the saved game (D21 chaining). Small and bounded. */
 export interface CampaignCarry {
+  /** Visible hardware requirements remembered until a between-round cold fix can be bought. */
+  readonly needs?: Readonly<BotNeeds>;
   readonly milestones: Milestones;
-  /** The bot's memory: research started since the last milestone (its off-path budget). */
+  /** Research budget memory and the last CPU purchase still awaiting a complete paid round. */
   readonly research: readonly BotEvent[];
   readonly wait: number;
   /** Ticks left before the next decision, so a chained run replays the unchained one exactly. */
@@ -71,6 +78,7 @@ export interface RoundSummary {
   readonly startS: number;
   readonly lengthS: number;
   readonly met: number;
+  readonly dismissed: number;
   readonly failed: number;
   readonly topCause: FailCause | null;
   readonly topDetail: string | null;
@@ -112,11 +120,12 @@ const MILESTONE_RESEARCH = new Set(['systemBoard', 'fabKhz', 'rack', 'fabMhz', '
 
 function fleetRates(state: GameState): { computeOps: number; pipe: number } {
   const c = state.compiled.sys;
-  let computeOps = 0, pipe = 0;
+  let computeOps = 0;
+  let pipe = 0;
   for (let s = 0; s < c.len; s += 1) {
     if (c.alive[s] !== 1) continue;
     computeOps += (c.threadRate[s] ?? 0) * (c.threads[s] ?? 0) * (c.etaCfg[s] ?? 1);
-    pipe = Math.max(pipe, c.pipeSpeed[s] ?? 0);
+    pipe = Math.max(pipe, Number.isFinite(c.pipeSpeed[s]) ? c.pipeSpeed[s] ?? 0 : 0);
   }
   return { computeOps, pipe };
 }
@@ -128,7 +137,7 @@ function summarize(r: RoundReport, state: GameState): RoundSummary {
   const topCause = top ? top[0] : null;
   return {
     index: r.index, startS: seconds(r.startTick), lengthS: seconds(r.durationTicks),
-    met: r.met, failed, topCause, topDetail: topCause ? r.failDetail[topCause] : null,
+    met: r.met, dismissed: r.dismissed, failed, topCause, topDetail: topCause ? r.failDetail[topCause] : null,
     peakIntensity: r.peakIntensity, gross: r.gross, energy: r.energy, data: r.data,
     systems: state.build.systems.filter((x) => x !== null).length, racks: state.build.racks.filter((x) => x?.opened).length,
     late: r.failedByCause.late, diskShare: r.deliveredWork > 0 ? r.spill.diskWork / r.deliveredWork : 0,
@@ -147,8 +156,9 @@ export function runCampaign(options: CampaignOptions = {}): CampaignResult {
   // The bot reads its log only for research since the last milestone; a stage starts from that memory.
   const memory = carry?.research.length ?? 0;
   const events: BotEvent[] = [...(carry?.research ?? [])];
+  const needs: BotNeeds = { ...carry?.needs };
   const rounds: RoundSummary[] = [];
-  const at: MutableMilestones = { ...(carry?.milestones ?? NO_MILESTONES) };
+  const at: MutableMilestones = { ...NO_MILESTONES, ...carry?.milestones };
   const wallMs: Partial<Record<keyof Milestones | 'end', number>> = {};
   const t0 = options.clock?.() ?? 0;
   const mark = (key: keyof Milestones, tick: number, reached: boolean) => {
@@ -161,13 +171,21 @@ export function runCampaign(options: CampaignOptions = {}): CampaignResult {
   while (state.clock.tick < ticks) {
     if (left === 0) {
       const before = events.length;
-      state = decide(state, policy, events);
+      const previous = state;
+      const lastRound = state.round.reports.at(-1)?.index ?? -1;
+      state = decide(state, policy, events, needs);
+      // Player-ended rounds are produced by actions, outside the following advance report.
+      for (const r of state.round.reports) {
+        if (r.index <= lastRound) continue;
+        rounds.push(summarize(r, state));
+        mark('firstRoundEndS', r.startTick + r.durationTicks, true);
+      }
       decisions += 1;
       const fresh = events.slice(before);
       if (fresh.some((e) => e.kind === 'buy')) mark('firstPurchaseS', state.clock.tick, true);
       mark('firstGpuS', state.clock.tick, state.build.systems.some((s) => s?.spec.accels.some((a) => a.kind === 'gpu')));
       mark('gpuGen2StartedS', state.clock.tick, fresh.some((e) => e.kind === 'research' && e.label === 'gpuGen2'));
-      wait = fresh.length > 0 ? policy.cadenceTicks : Math.min(capTicks(state.clock.tick, policy.cadenceTicks), wait * 2);
+      wait = fresh.length > 0 || state !== previous ? policy.cadenceTicks : Math.min(capTicks(state.clock.tick, policy.cadenceTicks), wait * 2);
       left = wait;
     }
     while (left > 0 && state.clock.tick < ticks) {
@@ -193,14 +211,18 @@ export function runCampaign(options: CampaignOptions = {}): CampaignResult {
     mark('roomS', now, levels.room);
     mark('dataCenterS', now, done.includes(DATA_CENTER));
     mark('regionsS', now, done.includes(REGIONS_NODE));
+    mark('secondRackS', now, state.build.racks.filter(r => r?.opened).length >= 2);
+    mark('additionalZoneS', now, state.build.rooms.filter(r => r?.opened).length >= 2);
+    mark('secondSiteS', now, state.build.sites.filter(s => s?.opened).length >= 2);
     mark('gpuGen2CompletedS', now, done.includes(researchId('gpuGen2')));
     if (options.until?.(state)) break;
   }
   if (options.clock) wallMs.end = options.clock() - t0;
   const lastMilestone = events.reduce((last, e, i) => (e.kind === 'research' && MILESTONE_RESEARCH.has(e.label) ? i : last), -1);
+  const pendingCapacity = events.reduce<BotEvent | undefined>((last, e) => e.researchCapacityAdded && (state.round.reports.at(-1)?.startTick ?? -1) < e.tick ? e : last, undefined);
   return {
     ticks: state.clock.tick, startTick, seed, policy: policy.id, milestones: at, rounds, events: events.slice(memory), wallMs, decisions, state,
-    carry: { milestones: at, research: events.slice(lastMilestone + 1).filter((e) => e.kind === 'research'), wait, left, decisions },
+    carry: { milestones: at, research: [...events.slice(lastMilestone + 1).filter((e) => e.kind === 'research'), ...(pendingCapacity ? [pendingCapacity] : [])], wait, left, decisions, needs },
     final: {
       credits: state.wallet.credits, data: state.wallet.data, completed: state.research.completed.length,
       systems: state.build.systems.filter((s) => s !== null).length,

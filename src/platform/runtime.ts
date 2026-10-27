@@ -130,7 +130,12 @@ export function createRuntime(store: RuntimeStore, options: RuntimeOptions = {})
       if (!interrupted && sinceCheckpoint === 0) representedAt += skipMs;
     } catch (error) {
       if (disposed) return;
-      if ((error as Error)?.name !== 'AbortError') store.setNotice('Catch-up stopped. Progress is saved.');
+      if ((error as Error)?.name !== 'AbortError') {
+        // A terminal runner error must not retry the same failing absence in
+        // returnFromAway's visible-lag loop. Keep the last confirmed state.
+        representedAt = wallNow();
+        store.setNotice('Offline recovery stopped. Unprocessed time skipped.');
+      }
       interrupted = true;
     }
     catching = false;

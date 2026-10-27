@@ -12,7 +12,7 @@ export const headDeadlineTick = (headTick: number) => headTick + HEAD_TICKS - 1;
 /** The visible window of the endless queue, head first (spec §5.2). */
 export const QUEUE_VISIBLE = 5;
 
-/** One boot time (D1.8), at base. fastBoot lowers it to 5 s, then 2 s. */
+/** Base boot latency; Boot loader levels lower it. */
 export const BOOT_TICKS_BASE = secondsToTicks(10);
 export const OVERLOAD_FAIL_TICKS = secondsToTicks(10);
 export const CRASH_TICKS = secondsToTicks(10);
@@ -22,7 +22,6 @@ export const FLOOR_TEMP_F = 50;
 export const HOME_TEMP_F = 70;
 /** A lump within this of its equilibrium snaps to it (spec §10.5), enabling the quiescent skip. */
 export const SETTLE_EPS_F = 0.05;
-export const HEALTH_WINDOW_TICKS = secondsToTicks(60);
 /** The market's per-tick rate ring: 10 s (takes per second, spec §16.2). */
 export const RATE_RING_TICKS = secondsToTicks(10);
 export const AUTO_RETURN_DELAY_TICKS = secondsToTicks(120);
@@ -80,11 +79,8 @@ export const GATHER_WAIT_TICKS = secondsToTicks(10);
 /** D25 checkpointing: a lost shard's replacement must be picked up within this many ticks (10 s). */
 export const CHECKPOINT_TICKS = secondsToTicks(10);
 export const MAX_UPS = 2;
-// The System-era bands (ram, gpu, storage) open at I 11.5–13.2 alongside threads and ints: 15 overlap there.
-export const MAX_ACTIVE_FAMILIES = 15;
 /** Catalog bound for per-family tallies. */
-export const MAX_FAMILIES = 64;
-export const MAX_SYSTEMS = MAX_SITES * MAX_ZONES_PER_SITE * RACKS_PER_ROOM * SERVERS_PER_RACK; // 6,912
+export const MAX_FAMILIES = 64; // 6,912
 
 /**
  * Ceilings at the start (spec §12.2) and at the architecture caps ("archCap"). D39: research never raises a part
@@ -101,9 +97,6 @@ export const CEILINGS_MAX: Readonly<Record<CeilingId, number>> = {
   gpuSlots: 2, driveSlots: 4, rackPorts: MAX_RACK_PORTS, roomPorts: MAX_ROOM_PORTS, uplinks: MAX_UPLINKS, researchQueue: 3,
   roomRows: MAX_ROWS, siteZones: MAX_ZONES_PER_SITE, sites: MAX_SITES, regions: MAX_SITES,
 };
-
-/* ---------- Economy ---------- */
-export const CREDITS_PER_WORK_UNIT = 1;
 export const ROUND_REPORTS_KEPT = 20;
 export const NET_WINDOW_TICKS = secondsToTicks(60);
 /** Queued tasks a system snapshot samples. */
@@ -136,4 +129,4 @@ export const viewW = (simW: number): number => simW * POWER_SCALE;
 export const viewPricePerJ = (simPrice: number): number => simPrice / POWER_SCALE;
 
 /** Player-facing level names. The id `chip` stays in code; the player sees "CPU" (D7.1). */
-export const LEVEL_NAMES = { chip: 'CPU', system: 'System', rack: 'Rack', room: 'Room', global: 'Global' } as const;
+export const LEVEL_NAMES = { chip: 'CPU', system: 'System', rack: 'Rack', room: 'Room', global: 'World' } as const;

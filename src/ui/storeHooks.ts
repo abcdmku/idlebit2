@@ -99,14 +99,16 @@ export function useViewState(): ViewState {
   return useSyncExternalStore(view.subscribe, view.getState, view.getState);
 }
 
-/** Quotes refresh for funds, round downtime and research unlocks, at most 2 Hz. */
+/** Paid changes and free build settings both invalidate the quote cache. */
 export function useQuote(request: QuoteRequest | null): QuoteResult | null {
   const shell = useShell();
+  const readRevision = useCallback(() => shell.store.getState().build.revision, [shell]);
+  const revision = useSyncExternalStore(shell.store.subscribe, readRevision, readRevision);
   const wallet = useGameSelector(s => `${s.hud.credits}|${s.hud.data}|${s.epoch}|${s.round.state}|${s.research.active}|${s.research.queued}|${s.bootMs}`, Object.is, 500);
   const key = request ? JSON.stringify(request) : '';
   return useMemo(() => (request ? shell.quote(request) : null),
     // eslint-disable-next-line react-hooks/exhaustive-deps -- `key` is the request's value identity
-    [shell, key, wallet]);
+    [shell, key, wallet, revision]);
 }
 
 export interface PlatformStatus { readonly notice: string | null; readonly catchingUp: boolean; readonly progress: number | null }

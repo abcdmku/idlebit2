@@ -46,8 +46,7 @@ export function OnlineRow({ mode, timerS, bootS = 10, added, market, onToggle }:
   const label = marketKey(market);
   return <div className="p-online" data-state={state} data-market={market.on ? 'on' : 'off'}>
     <span className="sw-t"><b>{WORDS[state]}{moving && timerS !== null ? ` · ${Math.ceil(left)} s` : ''}</b>
-      <span className="sw-pips" aria-hidden="true">{Array.from({ length: 10 }, (_, i) => <i key={i} className={i < lit ? 'on' : ''} />)}</span></span>
-    <span className="sw-s">{state === 'crashed' ? 'Reboots on its own' : marketLine(market)}</span>
+      {moving ? <span className="sw-pips" aria-hidden="true">{Array.from({ length: 10 }, (_, i) => <i key={i} className={i < lit ? 'on' : ''} />)}</span> : <span className="sw-s">{state === 'crashed' ? 'Reboots on its own' : marketLine(market)}</span>}</span>
     <button type="button" className="mk" aria-pressed={market.on} data-qa-target disabled={state === 'cold' || state === 'crashed'}
       aria-label={`${label}, tap to ${market.on ? 'take it off' : 'put it on'}`}
       onClick={(e) => { e.stopPropagation(); onToggle(!market.on); }}>{label}</button>

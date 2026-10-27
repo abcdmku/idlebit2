@@ -11,13 +11,6 @@ import { timersPending } from './timers';
 import { newTouchLog, retireTouchLog } from './touch';
 import { commitWorld, openWorld, toAmount, type World } from './world';
 
-export interface AdvanceOptions {
-  /** Test hook: disable the quiescent skip to prove it changes nothing. */
-  readonly skipQuiescent?: boolean;
-  /** Test hook: visit every rack in the run phase to prove the rack skip changes nothing. */
-  readonly visitAll?: boolean;
-}
-
 /** Vite sets this; Node scripts (bench, probes) run as production. */
 const DEV = import.meta.env?.DEV === true;
 const CONSUMED = 'advanceGameOwned: this state was consumed by an owned advance; use the returned state';
@@ -61,8 +54,8 @@ export const nextWakeTick = (w: World): number => w.round.autoReturnTick ?? Infi
  * TICK_MS) identical ticks and keeps the remainder, so advance(a + b) ≡ advance(b) ∘ advance(a).
  * Pure: `state` is left unchanged. The reference for advanceGameOwned.
  */
-export function advanceGame(state: GameState, elapsedMs: number, options: AdvanceOptions = {}): AdvanceResult {
-  return advance(state, elapsedMs, false, options);
+export function advanceGame(state: GameState, elapsedMs: number): AdvanceResult {
+  return advance(state, elapsedMs, false);
 }
 
 /**
@@ -70,13 +63,13 @@ export function advanceGame(state: GameState, elapsedMs: number, options: Advanc
  * instead of copying them, and returns the same result advanceGame would. `state` is consumed;
  * in DEV builds any later read of it throws.
  */
-export function advanceGameOwned(state: GameState, elapsedMs: number, options: AdvanceOptions = {}): AdvanceResult {
-  const result = advance(state, elapsedMs, true, options);
+export function advanceGameOwned(state: GameState, elapsedMs: number): AdvanceResult {
+  const result = advance(state, elapsedMs, true);
   if (DEV) consume(state);
   return result;
 }
 
-function advance(state: GameState, elapsedMs: number, owned: boolean, options: AdvanceOptions): AdvanceResult {
+function advance(state: GameState, elapsedMs: number, owned: boolean): AdvanceResult {
   if (!Number.isSafeInteger(elapsedMs) || elapsedMs < 0) {
     throw new RangeError(`advanceGame: elapsedMs must be a non-negative safe integer, got ${elapsedMs}`);
   }
@@ -86,12 +79,10 @@ function advance(state: GameState, elapsedMs: number, owned: boolean, options: A
   if (ticks === 0) return { state: { ...state, clock: { tick: state.clock.tick, carryMs } }, report: emptyReport() };
 
   const w = openWorld(state, owned);
-  if (options.visitAll) w.visitAll = true;
   w.touch = newTouchLog();
   const target = state.clock.tick + ticks;
-  const skip = options.skipQuiescent ?? true;
   while (w.tick < target) {
-    if (skip && isQuiescent(w)) {
+    if (isQuiescent(w)) {
       const wake = nextWakeTick(w);
       if (wake > w.tick) { w.tick = Math.min(target, wake); continue; }
     }

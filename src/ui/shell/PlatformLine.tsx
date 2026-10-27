@@ -1,19 +1,18 @@
-// One reserved line at the bottom-left of the free world, clear of the pipe that runs along its top
-// (it overlays the world, so nothing moves):
-// save notices and offline catch-up first, then the failure ticker (A11, spec §4.2: each failure
-// with its cause as it happens) and the round start (A16).
+// One reserved line in the head card's notice row (below the fix key, left of Dismiss): save notices and
+// offline catch-up first, then the failure ticker (A11, spec §4.2) and the round start (A16).
 import { useEffect, useRef, useState } from 'react';
 import type { FailCause, FailDetail, FamilyId, RenderSnapshot } from '../../game';
 import { causeLine, familyName } from '../hooks/feedModel';
 import { useGameSelector, usePlatformStatus, useShell } from '../storeHooks';
 import { restartKey, restartOf, restartText } from '../queue/restart';
 import { useLayout } from './geometry';
+import { nowRows } from '../layout';
 import { useNewVersion } from './version';
 import { IS_SANDBOX } from './sandbox';
 
 const FAIL_MS = 3000, ROUND_MS = 2000;
 
-interface Flash { readonly text: string; readonly tone: 'bad' | 'cyan' }
+interface Flash { readonly text: string; readonly tone: 'bad' | 'warn' | 'cyan' }
 export interface FailureNote { readonly family: FamilyId; readonly cause: FailCause; readonly detail: FailDetail | null }
 /** How far the ticker has read: the failure stream and the event ring have separate sequences. */
 export interface Seen { readonly failure: number; readonly event: number }
@@ -39,9 +38,9 @@ export function newsSince(s: RenderSnapshot, seen: Seen): News {
   return { failure, round, seen: { failure: f, event: ev } };
 }
 
-/** "✕ AND Mask · Can't run · cache". */
+/** "✕ Can't run · cache · AND Mask": the cause first (R17), so a narrow line that cuts it short cuts only the name. */
 export function failureText(f: FailureNote): string {
-  return `✕ ${familyName(f.family)} · ${causeLine(f.cause, f.detail)}`;
+  return `✕ ${causeLine(f.cause, f.detail)} · ${familyName(f.family)}`;
 }
 
 function useFlash(): Flash | null {
@@ -57,7 +56,7 @@ function useFlash(): Flash | null {
       const news = newsSince(store.getSnapshot(), seen.current!);
       seen.current = news.seen;
       if (news.failure) show({ text: failureText(news.failure), tone: 'bad' }, FAIL_MS);
-      else if (news.round !== null) show({ text: `Round ${news.round} · SLA reset`, tone: 'cyan' }, ROUND_MS);
+      else if (news.round !== null) show({ text: `Round ${news.round}`, tone: 'cyan' }, ROUND_MS);
     });
     return () => { stop(); clearTimeout(timer); };
   }, [store]);
@@ -89,16 +88,18 @@ export function PlatformLine({ saveNow }: { saveNow?: () => void } = {}) {
   const restart = useGameSelector(restartOf, (a, b) => restartKey(a) === restartKey(b), 250);
   const status = p.catchingUp ? `Catching up${p.progress === null ? '' : ` · ${p.progress}%`}` : notice ?? (restart.on ? restartText(restart) : null);
   const text = status ?? flash?.text ?? (IS_SANDBOX ? 'Sandbox · wallet refills' : null);
+  const world = L.view;
   // A newer build is deployed: a quiet, stable banner in the same place, with a 48 px Reload that saves first.
   if (newer) return <div className="platform-line version" role="status" data-testid="new-version"
-    style={{ left: L.view.x + L.lat, top: L.view.y + L.view.h - L.lat - 48, maxWidth: L.view.w - 2 * L.lat, height: 48 }}>
+    style={{ left: world.x + L.lat, top: world.y + world.h - L.lat - 48, maxWidth: world.w - 2 * L.lat, height: 48 }}>
     <span>New version available</span>
     <button type="button" className="skey" data-qa-target style={{ position: 'relative', width: 96, height: 48 }}
       onClick={() => { saveNow?.(); window.location.reload(); }}>Reload</button>
   </div>;
-  // The notice line sits in the head card's free fourth line, out of the world: payout pops draw on top of
-  // everything in the world, and only menus may cover them (user, 26 Oct).
-  const d = L.kind === 'desktop', tx = d ? L.lat + 16 * L.N + 8 : 8, y = d ? L.lat + 3 * L.lh : 64;
+  // The notice line sits in the head card's reserved notice row, out of the world: payout pops draw on top of
+  // everything in the world, and only menus may cover them (user, 26 Oct). It stays left of Dismiss and under the
+  // fix key, so a failure never covers either (R16). Its row is below Dismiss, so it takes the card's full width (R17).
+  const d = L.kind === 'desktop', tx = d ? L.lat + 16 * L.N + 8 : 8;
   return <p className={`platform-line${status ? '' : ` ${flash?.tone ?? ''}`}`} role="status" hidden={!text} data-testid="platform-line"
-    style={{ left: L.now.x + tx, top: L.now.y + y, maxWidth: L.now.w - tx - 8, height: L.lh }}>{text}</p>;
+    style={{ left: L.now.x + tx, top: L.now.y + nowRows(L).notice, maxWidth: L.now.w - tx - 8, height: L.lh }}>{text}</p>;
 }

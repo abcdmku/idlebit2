@@ -8,9 +8,10 @@ import { isAdd, tapAdd } from './addTap';
 type Shell = Pick<ShellContextValue, 'view' | 'store' | 'dispatch' | 'quote'>;
 
 /**
- * One tap (user, 26 Oct): a thing with its own view (the CPU in a system, a sled in a rack, a rack in a room,
- * a room or site on the map) zooms into it; anything else opens its whole detail with its keys, its plate
- * where it has one, else its callout. The same part again closes it; another swaps; empty space closes.
+ * One tap (user, 26 Oct): a unit with its own view (a sled in a rack, a rack in a room, a room or site on the
+ * map) zooms into it; anything else opens its whole detail with its keys, its plate where it has one, else its
+ * callout. A board CPU opens its component plate.
+ * The same other part again closes it; another swaps; empty space clears the selection.
  */
 export function activateTarget(shell: Shell, hit: HitTarget | null): void {
   if (!hit || shell.view.getState().selectedId === hit.id) { shell.view.dispatch({ type: 'cancel' }); return; }

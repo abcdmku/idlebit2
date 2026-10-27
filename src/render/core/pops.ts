@@ -8,7 +8,7 @@ import { TICK_MS } from '../../game';
 import type { CompletionView } from '../../game';
 import { toScreen } from './camera';
 import type { Camera, PixelRatio } from './camera';
-import { whole } from './format';
+import { payoutCount } from './format';
 import type { Rect } from './geom';
 import { TONE } from './labels';
 import type { Typography } from './labels';
@@ -115,7 +115,7 @@ export class PayoutPops {
    * component's live pop: rising pops are tall, so they are kept apart over their whole life.
    */
   private blocked(g: CanvasRenderingContext2D, p: Pending, now: number, cam: Camera, vp: Rect, ratio: PixelRatio, type: Typography, n: number): boolean {
-    const cw = p.credits >= 1 ? g.measureText(`+${whole(p.credits)}`).width : 0, dw = p.data >= 1 ? g.measureText(`+${whole(p.data)}`).width : 0;
+    const cw = p.credits >= 1 ? g.measureText(`+${payoutCount(p.credits)}`).width : 0, dw = p.data >= 1 ? g.measureText(`+${payoutCount(p.data)}`).width : 0;
     pathRect(p.anchor, cw, dw, cam, vp, ratio, type, n, plate);
     for (let i = 0; i < this.popCount; i++) {
       const o = this.pops[i]!;
@@ -126,8 +126,8 @@ export class PayoutPops {
     return false;
   }
   private texts(g: CanvasRenderingContext2D, pop: Pop): void {
-    pop.credText = pop.credits >= 1 ? `+${whole(pop.credits)}` : '';
-    pop.dataText = pop.data >= 1 ? `+${whole(pop.data)}` : '';
+    pop.credText = pop.credits >= 1 ? `+${payoutCount(pop.credits)}` : '';
+    pop.dataText = pop.data >= 1 ? `+${payoutCount(pop.data)}` : '';
     pop.credW = pop.credText ? g.measureText(pop.credText).width : 0;
     pop.dataW = pop.dataText ? g.measureText(pop.dataText).width : 0;
   }

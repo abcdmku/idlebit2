@@ -4,12 +4,12 @@ import type { PartRef, RackId, ResearchId, RoomId, ScopeRef, SwitchRef, SystemId
 import type { GameState, TaskRef } from './state';
 import type { GpuModelId } from './gpu';
 
-/** CPU generation index for barebones systems (Hz 0, kHz 1, MHz 2, GHz 3). */
 export type TierId = number;
+
 export type BoardPartKind = 'core' | 'socket' | 'l2' | 'l3' | 'scheduler' | 'ram' | 'gpu' | 'npu' | 'drive';
 
 export type ConfigSource =
-  | { readonly kind: 'barebones'; readonly tier: TierId; readonly storageNode?: boolean; readonly board?: BoardKind }
+  | { readonly kind: 'barebones'; readonly tier?: TierId; readonly storageNode?: boolean; readonly board?: BoardKind }
   | { readonly kind: 'copy'; readonly from: UnitRef }
   | { readonly kind: 'saved'; readonly name: string };
 
@@ -28,8 +28,10 @@ export type GameAction =
   /** Every level from the part's current one up to `level`, atomically, for the summed price (hot like upgradePart). */
   | { readonly type: 'upgradePartTo'; readonly part: PartRef; readonly level: number }
   | { readonly type: 'installGpu'; readonly system: SystemId; readonly model: GpuModelId; readonly index: number | null }
+  /** Cold replacement of all non-ECC RAM at the same generation, capacity and bandwidth. */
+  | { readonly type: 'convertRamToEcc'; readonly system: SystemId }
   | { readonly type: 'upgradeAll'; readonly system: SystemId; readonly kind: 'ram' | 'gpu' | 'drive'; readonly gen: number }
-  | { readonly type: 'replacePart'; readonly part: PartRef; readonly generation: number; readonly preserveCapacity: boolean }
+  | { readonly type: 'replacePart'; readonly part: PartRef; readonly generation: number; readonly preserveCapacity: boolean; readonly minimumCapacity?: number }
   | { readonly type: 'replaceCpu'; readonly system: SystemId }
   | { readonly type: 'addPart'; readonly system: SystemId; readonly kind: BoardPartKind; readonly generation: number; readonly ecc?: boolean }
   | { readonly type: 'removePart'; readonly part: PartRef }
@@ -53,7 +55,7 @@ export type GameAction =
   | { readonly type: 'setSetpoint'; readonly unit: { readonly kind: 'rack'; readonly id: RackId } | { readonly kind: 'room'; readonly id: RoomId }; readonly setpointF: number }
   | { readonly type: 'setPowerCap'; readonly part: PartRef; readonly on: boolean }
   | { readonly type: 'setSystemSetting'; readonly system: SystemId; readonly setting: 'dvfs' | 'turbo'; readonly on: boolean }
-  | { readonly type: 'setCStateLimit'; readonly system: SystemId; readonly limit: 0 | 1 | 3 | 6 }
+  | { readonly type: 'setCStateLimit'; readonly system: SystemId; readonly limit: 0 | 1 }
   | { readonly type: 'startResearch'; readonly project: ResearchId }
   | { readonly type: 'queueResearch'; readonly project: ResearchId }
   | { readonly type: 'unqueueResearch'; readonly project: ResearchId }

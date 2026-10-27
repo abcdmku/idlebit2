@@ -10,6 +10,7 @@ import { FAMILIES, payoutAt } from './families';
 import { canRunFleet, detailIndex, DETAIL_CODE, isDownGate } from './fleet';
 import { failTasks } from './sla';
 import { researchQueued } from '../exec/researchTask';
+import { noteTaken } from './frontier';
 
 /**
  * The endless queue (program D10, spec §5.2, §14.1 steps 2 and 7). The window holds the next five
@@ -131,6 +132,7 @@ export function takeHead(w: World, r: number): number {
   else unlink(w.hot, frontList(w.hot), r);
   rec.loc[t] = LOC.free;
   rec.taken[t] = w.tick;
+  noteTaken(w, rec.family[t]!);
   w.hot.g[G.taken] = w.hot.g[G.taken]! + 1;
   const row = ringRow(w);
   w.hot.ring.taken[row] = w.hot.ring.taken[row]! + 1;
@@ -219,18 +221,15 @@ function failHead(w: World): void {
 }
 
 /**
- * Market (tick step 2): start this tick's rate row (I advances per task drawn, D30, not with time). With
- * Auto-skip (D12.3), dismiss uncommitted heads no static-capability hardware can run; at most one
- * window's worth per tick, an engine bound that a real queue never reaches.
+ * Market (tick step 2): start this tick's rate row (I advances per task drawn, D30, not with time). A head no hardware
+ * can run is never skipped (D10.3, user 26 Oct): it holds the line for its 10 s, then fails once as cantRun inside the
+ * SLA. Only the player dismisses, for free.
  */
 export function marketPhase(w: World): void {
   if (w.round.phase !== 'running') return;
   const ring = w.hot.ring, row = ringRow(w);
   ring.at[row] = w.tick;
   ring.taken[row] = 0;
-  if (!w.research.unlocks.rules.includes('autoSkip')) return;
-  if (researchQueued(w)) return;
-  for (let i = 0; i < QUEUE_VISIBLE && w.hot.g[G.frontHead]! < 0 && headGate(w) !== 0; i += 1) dismissAt(w, 0);
 }
 
 /** Deadlines (tick step 7): the head only. Untaken at the end of headTick + 99, it fails once. */

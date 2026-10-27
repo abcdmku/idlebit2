@@ -7,7 +7,7 @@ import { P } from '../../render/core/palette';
 type PixelMap = readonly string[];
 const COIN8: PixelMap = ['..kkkk..', '.kwyyyk.', 'kwyyyyok', 'kwyyyyok', 'kyyyyyok', 'kyyyyook', '.kooook.', '..kkkk..'];
 const GEM8: PixelMap = ['...kk...', '..kwtk..', '.kwttdk.', 'kwtttddk', 'kttttddk', '.kttddk.', '..kddk..', '...kk...'];
-const LOCK: PixelMap = ['..kkk..', '.k...k.', '.k...k.', 'kkkkkkk', 'kgggggk', 'kggkggk', 'kgggggk', 'kkkkkkk'];
+const LOCK: PixelMap = ['..ggg..', '.g...g.', '.g...g.', 'kkkkkkk', 'kgggggk', 'kggkggk', 'kgggggk', 'kkkkkkk'];
 const COIN_COLORS = { k: P.goldInk, w: P.goldHi, y: P.gold, o: P.goldLo };
 const GEM_COLORS = { k: '#06372a', w: P.dataHi, t: P.data, d: P.dataLo };
 const LOCK_COLORS = { k: P.ink, g: P.silk };

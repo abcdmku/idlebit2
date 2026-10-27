@@ -1,4 +1,8 @@
 [
   { "id": "boot-phone", "width": 390, "height": 780, "dpr": 2, "seed": 42 },
-  { "id": "boot-desktop", "width": 1280, "height": 800, "dpr": 1, "seed": 42 }
+  { "id": "boot-desktop", "width": 1280, "height": 800, "dpr": 1, "seed": 42 },
+  { "id": "boot-small", "width": 320, "height": 568, "dpr": 1, "seed": 42 },
+  { "id": "boot-landscape", "width": 844, "height": 390, "dpr": 1, "seed": 42 },
+  { "id": "round-phone", "width": 390, "height": 780, "dpr": 1, "seed": 42, "steps": ["__br.pause()", "__br.advance(120000)"] },
+  { "id": "research-phone", "width": 390, "height": 780, "dpr": 1, "seed": 42, "steps": ["__br.pause()", "__br.advance(120000)", "__br.dispatch({type:'dismissReport'})", "__brShell.view.dispatch({type:'openResearch'})"] }
 ]

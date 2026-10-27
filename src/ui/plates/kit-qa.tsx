@@ -75,12 +75,12 @@ const addQuotes = (kind: 'system' | 'rack') => {
 };
 
 const node = (id: string, name: string, state: ResearchNodeView['state'], extra: Partial<ResearchNodeView> = {}): ResearchNodeView => ({
-  id: researchId(id), name, category: 'compute', state, progress: 0, dataCost: '150000' as Amount, creditCost: '0' as Amount, change: null, workOps: 3e6, requires: [], lockedBy: null,
+  id: researchId(id), name, category: 'compute', state, progress: 0, dataCost: '150000' as Amount, creditCost: '0' as Amount, change: null, workOps: 3e6, requires: [], requiredResearch: [], lockedBy: null,
   level: 'system', era: 'khz', tier: 6, needsData: false, effect: '', summary: '', answers: [], part: 'cores', tab: 'cpu', ...extra });
 const tree = (phase: 'running' | 'between') => ({
-  nodes: [node('fabKhz', 'kHz fab', 'active', { part: 'fab', progress: 0.4, effect: 'Gen 1 of core, clock, L1, L2, L3, scheduler and CPU package' }),
-    node('l3Cache', 'L3 cache', 'available', { part: 'cache', effect: 'New chip part L3, shared', dataCost: '5000' as Amount, workOps: 3e5 }),
-    node('octaCore', '8 cores', 'locked', { lockedBy: researchId('fabKhz'), effect: 'Core sites 4→8' }),
+  nodes: [node('fabKhz', 'kHz fab', 'active', { part: 'fab', progress: 0.4, effect: 'kHz CPU parts and scheduler' }),
+    node('l3Slices', 'L3 slices', 'available', { part: 'fab', effect: 'Higher L3 cache level', dataCost: '150000' as Amount, workOps: 3e6 }),
+    node('edramL3', 'eDRAM L3', 'locked', { part: 'fab', lockedBy: researchId('l3Slices'), effect: 'Higher L3 cache level' }),
     node('ddr', 'DDR', 'available', { part: 'ram', tab: 'system', category: 'memory', needsData: true, effect: 'RAM gen 1: 2× bandwidth', dataCost: '2000000' as Amount }),
     node('rackWater', 'Rack water', 'locked', { part: 'rackCooling', tab: 'rack', category: 'cooling', lockedBy: researchId('rack'), effect: 'Rack cooler technology 2: water' }),
     node('pipelining', 'Pipelining', 'done', { part: 'clock' })],
@@ -118,11 +118,11 @@ const scenes: Record<string, { level: LevelId; plate: ReactNode }> = {
     market={{ unit: { kind: 'system', id: systemId(3) }, on: true, live: 1, total: 1, drains: true, running: true, parentOff: null }} /> },
   rackunit: { level: 'rack', plate: <UnitPlate {...common} unit={rack} title="Rack A" sub="6 servers" status="72°F · PDU 40%" mode="onMarket" timerS={null}
     market={{ unit: rack, on: true, live: 5, total: 6, drains: false, running: true, parentOff: null }}
-    lines={[{ text: '5 of 6 servers have a switch port', tone: 'muted' }]} onSave={noop} saveLabel="Save this rack" /> },
+    onSave={noop} saveLabel="Save this rack" /> },
   'config-system': { level: 'rack', plate: <ConfigPlate {...common} kind="system" sub="Rack A · slot 8" credits={'1500' as Amount} landscape={land} quotes={addQuotes('system')} /> },
   'config-rack': { level: 'room', plate: <ConfigPlate {...common} kind="rack" sub="AZ a · slot 7" landscape={land} quotes={addQuotes('rack')} /> },
   save: { level: 'rack', plate: <SavePrompt bounds={bounds} unit={rack} defaultName="Rack A 1" onAction={act} onClose={noop} /> },
-  research: { level: 'system', plate: <ResearchKit phase="running" focus={researchId('l3Cache')} /> },
+  research: { level: 'system', plate: <ResearchKit phase="running" focus={researchId('l3Slices')} /> },
   'research-between': { level: 'system', plate: <ResearchKit phase="between" focus={null} /> },
 };
 

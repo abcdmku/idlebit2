@@ -9,7 +9,7 @@ import { runInsert, runUnlink } from './lists';
 import { executionBoundary } from './boundary';
 import { canAdmit, noteAdmit, noteAdmitted } from './slots';
 import { CPU, GPU, IO, NRES, shapeOf } from './shape';
-import { firstPart, partClock, partWork, placeRecord, releaseMemory } from './memory';
+import { firstLoadPart, firstPart, partClock, partWork, placeRecord, releaseMemory } from './memory';
 
 /**
  * Record mechanics on one system: start, stage entry and exit, release. All at a fraction τ of the
@@ -93,7 +93,8 @@ export function startRecord(w: World, s: number, r: number, tau: number, span: S
   noteAdmit(w, s, before);
   bindThreads(w, s, r, threads);
   placeRecord(w, s, r, selected.held);
-  rec.part[r] = firstPart(w, r, shape, rec.stage[r]!, 0);
+  const load = firstLoadPart(w, r);
+  rec.part[r] = load >= 0 ? load : firstPart(w, r, shape, rec.stage[r]!, 0);
   enterStage(w, s, r, tau, span, -1, NaN);
 }
 

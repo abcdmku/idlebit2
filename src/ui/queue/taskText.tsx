@@ -45,7 +45,7 @@ export const roundOf = (s: RenderSnapshot) => ({ phase: s.round.state, can: s.ro
 export function HeadClock({ blocked, risk, short = false, testId = 'head-clock' }: { blocked: boolean; risk: boolean; short?: boolean; testId?: string }) {
   const seconds = useHeadSeconds() ?? 10;
   const text = short ? (blocked ? 'blocked' : `${seconds} s`)
-    : risk ? `${seconds} s · a fail ends the round` : blocked ? `Blocked · ${seconds} s` : `${seconds} s to take`;
+    : risk ? `${seconds} s · a fail ends the round` : blocked ? `${seconds} s left` : `${seconds} s to take`;
   return <span className={risk && !short ? 'bad' : blocked ? 'warn' : clockTone(seconds)} data-testid={testId}>{text}</span>;
 }
 
@@ -69,9 +69,10 @@ export function InQueue({ task, short = false, testId = 'head-clock' }: { task: 
 }
 
 /** Between rounds the queue is frozen until Return (spec §4.1.5). */
-export function AutoReturn({ testId = 'head-clock' }: { testId?: string }) {
+export function AutoReturn({ testId = 'head-clock', compact = false }: { testId?: string; compact?: boolean }) {
   const r = useGameSelector(roundOf, shallowEqual, 250);
-  return r.auto !== null ? <span className="dim" data-testid={testId}>Auto return in {clockText(r.auto)}</span> : null;
+  return r.auto !== null ? <span className="dim" data-testid={testId}>{compact ? 'Return in' : 'Auto return in'} {clockText(r.auto)}</span>
+    : null;
 }
 
 export { windowText };

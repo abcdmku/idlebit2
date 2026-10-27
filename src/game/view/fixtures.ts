@@ -34,7 +34,7 @@ function powerRack(): GameState {
   const built = buildState({
     // Two zones: the Room and World levels everything-researched opens are owned too (their tabs open).
     seed: 42, sites: 1, zonesPerSite: 2, racksPerZone: 1, serversPerRack: 8, unlocks: 'max', round: 'between', credits: '1000000000',
-    system: (id, rack, slot) => ({ id, rack, slot, online: true, spec: barebonesSpec(1) }),
+    system: (id, rack, slot) => ({ id, rack, slot, online: true, spec: barebonesSpec(2) }),
     // QA-13: a port for every server (the 4-port starter switch left four servers unlinked, idle but unreachable).
     rack: (rack) => ({ ...rack, switch: { ...rack.switch, ports: Array(8).fill(rack.switch.ports[0]!) }, powerCtl: { ...defaultStartCtl(0, 1), startWith: 2 } }),
   });

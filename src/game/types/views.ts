@@ -329,7 +329,7 @@ export interface SiteView {
   readonly online: UnitMode;
   readonly zones: readonly ZoneView[];
   readonly grid: SupplyView | null;
-  readonly dataPlane: { readonly generation: number; readonly bitsPerSec: number; readonly latencyMs: number; readonly active: boolean } | null;
+  readonly dataPlane: { readonly generation: number; readonly bitsPerSec: number; readonly latencyMs: number; readonly active: boolean; readonly router?: LbView } | null;
   readonly energyPrice: number;
   readonly outsideF: number;
   readonly hottestF: number;
@@ -370,6 +370,8 @@ export interface ChipQueueEntryView {
 
 /** One queue entry (spec §16.2): a stable identity, its work and requirements, and whether it can be dismissed. */
 export interface QueueEntryView extends TaskRequirementsView {
+  /** Data contribution using this round's seeded ratio. Fractions accumulate in the wallet meter. */
+  readonly dataReward: number;
   readonly kind: 'task';
   readonly task: TaskRef;
   readonly key: number;
@@ -474,6 +476,7 @@ export type ResearchTabId = 'cpu' | 'system' | 'rack' | 'room' | 'global';
 /** A node's concrete before → after on the part it upgrades, as display strings ("Cores per CPU", "1", "2"). */
 export interface ResearchChangeView { readonly label: string; readonly before: string; readonly after: string }
 export interface ResearchNodeView {
+  readonly purchase?: { readonly series: 'cstate' | 'memoryVoltage' | 'bootLoader'; readonly level: number; readonly maxLevel: number };
   /** The root it grows from, and that root's hardware tab (a CPU part's node is on the CPU tab in every era). */
   readonly part: ResearchPartId;
   readonly tab: ResearchTabId;
@@ -492,6 +495,8 @@ export interface ResearchNodeView {
   readonly dataCost: Amount;
   readonly workOps: number;
   readonly requires: readonly ResearchId[];
+  /** Unmet prerequisites, with a purchase series linked to its next available level. */
+  readonly requiredResearch: readonly { readonly id: ResearchId; readonly name: string }[];
   /** First missing prerequisite, or null. */
   readonly lockedBy: ResearchId | null;
   readonly level: LevelId;
@@ -534,6 +539,9 @@ export interface ResearchTreeView {
    * servers between rounds; while a project runs, its current rate. For the hold estimate.
    */
   readonly takenOpsPerSec: number;
+  /** Hardware estimates at current clocks: one thread each / every thread on linked online systems. */
+  readonly roundOpsPerSec?: number;
+  readonly pausedOpsPerSec?: number;
   readonly queue: readonly ResearchId[];
   /** 0 until researchQueue. */
   readonly queueSlots: number;

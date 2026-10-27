@@ -2,7 +2,7 @@
 // It drops from under the head slot (RestFraming.pipe), runs under the strip, and drops into the
 // level's entry (LevelRenderer.entry). Drawn by the core in art px at N, so every level meets it the
 // same way. A transfer rides it at its real progress; one too short to see is a landing flash (D12.4).
-import { formatHertz, formatOps } from '../../game';
+import { formatHertz } from '../../game';
 import type { LevelSnapshot, RenderSnapshot, TransferView } from '../../game';
 import type { Camera, PixelRatio, RestFraming } from './camera';
 import { secondsText } from './format';
@@ -18,7 +18,7 @@ export const MIN_VISIBLE_TRANSFER_S = 0.25;
 export interface Inbound { name: string; speed: number; transfer: TransferView | null }
 const LINK: Readonly<Record<LevelSnapshot['level'], { name: string; kind: TransferView['link'] }>> = {
   chip: { name: 'Pipe', kind: 'pipe' }, system: { name: 'Pipe', kind: 'pipe' }, rack: { name: 'Uplink', kind: 'rack' },
-  room: { name: 'Fiber', kind: 'zone' }, global: { name: 'Backbone', kind: 'backbone' },
+  room: { name: 'Zone link', kind: 'zone' }, global: { name: 'Backbone', kind: 'backbone' },
 };
 function firstOf(s: RenderSnapshot, kind: TransferView['link']): TransferView | null {
   for (const t of s.feed.transfers) if (t.link === kind) return t;
@@ -53,8 +53,8 @@ export function inbound(s: RenderSnapshot, out: Inbound): Inbound {
   const f = s.focus, link = LINK[f.level];
   out.name = link.name; out.transfer = null; out.speed = 0;
   switch (f.level) {
-    case 'chip': out.speed = f.pipe.speed; out.transfer = f.pipe.transfer; break;
-    case 'system': out.speed = f.chip.pipe.speed; out.transfer = (f as { readonly inbound?: TransferView | null }).inbound ?? f.chip.pipe.transfer; break;
+    case 'chip': out.speed = f.pipe?.speed ?? 0; out.transfer = f.pipe?.transfer ?? null; break;
+    case 'system': out.speed = f.chip.pipe?.speed ?? 0; out.transfer = (f as { readonly inbound?: TransferView | null }).inbound ?? f.chip.pipe?.transfer ?? null; break;
     case 'rack': out.speed = f.switch.uplinks[0]?.speedHz ?? 0; out.transfer = topFlow(f, TOP.rack) ?? rackTransfer(s, f); break;
     case 'room': out.speed = f.network.switch.uplinks[0]?.speedHz ?? 0; out.transfer = topFlow(f, TOP.room) ?? firstOf(s, link.kind); break;
     case 'global': {
@@ -87,6 +87,7 @@ const lattice = (v: number, lat: number) => Math.round(v / lat) * lat;
  */
 export function drawPipe(g: CanvasRenderingContext2D, s: RenderSnapshot, timeMs: number, paused: boolean, f: RestFraming,
   vp: Rect, ratio: PixelRatio, entry: Point | null, type: Typography, rest = true, art: Rect | null = null, tagAlpha = 1): void {
+  if((s.focus.level==='chip'&&!s.focus.pipe)||(s.focus.level==='system'&&!s.focus.chip.pipe))return;
   const p = f.pipe;
   if (!p) return;
   const n = f.scale, x0 = p.x / n, y0 = p.y / n, ry = p.runY / n;
@@ -119,18 +120,23 @@ export function drawPipe(g: CanvasRenderingContext2D, s: RenderSnapshot, timeMs:
   tags.clear();
   const speed = formatHertz(link.speed);
   const moving = !!t && live && seconds >= MIN_VISIBLE_TRANSFER_S;
-  const bits = moving && t ? formatOps(t.bits) : '', secs = moving && t ? secondsText((1 - transferProgress(t, s.simTimeMs, timeMs)) * seconds) : '';
-  const spot = pipeTagSpot(p, vp, f, art, type, link.name, speed, bits, secs, tagAt);
+  const secs = moving && t ? secondsText((1 - transferProgress(t, s.simTimeMs, timeMs)) * seconds) : '';
+  const spot = pipeTagSpot(p, vp, f, art, type, link.name, speed, secs, tagAt);
   const x = spot.x, y = spot.y;
+  // A short phone can have no gutter at all. Keep the physical pipe, but omit its
+  // redundant tag instead of printing it over the queue. The pipe plate retains its speed.
+  const tagW = spot.stacked ? Math.max(tagWidth(link.name, type), tagWidth(speed, type), moving && spot.packet ? tagWidth(secs, type) : 0)
+    : Math.max(tagWidth(`${link.name} ${speed}`, type), moving ? tagWidth(secs, type) : 0);
+  const lines = spot.stacked ? 2 + (moving && spot.packet ? 1 : 0) : moving ? 2 : 1;
+  if (art && overlaps(x, y, tagW, type.line * lines, art)) return;
   if (!spot.stacked) {
     tags.label('pipe', x, y, 'left', true).text(`${link.name} ${speed}`, 'net');
-    if (moving) tags.label('packet', x, y + type.line, 'left', true).text(`${bits} · ${secs}`, 'net');
+    if (moving) tags.label('packet', x, y + type.line, 'left', true).text(secs, 'net');
   } else {
     tags.label('pipe', x, y, 'left', true).text(link.name, 'net');
     tags.label('pipe2', x, y + type.line, 'left', true).text(speed, 'net');
     if (moving && spot.packet) {
-      tags.label('packet', x, y + 2 * type.line, 'left', true).text(bits, 'net');
-      tags.label('packet2', x, y + 3 * type.line, 'left', true).text(secs, 'net');
+      tags.label('packet', x, y + 2 * type.line, 'left', true).text(secs, 'net');
     }
   }
   screen.cx = vp.x + vp.w / 2; screen.cy = vp.y + vp.h / 2; screen.s = ratio.x;
@@ -147,15 +153,15 @@ const overlaps = (x: number, y: number, w: number, h: number, r: Rect): boolean 
  * itself still shows on the pipe); else (no room) the default spot.
  */
 export function pipeTagSpot(p: { readonly x: number; readonly runY: number }, vp: Rect, f: RestFraming, art: Rect | null, type: Typography,
-  name: string, speed: string, bits: string, secs: string, out: { x: number; y: number; stacked: boolean; packet: boolean }): { x: number; y: number; stacked: boolean; packet: boolean } {
+  name: string, speed: string, secs: string, out: { x: number; y: number; stacked: boolean; packet: boolean }): { x: number; y: number; stacked: boolean; packet: boolean } {
   const phone = f.form === 'phone';
-  out.x = p.x + (phone ? 16 : 24); out.y = p.runY + (phone ? 8 : 24); out.stacked = false; out.packet = !!bits;
+  out.x = p.x + (phone ? 16 : 24); out.y = p.runY + (phone ? 8 : 24); out.stacked = false; out.packet = !!secs;
   if (!art) return out;
-  const lines = bits ? 2 : 1, oneW = Math.max(tagWidth(`${name} ${speed}`, type), bits ? tagWidth(`${bits} · ${secs}`, type) : 0);
+  const lines = secs ? 2 : 1, oneW = Math.max(tagWidth(`${name} ${speed}`, type), secs ? tagWidth(secs, type) : 0);
   if (!overlaps(out.x, out.y, oneW, lines * type.line, art)) return out;
-  const linkW = Math.max(tagWidth(name, type), tagWidth(speed, type)), packetW = bits ? Math.max(tagWidth(bits, type), tagWidth(secs, type)) : 0;
-  for (const withPacket of bits ? [true, false] : [false]) {
-    const w = withPacket ? Math.max(linkW, packetW) : linkW, h = (withPacket ? 4 : 2) * type.line;
+  const linkW = Math.max(tagWidth(name, type), tagWidth(speed, type)), packetW = secs ? tagWidth(secs, type) : 0;
+  for (const withPacket of secs ? [true, false] : [false]) {
+    const w = withPacket ? Math.max(linkW, packetW) : linkW, h = (withPacket ? 3 : 2) * type.line;
     for (const x of [p.x + (phone ? 16 : 24), vp.x + f.lattice]) {
       if (!overlaps(x, out.y, w, h, art)) { out.x = x; out.stacked = true; out.packet = withPacket; return out; }
     }

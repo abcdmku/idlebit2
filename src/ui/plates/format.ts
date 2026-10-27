@@ -94,6 +94,7 @@ export function watts(w: number): string {
 /** Speeds, sizes and work print through the shared formatters, so one quantity reads the same everywhere. */
 export const hertz = (hz: number) => formatHertz(hz);
 export const bits = (b: number) => formatSize(b);
+export const bitRate = (rate: number) => `${formatSize(rate)}/s`;
 export const ops = (n: number) => formatOps(n);
 
 const COUNTS: ReadonlySet<string> = new Set(['slots', 'cores', 'ports']);
@@ -101,7 +102,7 @@ const COUNTS: ReadonlySet<string> = new Set(['slots', 'cores', 'ports']);
 export function measureUnit(n: number, unit: EffectPreview['unit']): string {
   switch (unit) {
     case 'bits': return formatSize(n);
-    case 'bit/s': return formatHertz(n);
+    case 'bit/s': return bitRate(n);
     case 'Hz': return formatHertz(n);
     case 'J': return formatEnergy(n);
     case 'ops': return formatOps(n);
@@ -119,11 +120,11 @@ export function clock(seconds: number): string {
   return (h ? `${h}:${String(m).padStart(2, '0')}` : String(m)) + ':' + String(s).padStart(2, '0');
 }
 
-/** Payback copy: "4m 10s", "2h 5m", "3d 4h". */
+/** A hardware duration: "4 min 10 s", "2 h 5 min", "3 d 4 h". */
 export function span(seconds: number): string {
   const t = Math.max(0, Math.round(seconds)), d = Math.floor(t / 86400), h = Math.floor((t % 86400) / 3600), m = Math.floor((t % 3600) / 60), s = t % 60;
-  if (d >= 2) return `${d}d ${h}h`;
-  if (d || h) return `${d * 24 + h}h ${m}m`;
-  if (m) return `${m}m ${s}s`;
-  return `${s}s`;
+  if (d >= 2) return `${d} d ${h} h`;
+  if (d || h) return `${d * 24 + h} h ${m} min`;
+  if (m) return `${m} min ${s} s`;
+  return `${s} s`;
 }

@@ -1,13 +1,8 @@
-// "Saving up · ~4 min" beside an unaffordable price (user, 26 Oct: a buy you can't make yet must never
-// look like nothing happened). The same recent-income ETA as the Buy tile.
-import { useGameSelector } from '../storeHooks';
-import { etaText, useCreditsPerSec } from './eta';
+// An unaffordable purchase says "Saving up", without predicting when it can be bought.
 
 export function useSavingUp(price: number | null, affordable: boolean): string | null {
-  const credits = useGameSelector(s => Math.floor(Number(s.hud.credits)), Object.is, 500);
-  const cps = useCreditsPerSec();
   if (affordable || price === null || price <= 0) return null;
-  return `Saving up · ${etaText(Math.max(0, price - credits), cps) ?? '—'}`;
+  return 'Saving up';
 }
 
 /** The note for one offer, or nothing when it can be bought (or has no price). */

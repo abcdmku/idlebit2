@@ -19,7 +19,7 @@ const decision = createRateAnimation();
 const point: Point = { x: 0, y: 0 };
 
 export { LB_SHORT };
-const SIGNS = Array.from(ZONE_LETTERS, ch => `AZ ${ch}`), DOORS = Array.from(ZONE_LETTERS, ch => `AZ${ch}`);
+const SIGNS = Array.from(ZONE_LETTERS, ch => `Zone ${ch}`), DOORS = Array.from(ZONE_LETTERS, ch => `Z-${ch}`);
 
 /** The next built zone of the site after this one, cyclic; -1 when this is the only one. */
 export function nextZone(s: RoomSnapshot): number {

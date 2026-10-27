@@ -1,6 +1,6 @@
 # Plates
 
-A tap on the world opens the target's upgrade callout (`callout/`). Its **More** key sets `ViewState.plate`, and `PlateLayer` then renders the full plate for `useViewState().selected`. A save icon opens its prompt at once. Each plate reads `../storeHooks` (`useShell`, `useGameSelector`, `useViewState`, `useQuote`).
+A tap on hardware opens its plate and spends nothing. Targets without a plate use the upgrade callout (`callout/`). `PlateLayer` renders the full plate for `useViewState().selected`. A save icon opens its prompt at once. Each plate reads `../storeHooks` (`useShell`, `useGameSelector`, `useViewState`, `useQuote`).
 
 ## What the plates need from the shell
 

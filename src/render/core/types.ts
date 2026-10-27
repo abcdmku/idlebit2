@@ -196,6 +196,8 @@ export interface CanvasRenderer {
   hit(xCss: number, yCss: number): HitTarget | null;
   /** CSS rect of the focus-world target with this id (the callout anchor). */
   anchor(id: string, out: Rect): boolean;
+  /** Independent copies of the current world's targets, for semantic UI controls. Empty during zoom. */
+  getTargets(): readonly HitTarget[];
   /** A touch press on `target` (from `hit`): its reduced-strength bracket until `press(null)`. Hover uses `ViewPresentation.hoverId`. */
   press(target: HitTarget | null): void;
   /** The zoom in progress. The UI drops the scope partner once this is null again. */

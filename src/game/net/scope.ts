@@ -1,7 +1,6 @@
 import { G } from '../core/buffers';
-import { MAX_SITES, MAX_ZONES_PER_SITE, MAX_ROOM_PORTS, RACKS_PER_ROOM, SERVERS_PER_RACK } from '../core/constants';
+import { MAX_SITES, MAX_ZONES_PER_SITE, RACKS_PER_ROOM, SERVERS_PER_RACK } from '../core/constants';
 import type { World } from '../core/world';
-import { canAdmit } from '../exec/slots';
 
 /**
  * Routing scopes (spec §7.1). A router is (kind, id): a rack load balancer over its systems, a room
@@ -60,21 +59,6 @@ export function resetRouted(w: World): void {
   h.site.lbRouted.fill(0); h.site.lbLast.fill(-1);
   h.g[G.globalRouted] = 0;
 }
-
-/** Can child `u` of a router of `kind` admit a task now (spec §7.7 step 1)? */
-export function childAdmits(w: World, kind: number, u: number): boolean {
-  const c = w.compiled, h = w.hot;
-  switch (kind) {
-    case RACK: return canAdmit(w, u);
-    case ROOM: return c.rack.alive[u] === 1 && c.rack.opened[u] === 1 && h.rack.freeSlots[u]! > 0
-      && c.room.portLink[c.rack.room[u]! * MAX_ROOM_PORTS + c.rack.slot[u]!]! >= 0;
-    case SITE: return c.room.alive[u] === 1 && c.room.opened[u] === 1 && h.room.freeSlots[u]! > 0;
-    default: return c.site.alive[u] === 1 && c.site.opened[u] === 1 && h.site.freeSlots[u]! > 0 && (u === 0 || c.site.backboneLink[u]! >= 0);
-  }
-}
-
-/** The router a child of `kind` owns: a rack's LB under a room, a room's LB under a site, a site's data plane. */
-export const childKind = (kind: number): number => kind - 1;
 
 /**
  * The highest router that exists (spec §7.1): the global scheduler, else the gateway site's data

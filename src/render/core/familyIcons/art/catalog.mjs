@@ -9,8 +9,8 @@ export const BAND = {
   gpu: { name: 'GPU', a: '#ff7ad9', d: '#a8418e', l: '#ffc4ee' },
   storage: { name: 'Storage', a: '#e0b07a', d: '#8f6a45', l: '#f5dcbc' },
   rackDist: { name: 'Rack-scale', a: '#7be38f', d: '#3f8f54', l: '#c6f7cf' },
-  roomDist: { name: 'Room-scale', a: '#c9cce0', d: '#6f7390', l: '#f2f3fa' },
-  multiAz: { name: 'Multi-AZ', a: '#5ab0ff', d: '#2a5c9e', l: '#bfe3ff' },
+  roomDist: { name: 'Zone-scale', a: '#c9cce0', d: '#6f7390', l: '#f2f3fa' },
+  multiAz: { name: 'Multi-zone', a: '#5ab0ff', d: '#2a5c9e', l: '#bfe3ff' },
   region: { name: 'Regional', a: '#f5b878', d: '#9a6232', l: '#ffe2c2' },
 };
 export const BAND_ORDER = Object.keys(BAND);

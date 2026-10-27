@@ -57,6 +57,15 @@ function check(raw: unknown): GameState {
   arr(round.reports, 'round.reports');
   for (const k of ['gross', 'data', 'energy']) whole(round[k], `round.${k}`);
   if (finite(round.grace, 'round.grace') < 0) fail('round.grace', 'expected a non-negative grace');
+  const frontier = obj(round.frontier, 'round.frontier');
+  if (finite(frontier.bestI, 'round.frontier.bestI') < 0) fail('round.frontier.bestI', 'expected a non-negative intensity');
+  int(frontier.bestRound, 'round.frontier.bestRound');
+  int(frontier.bestMet, 'round.frontier.bestMet');
+  int(frontier.bestMetRound, 'round.frontier.bestMetRound');
+  const taken = arr(frontier.taken, 'round.frontier.taken');
+  taken.forEach((f, i) => { if (!FAMILIES[int(f, `round.frontier.taken[${i}]`)]) fail('round.frontier.taken', 'unknown family'); });
+  if (int(frontier.takenAtStart, 'round.frontier.takenAtStart') > taken.length) fail('round.frontier.takenAtStart', 'exceeds taken');
+  if (round.runwayStart !== null) obj(round.runwayStart, 'round.runwayStart');
   const build = obj(s.build, 'build');
   const lengths = ['systems', 'racks', 'rooms', 'sites'].map((k) => arr(build[k], `build.${k}`).length);
   obj(build.global, 'build.global');

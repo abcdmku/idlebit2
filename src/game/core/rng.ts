@@ -47,9 +47,3 @@ export function nextU32(host: RngHost): number {
 
 /** Uniform in [0, 1). */
 export const nextFloat = (host: RngHost) => nextU32(host) / UINT32_RANGE;
-
-/** Uniform integer in [min, maxExclusive). */
-export function nextInt(host: RngHost, min: number, maxExclusive: number): number {
-  if (!(maxExclusive > min)) throw new Error('RNG integer range must be non-empty');
-  return min + Math.floor((nextU32(host) / UINT32_RANGE) * (maxExclusive - min));
-}

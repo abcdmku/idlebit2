@@ -129,15 +129,16 @@ A task record is a cohort: `count` identical tasks that share family, size jitte
 - Losing any shard fails the task with the root cause (D4.1). It frees every sibling (records, link transfers, router-queue shares) and the parent row, unless `checkpointing` re-places the shard inside 10 s.
 - An unsplit task (`n = 1`) has no parent row and pays at its own completion, as before.
 
-**Memory hierarchy (D26).**
+**Memory hierarchy (D26, D46).**
 - **Placement.** At shard start, exec writes `memC/memR/memD` from the system's free tiers, fastest first: three subtractions on `usedCache/usedRam/usedDisk`. The rack storage node's free disk is a per-rack summary.
+- **Loading.** Before the first authored stage, every shard loads its placement, cache then RAM then disk. `rec.part` 3–5 identifies these loads; stage parts remain 0–2. Cache bits run as CPU ops on assigned threads. RAM and disk bits, including unified-memory overflow, run on their own pools. No wall-clock countdown is added.
 - **Stages.** A `mem` stage of `M` bits expands at start into up to three ordinary stages on existing clocks:
-  - the cache part, zero work, skipped;
+  - the cache part, `M × (1 − trafR − trafD)` CPU ops;
   - the RAM part, `M × memR/ws` on the RAM pool clock;
   - the disk part, `M × memD/ws` on the IO pool with holds.
   
   The expansion is computed once at start from the frozen fractions, so the work-clock model (§1.5) is unchanged and delta invariance holds by construction.
-  The cost is at most two extra stage transitions per `mem` stage: about +2 events per shard in the §1.10 budget. A shard with no spill, the common well-built case, adds none.
+  Loading adds up to three work-completion events per shard. A memory stage adds at most two transitions between tiers. Empty tier parts are skipped. Placement remains available after its holds are released so completion can tally initial loads as well as stage traffic.
 - **No migration.** Placement never changes after start. There is no per-tick rebalancing and no per-bit bookkeeping.
 - **Unified memory.** With `unifiedMemory`, a GPU stage's off-VRAM fractions expand the same way after the GPU stage.
 - **Report.** `round.spill` accumulates `W × memR/ws` and `W × memD/ws` per met task: two adds per completion.
@@ -172,7 +173,7 @@ This is the part that makes the sim fast by construction.
 - **In-tick carry.** When a record completes and the system's own queue holds the next runnable task, that task starts at `finish_prev` rather than at `W_now`. It can complete within the same tick. Tasks that come from a link or the feed start at the tick boundary. Completing a task therefore starts the next one immediately with no lost work (program §5), and tiny late-game tasks don't each cost a tick.
 - Per-system draw changes only at events: admission, completion, stage change, C-state, turbo, failure. Draw is recomputed for visited systems, and the rack draw sum is recomputed in fixed slot order whenever a member changed, so no float drift builds up.
 
-The test oracle (`testkit/oracle.ts`) steps every record naively each tick using the same predicate. Bookkeeping must match it exactly on randomized fixtures.
+The test oracle (`testkit/oracle.ts`) was removed with the D40 test cleanup; the remaining invariant tests are delta invariance, D9 owned ≡ pure, the save round trip, `Amount` and purity.
 
 ### 1.6 Strategies
 
@@ -339,7 +340,7 @@ core/                        S1
   actions.ts                 applyAction dispatcher, debit, revision of compiled
   events.ts                  ring writer
 save/                        S1  schema.ts, serialize.ts (typed arrays as base64), validate.ts
-testkit/                     S1  builders.ts (buildState from a fleet spec), fleets.ts (named fixtures), oracle.ts
+testkit/                     S1  builders.ts (buildState from a fleet spec), fleets.ts (named fixtures)
 market/                      S2
   families.ts                family catalog data from docs/tasks.md
   curve.ts                   round-age intensity, mix windows, seeded weights and size variation
@@ -569,7 +570,7 @@ export type SwitchRef = { kind: 'rack'; id: RackId } | { kind: 'room'; id: RoomI
 - **Online and offline.** Mid-round toggles start the boot timer (10 s base, lowered by Fast boot, D1.8). Between rounds they apply at once. `returnToMarket` brings every online unit in together and reseeds the round.
 - **Add during a round.** A unit added mid-round runs the same boot timer before it accepts tasks.
 - **Configurations.** `saveConfig` stores generations, levels, port speeds, strategies, filters, setpoints and toggles, never runtime state. A configuration that needs unresearched parts quotes as locked with the missing node named.
-- **Navigation.** Zoom, select, open plate and cancel remain `ViewCommand`s in the UI view store (v2 §4). They never reach the sim. The research wafer and the save-name prompt are view state.
+- **Navigation.** Zoom, select, open plate and cancel remain `ViewCommand`s in the UI view store (v2 §4). They never reach the sim. Research preserves its selected hardware or task while open; the underlying dialog is unmounted and Back closes the sheet before clearing that origin. Search and prerequisite history live inside the Research view. A system summary can open a CPU cache component's plate from its embedded chip snapshot without changing the world focus. The research wafer and save-name prompt are view state.
 - **Network rack.** Tapping the room's network rack opens a plate that issues `setStrategy`, `setFilter`, `upgradePort` and `addPorts` with `SwitchRef { kind: 'room' }`.
 
 ## 5. Keep, adapt, delete
@@ -634,7 +635,7 @@ Twelve agents. S1 alone owns `src/game/types/**`, `src/game/index.ts`, `src/game
 | Agent | Owns (exclusive) | Inputs | Outputs | Starts | Hands off at |
 |---|---|---|---|---|---|
 | **S1 Sim core and contract** | `src/game/{index.ts,types/**,core/**,save/**,testkit/**}`, `docs/v3-contract-requests.md` | This doc, program, spec | Contract, tick loop, World, pools, RNG, ledger, timers, action dispatcher, save v3, fleet builders, oracle | Day 0 | G0: full contract and a running empty tick; G1–G3: core features each gate needs |
-| **S2 Market, rounds and balance** | `src/game/{market/**,probes/**}`, `scripts/balance/**` | `docs/tasks.md`, `scripts/market-model.ts` | Families, curve, arrivals, feed, deadline ring, SLA, rounds, report, auto-return; the balance bot and 24 h campaign | After G0 | G1: bands to `ram`; G3: all bands; G4: campaign and pacing |
+| **S2 Market, rounds and balance** | `src/game/{market/**,probes/**}`, `scripts/balance/**` | `docs/tasks.md` | Families, curve, arrivals, feed, deadline ring, SLA, rounds, report, auto-return; the balance bot and 24 h campaign | After G0 | G1: bands to `ram`; G3: all bands; G4: campaign and pacing |
 | **S3 Execution and network** | `src/game/{exec/**,net/**}` | Spec, research tree | Work clocks, admission gates, schedulers, research share, kill; links, hops, routers, filters, gangs, data plane, backbone | After G0 | G1: exec, system strategies; G2: rack network, gang rack; G3: room, site, global |
 | **S4 Power and heat** | `src/game/phys/**` | Spec power and heat sections | Draw model, supplies, overload, failures, lumps, cooling, e(T), crash, joules | After G0 | G1: PSU, C-states, DVFS; G2: rack; G3: room, site, regions |
 | **S5 Catalog, research, configurations and quotes** | `src/game/build/**` | Spec catalog, `docs/research.md` appendix | Catalog, compile, part/unit/config/port actions, research tree and effects, quotes | After G0 | G1: chip and board; G2: rack, configuration plate; G3: room, global |
@@ -698,7 +699,7 @@ Fixtures are deterministic builders in `src/game/testkit/fleets.ts`. There are n
 
 - **Delta invariance.** Random partitions (1 ms to 10 s pieces) of 10 min of sim on `boot`, `rackFull`, a 2-rack split fixture with router queues (D25), and a small-RAM spill fixture with completion windows (D26) produce `toEqual` states, including RNG words, draw counts and the event ring. The owned-vs-pure equivalence test (D9) runs on the same split fixture.
 - **Save round-trip.** Save at random ticks mid-round, load, continue: the result equals an uninterrupted run.
-- **Clock oracle.** `testkit/oracle.ts` stepping matches `exec` on randomized system mixes, with rate changes, time slicing and RAM sharing.
+- **Clock oracle.** Removed with the D40 test cleanup; delta invariance and the D9 owned ≡ pure test remain.
 - **Strategy effects.** Every strategy, filter and split rule has a test that fails if it is replaced by the base `firstFit` spread.
 - **Market constraints** (§1.9) over the whole curve.
 - **Purity test**, unchanged.

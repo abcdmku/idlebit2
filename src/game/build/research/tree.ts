@@ -4,6 +4,7 @@ import { CREDITS_ONLY, CREDITS_PER_DATA, TREE_ROWS, WORK_TIER_OPS } from './tree
 import { amount } from '../../amount';
 import { EFFECT_TEXT, SHORT_TEXT } from './tree.text';
 import { deferredHardwareResearch } from './runtimeCompatibility';
+import { LEVEL_RESEARCH } from './levels';
 
 const creditsOnly = new Set(CREDITS_ONLY);
 
@@ -11,7 +12,7 @@ const creditsOnly = new Set(CREDITS_ONLY);
  * The research tree (docs/research.md §9). Work volume comes from the node's tier. D32: a node priced
  * D costs D Data plus 10 × D Credits; power, cooling and operations nodes cost the Credits only.
  */
-export const RESEARCH: readonly ResearchDef[] = TREE_ROWS.map(([id, name, category, requires, level, era, tier, price, effects, answers]) => {
+export const RESEARCH: readonly ResearchDef[] = [...TREE_ROWS.map(([id, name, category, requires, level, era, tier, price, effects, answers]): ResearchDef => {
   const runtime = deferredHardwareResearch(id);
   return {
     id: researchId(id), name, category, requires: requires.map(researchId), level: level === 'cpu' ? 'chip' : level, era, tier,
@@ -19,7 +20,7 @@ export const RESEARCH: readonly ResearchDef[] = TREE_ROWS.map(([id, name, catego
     work: WORK_TIER_OPS[tier], creditCost: amount((BigInt(price) * BigInt(CREDITS_PER_DATA)).toString()), effects: runtime?.effects ?? effects,
     effect: runtime?.effect ?? EFFECT_TEXT[id] ?? '', summary: SHORT_TEXT[id] ?? '', answers, implemented: true,
   };
-});
+}), ...LEVEL_RESEARCH];
 
 const BY_ID = new Map<string, ResearchDef>(RESEARCH.map((node) => [node.id, node]));
 /** Tree order index, used for deterministic effect merging. */

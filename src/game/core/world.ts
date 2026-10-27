@@ -74,8 +74,6 @@ export interface World {
    * next tick (spec §5.2). False between ticks, where `tick` is already the next tick.
    */
   late: boolean;
-  /** Test hook: the run phase visits every rack, as before the rack skip (run.ts). */
-  visitAll?: boolean;
   /** Power-input change log of this advance call (core/touch.ts, R34); absent outside advance. */
   touch?: TouchLog;
 }

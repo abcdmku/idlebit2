@@ -56,8 +56,7 @@ export const marketKey = (m: MarketState) => (m.on ? 'On market' : 'Off market')
 export function marketLine(m: MarketState): string {
   if (m.parentOff) return `Off with its ${m.parentOff}`;
   const count = m.unit.kind === 'system' ? '' : `${m.live} / ${m.total} on market`;
-  const drain = m.on && m.running && m.drains ? 'Drains first' : '';
-  if (count) return drain ? `${count} · ${drain}` : count;
+  if (count) return count;
   if (!m.running) return m.on ? 'On next round' : 'Sits out next round';
-  return m.on ? (drain ? 'Taking tasks · Drains first' : 'Taking tasks') : 'Takes no tasks';
+  return '';
 }

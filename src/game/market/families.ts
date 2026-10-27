@@ -4,7 +4,7 @@ import { familyId, type FamilyId } from '../types/ids';
 /**
  * The 50 task families of docs/tasks.md §5, in catalog order. Catalog order is the RNG draw
  * order (§3.6). Stage coefficients, working set and VRAM are per unit of size (a shard of u units multiplies them by u, D25);
- * payload is derived from the task's stage work (D10.4). Transcribed from scripts/market-model.ts `FAMS`.
+ * payload is derived from the task's stage work (D10.4).
  * D26.3: the model's RAM-stream (r) and storage-IO (d) coefficients fold into one mem stage of bits touched
  * (adjacent ones merge), and its old disk capacity joins the working set (wsPerUnit + disk).
  */
@@ -119,9 +119,6 @@ export const FAMILIES: readonly FamilyDef[] = rows;
 /** Stable string key of a family (glyphs, labels); 'unknown' for an id outside the catalog. */
 export const familyKey = (id: FamilyId): string => FAMILIES[id]?.key ?? 'unknown';
 
-/** Credits per unit of size: Σ stage coefficients (D2, 1 Credit per op or bit). */
-export const payPerUnit = (f: FamilyDef): number => f.stages.reduce((sum, s) => sum + s.work.perSize, 0);
-
 /** Whole-unit stage work of a shard (or task) of `size` units. */
 export const stageWork = (stage: StageDef, size: number): number => stage.work.fixed + stage.work.perSize * size;
 
@@ -135,8 +132,4 @@ export function payoutAt(f: FamilyDef, size: number): number {
 /** Gate quantities of a shard of `size` units (bits, spec §6.3). */
 export const workingSetAt = (f: FamilyDef, size: number) => f.workingSet.fixed + f.workingSet.perSize * size;
 export const vramAt = (f: FamilyDef, size: number) => f.vramBits.fixed + f.vramBits.perSize * size;
-/** Payload bits equal work (D10.4). */
-export const payloadAt = (f: FamilyDef, size: number) => Math.ceil(payoutAt(f, size));
-
-export const usesResource = (f: FamilyDef, r: Resource): boolean => f.stages.some((s) => s.resource === r);
 

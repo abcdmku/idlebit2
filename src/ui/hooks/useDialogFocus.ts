@@ -1,10 +1,16 @@
 import { useEffect, useRef, type RefObject } from "react";
 
 const FOCUSABLE =
-  'button:not(:disabled), [href], input:not(:disabled), textarea:not(:disabled), select:not(:disabled), [tabindex]:not([tabindex="-1"]):not(:disabled)';
+  'button:not(:disabled), summary, [href], input:not(:disabled), textarea:not(:disabled), select:not(:disabled), [tabindex]:not([tabindex="-1"]):not(:disabled)';
 
 const controls = (root: HTMLElement) => Array.from(root.querySelectorAll<HTMLElement>(FOCUSABLE))
-  .filter(element => !element.closest('[hidden], [inert], [aria-hidden="true"]'));
+  .filter(element => {
+    if (element.closest('[hidden], [inert], [aria-hidden="true"]')) return false;
+    for (let parent = element.parentElement; parent && parent !== root; parent = parent.parentElement) {
+      if (parent.tagName === 'DETAILS' && !parent.hasAttribute('open') && parent.querySelector(':scope > summary') !== element) return false;
+    }
+    return true;
+  });
 
 /**
  * Modal keyboard contract: focus moves into the dialog once on open, Tab is

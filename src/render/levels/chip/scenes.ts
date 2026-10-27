@@ -12,7 +12,7 @@ const core = (busy: boolean, progress: number, research = 0, run: Run | null = n
   const taskId = busy ? run?.taskId ?? next++ : null;
   return {
     socket: 0, generation: 0, level: 1, busy: busy ? 1 : 0, family: busy ? run?.family ?? 2 : null, taskId,
-    progress, threads: 1, research, cstate: 0, shard: busy ? run?.shard ?? 0 : null, shardThreads: busy ? run?.threads ?? 1 : 0, rate: 0, hz: 0, sleep: null,
+    activity: busy ? 'compute' : null, progress, threads: 1, research, cstate: 0, shard: busy ? run?.shard ?? 0 : null, shardThreads: busy ? run?.threads ?? 1 : 0, rate: 0, hz: 0, sleep: null,
   };
 };
 /** One QA shard transfer on the pipe (all D25 fields set). */
@@ -50,7 +50,8 @@ export function chipScene(scene: CpuScene, simTimeMs = 2000): ChipSnapshot {
     clock: { hz, effectiveHz: hz, generation: max ? 3 : 1, level: 1 },
     coreSites: max || multi ? 32 : ring ? 10 : mesh ? 20 : boot ? 1 : 2, cores, researchShare: 0.1,
     pipe: { speed: 1000, transfer, waiting: scene === 'landing' },
-    cache: { capacityBits: bits, usedBits: boot ? 0 : max ? 2 ** 26 : 48, spilledOutBits: 0, levels: [{ kind: 'l1', bits, generation: 0, level: 1 }] },
+    cache: { capacityBits: bits, usedBits: boot ? 0 : max ? 2 ** 26 : 48, loadedBits: boot ? 0 : max ? 2 ** 26 : 48,
+      spilledOutBits: 0, levels: [{ kind: 'l1', bits, generation: 0, level: 1 }] },
     queue: boot ? [] : Array.from({ length: max ? 20 : 2 }, (_, i) => ({ taskId: 400 + i, family: familyId([4, 0, 1, 3][i % 4]!) })),
     scheduler: boot ? null : { generation: 0, level: 1, strategy: 'fifo', q: max ? 32 : 4, k: 2, queued: max ? 20 : 2, running: 2, reserved: 0 },
     slots: boot ? [{ kind: 'core', index: 1, locked: true }, { kind: 'scheduler', index: 0, locked: true }]

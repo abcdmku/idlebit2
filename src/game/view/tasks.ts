@@ -1,6 +1,7 @@
 import { LOC, type HotBuffers } from '../core/buffers';
 import { ACCEL_CLOCKS, DT_S, RES_CLOCKS } from '../core/constants';
 import { isEAxis } from '../exec/clocks';
+import { isLoadingPart } from '../exec/memory';
 import { FAMILIES } from '../market/families';
 import type { Resource } from '../types/catalog';
 import { familyId } from '../types/ids';
@@ -53,7 +54,11 @@ export function taskView(hot: HotBuffers, r: number, res: number, progress: numb
     taskId, shard, shards, units: hot.rec.units[r] ?? 0,
     threads: hot.rec.loc[r] === LOC.running ? (hot.rec.threads[r] ?? 0) * (hot.rec.count[r] ?? 1) : 0,
     key: shardKey(taskId, shard), family: familyId(hot.rec.family[r] ?? 0), count: hot.rec.count[r] ?? 0,
-    stage: hot.rec.stage[r] ?? 0, resource: RES_NAME[res] ?? 'compute', progress,
+    stage: hot.rec.stage[r] ?? 0,
+    resource: hot.rec.loc[r] === LOC.running && (isLoadingPart(hot.rec.part[r] ?? 0)
+      || res === 0 && FAMILIES[hot.rec.family[r] ?? 0]?.stages[hot.rec.stage[r] ?? 0]?.resource === 'mem')
+      ? 'mem' : RES_NAME[res] ?? 'compute',
+    progress,
     ...placementOf(hot, r, res),
     windowEndTick: deadline === null ? null : taken + deadline - 1,
   };

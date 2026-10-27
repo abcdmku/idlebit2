@@ -4,10 +4,10 @@ export type GpuSeries = 3 | 5 | 7 | 9;
 export type GpuTier = 30 | 50 | 60 | 70 | 80 | 90;
 export type GpuModelId = `${GpuGeneration}${GpuSeries}${GpuTier}`;
 
+/** A card's upgrade state is its model: generation (researched), type (series, chosen at install) and tier. */
 export interface GpuBuild {
   readonly kind: 'gpu';
   readonly model: GpuModelId;
-  readonly upgrades: number;
 }
 export interface NpuBuild {
   readonly kind: 'npu';
@@ -26,7 +26,9 @@ export interface GpuStats {
   readonly generation: GpuGeneration;
   readonly series: GpuSeries;
   readonly tier: GpuTier;
-  readonly upgrades: number;
+  /** 0 for tier 30 … 5 for tier 90. */
+  readonly tierIndex: number;
+  readonly maxTierIndex: number;
   readonly cores: number;
   readonly vramBits: number;
   readonly clockHz: number;
@@ -35,7 +37,6 @@ export interface GpuStats {
   readonly idleW: number;
   readonly loadW: number;
   readonly efficiencyOpsPerJ: number;
-  readonly maxUpgrades: number;
 }
-/** Native model specifications, evaluated with zero hot upgrades. */
+/** Model specifications before installed memory and tensor technology. */
 export type GpuModelDefinition = GpuStats;

@@ -33,7 +33,7 @@ export function barebonesSpec(tier = 0, board: BoardKind = 'general'): SystemSpe
   if (!spec) {
     spec = {
       kind: 'server', board, cpu: { cpu: L1(tier), cores: [L1(tier)], clock: L1(tier), l1: L1(tier), l2: null, l3: null }, cpuCount: 1,
-      scheduler: null, ram: [], accels: [], drives: [], psu: supply(0), settings: { dvfs: false, turbo: false, cStateLimit: 0 },
+      scheduler: null, ram: [], accels: [], drives: [], psu: supply(0), settings: { dvfs: false, turbo: false, cStateLimit: 1 },
     };
     BAREBONES_SPECS.set(key, spec);
   }

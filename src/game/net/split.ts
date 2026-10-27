@@ -14,6 +14,7 @@ import { routeStrategy } from './routers';
 import { SINGLE_SITE } from './routers/latency';
 import { childAt, FANOUT, GLOBAL, RACK, ROOM, routerOf, SITE } from './scope';
 import { floorShards } from './floor';
+import { gateBelow } from './stuck';
 
 /**
  * split(R, e) (spec §7.7, §7.8, D25.2): cuts entry e (a task of s units or a share of u units) at
@@ -231,6 +232,7 @@ function splitAt(w: World, kind: number, id: number, u: number, exact: number, d
   rec.units[probe] = u;
   beginDecision();
   const strategy = routeStrategy(cols.strategy);
+  const capability = (cols.filters & FILTER_BIT.capability) !== 0;
   n = strategy.plan(w, kind, id, probe, C, S, Wt, n);
   if (kind === GLOBAL && exact === 0 && SINGLE_SITE.has(strategy.id)) n = Math.min(n, 1);
 
@@ -248,7 +250,11 @@ function splitAt(w: World, kind: number, id: number, u: number, exact: number, d
     for (let i = 0; i < n; i += 1) {
       if (alloc[i] === 0) continue;
       note(kind, id, S[i]!);
-      if (kind === RACK) addLeaf(-1, C[i]!, share[i]!);
+      if (kind === RACK) {
+        rec.units[probe] = share[i]!;
+        if (capability && canRunOn(w, C[i]!, probe) !== 0) return rollback(n0, notes0, used0);
+        addLeaf(-1, C[i]!, share[i]!);
+      }
       else if (!splitAt(w, kind - 1, C[i]!, share[i]!, alloc[i]!, depth + 1)) return rollback(n0, notes0, used0);
     }
     return true;
@@ -277,7 +283,6 @@ function splitAt(w: World, kind: number, id: number, u: number, exact: number, d
   let given = 0;
   for (let j = 0; j < pick.length; j += 1) given += share[j]!;
   share[0] = share[0]! + (u - given);
-  const capability = (cols.filters & FILTER_BIT.capability) !== 0;
   for (let j = 0; j < pick.length; j += 1) {
     const i = pick[j]!, child = C[i]!, part = share[j]!;
     note(kind, id, S[i]!);
@@ -289,7 +294,13 @@ function splitAt(w: World, kind: number, id: number, u: number, exact: number, d
     const before = tree.n, beforeNotes = tree.notes, beforeUsed = tree.used;
     if (queueEmpty(w, kind - 1, child) && takers(w, kind, child, 1) > 0 && splitAt(w, kind - 1, child, part, 0, depth + 1)) continue;
     rollback(before, beforeNotes, beforeUsed);
-    if (queueFree(w, kind - 1, child) > 0) { addLeaf(kind - 1, child, part); continue; }
+    if (queueFree(w, kind - 1, child) > 0) {
+      // The grain probe may fit while this actual share cannot. Capability filtering must
+      // wait for a capable destination, rather than queue work that can only misroute.
+      if (capability && gateBelow(w, kind - 1, child, rec.family[probe]!, part, entry.size, false) !== 0)
+        return rollback(n0, notes0, used0);
+      addLeaf(kind - 1, child, part); continue;
+    }
     return rollback(n0, notes0, used0);
   }
   if (strategy.used) {

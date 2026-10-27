@@ -9,14 +9,19 @@ export { advanceGame, advanceGameOwned, copyGameState, copyOfflineState } from '
 export { applyAction } from './core/actions';
 export { deriveRenderSnapshot } from './view/snapshot';
 export { quote } from './build/quotes';
+export { SETPOINT_MIN_F, SETPOINT_MAX_F } from './build/settings';
+export { selectSystemPower } from './view/systemPower';
+export { selectRunway, tierOf, tierValue } from './view/frontier';
+export { ROUTE_NAMES, FILTER_NAMES, QUEUE_NAMES, rackLetter, zoneLetter, regionName } from './view/labels';
 export { selectResearchTree, selectContextualResearchTree, selectSavedConfigs, selectQueuePage, selectUnitLabel } from './view/selectors';
+export { queueWindow as selectMarketQueue } from './view/feed';
 export { serializeSave, deserializeSave, SAVE_SCHEMA } from './save/serialize';
 export { offlineCapMs } from './build/research/effects';
 export { netPerMinute } from './core/ledger';
 export { slaPercent } from './core/sla';
 export { partName } from './build/catalog/names';
 export { FAMILIES, familyKey } from './market/families';
-export { formatClock, formatEnergy, formatHertz, formatOps, formatSize } from './format';
+export { formatClock, formatEnergy, formatHertz, formatOps, formatSize, formatWatts } from './format';
 
 export { TICK_MS, HEAD_TICKS, QUEUE_VISIBLE, RECENT_OUTCOMES, REGIONS, LEVEL_NAMES, MAX_CORES_PER_CPU, MAX_CPUS, SERVERS_PER_RACK, RACK_SLOTS_PER_ROW, MAX_ROWS, MAX_ZONES_PER_SITE, MAX_SITES } from './core/constants';
 export { FAIL_CAUSES, FAIL_DETAILS } from './types/events';
@@ -26,3 +31,9 @@ export {
 } from './types/catalog';
 export { systemId, rackId, roomId, siteId, familyId, researchId } from './types/ids';
 export { MAX_ACCELS, ACCEL_DOMAINS, ACCEL_CLOCKS, POOL_DOMAIN, GENERAL_MAX_GPUS, ACCEL_GPU_SLOTS, ROUTER_QUEUE_MAX, MAX_SHARDS } from './core/constants';
+export { supplyPreparation, supplyResearch } from './build/supplyRecovery';
+
+
+
+
+export { amount } from './amount';

@@ -23,7 +23,8 @@ const MILESTONE_TARGETS: readonly [string, keyof Milestones, number, number][] =
   ['First round ends', 'firstRoundEndS', 4 * M, 8 * M],
   // Program D19 from System on.
   ['System unlocked', 'systemS', 20 * M, 30 * M],
-  ['Rack unlocked', 'rackS', 5 * H, 7 * H],
+  // D19 as amended 26 Oct (Rack research 9e6 Data, so the pipe wall lands as Rack comes within reach).
+  ['Rack unlocked', 'rackS', 3.5 * H, 5 * H],
   ['Room unlocked', 'roomS', 2 * D, 4 * D],
   ['Data center (zones)', 'dataCenterS', 7 * D, 14 * D],
   ['Regions', 'regionsS', 14 * D, 28 * D],
@@ -41,7 +42,7 @@ const mean = (xs: readonly number[]) => xs.reduce((a, b) => a + b, 0) / xs.lengt
 function maxGap(result: CampaignResult, from: number, to: number): number | null {
   const end = Math.min(to, result.ticks / 10);
   if (end <= from) return null;
-  const times = result.events.filter((e) => e.kind !== 'return').map((e) => e.tick / 10).filter((t) => t >= from && t < end);
+  const times = result.events.filter((e) => e.kind === 'buy' || e.kind === 'research').map((e) => e.tick / 10).filter((t) => t >= from && t < end);
   let last = from, gap = 0;
   for (const t of times) { gap = Math.max(gap, t - last); last = t; }
   return Math.max(gap, end - last);

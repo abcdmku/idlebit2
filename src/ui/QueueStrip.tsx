@@ -10,6 +10,7 @@ import { MIN_VISIBLE_TRANSFER_S, type Rect } from '../render/core';
 import { TaskAccent, taskTypeStyle } from './art/TaskType';
 import { RimClock } from './hooks/headClock';
 import { familyName, payoutShort, payoutText, taskKey } from './hooks/feedModel';
+import { Payout, payoutFit } from './queue/Payout';
 import type { ShellLayout } from './layout';
 import { headRisk, SLA_WINDOW } from './queue/risk';
 import { fits, HeadClock, InQueue, needShort, shortSeconds, TaskIcon, taskTitle, windowText } from './queue/taskText';
@@ -24,7 +25,7 @@ function Tag({ L, t, slot, running, risk, waiting = false, twoLine = false }: { 
   /** D27: research waits at the front, so the market's head waits behind it. */ waiting?: boolean }) {
   const { view } = useShell();
   const head = slot === 0, d = L.kind === 'desktop', n = L.N, icon = 16 * n;
-  const rect: Rect = head ? L.headSlot : L.cards[slot - 1]!;
+  const rect: Rect = head ? L.headSlot : L.cards[slot - 1]!, oy = (rect.h - 64) / 2;
   const blocked = running && t.blockedBy !== null;
   let body;
   if (d) {
@@ -43,10 +44,10 @@ function Tag({ L, t, slot, running, risk, waiting = false, twoLine = false }: { 
     const lands = running && t.transferS !== null && t.transferS >= MIN_VISIBLE_TRANSFER_S;
     const extra = !running ? '' : waiting ? '· waiting' : blocked ? `needs ${needShort(t)}`
       : t.deadline !== null ? `· ${windowText(t.deadline)}` : lands ? `· ${shortSeconds(t.transferS!)}` : '';
-    const room = (more: string) => fits(oneLine ? `${name} ${pay} ${more}` : `${pay} ${more}`, w, L.body);
+    const room = (more: string) => fits(oneLine ? `${name} ${payoutFit(pay)} ${more}` : `${payoutFit(pay)} ${more}`, w, L.body);
     const tail = !head && extra && room(extra)
       ? <span className={waiting ? 'dim' : blocked ? 'warn' : t.deadline !== null ? 'mute' : 'net'}> {extra}</span> : null;
-    const values = <><span className={running ? 'gold' : 'dim'}>{pay}</span>{tail}</>;
+    const values = <><span className={running ? 'gold' : 'dim'}><Payout text={pay} /></span>{tail}</>;
     body = <>
       <span className="aic" style={{ left: L.lat, top: (rect.h - icon) / 2 }}><TaskIcon task={t} n={n} /></span>
       {oneLine ? <T x={tx} y={0} h={rect.h} w={w}><b>{name}</b> {head ? state : values}</T> : <>
@@ -59,14 +60,16 @@ function Tag({ L, t, slot, running, risk, waiting = false, twoLine = false }: { 
       : t.committed ? <InQueue task={t} short testId="strip-state" />
       : <HeadClock blocked={blocked} risk={risk} short testId="strip-state" />;
     body = <>
-      <span className="aic" style={{ left: 8, top: 8 }}><TaskIcon task={t} n={n} /></span>
-      <T x={48} y={16} w={rect.w - 48 - 4}>{state}</T>
-      <T x={8} y={40} w={rect.w - 16}>{familyName(t.family)}</T>
+      <span className="aic" style={{ left: 8, top: 8 + oy }}><TaskIcon task={t} n={n} /></span>
+      <T x={48} y={16 + oy} w={rect.w - 48 - 4}>{state}</T>
+      <T x={8} y={40 + oy} w={rect.w - 8}>{familyName(t.family)}</T>
     </>;
   } else {
+    const reward = payoutShort(t);
     body = <>
       <span className="aic" style={{ left: Math.round((rect.w - icon) / 16) * 8, top: 8 }}><TaskIcon task={t} n={n} /></span>
-      <T x={8} y={40} w={rect.w - 8} className={!running ? 'dim' : blocked ? 'warn' : 'gold'}>{blocked ? needShort(t, true) : payoutShort(t)}</T>
+      <T x={8} y={40} w={rect.w - 8} className={!running ? 'dim' : blocked ? 'warn' : 'gold'}>{blocked ? needShort(t, true)
+        : rect.w < 64 ? reward.replace(/^\+/, '') : <Payout text={reward} />}</T>
     </>;
   }
   // Tapping a card opens its task detail (user, 26 Oct).
@@ -82,12 +85,12 @@ function Tag({ L, t, slot, running, risk, waiting = false, twoLine = false }: { 
 
 /** D27: research at the front of the line: the flask, its name and work, "next in line"; no clock, no Dismiss. */
 function ResearchTag({ L, r }: { L: ShellLayout; r: ResearchQueueEntryView }) {
-  const d = L.kind === 'desktop', n = L.N, icon = 16 * n, rect = L.headSlot;
+  const d = L.kind === 'desktop', n = L.N, icon = 16 * n, rect = L.headSlot, oy = (rect.h - 64) / 2;
   const flask = <ArtCanvas w={16} h={16} n={n} artKey="flask" draw={drawFlask} />;
   if (!d) return <div className="tag is-head research" style={{ left: 0, top: 0, width: rect.w, height: rect.h }} data-k="head-task" data-testid="research-head" title={`${r.name}: next in line`}>
-    <span className="aic" style={{ left: 8, top: 8 }}>{flask}</span>
-    <T x={48} y={16} w={rect.w - 52} className="rnd">next</T>
-    <T x={8} y={40} w={rect.w - 16}>{r.name}</T>
+    <span className="aic" style={{ left: 8, top: 8 + oy }}>{flask}</span>
+    <T x={48} y={16 + oy} w={rect.w - 52} className="rnd">next</T>
+    <T x={8} y={40 + oy} w={rect.w - 16}>{r.name}</T>
   </div>;
   const tx = L.lat + icon + 8, w = rect.w - tx - 8, ops = formatOps(r.work);
   return <div className="tag is-head research" style={{ left: 0, top: 0, width: rect.w, height: rect.h }} data-k="head-task" data-testid="research-head" title={`${r.name}: ${ops}, next in line`}>
@@ -111,10 +114,11 @@ export function QueueStrip() {
   const running = !q.frozen, head = rq ? null : q.window[0] ?? null, behind = rq ? 0 : 1;
   const blocked = running && !!head && head.blockedBy !== null;
   const risk = running && !!head && !head.committed && headRisk(q.met, q.failed, q.checking, q.slaWindow);
-  const first = L.cards[0], last = L.cards[3];
+  const first = L.cards[0];
+  const cardsRight = Math.max(...L.cards.map(c => c.x + c.w)), cardsBottom = Math.max(...L.cards.map(c => c.y + c.h));
   // QA-22: one form for the four cards, decided by the longest (cards are as wide as each other).
   const cardW = first.w - (L.lat + 16 * L.N + 8) - 8;
-  const twoLine = L.kind === 'desktop' && L.cards.some((_, i) => { const t = q.window[i + behind]; return !!t && !fits(`${familyName(t.family)} ${payoutText(t)}`, cardW, L.body); });
+  const twoLine = L.kind === 'desktop' && L.cards.some((_, i) => { const t = q.window[i + behind]; return !!t && !fits(`${familyName(t.family)} ${payoutFit(payoutText(t))}`, cardW, L.body); });
   return <section className="queue" aria-label="Task queue" data-testid="queue">
     <div className={`panel head-slot${blocked ? ' blocked' : ''}${risk ? ' risk' : ''}${rq ? ' research-head' : ''}`}
       style={{ ...box(L.headSlot), ...taskTypeStyle(head?.family), ...(risk ? { '--rim': 'var(--fault)' } as CSSProperties : {}) }}
@@ -123,7 +127,7 @@ export function QueueStrip() {
       {/* Desktop: the bar on the top edge above one centred line; phone: on the bottom edge, clear of the name. */}
       <RimClock w={L.headSlot.w} n={L.N} blocked={blocked} top={L.kind === 'phone' ? L.headSlot.h - 3 * L.N : undefined} />
     </div>
-    <ol className="panel slots" aria-label="Next tasks" style={box({ x: first.x, y: first.y, w: last.x + last.w - first.x, h: first.h })}>
+    <ol className="panel slots" aria-label="Next tasks" style={box({ x: first.x, y: first.y, w: cardsRight - first.x, h: cardsBottom - first.y })}>
       {L.cards.map((c, i) => {
         const t = q.window[i + behind];
         return <li key={i} className="slot" style={box(c, first)} data-k={`slot${i}`}>

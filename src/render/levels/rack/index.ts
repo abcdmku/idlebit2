@@ -36,8 +36,9 @@ export function createRackRenderer(registry: LevelRegistry): LevelRenderer<'rack
     focus(s, _vp, out, form, area) {
       copyRect(FOCUS, out); out.x += colX(rackCol(s)) + rackRowScroll.apply(s, area);
       // Phone: the rest also frames a gutter left of the cabinet, so the pipe tags beside the first
-      // drop never touch it (the cabinet rests right of centre; 174 art px still fits at 2).
-      if (form === 'phone') { out.x -= PHONE_TAG_GUTTER; out.w += PHONE_TAG_GUTTER; }
+      // drop never touch it (the cabinet rests right of centre; 174 art px fits at 2 from a 348 px view).
+      // A narrower view (320 px) keeps the whole cabinet instead: the gutter would crop its PDU strip.
+      if (form === 'phone' && (!area || area.w >= (out.w + PHONE_TAG_GUTTER) * 2)) { out.x -= PHONE_TAG_GUTTER; out.w += PHONE_TAG_GUTTER; }
       return out;
     },
     /** The pipe tags keep clear of the active cabinet itself, not the phone gutter beside it. */

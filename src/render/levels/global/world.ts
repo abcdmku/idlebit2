@@ -16,7 +16,7 @@ const SHEATH = '#16253a', PLATE = mix(P.void, P.ink, 0.25), DP = mix(P.net, P.in
 const hub: Rect = { x: 0, y: 0, w: 0, h: 0 };
 const BASE_PRICE = REGIONS[0].energyPrice;
 /** Climate sign per region (A28): "70°F · cost ×1.0", outside air and the energy price against the first region's. */
-export const CLIMATE_SIGNS = REGIONS.map(r => `${r.outsideF}°F · cost ×${(r.energyPrice / BASE_PRICE).toFixed(1)}`);
+export const CLIMATE_SIGNS = REGIONS.map(r => `${r.outsideF}°F · power ×${(r.energyPrice / BASE_PRICE).toFixed(1)}`);
 
 function drawMap(g: G): void {
   for (let y = 0; y < SIZE.h; y++) {
@@ -110,7 +110,13 @@ function drawSite(g: G, i: number, site: SiteView, frame: WorldFrame, ctx: Globa
   const room = ctx.registry.has('room') ? ctx.registry.level('room') : null;
   for (let z = 0; z < n; z++) {
     const t = tiles[z], zv = site.zones[z];
-    if (room) room.drawMini(g, zv, t, frame);
+    if (zv.roomId === null) {
+      R(g, t.x, t.y, t.w, t.h, P.ink);
+      R(g, t.x + 1, t.y + 1, t.w - 2, t.h - 2, P.steelLo);
+      const cx = t.x + (t.w >> 1), cy = t.y + (t.h >> 1);
+      R(g, cx - 2, cy, 5, 1, P.gold); R(g, cx, cy - 2, 1, 5, P.gold);
+    }
+    else if (room) room.drawMini(g, zv, t, frame);
     else { R(g, t.x, t.y, t.w, t.h, P.ink); R(g, t.x + 1, t.y + 1, t.w - 2, t.h - 2, P.steelLo); }
   }
 }

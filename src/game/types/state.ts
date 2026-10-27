@@ -5,6 +5,7 @@ import type { CeilingId, FilterId, PartId, QueueStrategyId, RouteStrategyId, Rul
 import type { EventRing } from './events';
 import type { FamilyId, LevelId, ResearchId } from './ids';
 import type { RoundReport } from './report';
+import type { FrontierState, RunwayMark } from './frontier';
 
 export type { CompiledBuffers, HotBuffers } from '../core/buffers';
 
@@ -25,7 +26,7 @@ export interface GameState {
   readonly build: BuildState;
   readonly research: ResearchState;
   readonly configs: SavedConfigs;
-  /** Derived from build + research. Never written by the tick; replaced copy-on-write by actions. */
+  /** Derived from build + research; replaced copy-on-write when hardware or research changes. */
   readonly compiled: CompiledBuffers;
   /** Runtime typed arrays the tick mutates; cloned once per advance call that ticks. */
   readonly hot: HotBuffers;
@@ -77,6 +78,10 @@ export interface RoundState {
   readonly researchOps: number;
   /** Newest last, at most ROUND_REPORTS_KEPT. */
   readonly reports: readonly RoundReport[];
+  /** D40: best reach ever and the families ever taken. */
+  readonly frontier: FrontierState;
+  /** D40: the next milestone's progress at Return, frozen into the round's report. */
+  readonly runwayStart: RunwayMark | null;
 }
 
 export interface TaskRef {

@@ -22,7 +22,7 @@ export interface ViewState {
   readonly selectedId: string | null;
   /** A copy of the tapped target; its callout (and, on request, its plate) resolve it. */
   readonly selected: HitTarget | null;
-  /** The selected target's full plate is open (the callout's More). */
+  /** The selected target's full plate is open; retained as Research's return target while the sheet is shown. */
   readonly plate: boolean;
   readonly sheet: Sheet | null;
   readonly researchProject: ResearchId | null;
@@ -41,7 +41,7 @@ export type ViewCommand =
   | { readonly type: 'openResearch'; readonly project?: ResearchId | null }
   | { readonly type: 'toggleSheet'; readonly sheet: Sheet }
   | { readonly type: 'openTask'; readonly task: string }
-  /** Phone back, browser Back and Escape: close the topmost menu only (task detail, plate, callout, sheet). */
+  /** Phone back, browser Back and Escape: close the research sheet, then its retained task or hardware origin. */
   | { readonly type: 'back' }
   | { readonly type: 'cancel' };
 
@@ -122,20 +122,20 @@ export function createViewStore(read: () => RenderSnapshot, initial: ViewState):
       case 'openPlate':
         return state.selected && !state.plate ? { ...state, plate: true } : state;
       case 'openResearch':
-        return { ...state, ...CLEAR, sheet: 'research', researchProject: command.project ?? null };
+        return { ...state, sheet: 'research', researchProject: command.project ?? null };
       case 'toggleSheet':
         return state.sheet === command.sheet ? { ...state, sheet: null, researchProject: null }
-          : { ...state, ...CLEAR, sheet: command.sheet, researchProject: null };
+          : { ...state, sheet: command.sheet, researchProject: null };
       case 'cancel':
         return state.selected || state.sheet || state.task
           ? { ...state, ...CLEAR, sheet: null, researchProject: null } : state;
       case 'openTask':
         return { ...state, ...CLEAR, sheet: null, researchProject: null, task: command.task };
       case 'back':
-        // Innermost first: a task detail, then a part's detail (plate or callout: one layer), then a sheet.
+        // Research returns to the hardware or task that opened it.
+        if (state.sheet) return { ...state, sheet: null, researchProject: null };
         if (state.task) return { ...state, task: null };
         if (state.selected) return { ...state, ...CLEAR };
-        if (state.sheet) return { ...state, sheet: null, researchProject: null };
         return state;
     }
   };

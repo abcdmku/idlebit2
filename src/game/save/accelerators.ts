@@ -2,7 +2,7 @@ import { accelNeed, readAccelDomain } from '../core/accelerators';
 import { LOC } from '../core/buffers';
 import { ACCEL_CLOCKS, ACCEL_DOMAINS, DT_S, GENERAL_MAX_GPUS, MAX_ACCELS } from '../core/constants';
 import { FAMILIES } from '../market/families';
-import { partClock } from '../exec/memory';
+import { PART_LOAD_DISK, isLoadingPart, partClock } from '../exec/memory';
 import { shapeOf } from '../exec/shape';
 import { evaluateGpu, gpuModel } from '../build/catalog/gpuModels';
 import { installedGpuStats } from '../build/gpu';
@@ -47,9 +47,9 @@ export function validateAccelBuilds(state: GameState, fail: Reject): void {
       if (raw.kind === 'gpu') {
         const model = typeof raw.model === 'string' ? gpuModel(raw.model) : null;
         if (!model) fail(`${at}.model`, 'invalid GPU model');
-        if (!Number.isInteger(raw.upgrades) || (raw.upgrades as number) < 0 || (raw.upgrades as number) > 5) fail(`${at}.upgrades`, 'expected 0..5 hot upgrades');
+        if ('upgrades' in raw) fail(`${at}.upgrades`, 'obsolete GPU hot pushes (tiers replace them)');
         if ('gen' in raw || 'level' in raw) fail(at, 'obsolete GPU gen/level build');
-        evaluateGpu(model.model, raw.upgrades as number);
+        evaluateGpu(model.model);
         const gen = model.generation - 1;
         if (!(unlocks.gens.gpu & 1) || !(unlocks.gens.gpu & (1 << gen))) fail(at, 'GPU generation is locked');
       } else if (raw.kind === 'npu') {
@@ -88,7 +88,8 @@ export function validateAccelRuntime(state: GameState, fail: Reject): void {
       if (rec.loc[r] !== LOC.running || rec.owner[r] !== sys || rec.prev[r] !== prev) fail(`hot.rec[${r}]`, 'run-list ownership mismatch');
       const { family } = demand(r);
       // D26.2: the record's current stage part names its clock (a mem stage's RAM and disk parts).
-      if (rec.part[r]! > 2 || partClock(shapeOf(rec.family[r]!), rec.stage[r]!, rec.part[r]!) !== resource) fail(`hot.rec[${r}]`, 'wrong resource list');
+      if (rec.part[r]! > PART_LOAD_DISK || isLoadingPart(rec.part[r]!) && rec.stage[r] !== 0
+        || partClock(shapeOf(rec.family[r]!), rec.stage[r]!, rec.part[r]!) !== resource) fail(`hot.rec[${r}]`, 'wrong resource list');
       if (resource === 2 && (rec.accelDomain[r] !== domain || family.tensor !== tensor)) fail(`hot.rec[${r}].accelDomain`, 'wrong accelerator clock');
       const waitingIo = resource === 3 && rec.start[r] === Infinity && rec.finish[r] === Infinity;
       // Linking rebases in-flight work onto a new clock; completed work can put its start below zero.
@@ -115,7 +116,13 @@ export function validateAccelRuntime(state: GameState, fail: Reject): void {
         catch { fail(`build.systems[${sys}].spec.accels[${slot}]`, 'invalid GPU technology'); }
         const fields = { accelCores: expected.cores, accelClockHz: expected.clockHz, accelVram: expected.vramBits,
           accelOps: expected.opsPerS, accelTensorOps: expected.tensorOpsPerS, accelIdleW: expected.idleW, accelLoadW: expected.loadW };
-        for (const [key, value] of Object.entries(fields)) if (s[key as keyof typeof fields][p] !== value) fail(`compiled.sys.${key}[${p}]`, 'does not match evaluated GPU model');
+        // V8's optimized power arithmetic can differ by a few ULPs from a cold load. Keep saved values
+        // intact and reject changes larger than floating-point roundoff.
+        for (const [key, value] of Object.entries(fields)) {
+          const saved = s[key as keyof typeof fields][p]!;
+          if (Math.abs(saved - value) > 8 * Number.EPSILON * Math.max(1, Math.abs(value)))
+            fail(`compiled.sys.${key}[${p}]`, 'does not match evaluated GPU model');
+        }
       }
       if (kind === 2 && (s.accelCores[p] !== 0 || s.accelOps[p] !== 0 || !(s.accelTensorOps[p]! > 0))) fail(`compiled.sys.accelOps[${p}]`, 'NPU must be tensor only');
       const task = hot.accelTaskS[p]!, research = hot.accelResearchS[p]!;

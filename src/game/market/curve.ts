@@ -4,17 +4,19 @@ import type { FamilyDef } from '../types/catalog';
 export const CURVE = {
   /**
    * D30: every round starts at I = 0 and each task drawn advances I by 1 / k(I): k tasks per unit of I,
-   * k(I) = k0 + k1 × I + k2 × I². Hardware never changes the curve, only how fast a round moves along it; later
-   * intensities take more tasks per unit, so a fast fleet's round still lasts minutes near its wall.
+   * The opening keeps its quadratic curve. Beyond I14, a cubic term gives fleet bands enough tasks
+   * for 10–45 minute rounds. Hardware never changes this curve, only how fast a round moves along it.
    */
   k0: 9, k1: 0.3, k2: 0.03,
+  fleetFrom: 14, fleetK: 0.35,
   sizeJit: 0.2, weightJit: 0.3, dataJit: 0.1,
   ramp: 1,
   sizeExp: 0.85,
 } as const;
 
 /** Tasks per unit of I at I (D30). */
-export const tasksPerUnit = (I: number): number => CURVE.k0 + CURVE.k1 * I + CURVE.k2 * I * I;
+export const tasksPerUnit = (I: number): number => CURVE.k0 + CURVE.k1 * I + CURVE.k2 * I * I
+  + CURVE.fleetK * Math.max(0, I - CURVE.fleetFrom) ** 3;
 /** The intensity after one more task is drawn at I (D30). */
 export const nextIntensity = (I: number): number => I + 1 / tasksPerUnit(I);
 export const sizeScale = (I: number): number => 2 ** (CURVE.sizeExp * I);

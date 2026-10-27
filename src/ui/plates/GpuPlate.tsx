@@ -1,17 +1,17 @@
-import { useMemo, useState } from 'react';
-import { POOL_DOMAIN, selectResearchTree, type Amount, type GpuGeneration, type GpuStats, type PartView, type GpuSeries, type GpuTier, type Quote, type QuoteResult, type QuoteRequest, type ResearchNodeView, type ResearchTreeView, type SystemId, type TaskView } from '../../game';
+import { useMemo } from 'react';
+import { POOL_DOMAIN, selectResearchTree, type GpuGeneration, type GpuStats, type PartView, type Quote, type ResearchId, type ResearchNodeView, type SystemId, type TaskView } from '../../game';
 import { useGameSelector, useQuote, useShell } from '../storeHooks';
 import { projectKey } from '../research/model';
 import { familyName } from '../hooks/feedModel';
-import { TaskTypeLabel } from '../art/TaskType';
-import { useLayout } from '../shell/geometry';
-import { bits, hertz, ops, quantity, span, watts } from './format';
+import { bits, ops, quantity, watts } from './format';
 import { PlateFrame } from './PlateFrame';
 import type { PlateCommon } from './types';
-import { exactAmount, GPU_CLASSES, GPU_GENERATIONS, GPU_SERIES, GPU_TIERS, gpuResearch, lacksAmount, SERIES_COPY, SERIES_NAMES, type GpuSelection } from './gpuModel';
-import { OverSupplyNote, Pips } from './widgets';
+import { GPU_CLASSES, GPU_GENERATIONS, GPU_TIERS, gpuResearch, SERIES_NAMES } from './gpuModel';
+import { changeNote, Key, OverSupplyNote, Price, QuoteKey } from './widgets';
+import { LockIcon } from './icons';
+import { OptionRow, perGeneration, routine, type Option } from './OptionRow';
+import { partQuotes } from './PartKeys';
 import { GpuCard } from './GpuCard';
-import { GpuPower } from './GpuPower';
 import '../styles/gpu.css';
 
 interface GpuPlateProps extends Omit<PlateCommon, 'quotes'> {
@@ -21,160 +21,189 @@ interface GpuPlateProps extends Omit<PlateCommon, 'quotes'> {
   tasks?: readonly TaskView[];
 }
 
-/** The connected picker owns selection only. Every stat, price and purchase comes from the sim. */
-export function GpuPlate({ system, index, installed, ...props }: GpuPlateProps) {
-  const shell = useShell();
-  const walletKey = useGameSelector(s => `${s.epoch}|${s.hud.credits}|${s.hud.data}|${s.research.active}|${s.research.queued}`, Object.is, 500);
-  void walletKey;
-  const tree = selectResearchTree(shell.store.getState());
-  const cap = [...GPU_GENERATIONS].reverse().find(g => generationResearched(tree.nodes, g)) ?? null;
-  const card = installed?.gpu ?? null;
-  // D39: an occupied slot is only offered strictly better cards. The plate opens on the first one.
-  const first = useMemo(() => card && index !== null ? firstOffer(shell.quote, system, index, card.generation) : null,
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- the installed model and wallet are the inputs
-    [shell, system, index, card?.model, walletKey]);
-  // A pick belongs to the card it was made against; after a replace the plate reopens on the next offer.
-  const [pick, setPick] = useState<{ readonly model: string | undefined; readonly selection: GpuSelection } | null>(null);
-  const picked = pick && pick.model === card?.model ? pick.selection : null;
-  const setSelection = (next: GpuSelection) => setPick({ model: card?.model, selection: next });
-  const selection: GpuSelection = picked ?? first ?? {
-    generation: card?.generation ?? cap ?? 1, series: card?.series ?? 3, tier: card?.tier ?? 30,
-  };
-  const models = useQuote({ kind: 'gpuModels', system, index, generation: selection.generation });
-  const part = useQuote(index === null ? null : { kind: 'part', part: { unit: { kind: 'system', id: system }, slot: { kind: 'gpu', index } } });
-  const code = `${selection.generation}${selection.series}${selection.tier}`;
-  const selected = models?.quotes.find(q => q.action.type === 'installGpu' && q.action.model === code);
-  const upgrade = part?.quotes.find(q => q.action.type === 'upgradePart' && q.gpu);
-  const credits = shell.store.getSnapshot().hud.credits;
-  return <GpuModelPlate {...props} installed={installed} system={system} index={index} selection={selection} onSelect={setSelection}
-    selected={selected} upgrade={upgrade} tree={tree} credits={credits} data={shell.store.getSnapshot().hud.data} cap={cap}
-    best={!!card && index !== null && first === null} />;
-}
-
-export interface GpuModelPlateProps extends GpuPlateProps {
-  selection: GpuSelection;
-  onSelect: (selection: GpuSelection) => void;
-  selected: Quote | undefined;
-  upgrade: Quote | undefined;
-  tree: ResearchTreeView;
-  credits: Amount;
-  data: Amount;
-  cap: GpuGeneration | null;
-  /** The installed card has no strictly better model on offer. */
-  best?: boolean;
-}
-
 /** Gen 1 has no project of its own (D39: it needs System); every later generation needs its research. */
-function generationResearched(nodes: readonly ResearchNodeView[], g: GpuGeneration): boolean {
+function researched(nodes: readonly ResearchNodeView[], g: GpuGeneration): boolean {
   const node = gpuResearch(nodes, g);
   return node ? node.state === 'done' : g === 1;
 }
 
-/** The first model the sim offers for this slot: from the installed generation up, then below; unlocked first. */
-function firstOffer(quote: (r: QuoteRequest) => QuoteResult, system: SystemId, index: number, from: GpuGeneration): GpuSelection | null {
-  const order = [...GPU_GENERATIONS.filter(g => g >= from), ...GPU_GENERATIONS.filter(g => g < from)];
-  const offers = order.flatMap(generation => quote({ kind: 'gpuModels', system, index, generation }).quotes);
-  const q = offers.find(o => !o.locked) ?? offers[0];
-  if (!q || q.action.type !== 'installGpu') return null;
-  const code = q.action.model;
-  return { generation: Number(code[0]) as GpuGeneration, series: Number(code[1]) as GpuSeries, tier: Number(code.slice(2)) as GpuTier };
-}
+/**
+ * GPU tier ruling (upgrade experience decision, 26 Oct): a card is its generation, type and tier. The plate leads
+ * with that state and the card's live duty. Its two buys are pinned in the footer, always in view: the next tier
+ * (hot) and a later generation at the same type and tier (cold, the difference in value), or that generation's
+ * research. The body says what each changes, then offers another type at the same tier (cold, any rise in value)
+ * and Remove. An empty bay offers one card per type at the newest researched generation the wallet can buy.
+ * Every figure, price and lock is the sim's quote.
+ */
+export function GpuPlate({ system, index, installed, tasks = [], onAction, onResearch, ...frame }: GpuPlateProps) {
+  const shell = useShell();
+  // Wallet and research changes re-quote the keys below (each quote hook keys on them too).
+  const walletKey = useGameSelector(s => `${s.epoch}|${s.hud.credits}|${s.hud.data}|${s.research.active}|${s.research.queued}`, Object.is, 500);
+  const state = shell.store.getState(), tree = selectResearchTree(state);
+  const open = GPU_GENERATIONS.filter(g => researched(tree.nodes, g));
+  const card = installed?.kind === 'gpu' ? installed.gpu ?? null : null;
+  const slot = index === null ? null : { unit: { kind: 'system' as const, id: system }, slot: { kind: 'gpu' as const, index } };
+  const part = useQuote(slot && { kind: 'part', part: slot });
+  // The furthest researched generation above the card; none researched yet: its next generation's project.
+  const later = card ? open.filter(g => g > card.generation).at(-1) ?? null : null;
+  const genQuote = useQuote(card && later !== null ? { kind: 'gpuModels', system, index, generation: later } : null)?.quotes[0];
+  const nextNode = card && later === null && card.generation < 9 ? gpuResearch(tree.nodes, (card.generation + 1) as GpuGeneration) : undefined;
+  const typeQuotes = useQuote(card ? { kind: 'gpuModels', system, index, generation: card.generation } : null)?.quotes ?? [];
+  // An empty bay: the newest researched generation with a card the wallet covers (a later generation keeps tier and
+  // type and costs only the difference, so an older card is never wasted); the newest when none is affordable.
+  const openKey = open.join(',');
+  const entry = useMemo(() => {
+    if (card) return [];
+    const byGen = open.map(generation => shell.quote({ kind: 'gpuModels', system, index, generation }).quotes);
+    const at = byGen.map((qs, i) => (qs.some(q => !q.locked && q.affordable) ? i : -1)).filter(i => i >= 0).at(-1) ?? byGen.length - 1;
+    return byGen[at] ?? [];
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- the wallet, research and slot are the inputs
+  }, [shell, card?.model, system, index, walletKey, openKey]);
+  const focus = shell.store.getSnapshot().focus, bays = focus.level === 'system' ? focus.gpu.length : 0;
+  const npus = useQuote(index === null ? { kind: 'part', part: { unit: { kind: 'system', id: system }, slot: { kind: 'gpu', index: bays } } } : null);
+  const act = (q: Quote) => onAction(q.action);
+  const step = { onAction: act, onResearch, researchName: frame.researchName };
 
-export function GpuModelPlate({ system, index, installed, tasks = [], selection: s, onSelect, selected: q, upgrade, tree, credits, data, cap, best = false,
-  onAction, onResearch, ...frame }: GpuModelPlateProps) {
-  const L = useLayout();
-  const before = q?.gpu?.before ?? installed?.gpu ?? null, after = q?.gpu?.after;
-  const code = `${s.generation}${s.series}${s.tier}`;
-  const nextGeneration = GPU_GENERATIONS.find(g => cap === null || g > cap);
-  const next = nextGeneration ? gpuResearch(tree.nodes, nextGeneration) : undefined;
-  const researchKey = next ? projectKey(next, tree, credits, data) : null;
-  const selectedResearch = q?.locked?.code === 'research' ? q.locked.node : null;
-  const feePending = next?.state === 'available' || next?.state === 'locked' || next?.state === 'queued';
-  const hot = upgrade?.gpu?.after;
-  const held = installed?.vramUsedBits ?? 0;
-  const assigned = index === null ? [] : tasks.filter(t => t.accelDomain === index || t.accelDomain === POOL_DOMAIN);
-  const notOffered = !q && index !== null && !!installed?.gpu;
-  const note = best ? 'Your card is the best available' : notOffered ? 'Not an upgrade' : q?.locked?.text ?? (q && !q.affordable ? 'Needs more Credits' : q?.cold
-    ? q.downtimeMs > 0 ? `${span(q.downtimeMs / 1000)} offline. Running work is lost.${index === null ? '' : ' Old card is scrapped.'}`
-      : `No downtime between rounds.${index === null ? '' : ' Old card is scrapped.'}`
-    : index === null ? 'Installs this preconfigured model.' : 'No downtime. Old card is scrapped.');
-  return <PlateFrame {...frame} title={index === null ? 'Buy GPU' : installed?.kind === 'npu' ? 'Replace NPU with GPU' : 'Replace GPU'} sub={`System ${system + 1}${index === null ? '' : ` · slot ${index + 1}`}`}
-    className="gpu-picker" closeKey pinTop>
-    <div className="gpu-scroll" tabIndex={0} aria-label="GPU models and actions">
-      <div className="gpu-body">
-        <div className="gpu-configure">
-          <label className="gpu-generation"><span>Generation</span><select aria-label="GPU generation" value={s.generation}
-            onChange={e => onSelect({ ...s, generation: Number(e.target.value) as GpuGeneration })}>
-            {GPU_GENERATIONS.map(g => <option key={g} value={g}>Gen {g} · {GPU_CLASSES[g - 1]}{generationResearched(tree.nodes, g) ? '' : ' · locked'}</option>)}
-          </select></label>
-          <div className="gpu-choice-label">Series</div>
-          <div className="gpu-options gpu-series" role="group" aria-label="GPU series">
-            {GPU_SERIES.map(series => <button key={series} type="button" aria-pressed={s.series === series}
-              aria-label={`Series ${series}, ${SERIES_NAMES[series]}`} onClick={() => onSelect({ ...s, series })}>
-              <b>{series}</b><span>{SERIES_NAMES[series]}</span></button>)}
-          </div>
-          <div className="gpu-choice-label">Tier</div>
-          <div className="gpu-options gpu-tiers" role="group" aria-label="GPU tier">
-            {GPU_TIERS.map(tier => <button key={tier} type="button" aria-pressed={s.tier === tier} aria-label={`Tier ${tier}`}
-              onClick={() => onSelect({ ...s, tier })}>{tier}</button>)}
-          </div>
-          <p className="gpu-emphasis">{SERIES_COPY[s.series]}</p>
-          <p className="gpu-cap">Current cap · {cap === null ? 'GPU research needed' : `Gen ${cap}, ${GPU_CLASSES[cap - 1]}`}</p>
-        </div>
-        <div className="gpu-quote">
-          <div className="gpu-model"><GpuCard /><div><b>{code} · {SERIES_NAMES[s.series]}</b><span>Gen {s.generation} · {GPU_CLASSES[s.generation - 1]} class</span></div></div>
-          <GpuComparison before={before} after={after} code={code} installedLabel={installed?.kind === 'npu' ? `NPU Gen ${installed.generation + 1}` : undefined} />
-          <GpuPower power={q?.gpuPower} />
-          {!best && <button type="button" className="key gpu-buy" disabled={!q || !!q.locked || !q.affordable} onClick={() => q && onAction(q.action)}>
-            <span>{index === null ? 'Buy' : 'Replace with'} {code}</span><span className="gpu-price">{q ? `${exactAmount(q.cost)} Cr` : notOffered ? '' : 'Loading quote'}</span>
-          </button>}
-          {q && <OverSupplyNote quote={q} onAction={x => onAction(x.action)} />}
-          <p className={`gpu-note${q?.locked || q && !q.affordable || notOffered && !best ? ' warn' : ''}`} aria-live="polite">{note}</p>
-          <button type="button" className="gpu-research-link" disabled={!selectedResearch} onClick={() => selectedResearch && onResearch?.(selectedResearch)}>
-            {selectedResearch ? 'Open required research' : q ? 'Selected generation researched' : best ? 'Nothing better to buy' : notOffered ? 'Pick a better model' : 'Waiting for quote'}
-          </button>
-        </div>
-      </div>
-      <div className="gpu-alternatives">
-        <section>
-          <div className="gpu-alt-title"><span>{before ? `Keep ${before.model} · hot upgrade` : 'Hot upgrades after purchase'}</span><Pips filled={before?.upgrades ?? 0} max={before?.maxUpgrades ?? 5} /></div>
-          <button type="button" className="key ghost" disabled={!upgrade || !!upgrade.locked || !upgrade.affordable} onClick={() => upgrade && onAction(upgrade.action)}>
-            <span>{before ? before.upgrades >= before.maxUpgrades ? 'Upgrade limit reached' : `Push +${before.upgrades} to +${hot?.upgrades ?? before.upgrades + 1}` : 'No card installed'}</span>
-            <span className="gpu-price">{upgrade ? `${exactAmount(upgrade.cost)} Cr` : ''}</span>
-          </button>
-          <p className="gpu-note">{upgrade?.locked?.text ?? (upgrade && !upgrade.affordable ? 'Needs more Credits' : hot && before
-            ? `${hot.cores.toLocaleString('en-US')} cores · ${bits(hot.vramBits)} VRAM · ${hertz(hot.clockHz)}. ${quantity(before.efficiencyOpsPerJ, 'ops/J')} → ${quantity(hot.efficiencyOpsPerJ, 'ops/J')}. Instant. Running work stays.`
-            : 'Each push raises specs and lowers efficiency.')}</p>
-          <GpuPower power={upgrade?.gpuPower} hot />
-        </section>
-        <section>
-          <div className="gpu-alt-title"><span>{nextGeneration ? `Next · Gen ${nextGeneration}` : 'All generations researched'}</span></div>
-          <button type="button" className="key locked-action" disabled={!next || !researchKey?.action && !next.lockedBy}
-            onClick={() => { if (researchKey?.action) onAction(researchKey.action); else if (next?.lockedBy) onResearch?.(next.id); }}>
-            <span>{next ? `${researchKey?.label ?? 'Research'} · ${next.name}` : 'Gen 9 unlocked'}</span>
-            {next && <span className="gpu-research-price"><span>{exactAmount(next.dataCost)} Data</span><span>{exactAmount(next.creditCost ?? '0' as Amount)} Cr</span></span>}
-          </button>
-          <p className="gpu-shortfall">{next && feePending && (next.needsData || lacksAmount(data, next.dataCost)) ? 'Needs Data. ' : ''}{next && feePending && (next.needsCredits || lacksAmount(credits, next.creditCost)) ? 'Needs Credits.' : ''}</p>
-          <p className="gpu-note">{next ? `${ops(next.workOps)} + energy. Fees charged when work starts. Cancel gives no refund.` : 'Choose a model from any generation.'}</p>
-        </section>
-      </div>
-      <p className="gpu-status">{before ? `${bits(held)} of ${bits(before.vramBits)} VRAM held. ` : ''}Task fit uses cores and VRAM. Clock sets work speed.</p>
-      {assigned.length > 0 && <ul className="gpu-tasks" aria-label="Assigned GPU work">{assigned.map(t => <li key={t.key}>
-        <TaskTypeLabel family={t.family} n={L.N} />
-        <span><span className="gpu-task-family">{familyName(t.family)}</span> · {t.gpuCoresMin} cores · {bits(t.vramBits)} VRAM · {t.accelDomain === POOL_DOMAIN ? 'linked pool' : `slot ${(t.accelDomain ?? 0) + 1}`}</span>
-      </li>)}</ul>}
-    </div>
+  const tier = part?.quotes.find(q => q.action.type === 'upgradePart');
+  const top = tier?.locked?.code === 'ceiling';
+  const remove = part?.quotes.find(q => q.action.type === 'removePart');
+  const title = card ? `GPU ${card.model}` : installed?.kind === 'npu' ? `NPU ${index! + 1}` : npus?.quotes.some(q => q.action.type === 'addPart') ? 'GPU or NPU' : 'Buy GPU';
+  const footer = card ? <div className="gpu-keys">
+    {tier && !top ? <StepKey quote={tier} label={`Tier ${tier.gpu?.after.tier ?? ''}`} verb="Upgrade to" onAction={act} onResearch={onResearch} />
+      : <Key label="Tier 90" disabled ariaLabel="Tier 90 is the top tier" onPress={() => undefined} />}
+    {genQuote ? <StepKey quote={genQuote} label={`Gen ${genQuote.gpu?.after.generation ?? ''}`} verb="Replace with" onAction={act} onResearch={onResearch} />
+      : nextNode ? <ResearchKey node={nextNode} tree={tree} onAction={onAction} onResearch={onResearch} />
+        : <Key label="Gen 9" disabled ariaLabel="Generation 9 is the newest" onPress={() => undefined} />}
+  </div> : undefined;
+  return <PlateFrame {...frame} title={title} sub={index === null ? undefined : `Slot ${index + 1}`} className="gpu-picker" closeKey pinTop footer={footer}>
+    {card && installed && <CardState card={card} part={installed} />}
+    {card && tier && <GpuStep {...step} quote={tier} before={card} keyless
+      title={top ? 'Tier 90 reached' : `Tier ${tier.gpu?.after.tier ?? ''}`}
+      note={''} />}
+    {card && genQuote && <GpuStep {...step} quote={genQuote} before={card} keyless
+      title={`Gen ${genQuote.gpu?.after.generation ?? ''} · ${genQuote.gpu?.after.model ?? ''}`}
+      note={`${changeNote(genQuote)} · keeps tier ${card.tier}`} />}
+    {card && nextNode && <ResearchReason node={nextNode} tree={tree} />}
+    {card && typeQuotes.length > 0 && <TypeKeys quotes={typeQuotes} onAction={act} onResearch={onResearch} />}
+    {!card && entry.map(q => <GpuStep key={q.label} {...step} quote={q} verb="Buy" before={null}
+      title={`${q.gpu?.after.model ?? q.label} · ${q.gpu ? SERIES_NAMES[q.gpu.after.series] : ''}`}
+      note={q.gpu ? `Tier 30 · Gen ${q.gpu.after.generation}` : ''} />)}
+    {index === null && <NpuKeys quotes={npus?.quotes.filter(q => q.action.type === 'addPart') ?? []} onAction={act} onResearch={onResearch} title="Or an NPU · tensor work only" />}
+    {installed?.kind === 'npu' && <NpuOwn quotes={part?.quotes ?? []} generation={installed.generation} onAction={act} onResearch={onResearch} />}
+    {card && remove && <div className="gpu-remove"><Key label="Remove card" tone="replace" ariaLabel={`Remove GPU ${card.model}`} disabled={!!remove.locked} onPress={() => act(remove)} /></div>}
+    <AssignedWork tasks={tasks} index={index} />
   </PlateFrame>;
 }
 
-function GpuComparison({ before, after, code, installedLabel }: { before: GpuStats | null; after: GpuStats | undefined; code: string; installedLabel?: string }) {
-  const rows: readonly [string, (s: GpuStats) => string][] = [
-    ['Cores', s => s.cores.toLocaleString('en-US')], ['VRAM', s => bits(s.vramBits)], ['Clock', s => hertz(s.clockHz)],
-    ['Rated work', s => `${ops(s.opsPerS)}/s`], ['Efficiency', s => quantity(s.efficiencyOpsPerJ, 'ops/J')],
-    ['Card load', s => watts(s.idleW + s.loadW)],
+/** A pinned step: one fixed-size key with its price; why it cannot be bought is said in the body. */
+function StepKey({ quote: q, label, verb, onAction, onResearch }: { quote: Quote; label: string; verb: string; onAction: (q: Quote) => void; onResearch?: (id: ResearchId) => void }) {
+  const research = q.locked?.code === 'research' ? q.locked.node : null;
+  if (research) return <Key tone="locked-action" label={<><LockIcon />{label}</>} ariaLabel={`${label}: research needed`} onPress={() => onResearch?.(research)} />;
+  return <Key label={label} price={q.locked ? null : { cost: q.cost, currency: q.currency }} disabled={!!q.locked || !q.affordable}
+    ariaLabel={`${verb} ${label}, ${q.cost} Credits`} onPress={() => onAction(q)} />;
+}
+
+/** No later generation researched: its project, one tap from the card, with both its costs. */
+function ResearchKey({ node, tree, onAction, onResearch }: { node: ResearchNodeView; tree: ReturnType<typeof selectResearchTree>;
+  onAction: PlateCommon['onAction']; onResearch?: (id: ResearchId) => void }) {
+  const shell = useShell(), hud = shell.store.getSnapshot().hud;
+  const key = projectKey(node, tree, hud.credits, hud.data);
+  return <button type="button" className="key locked-action" disabled={!key.action && !node.lockedBy} aria-label={`${key.label} ${node.name}`}
+    onClick={() => { if (key.action) onAction(key.action); else if (node.lockedBy) onResearch?.(node.id); }}>
+    <span className="kl">{key.action?.type === 'cancelResearch' ? 'Pause' : 'Research'} Gen {node.id.replace('gpuGen', '')}</span>
+  </button>;
+}
+
+function ResearchReason({ node, tree }: { node: ResearchNodeView; tree: ReturnType<typeof selectResearchTree> }) {
+  const shell = useShell(), hud = shell.store.getSnapshot().hud;
+  const key = projectKey(node, tree, hud.credits, hud.data);
+  return <section className="gpu-step">
+    <p className="gpu-step-title">Gen {node.id.replace('gpuGen', '')} research</p>
+    <div className="gpu-research-price"><Price cost={node.dataCost} currency="data" />{node.creditCost && <Price cost={node.creditCost} />}</div>
+    {!key.action && !node.lockedBy && <p className="need">{key.label}</p>}
+  </section>;
+}
+
+/** Another type at the same generation and tier: a cold swap that costs any rise in value, else nothing. */
+function TypeKeys({ quotes, onAction, onResearch }: { quotes: readonly Quote[]; onAction: (q: Quote) => void; onResearch?: (id: ResearchId) => void }) {
+  return <section className="gpu-step gpu-types"><p className="gpu-step-title"><b>Change type</b></p>
+    <p className="gpu-note">Keeps generation and tier · {quotes[0] ? changeNote(quotes[0]) : 'Cold swap'}</p>
+    <div className="gpu-type-keys">{quotes.map(q => {
+      const after = q.gpu?.after, name = after ? `${SERIES_NAMES[after.series]} · ${after.model}` : q.label;
+      const free = BigInt(q.cost) === 0n;
+      return q.locked?.code === 'research' ? <QuoteKey key={q.label} quote={q} label={name} onAction={onAction} onResearch={onResearch} showSupplyNote={false} />
+        : <Key key={q.label} label={name} price={free || q.locked ? null : { cost: q.cost, currency: q.currency }}
+          disabled={!!q.locked || !q.affordable} ariaLabel={`Change to ${name}, ${q.cost} Credits`} onPress={() => onAction(q)} />;
+    })}</div>
+  </section>;
+}
+
+/** The card as it is: art, model, type, generation, its tier on the 30–90 ladder, and its duty right now. */
+function CardState({ card, part }: { card: GpuStats; part: PartView }) {
+  const busy = Math.round(Math.max(0, Math.min(1, part.resourceBusy)) * 100);
+  return <section className="gpu-state" aria-label={`GPU ${card.model}, ${SERIES_NAMES[card.series]}, generation ${card.generation}, tier ${card.tier} of 90`}>
+    <div className="gpu-model"><GpuCard tier={card.tierIndex} busy={part.resourceBusy} />
+      <div><b>{SERIES_NAMES[card.series]}</b><span>Gen {card.generation} · {GPU_CLASSES[card.generation - 1]}</span></div></div>
+    <ol className="gpu-ladder" aria-hidden="true">{GPU_TIERS.map((t, i) =>
+      <li key={t} className={i < card.tierIndex ? 'done' : i === card.tierIndex ? 'now' : ''}>{t}</li>)}</ol>
+    <p className="gpu-live">{card.cores.toLocaleString('en-US')} cores · {ops(card.opsPerS)}/s · busy {busy}%</p>
+    <p className="gpu-live">VRAM {bits(part.vramUsedBits ?? 0)} of {bits(card.vramBits)}</p>
+  </section>;
+}
+
+/** The three specs that decide task fit and speed, before → after. */
+const SPECS: readonly (readonly [string, (s: GpuStats) => string, (s: GpuStats) => number])[] = [
+  ['Cores', s => s.cores.toLocaleString('en-US'), s => s.cores], ['VRAM', s => bits(s.vramBits), s => s.vramBits],
+  ['Work', s => `${ops(s.opsPerS)}/s`, s => s.opsPerS],
+];
+
+/** One change: what it is, its specs against the card it changes, what it costs in time, then its key (unless pinned). */
+function GpuStep({ quote: q, title, note, verb = '', before: slot, keyless = false, onAction, onResearch, researchName }: {
+  quote: Quote; title: string; note: string; verb?: string; before: GpuStats | null; keyless?: boolean;
+  onAction: (q: Quote) => void; onResearch?: (id: ResearchId) => void; researchName?: (id: ResearchId) => string;
+}) {
+  // The quote's own before and after, both at the view's power scale.
+  const after = q.locked?.code === 'ceiling' ? null : q.gpu?.after ?? null, before = slot && (q.gpu?.before ?? slot);
+  const why = q.locked && q.locked.code !== 'research' && q.locked.code !== 'ceiling' ? q.locked.text : !q.locked && !q.affordable ? 'Needs more Credits' : '';
+  return <section className="gpu-step">
+    <p className="gpu-step-title"><b>{title}</b></p>
+    {after && <ul className="gpu-delta">{SPECS.map(([label, value, num]) => {
+      const up = before ? num(after) > num(before) : false;
+      return <li key={label} className={up ? 'up' : ''}><span>{label}</span><b>{before ? `${value(before)} → ` : ''}{value(after)}{up ? ' ↑' : ''}</b></li>;
+    })}</ul>}
+    {after && <p className="gpu-note">{note && <>{note} · </>}Card load {watts(after.idleW + after.loadW)} · {quantity(after.efficiencyOpsPerJ, 'ops/J')}</p>}
+    {!after && note && <p className="gpu-note">{note}</p>}
+    {q.locked?.code !== 'ceiling' && <>
+      <OverSupplyNote quote={q} onAction={onAction} scope={title} />
+      {keyless ? why && <p className="need gpu-why">{why}</p>
+        : <QuoteKey quote={q} label={verb} showSupplyNote={false} onAction={onAction} onResearch={onResearch} researchName={researchName}
+          ariaLabel={`${verb} ${title}, ${q.cost} Credits`} />}
+    </>}
+  </section>;
+}
+
+function NpuKeys({ quotes, title, onAction, onResearch }: { quotes: readonly Quote[]; title: string; onAction: (q: Quote) => void; onResearch?: (id: ResearchId) => void }) {
+  const options: Option[] = routine(quotes.map(x => ({ name: x.label ?? 'NPU', verb: 'Add', quote: x })));
+  if (!options.length) return null;
+  return <section className="gpu-npu"><p className="gpu-step-title"><b>{title}</b></p>
+    <div className="opts">{options.map((o, i) => <OptionRow key={i} option={o} onAction={x => onAction(x)} onResearch={onResearch} />)}</div></section>;
+}
+
+/** An installed NPU keeps its own level and generation keys. A GPU in its place: remove it, then tap the bay. */
+function NpuOwn({ quotes, generation, onAction, onResearch }: { quotes: readonly Quote[]; generation: number; onAction: (q: Quote) => void; onResearch?: (id: ResearchId) => void }) {
+  const own = partQuotes(quotes), options: Option[] = [
+    ...(own.upgrade ? [{ name: own.upgrade.label ?? 'Next level', verb: 'Upgrade', quote: own.upgrade }] : []),
+    ...routine(perGeneration(own.replaces).map(r => ({ name: r.label ?? 'Next generation', verb: 'Replace', quote: r }))),
   ];
-  return <table className="gpu-comparison" aria-label="Installed and selected GPU comparison">
-    <thead><tr><th>Specs</th><th>{before ? `${before.model} +${before.upgrades}` : installedLabel ?? 'Empty slot'}</th><th>{code} native</th></tr></thead>
-    <tbody>{rows.map(([label, value]) => <tr key={label}><th scope="row">{label}</th><td>{before ? value(before) : '—'}</td><td>{after ? value(after) : '—'}</td></tr>)}</tbody>
-  </table>;
+  return <section className="gpu-npu"><p className="gpu-step-title"><b>NPU · Gen {generation + 1}</b></p>
+    <div className="opts">{options.map((o, i) => <OptionRow key={i} option={o} onAction={x => onAction(x)} onResearch={onResearch} />)}</div></section>;
+}
+
+function AssignedWork({ tasks, index }: { tasks: readonly TaskView[]; index: number | null }) {
+  const assigned = index === null ? [] : tasks.filter(t => t.accelDomain === index || t.accelDomain === POOL_DOMAIN);
+  if (!assigned.length) return null;
+  return <section className="plate-section"><p className="cfg-lab">Running here</p>
+    <ul className="gpu-tasks" aria-label="Assigned GPU work">{assigned.map(t => <li key={t.key}>
+      <span><span className="gpu-task-family">{familyName(t.family)}</span> · {t.gpuCoresMin} {t.gpuCoresMin === 1 ? 'core' : 'cores'} · {bits(t.vramBits)} VRAM{t.accelDomain === POOL_DOMAIN ? ' · linked pool' : ''}</span>
+    </li>)}</ul></section>;
 }

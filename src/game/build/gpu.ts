@@ -18,5 +18,5 @@ export function gpuTechnology(u: Unlocks, generation: GpuGeneration): GpuTechnol
 export function installedGpuStats(card: GpuBuild, u: Unlocks): GpuStats {
   const native = gpuModel(card.model);
   if (!native) throw new RangeError(`Unknown GPU model: ${card.model}`);
-  return evaluateGpu(card.model, card.upgrades, gpuTechnology(u, native.generation));
+  return evaluateGpu(card.model, gpuTechnology(u, native.generation));
 }

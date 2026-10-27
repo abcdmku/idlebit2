@@ -14,7 +14,7 @@ const requests = (s: GameState): QuoteRequest[] => {
   if (s.build.racks[0]) out.push({ kind: 'switch', sw: { kind: 'rack', id: rackId(0) } });
   if (s.build.rooms[0]) out.push({ kind: 'switch', sw: { kind: 'room', id: roomId(0) } });
   const unit = { kind: 'system' as const, id: systemId(0) };
-  for (const slot of [{ kind: 'clock', socket: 0 }, { kind: 'l1', socket: 0 }, { kind: 'ram', index: 0 }, { kind: 'gpu', index: 0 }] as const) {
+  for (const slot of [{ kind: 'clock', socket: 0 }, { kind: 'ram', index: 0 }, { kind: 'gpu', index: 0 }] as const) {
     out.push({ kind: 'part', part: { unit, slot } });
   }
   return out;

@@ -43,7 +43,7 @@ function useAnchor(id: string, chip: boolean, n: number): Rect | null {
 export function Callout() {
   const view = useViewState(), focus = useGameSelector(s => s.focus);
   const t = view.selected;
-  if (!t || view.plate || t.kind === 'save' || focus.level !== t.owner.level) return null;
+  if (!t || view.sheet || view.plate || t.kind === 'save' || focus.level !== t.owner.level) return null;
   return <Open key={t.id} target={t} focus={focus} />;
 }
 
@@ -53,7 +53,7 @@ function Open({ target: t, focus }: { target: HitTarget; focus: LevelSnapshot })
   const part = useAnchor(t.id, false, L.N), around = useAnchor(t.id, t.owner.level === 'chip', L.N);
   const request = plateRequest(t, focus);
   const quotes = useQuote(request);
-  const m = calloutModel(t, focus, quotes, offers);
+  const m = calloutModel(t, focus, quotes, offers, shell.store.getState());
   const unit = targetUnit(t), market = unit ? marketOf(shell.store.getState(), unit) : null;
   const [bought, setBought] = useState(0), [armed, setArmed] = useState(true), timer = useRef<ReturnType<typeof setTimeout>>(undefined);
   useEffect(() => () => clearTimeout(timer.current), []);
@@ -61,9 +61,7 @@ function Open({ target: t, focus }: { target: HitTarget; focus: LevelSnapshot })
   const d = L.kind === 'desktop';
   // The plates' rule (place.ts): never over the tapped part. Desktop docks in the gutter beside it; phone
   // sits below, else above. No leader: it would cross other parts' art (user, 26 Oct).
-  const p = placePlate(around, L.callout.w, L.callout.h, L.calloutBounds, { beside: d });
-  const at = { x: Math.round(p.x / 8) * 8, y: Math.round(p.y / 8) * 8, w: L.callout.w, h: L.callout.h };
-  const pad = d ? 16 : 8, gap = 8, by = at.h - pad - KEY_H;
+  const pad = d ? 16 : 8, gap = 8;
   const o = m.offer, act = o ? offerAction(o as Offer) : null;
   const keys: { id: string; label: string; tone: string; disabled?: boolean; pressed?: boolean; run: () => void }[] = [];
   if (market) keys.push({ id: 'market', label: marketKey(market), tone: market.on ? 'go' : 'plain', pressed: market.on,
@@ -81,17 +79,22 @@ function Open({ target: t, focus }: { target: HitTarget; focus: LevelSnapshot })
         }
       } });
   }
+  const line = m.change || (market ? marketLine(market) : '');
+  const h = keys.length ? L.callout.h : 2 * pad + (line ? 2 : 1) * L.lh;
+  const p = placePlate(around, L.callout.w, h, L.calloutBounds, { beside: d });
+  const at = { x: Math.round(p.x / 8) * 8, y: Math.round(p.y / 8) * 8, w: L.callout.w, h };
+  const by = at.h - pad - KEY_H;
   // The market key is wider ("Off market"); the keys beside it narrow so three still fit.
   const keyW = (i: number) => market ? (i === 0 ? 96 : 72) : 80;
   const keyRight = (i: number) => pad + Array.from({ length: i }, (_, j) => keyW(j) + gap).reduce((a, b) => a + b, 0);
   return <>
     <aside className="panel callout" style={box(at)} data-k="callout" data-testid="callout" role="dialog" aria-label={m.name}
       onPointerDown={e => e.stopPropagation()}>
-      <T x={pad} y={pad} w={at.w - 2 * pad - 96}><b>{m.name}</b></T>
+      <T x={pad} y={pad} w={at.w - 2 * pad - (o ? 96 : 0)}><b>{m.name}</b></T>
       <T right={pad} y={pad}>{o?.price != null ? <PriceText offer={o as Offer} n={L.N} />
         : o && !m.research && (o as Offer).right ? <RightText offer={o as Offer} n={L.N} /> : null}</T>
-      <T x={pad} y={pad + L.lh} w={at.w - 2 * pad} className={m.research ? 'warn' : 'mute'}>
-        <span key={bought} className={bought ? 'flash' : undefined}>{m.change || (market ? marketLine(market) : '')}</span></T>
+      {line && <T x={pad} y={pad + L.lh} w={at.w - 2 * pad} className={m.research ? 'warn' : 'mute'}>
+        <span key={bought} className={bought ? 'flash' : undefined}>{line}</span></T>}
       {keys.map((k, i) => <button key={k.id} type="button" className={`skey ${k.tone}`} data-testid={`callout-${k.id}`} disabled={k.disabled} data-qa-target
         aria-pressed={k.pressed} style={{ right: keyRight(i), top: by, width: keyW(i), height: KEY_H }} onClick={k.run}>{k.label}</button>)}
     </aside>

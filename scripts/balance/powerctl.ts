@@ -16,7 +16,7 @@ const loaded = deserializeSave((JSON.parse(readFileSync(arg('from', ''), 'utf8')
 if (!loaded.ok) throw new Error(loaded.error);
 const stageState = loaded.state;
 const RICH = '1' + '0'.repeat(40);
-const NEEDED = ['s3Sleep', 'meteredPdu', 'powerCtl', 'packageC', 'cstateC3', 'cstateC6', 'lbCapability', 'lbHealth'];
+const NEEDED = ['s3Sleep', 'meteredPdu', 'powerCtl', 'packageC', ...Array.from({ length: 36 }, (_, i) => `cstate${i + 1}`), 'lbCapability', 'lbHealth'];
 
 function tryAct(s: GameState, a: GameAction): GameState {
   const out = applyAction(s, a);

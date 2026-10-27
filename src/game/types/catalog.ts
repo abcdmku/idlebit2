@@ -65,30 +65,8 @@ export type WattsRule =
   | { readonly kind: 'idle'; readonly idle: readonly number[] }
   | { readonly kind: 'cooler'; readonly wpw: readonly number[] }
   | { readonly kind: 'supply'; readonly loss: readonly number[]; readonly lossPerLevel: number };
-/** Spec Appendix A.5. Prices are whole Credits per generation; upgrades grow as x^1.2. */
-export interface PartRow {
-  readonly id: PartId; readonly scope: PartScope; readonly names: readonly string[]; readonly gates: readonly ResearchId[];
-  readonly curve: Curve; readonly levelMax?: number;
-  readonly base: readonly number[]; readonly base2?: readonly number[];
-  readonly watts: WattsRule;
-  readonly price: readonly number[]; readonly upgrade: readonly number[];
-  /** clock: upgrade price × cores on the socket (D34). */
-  readonly upgradeDrive?: 'cores';
-  readonly tech?: readonly CoolTech[]; readonly tau?: readonly number[];
-  readonly tensorFactor?: readonly number[];
-}
-export interface LadderRow {
-  readonly id: 'switch' | 'roomSwitch' | 'dataPlane' | 'backbone'; readonly scope: PartScope;
-  readonly names: readonly string[]; readonly gates: readonly ResearchId[];
-  readonly baseK: readonly number[]; readonly topK: readonly number[]; readonly latency: readonly number[];
-  readonly minPorts: number; readonly portCeiling?: 'rackPorts' | 'roomPorts';
-  /** W per bit/s of port speed. */
-  readonly wPerUnit: number;
-  readonly price: readonly number[]; readonly portStep: readonly number[];
-  readonly portAdd?: readonly number[]; readonly portAddGrowth?: number;
-}
 
-/* ---------- Task families (docs/tasks.md; scripts/market-model.ts) ---------- */
+/* ---------- Task families (docs/tasks.md) ---------- */
 
 export type BandId = 'bits' | 'ints' | 'threads' | 'ram' | 'gpu' | 'storage' | 'rackDist' | 'roomDist' | 'multiAz' | 'region';
 /** A quantity that grows with the cohort's size draw: value = fixed + perSize × size. */
@@ -152,7 +130,7 @@ export const RULE_IDS = [
   'sharedStorage', 'cutThrough', 'qos', 'routingCapacity', 'linkScale', 'subseaLatency',
   'coreIdle', 'packageIdle', 's3Sleep', 'dvfs', 'turbo', 'powerCap', 'loadShed', 'lossFraction',
   'supplyCapacity', 'dualFeed', 'upsRideThrough', 'thermalThrottle', 'rackSetpoint', 'rackWater', 'roomLeak',
-  'roomSetpoint', 'economizer', 'telemetry', 'autoReturn', 'autoSkip', 'gracefulDrain', 'bootSeconds', 'offlineCap',
+  'roomSetpoint', 'economizer', 'telemetry', 'autoReturn', 'gracefulDrain', 'bootSeconds', 'offlineCap',
   'configSave', 'rollingUpgrade', 'hotPlug', 'liveMigration', 'hotSwap', 'checkpointing',
   /** D25.9 split rules (spec §8.5). */
   'gather', 'shardSteal', 'stealRoom',
@@ -170,6 +148,8 @@ export type ResearchEffect =
 export type AnswerCode =
   | BandId | 'pickup' | 'misroute' | 'gate' | 'overload' | 'heat' | 'energy' | 'transfer' | 'downtime' | 'density' | 'idle';
 export interface ResearchDef {
+  /** Repeated efficiency purchases apply immediately, without occupying the research processor. */
+  readonly purchase?: { readonly series: 'cstate' | 'memoryVoltage' | 'bootLoader'; readonly level: number; readonly maxLevel: number };
   /** D32: whole Credits paid once when research starts, 10 × the node's price. */
   readonly creditCost: Amount;
   readonly id: ResearchId;

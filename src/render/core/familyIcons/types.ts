@@ -38,8 +38,8 @@ export const BAND_NAME: Readonly<Record<BandId, string>> = {
   gpu: 'GPU',
   storage: 'Storage',
   rackDist: 'Rack-scale',
-  roomDist: 'Room-scale',
-  multiAz: 'Multi-AZ',
+  roomDist: 'Zone-scale',
+  multiAz: 'Multi-zone',
   region: 'Regional',
 };
 /**

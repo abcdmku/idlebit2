@@ -42,7 +42,7 @@ const HALT = mix(P.fault, P.ink, 0.25), SLEEP_LED = mix(P.led, P.ink, 0.55), box
 
 function lcdLine(v: ServerSlotView, look: ServerLook, max: number): string {
   switch (look) {
-    case 'crash': return 'HALTED';
+    case 'crash': return 'HALT';
     case 'noport': return max >= 7 ? 'NO PORT' : 'NO NET';
     case 'offline': return max >= 7 ? 'OFFLINE' : 'OFF';
     case 'paused': return 'READY';

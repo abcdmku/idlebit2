@@ -22,14 +22,14 @@ const CEILING_LABEL: Partial<Record<CeilingId, string>> = {
 const GEN_LABEL: Partial<Record<PartId, string>> = {
   core: 'Cores', clock: 'Clock', l1: 'L1 cache', l2: 'L2 cache', l3: 'L3 cache', ram: 'RAM', gpu: 'GPU', npu: 'NPU',
   storage: 'Drive', storageNode: 'Storage node', psu: 'Power supply', switch: 'Switch', lb: 'Load balancer', pdu: 'PDU', ups: 'UPS',
-  rackCooler: 'Rack cooling', roomCooler: 'Room cooling', dataPlane: 'Data plane', backbone: 'Backbone', grid: 'Grid feed',
+  rackCooler: 'Rack cooling', roomCooler: 'Room cooling', dataPlane: 'Data plane', backbone: 'Backbone', grid: 'Grid',
 };
 
 const percent = (f: number): string => `${Math.round(f * 100)}%`;
 const change = (label: string, before: string, after: string): ResearchChangeView => ({ label, before, after });
 
 /** The scheduler's queue at level 1 of generation g, as the board prints it. */
-const queueText = (g: number): string => (g < 0 ? 'No queue' : `${capacity2(PARTS.scheduler, g, 1)} tasks`);
+const queueText = (g: number): string => (g < 0 ? 'No queue' : `${capacity2(PARTS.scheduler, g, 1)} slots`);
 /** Before for a part with no generation researched yet: a dash, never "none → Hz L2". */
 const NOT_YET = '—';
 
@@ -70,7 +70,7 @@ function ruleChange(state: GameState, e: Extract<ResearchEffect, { kind: 'rule' 
   const u = state.research.unlocks, p = e.params ?? {};
   switch (e.id) {
     case 'coreIdle': return p.factor === undefined ? null : change('Idle core power', percent(idleCoreFactor(state)), percent(p.factor));
-    case 'offlineCap': return p.hours === undefined ? null : change('Offline cap', `${u.offlineCapHours} h`, `${p.hours} h`);
+    case 'offlineCap': return p.hours === undefined ? null : change('Offline progress', `${u.offlineCapHours} h`, `${p.hours} h`);
     case 'bootSeconds': return p.seconds === undefined ? null : change('Boot time', `${(u.bootTicks * TICK_MS) / 1000} s`, `${p.seconds} s`);
     default: return null;
   }

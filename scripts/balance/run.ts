@@ -25,6 +25,7 @@ export interface StageFile {
   readonly carry: CampaignCarry;
   readonly seed: number;
   readonly policy: PolicyId;
+  readonly review?: { readonly choices: readonly number[]; readonly rounds: readonly { startS: number; lengthS: number }[]; readonly saveReloaded: true };
   readonly stage: { readonly startTick: number; readonly endTick: number; readonly wallS: number; readonly rounds: number; readonly decisions: number; readonly speedup: number };
 }
 
@@ -54,6 +55,9 @@ if (process.argv[1]?.endsWith('run.ts')) {
 
   const t0 = performance.now();
   const result = runCampaign({ ticks: startTick + Math.round(hours * 36_000), policy, seed, from: start, clock: () => performance.now() });
+  const saved = serializeSave(result.state);
+  const reload = deserializeSave(saved);
+  if (!reload.ok) throw new Error(`Campaign save cannot reload: ${reload.error}`);
   const wallS = (performance.now() - t0) / 1000;
   const rows = pacingReport(result);
 
@@ -67,7 +71,9 @@ if (process.argv[1]?.endsWith('run.ts')) {
   const out = arg('out', '');
   if (out) {
     const stage: StageFile = {
-      save: serializeSave(result.state), carry: result.carry, seed, policy,
+      save: saved, carry: result.carry, seed, policy,
+      review: { choices: result.events.filter(e => e.kind === 'buy' || e.kind === 'research').map(e => e.tick / 10),
+        rounds: result.rounds.map(({ startS, lengthS }) => ({ startS, lengthS })), saveReloaded: true },
       stage: { startTick: result.startTick, endTick: result.ticks, wallS, rounds: result.rounds.length, decisions: result.decisions,
         speedup: (result.ticks - result.startTick) / 10 / wallS },
     };

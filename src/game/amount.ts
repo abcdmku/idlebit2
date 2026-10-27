@@ -3,16 +3,6 @@ import Decimal from "decimal.js";
 /** A canonical base-10 amount. Runtime and save values never use exponent notation. */
 export type Amount = string & { readonly __amountBrand: unique symbol };
 
-export interface ExactResourceBag {
-  credits: Amount;
-  data: Amount;
-}
-
-export interface ExactCost {
-  resource: keyof ExactResourceBag;
-  amount: Amount;
-}
-
 export type AmountInput = Amount | string | number | Decimal;
 
 const AmountDecimal = Decimal.clone({
@@ -55,12 +45,6 @@ export const amountPow = (value: AmountInput, exponent: number) => {
   return amount(decimal(value).pow(exponent));
 };
 
-export const amountRound = (value: AmountInput) =>
-  amount(decimal(value).toDecimalPlaces(0, Decimal.ROUND_HALF_UP));
-
-export const amountRoundTo = (value: AmountInput, decimalPlaces: number) =>
-  amount(decimal(value).toDecimalPlaces(decimalPlaces, Decimal.ROUND_HALF_UP));
-
 export const amountFloor = (value: AmountInput) =>
   amount(decimal(value).toDecimalPlaces(0, Decimal.ROUND_FLOOR));
 
@@ -73,39 +57,7 @@ export const amountDivide = (left: AmountInput, right: AmountInput) => {
 export const amountCompare = (left: AmountInput, right: AmountInput) =>
   decimal(left).comparedTo(decimal(right));
 
-export const amountMin = (left: AmountInput, right: AmountInput) =>
-  amountCompare(left, right) <= 0 ? amount(left) : amount(right);
-
-export const amountMax = (left: AmountInput, right: AmountInput) =>
-  amountCompare(left, right) >= 0 ? amount(left) : amount(right);
-
-export const amountAbs = (value: AmountInput) => amount(decimal(value).abs());
-
-export const amountClampMin = (value: AmountInput, minimum: AmountInput = 0) =>
-  amountMax(value, minimum);
-
 export const amountToNumber = (value: AmountInput) => decimal(value).toNumber();
-
-/** Temporary projection for legacy UI/math surfaces; exact state remains authoritative. */
-export const amountToSafeNumber = (value: AmountInput) => {
-  const parsed = decimal(value);
-  if (parsed.greaterThan(Number.MAX_VALUE)) return Number.MAX_VALUE;
-  if (parsed.lessThan(-Number.MAX_VALUE)) return -Number.MAX_VALUE;
-  return parsed.toNumber();
-};
 
 export const sumAmounts = (values: readonly AmountInput[]) =>
   values.reduce<Amount>((total, value) => amountAdd(total, value), ZERO_AMOUNT);
-
-export const exactResourceBag = (
-  credits: AmountInput = 0,
-  data: AmountInput = 0,
-): ExactResourceBag => ({
-  credits: amount(credits),
-  data: amount(data),
-});
-
-export const exactCost = (
-  resource: ExactCost["resource"],
-  value: AmountInput,
-): ExactCost => ({ resource, amount: amount(value) });
