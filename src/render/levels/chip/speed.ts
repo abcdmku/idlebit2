@@ -22,6 +22,13 @@ export function coreActivityText(c: CoreView, compact = false): string {
   if (c.activity === 'compute') return 'Compute';
   return c.research > 0 ? 'Research' : c.busy > 0 ? 'Waiting' : 'Idle';
 }
+/** Research on a core is pink. Cache work stays cyan; everything else keeps its task tone. */
+export function coreActivityTone(c: CoreView): 'preload' | 'cyan' | 'value' | 'rnd' | 'dim' {
+  if (c.activity == null && c.research > 0) return 'rnd';
+  if (c.activity === 'preload') return 'preload';
+  if (c.activity === 'cacheLoad' || c.activity === 'cacheAccess') return 'cyan';
+  return c.activity ? 'value' : 'dim';
+}
 /** QA-24: between rounds (not live) a core that reports 0 Hz shows the clock it is ready to run at. */
 export const readySpeedText = (c: CoreView, chip: ChipSnapshot, live: boolean): string =>
   !live && !coreSleep(c) && coreHz(c) <= 0 ? formatHertz(chip.clock.hz) : coreSpeedText(c);

@@ -185,12 +185,13 @@ function phone(aw: number, ah: number, safe: SafeInsets): PhoneLayout {
   const card = (i: number) => r(headSlot.x + headSlot.w + i * cardW, strip.y, cardW, 48);
   const top = strip.y + strip.h;
   // Settings, Research, labelled resources/wait, then Dismiss; all controls keep their boxes.
-  const now = r(U, nowY, world.w, nowH), settings = r(U + 8, nowY, 48, 48), research = r(U + 64, nowY, 48, 48);
+  const now = r(U, nowY, world.w, nowH);
+  const settings = r(U + 8, nowY, 48, nowH), research = r(U + 64, nowY, 48, nowH);
   const view = r(world.x, top, world.w, world.y + world.h - top);
   return {
     kind: 'phone', N, lat, gutter: U, x, y, w: W, h: H, body: 13, lh: 16, big: 24, mid: 18,
     world, view, band, strip, headSlot, cards: [card(0), card(1), card(2), card(3)],
-    now, dismiss: r(now.x + now.w - 72, now.y, 64, KEY_H),
+    now, dismiss: r(now.x + now.w - 72, now.y, 64, nowH),
     research, settings, lab: r(U, H < 640 ? band.y + band.h : top, world.w, H - U - (H < 640 ? band.y + band.h : top)),
     rungs: band0, rungRow, rungLabel: r(walletX, band.y, 0, rungRow),
     sla: r(band.x, band.y + rungRow, band.w - 88, 48), endKey: r(band.x + band.w - 80, band.y + rungRow, 80, 48), wallet: r(walletX, band.y, band.x + band.w - U - walletX, rungRow),

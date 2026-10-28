@@ -30,27 +30,44 @@ export function systemLoad(state: GameState, s: number): number {
  * Busy fraction of each of a system's first `nCores` cores (CPU 1), read from the threads its running records
  * are bound to (rec.thread0); other busy threads (research holders) fill the lowest free ones. Core i is always core i.
  */
-export function coreOccupancy(state: GameState, s: number, nCores: number, tpc: number, busyThreads: number): Float64Array {
+/**
+ * Task busy and research, per core. Bound records keep their threads. Research holders take the lowest
+ * free threads, then any other unbound busy threads. `researchThreads` are included in `busyThreads`.
+ */
+export function coreDuty(state: GameState, s: number, nCores: number, tpc: number, busyThreads: number, researchThreads: number): { readonly busy: Float64Array; readonly research: Float64Array } {
   const rec = state.hot.rec, h = state.hot.sys;
   const total = nCores * tpc;
-  const used = new Uint8Array(Math.max(1, total));
+  const task = new Uint8Array(Math.max(1, total)), research = new Uint8Array(Math.max(1, total));
   const mark = (r: number) => {
     const t0 = rec.thread0[r] ?? -1;
     if (t0 < 0) return;
     const held = (rec.threads[r] ?? 1) * (rec.count[r] ?? 1);
-    for (let t = t0; t < t0 + held && t < total; t += 1) used[t] = 1;
+    for (let t = t0; t < t0 + held && t < total; t += 1) task[t] = 1;
   };
   for (let res = 0; res < 4; res += 1) {
     if (res === 2) { for (let a = 0; a < ACCEL_CLOCKS; a += 1) for (let r = h.accelHead[s * ACCEL_CLOCKS + a] ?? -1; r >= 0; r = rec.next[r] ?? -1) mark(r); continue; }
     for (let r = h.head[s * 4 + res] ?? -1; r >= 0; r = rec.next[r] ?? -1) mark(r);
   }
-  // Threads busy without a binding (research holders, hand-built states) take the lowest free ones.
   let placed = 0;
-  for (let t = 0; t < total; t += 1) placed += used[t]!;
-  let rest = Math.max(0, Math.min(total, busyThreads) - placed);
-  for (let t = 0; t < total && rest > 0; t += 1) if (!used[t]) { used[t] = 1; rest -= 1; }
+  for (let t = 0; t < total; t += 1) placed += task[t]!;
+  const unbound = Math.max(0, Math.min(total, busyThreads) - placed);
+  let researchLeft = Math.min(Math.max(0, researchThreads), unbound), extra = unbound - researchLeft;
+  for (let t = 0; t < total && (researchLeft > 0 || extra > 0); t += 1) if (!task[t]) {
+    if (researchLeft > 0) { research[t] = 1; researchLeft -= 1; } else { task[t] = 1; extra -= 1; }
+  }
+  const busy = new Float64Array(nCores), held = new Float64Array(nCores);
+  for (let i = 0; i < nCores; i += 1) {
+    let tasks = 0, researching = 0;
+    for (let k = 0; k < tpc; k += 1) { tasks += task[i * tpc + k]!; researching += research[i * tpc + k]!; }
+    busy[i] = tasks / tpc; held[i] = researching / tpc;
+  }
+  return { busy, research: held };
+}
+
+export function coreOccupancy(state: GameState, s: number, nCores: number, tpc: number, busyThreads: number): Float64Array {
+  const duty = coreDuty(state, s, nCores, tpc, busyThreads, state.hot.sys.researchThreads[s] ?? 0);
   const out = new Float64Array(nCores);
-  for (let i = 0; i < nCores; i += 1) { let n = 0; for (let k = 0; k < tpc; k += 1) n += used[i * tpc + k]!; out[i] = n / tpc; }
+  for (let i = 0; i < nCores; i += 1) out[i] = Math.min(1, duty.busy[i]! + duty.research[i]!);
   return out;
 }
 

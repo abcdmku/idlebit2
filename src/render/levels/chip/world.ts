@@ -150,6 +150,7 @@ function drawCore(g: G, r: Rect, core: CoreView | undefined, live: boolean, chip
   dimIfAsleep(g, r, core, live);
   if (n > 2) {
     if (busy) drawGridPiece(g, r, core.progress, colour, core.family);
+    else if (lent) drawGridPiece(g, r, frame.snapshot.research?.progress ?? 0, P.rnd);
     return;
   }
   // Big sites (L2): the task's family icon under the name, its piece gauge near the foot.

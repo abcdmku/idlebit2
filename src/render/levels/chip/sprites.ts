@@ -60,8 +60,9 @@ export function pad(g: G, x: number, y: number, lit: boolean): void {
   R(g, x - 4, y - 2, 9, 5, P.ink); R(g, x - 3, y - 1, 7, 3, lit ? P.padHi : P.pad); R(g, x - 3, y + 1, 7, 1, P.padLo);
 }
 export function coreBlock(g: G, r: Rect, busy: boolean, lent: boolean): Rect {
-  const top = lent ? mix(P.logic, P.rnd, 0.3) : busy ? P.logicHi : P.logic;
-  return prism(g, r.x, r.y + 3, r.w, r.h - 3, 3, { top, front: busy || lent ? P.logic : P.logicLo, sx: 2, sy: 2 });
+  const top = lent ? mix(P.logic, P.rnd, 0.72) : busy ? P.logicHi : P.logic;
+  const front = lent ? mix(P.logicLo, P.rndLo, 0.7) : busy ? P.logic : P.logicLo;
+  return prism(g, r.x, r.y + 3, r.w, r.h - 3, 3, { top, front, sx: 2, sy: 2 });
 }
 /** The add site's "+" centre row: mid-site (labels.ts puts the price under it). */
 export const addMarkY = (r: Rect): number => r.y + (r.h >> 1);

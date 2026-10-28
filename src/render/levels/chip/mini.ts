@@ -38,7 +38,7 @@ export function drawChipMini(g: CanvasRenderingContext2D, system: SystemSnapshot
   // to its completed work, filling from bottom to top as the shard progresses.
   for (let i = 0; i < sites.length; i++) {
     const c = chip.cores[i], busy = live && !!c && c.busy > 0;
-    const r = box(sites[i]!, !c ? mix(P.wafer, P.ink, 0.25) : busy ? P.logicLo : live && c.research > 0 ? mix(P.logic, P.rnd, 0.3) : P.logic);
+    const r = box(sites[i]!, !c ? mix(P.wafer, P.ink, 0.25) : busy ? P.logicLo : live && c.research > 0 ? mix(P.logic, P.rnd, 0.72) : P.logic);
     const colour = busy ? coreColor(c) : null;
     if (!colour) continue;
     const h = Math.round(r.h * Math.max(0, Math.min(1, c!.progress)));

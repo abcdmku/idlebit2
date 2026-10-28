@@ -9,10 +9,10 @@ import { DRAW_NONE, DRAW_SLEEP, drawKind } from '../phys/draw';
 import type { CacheLevelView, ChipSnapshot, CoreSleep, CoreView, SchedulerView } from '../types/snapshot';
 import type { GameState } from '../types/state';
 import type { BuildSlotView } from '../types/views';
-import { modeName, psuView, systemTimerS } from './common';
+import { coreDuty, modeName, psuView, systemTimerS } from './common';
 import { inboundTransfer, shardOf } from './flows';
 import { forEachRunning, stageProgress } from './tasks';
-import { coreOccupancy } from './common';
+
 import { spilledOutOfCache } from './memory';
 import { PART_LOAD_CACHE } from '../exec/memory';
 import { FAMILIES } from '../market/families';
@@ -80,12 +80,13 @@ export function chipSnapshot(state: GameState, id: SystemId, parent: NodeRef | n
   const nCores = parts.length;
   const tpc = nCores > 0 ? Math.max(1, Math.round(threads / (nCores * Math.max(1, cpus)))) : 1;
   const share = researchShare(state, id);
+  const duty = coreDuty(state, id, nCores, tpc, busyThreads, h.researchThreads[id] ?? 0);
 
   // Each running record sits on the threads it was bound to at start (rec.thread0): core i shows the task on
   // core i, so a finished task never shifts the others (user, 25 Oct). CPU-stage records show their task.
   const rec = state.hot.rec;
   const oldestFirst = (a: number, b: number): number => rec.taken[a]! - rec.taken[b]! || rec.taskId[a]! - rec.taskId[b]!;
-  const occ = coreOccupancy(state, id, nCores, tpc, busyThreads);
+
   const fam = new Int32Array(nCores).fill(-1);
   const taskIds: (number | null)[] = Array(nCores).fill(null);
   const prog = new Float64Array(nCores);
@@ -138,14 +139,14 @@ export function chipSnapshot(state: GameState, id: SystemId, parent: NodeRef | n
   const paused = h.mode[id] === MODE.paused;
   const liveHz = paused ? hz : draw === DRAW_NONE || draw === DRAW_SLEEP ? 0 : hz * (h.clockFactor[id] ?? 1);
   const cores: CoreView[] = parts.map((part, i) => {
-    const busy = occ[i]!;
-    const sleep: CoreSleep | null = paused ? null : draw === DRAW_SLEEP ? 'S3' : draw !== DRAW_NONE && busy === 0 && cstate > 0 ? 'C-state' : null;
+    const busy = duty.busy[i]!, research = share > 0 ? duty.research[i]! : 0, occupied = busy + research;
+    const sleep: CoreSleep | null = paused ? null : draw === DRAW_SLEEP ? 'S3' : draw !== DRAW_NONE && occupied === 0 && cstate > 0 ? 'C-state' : null;
     return {
       socket: 0, rate: hz, generation: part.gen, level: part.level, busy,
       hz: sleep === null ? liveHz : 0, sleep,
       taskId: taskIds[i]!, family: fam[i]! >= 0 ? familyId(fam[i]!) : null, activity: activity[i]!, progress: prog[i]!, threads: tpc,
       shard: shardIx[i]! >= 0 ? shardIx[i]! : null, shardThreads: group[i]!,
-      research: share > 0 ? Math.min(1 - busy, share) : 0, cstate: busy > 0 ? 0 : cstate,
+      research, cstate: occupied > 0 ? 0 : cstate,
     };
   });
 
