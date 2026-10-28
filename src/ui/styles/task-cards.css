@@ -40,4 +40,9 @@
 .l-phone .task-now .task-state { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px; padding: 0; align-items: start; }
 .l-phone .task-now .task-clock { text-align: right; }
 .l-phone .task-now .task-actions { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 8px; }
-.task-now-portrait .task-actions { margin-left: 136px; }
+.task-market-compact .market-task { display:grid!important; grid-template-columns:32px minmax(0,1fr); grid-template-rows:16px 16px;
+  align-content:center; gap:0 8px; padding:8px!important; }
+.task-market-compact .market-task-heading { display:contents; }
+.task-market-compact .market-task-heading canvas { grid-column:1; grid-row:1 / 3; }
+.task-market-compact .market-task-heading b { grid-column:2; grid-row:1; white-space:nowrap; }
+.task-market-compact .market-task>.task-rewards,.task-market-compact .research-market>.rnd { grid-column:2; grid-row:2; padding:0; gap:8px; }

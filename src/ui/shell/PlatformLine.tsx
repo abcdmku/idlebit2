@@ -6,7 +6,7 @@ import { causeLine, familyName } from '../hooks/feedModel';
 import { useGameSelector, usePlatformStatus, useShell } from '../storeHooks';
 import { restartKey, restartOf, restartText } from '../queue/restart';
 import { useLayout } from './geometry';
-import { nowRows } from '../layout';
+import { hasTaskDock, nowRows } from '../layout';
 import { useNewVersion } from './version';
 import { IS_SANDBOX } from './sandbox';
 
@@ -100,6 +100,6 @@ export function PlatformLine({ saveNow }: { saveNow?: () => void } = {}) {
   // everything in the world, and only menus may cover them (user, 26 Oct). It stays left of Dismiss and under the
   // fix key, so a failure never covers either (R16). Its row is below Dismiss, so it takes the card's full width (R17).
   const d = L.kind === 'desktop', tx = d ? L.lat + 16 * L.N + 8 : 8;
-  return <p className={`platform-line${status ? '' : ` ${flash?.tone ?? ''}`}`} role="status" hidden={!text} data-testid="platform-line"
+  return <p className={`platform-line${hasTaskDock(L) ? ' platform-line-dock' : ''}${status ? '' : ` ${flash?.tone ?? ''}`}`} role="status" hidden={!text} data-testid="platform-line"
     style={{ left: L.now.x + tx, top: L.now.y + nowRows(L).notice, maxWidth: L.now.w - tx - 8, height: L.lh }}>{text}</p>;
 }

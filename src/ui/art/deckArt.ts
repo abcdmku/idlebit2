@@ -81,11 +81,27 @@ export function drawMiniIcon(g: G, kind: PartIconKind, dim = false): void {
 /** 16 × 16 research flask. */
 export function drawFlask(g: G): void {
   g.clearRect(0, 0, 16, 16);
-  R(g, 6, 1, 4, 1, P.ink); R(g, 6, 2, 1, 4, P.ink); R(g, 9, 2, 1, 4, P.ink); R(g, 7, 2, 2, 4, '#3a2f6e');
-  R(g, 5, 6, 1, 1, P.ink); R(g, 10, 6, 1, 1, P.ink); R(g, 4, 7, 1, 2, P.ink); R(g, 11, 7, 1, 2, P.ink);
-  R(g, 3, 9, 1, 4, P.ink); R(g, 12, 9, 1, 4, P.ink); R(g, 4, 13, 8, 1, P.ink);
-  R(g, 6, 6, 4, 1, '#3a2f6e'); R(g, 5, 7, 6, 2, '#3a2f6e');
-  R(g, 4, 9, 8, 4, P.rnd); R(g, 5, 9, 2, 1, '#ffc2f0'); R(g, 4, 12, 8, 1, P.rndLo); px(g, 8, 10, '#ffffff'); px(g, 10, 11, '#ffc2f0');
+  R(g, 5, 0, 6, 3, P.ink); R(g, 6, 3, 4, 3, P.ink);
+  R(g, 5, 6, 6, 1, P.ink); R(g, 4, 7, 8, 1, P.ink); R(g, 3, 8, 10, 6, P.ink); R(g, 4, 14, 8, 1, P.ink);
+  R(g, 6, 1, 4, 1, '#dbb587'); R(g, 7, 2, 2, 1, '#95664f');
+  R(g, 7, 3, 2, 4, '#91b9d6'); R(g, 6, 6, 4, 2, '#91b9d6');
+  R(g, 5, 7, 6, 2, '#91b9d6'); R(g, 4, 8, 8, 5, '#b5dceb'); R(g, 5, 13, 6, 1, '#6e91ba');
+  R(g, 5, 9, 6, 4, '#e969cb'); R(g, 4, 10, 8, 2, '#dc4cb6'); R(g, 5, 12, 6, 1, '#9c398e');
+  R(g, 4, 9, 1, 3, '#edfbff'); px(g, 5, 8, '#ffffff'); px(g, 6, 10, '#ffd8f7'); px(g, 9, 11, '#ffb8ea');
+}
+
+/** 16 × 16 toothed gear, with a round bore and a shaded metal rim. */
+export function drawGear(g: G): void {
+  g.clearRect(0, 0, 16, 16);
+  const mask = ['0000001111000000', '0000001111000000', '0011001111001100', '0011111111111100',
+    '0001111111111000', '0001110000111000', '1111100000011111', '1111100000011111',
+    '1111100000011111', '1111100000011111', '0001110000111000', '0001111111111000',
+    '0011111111111100', '0011001111001100', '0000001111000000', '0000001111000000'];
+  const solid = (x: number, y: number) => mask[y]?.[x] === '1';
+  for (let y = 0; y < 16; y++) for (let x = 0; x < 16; x++) if (solid(x, y)) {
+    const edge = !solid(x - 1, y) || !solid(x + 1, y) || !solid(x, y - 1) || !solid(x, y + 1);
+    px(g, x, y, edge ? P.ink : y < 7 ? '#dfdcff' : y > 10 ? '#776caa' : '#b2a9df');
+  }
 }
 
 /** 16 × 16 task icon: the family's L2 icon (14 × 14 in its 16 px cell), in its band colour. */

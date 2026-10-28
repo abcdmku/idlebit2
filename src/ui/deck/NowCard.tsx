@@ -19,6 +19,8 @@ import { meetLabel, useMeet } from '../queue/meet';
 import { amountText } from '../hooks/format';
 import { CoinIcon } from '../plates/icons';
 import '../styles/task-cards.css';
+import { hasTaskDock } from '../layout';
+import { TaskDock } from './TaskDock';
 
 export function NowCard() {
   const L = useLayout(), shell = useShell(), taskOpen = useViewState().task !== null;
@@ -32,10 +34,12 @@ export function NowCard() {
     .sort((a, b) => BigInt(a.cost) < BigInt(b.cost) ? -1 : BigInt(a.cost) > BigInt(b.cost) ? 1 : 0)[0] ?? null;
   const risk = running && !!head && !head.committed && headRisk(q.met, q.failed, q.checking, q.slaWindow);
   const open = () => { if (head) shell.view.dispatch({ type: 'openTask', task: taskKey(head.task) }); };
-  const status = !running ? 'Next round' : head ? blocked ? blockedText(head)
+  const status = !running ? 'Next round' : head ? blocked ? blockedText(head) ?? waitingText(head)
     : head.waitingFor === 'restart' && restart.on && !head.committed ? restartText(restart) : waitingText(head) : 'Waiting for tasks';
-  const portrait = L.kind === 'phone' && L.now.w === L.strip.w && L.w < 640;
-  return <section className={`panel now task-now${portrait ? ' task-now-portrait' : ''}${blocked ? ' blocked' : ''}`} data-k="now" aria-label={research ? 'Research next in line' : 'Next task'} data-testid="now"
+  if (hasTaskDock(L)) return <TaskDock head={head} research={research} running={running} blocked={blocked} status={status} round={round}
+    primaryLabel={blocked ? buy ? meetLabel(buy) : 'View fix' : 'Task details'}
+    onPrimary={() => { if (blocked && buy) shell.dispatch(buy.action); else open(); }} />;
+  return <section className={`panel now task-now${blocked ? ' blocked' : ''}`} data-k="now" aria-label={research ? 'Research next in line' : 'Next task'} data-testid="now"
     style={{ ...box(L.now), ...taskTypeStyle(head?.family), ...(risk ? { '--rim': 'var(--fault)' } : {}) } as CSSProperties}>
     <RimClock w={L.now.w} n={L.N} blocked={blocked} />
     {head && <TaskAccent n={L.N} />}

@@ -7,12 +7,14 @@
 // Desktop (N = 3, cell 24, from 1200 × 760; N = 2, cell 16, below that):
 //   band: ladder | SLA (centre) | Data over Credits (right); the strip; the world;
 //   deck: one row, Research at the left beside the head card (Dismiss).
-// Phone (N = 2, 8 px): band, market, world, then a full-width task card with menu keys in its action row.
+// Phone (N = 2, 8 px): band, compact market, world, then a task bar and on-demand requirements drawer.
 // Landscape keeps the market and deck in a left column beside the world.
 import type { Rect } from '../render/core';
 
 export interface SafeInsets { readonly top: number; readonly right: number; readonly bottom: number; readonly left: number }
 export const NO_INSETS: SafeInsets = { top: 0, right: 0, bottom: 0, left: 0 };
+/** Portrait phones use the compact task bar and an on-demand drawer. */
+export const hasTaskDock = (L: ShellLayout): boolean => L.kind === 'phone' && L.w < 640;
 
 interface Common {
   /** Art scale: CSS px per art px. */
@@ -35,7 +37,7 @@ interface Common {
   readonly headSlot: Rect;
   /** Incoming card geometry; cards continue horizontally beyond the visible viewport. */
   readonly cards: readonly [Rect, Rect, Rect, Rect];
-  /** The head task's big card above the deck, and its Dismiss (Return to market between rounds). */
+  /** The head task's card or compact bar, and its Dismiss (Return between rounds). */
   readonly now: Rect;
   readonly dismiss: Rect;
   /** Research has a stable reserved key beside the card or inside its action row. */
@@ -73,8 +75,8 @@ const inset = (a: Rect, d: number): Rect => r(a.x + d, a.y + d, a.w - 2 * d, a.h
 const snap8 = (v: number) => Math.floor(v / 8) * 8;
 /** Keys are at least 44 px tall (touch) on every layout. */
 const KEY_H = 48;
-/** Name/rewards, hardware facts, pickup state, 48px actions, then a reserved platform notice. */
-const NOW_PHONE = 160;
+/** Landscape's side-column task card keeps its facts and 48px action row. */
+const LANDSCAPE_TASK_H = 160;
 
 /**
  * The N = 3 desktop from 1200 × 760 (50 × 31 cells of 24); the N = 2 desktop from 960 × 592
@@ -94,11 +96,11 @@ export function shellLayout(vw: number, vh: number, safe: SafeInsets = NO_INSETS
   return phone(aw, ah, safe);
 }
 
-/** The platform notice has its own row below task facts and actions in every state. */
+/** Notices use the card's reserved row, or float just above the compact phone bar. */
 export function nowRows(L: ShellLayout): {
   readonly notice: number;
 } {
-  return { notice: L.now.h - L.lh - 8 };
+  return { notice: hasTaskDock(L) ? -24 : L.now.h - L.lh - 8 };
 }
 
 /** Short, wide screens keep the CPU at 2×. Queue and deck share the left column. */
@@ -109,7 +111,7 @@ function landscape(aw: number, ah: number, safe: SafeInsets): PhoneLayout {
   const sla = r(256, 8, endKey.x - 264, 48);
   const headSlot = r(8, 64, 136, 80);
   const card = (i: number) => r(144 + i * 144, 64, 144, 80);
-  const research = r(8, H - 56, 288, 48), now = r(8, research.y - 8 - NOW_PHONE, 288, NOW_PHONE);
+  const research = r(8, H - 56, 288, 48), now = r(8, research.y - 8 - LANDSCAPE_TASK_H, 288, LANDSCAPE_TASK_H);
   const view = r(312, 56, W - 320, H - 56);
   return { kind: 'phone', N: 2, lat: 8, gutter: 8, x, y, w: W, h: H, body: 13, lh: 16, big: 24, mid: 18,
     world: view, view, band, strip: r(8, 64, 288, 80), headSlot, cards: [card(0), card(1), card(2), card(3)],
@@ -126,9 +128,10 @@ function rungs(band: Rect, rz: number, step: number): ShellLayout['rungs'] {
 
 /** Keep the deck's total footprint fixed while giving Settings a separate touch target. */
 function menuKeys(area: Rect): Pick<ShellLayout, 'research' | 'settings'> {
+  if (area.h > 48 && area.w >= 240) return { settings: r(area.x, area.y, 72, 72), research: r(area.x + 80, area.y, area.w - 80, area.h) };
   return area.w < 160
-    ? { research: r(area.x, area.y, area.w, 48), settings: r(area.x, area.y + 48, area.w, 48) }
-    : { research: r(area.x, area.y, area.w - 56, area.h), settings: r(area.x + area.w - 48, area.y, 48, 48) };
+    ? { settings: r(area.x, area.y, area.w, 48), research: r(area.x, area.y + 48, area.w, 48) }
+    : { settings: r(area.x, area.y, 48, 48), research: r(area.x + 56, area.y, area.w - 56, area.h) };
 }
 
 function desktop(N: 2 | 3, aw: number, ah: number, safe: SafeInsets): DesktopLayout {
@@ -170,24 +173,24 @@ function phone(aw: number, ah: number, safe: SafeInsets): PhoneLayout {
   const N = 2, U = 8, lat = 8;
   const W = Math.floor(Math.min(aw, 440) / U) * U, H = Math.max(320, Math.floor(ah / U) * U);
   const x = safe.left + Math.floor((aw - W) / 2), y = safe.top;
-  const nowH = NOW_PHONE, nowY = H - U - nowH;
+  const nowH = 56, nowY = H - U - nowH;
   const world = r(U, U, W - 2 * U, nowY - 2 * U);
   // The band: the ladder row (48 px rungs, a primary tap) with Data over Credits at its right, then SLA and End round.
   const rungRow = 48, band = r(U, U, world.w, rungRow + 48);
   const band0 = rungs(band, rungRow, 0), walletX = band0[4].x + band0[4].w + 8;
   // The head is fixed; incoming cards retain their width and scroll through the remaining strip.
-  const strip = r(U, band.y + band.h, world.w, 80);
-  const headSlot = r(U, strip.y, W < 360 ? 136 : 152, 80);
-  const cardW = 144;
-  const card = (i: number) => r(headSlot.x + headSlot.w + i * cardW, strip.y, cardW, 80);
+  const strip = r(U, band.y + band.h, world.w, 48);
+  const headSlot = r(U, strip.y, W < 360 ? 160 : 176, 48);
+  const cardW = 200;
+  const card = (i: number) => r(headSlot.x + headSlot.w + i * cardW, strip.y, cardW, 48);
   const top = strip.y + strip.h;
-  // Full-width facts above a stable row of Research, Settings, Details/fix, and Dismiss.
-  const now = r(U, nowY, world.w, nowH), research = r(U + 8, nowY + 88, 72, 48), settings = r(U + 88, nowY + 88, 48, 48);
+  // Settings, Research, labelled resources/wait, then Dismiss; all controls keep their boxes.
+  const now = r(U, nowY, world.w, nowH), settings = r(U + 8, nowY, 48, 48), research = r(U + 64, nowY, 48, 48);
   const view = r(world.x, top, world.w, world.y + world.h - top);
   return {
     kind: 'phone', N, lat, gutter: U, x, y, w: W, h: H, body: 13, lh: 16, big: 24, mid: 18,
     world, view, band, strip, headSlot, cards: [card(0), card(1), card(2), card(3)],
-    now, dismiss: r(now.x + now.w / 2 + 72, now.y + 88, now.w / 2 - 80, KEY_H),
+    now, dismiss: r(now.x + now.w - 72, now.y, 64, KEY_H),
     research, settings, lab: r(U, H < 640 ? band.y + band.h : top, world.w, H - U - (H < 640 ? band.y + band.h : top)),
     rungs: band0, rungRow, rungLabel: r(walletX, band.y, 0, rungRow),
     sla: r(band.x, band.y + rungRow, band.w - 88, 48), endKey: r(band.x + band.w - 80, band.y + rungRow, 80, 48), wallet: r(walletX, band.y, band.x + band.w - U - walletX, rungRow),

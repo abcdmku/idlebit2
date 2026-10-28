@@ -1,0 +1,25 @@
+.task-dock { --fill:#241c4f; --rim:var(--cyan); }
+.task-peek { position:absolute; box-sizing:border-box; display:flex; flex-direction:column; justify-content:center; min-width:0;
+  line-height:16px; gap:8px; padding:0!important; }
+.task-peek-resources { display:flex; align-items:center; gap:8px; white-space:nowrap; padding-right:8px; }
+.task-peek-resources>span { display:inline-flex; align-items:center; gap:3px; }
+.task-peek-resources canvas { flex:none; }
+.task-peek-state { display:flex; justify-content:space-between; gap:4px; width:100%; white-space:nowrap; }
+.task-drawer-chevron { position:absolute; right:0; top:4px; }
+.task-dock-action { padding:0 4px!important; }
+.deck .research-dock-key,.deck .settings-key { z-index:2; }
+.research-dock-progress { position:absolute; left:4px; right:4px; bottom:4px; height:2px; background:#241331; }
+.research-dock-progress>i { display:block; height:100%; max-width:100%; background:var(--rnd); }
+.research-dock-ready { position:absolute; right:4px; top:2px; background:var(--ink); padding:0 2px; }
+.task-drawer { z-index:9; display:grid; grid-template-rows:56px minmax(0,1fr) 48px; box-sizing:border-box; padding:8px 12px 12px; overscroll-behavior:contain; --fill:#241c4f; --rim:var(--cyan); }
+.task-drawer>header { display:flex; align-items:center; justify-content:space-between; gap:8px; min-height:48px; margin-bottom:8px; }
+.task-drawer>header>b { overflow-wrap:anywhere; }
+.task-drawer-close { position:relative!important; flex:none; width:48px; height:48px; }
+.task-drawer-close .x-glyph { width:12px; height:12px; --x-w:1px; }
+.task-drawer-requirements { margin:12px 0; }
+.task-drawer .task-facts { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:8px; }
+.task-drawer .task-facts>span { min-width:0; overflow-wrap:anywhere; }
+.task-drawer-body { overflow-y:auto; min-height:0; }
+.task-drawer-body>p { margin:12px 0; }
+.task-drawer-details { position:relative!important; width:100%; min-height:48px; padding:8px!important; }
+.platform-line-dock { background:#100c22ed; padding-inline:4px; }

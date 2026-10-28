@@ -1459,6 +1459,8 @@ Core and component progress bars fill from 0% at the start to 100% at completion
 
 Task popups show their description, processing work and capable-system count directly on opening, without a Details disclosure.
 
+On portrait phones, D58 uses a 48px market strip and 56px bottom task bar. Settings comes before Research. The bar shows a core icon and count beside a memory icon and bit value, substitutes a blocking GPU/VRAM icon when relevant, and puts the live pickup wait and head timer on the next line. Tapping it opens a drawer with fixed frame/action positions for full resource requirements, payment and Details/fix. Close, Escape and phone Back close the drawer. Dismiss/Return remains in the bottom bar. The fixed market head plus 50 incoming offers remain browsable. Transient platform notices sit above the bar without shifting its controls.
+
 | Field | Source |
 |---|---|
 | Credits | wallet, whole Credits, larger than body text |

@@ -9,6 +9,7 @@ import { box, T, useLayout } from '../shell/geometry';
 import { shallowEqual, useGameSelector, useShell, useViewState } from '../storeHooks';
 import { NowCard } from './NowCard';
 import { SettingsKey } from '../settings/SettingsKey';
+import { hasTaskDock } from '../layout';
 
 /** Projects the player could start right now (A04): the tile says so, as Build says "2 ready". */
 function useResearchReady(): number {
@@ -30,19 +31,29 @@ function ResearchKey() {
     // A paused project keeps its progress but holds no place in line.
     paused: !s.research.active && Object.keys(store.getState().research.parked).length > 0 }), shallowEqual, 250);
   const n = L.N, d = L.kind === 'desktop', k = L.research, pct = r.active ? `${Math.floor(r.progress * 100)}%` : '';
+  if (hasTaskDock(L)) return <button type="button" className={`skey research-dock-key${open ? ' open' : ''}`} style={box(k)}
+    data-testid="research-key" data-qa-target aria-expanded={open} aria-haspopup="dialog"
+    title={r.active ? `Research: ${r.active} ${pct}` : ready ? `${ready} research projects ready` : 'Research'}
+    aria-label={r.active ? `Research ${r.active} ${pct}` : 'Research'} onClick={() => view.dispatch({ type: 'toggleSheet', sheet: 'research' })}>
+    <ArtCanvas w={16} h={16} n={n} artKey="flask" draw={drawFlask} />
+    <i className="research-dock-progress" data-free="art" aria-hidden="true"><i style={{ width: `${r.progress * 100}%` }} /></i>
+    {ready > 0 && !r.active && <b className="research-dock-ready gold">{ready}</b>}
+  </button>;
   const idle = !r.active && ready ? <span className="gold">{ready} ready</span>
     : r.needsData ? <span className="dim">Needs Data</span> : <span className="dim">Idle</span>;
   // Icon at the top left, the title beside it, then one state line (and, on desktop, the project).
-  const compact = !d && k.w < 112, flat = !d && k.h === 48;
+  const stacked = d && k.w < 128;
+  const compact = stacked || !d && k.w < 112, flat = !d && k.h === 48;
   const textOnly = flat && k.w < 112;
-  const pad = d ? L.lat : 8, icon = 16 * n, tx = compact || textOnly ? pad : pad + icon + 8, line2 = d ? pad + L.lh : flat ? 24 : compact ? 56 : 48;
+  const pad = d ? L.lat : 8, icon = 16 * n, tx = compact || textOnly ? pad : pad + icon + 8;
+  const line2 = d ? stacked ? pad + icon + 8 + L.lh : pad + L.lh : flat ? 24 : compact ? 56 : 48;
   return <button type="button" className={`panel research${open ? ' open' : ''}`} style={box(k)} data-k="research" data-testid="research-key" data-qa-target
     aria-expanded={open} aria-label={r.active ? `Research ${r.active} ${pct}` : ready ? `Research, ${ready} ready` : 'Research'}
     onClick={() => view.dispatch({ type: 'toggleSheet', sheet: 'research' })}>
     <i className="rim-track" data-free="art" style={{ left: n, top: n, width: k.w - 2 * n, height: 2 * n }}>
       <b className="rim-fill" data-tone="rnd" style={{ height: 2 * n, width: Math.round((k.w / n - 2) * r.progress) * n }} /></i>
     {!textOnly && <span className="aic" style={{ left: compact ? Math.floor((k.w - icon) / 16) * 8 : pad, top: pad }}><ArtCanvas w={16} h={16} n={n} artKey="flask" draw={drawFlask} /></span>}
-    <T x={tx} y={d || flat ? pad : compact ? 40 : 16} w={k.w - tx - 4}>{r.stopped ? <b className="warn">Stopped</b> : <b>Research</b>}</T>
+    <T x={tx} y={stacked ? pad + icon + 8 : d || flat ? pad : compact ? 40 : 16} w={k.w - tx - 4}>{r.stopped ? <b className="warn">Stopped</b> : <b>Research</b>}</T>
     <T x={d || flat ? tx : pad} y={line2} w={k.w - (d || flat ? tx : pad) - pad}>{r.stopped ? <span className="warn">no Credits</span>
       : r.active ? <span className="rnd">{r.waiting ? compact ? 'Next' : 'Next in line' : compact ? pct : `Running ${pct}`}</span>
       : r.paused ? <span className="mute">Paused</span> : idle}</T>

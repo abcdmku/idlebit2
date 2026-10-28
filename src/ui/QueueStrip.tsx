@@ -6,7 +6,7 @@ import { drawFlask } from './art/deckArt';
 import { TaskAccent, taskTypeStyle } from './art/TaskType';
 import { RimClock } from './hooks/headClock';
 import { familyName, taskKey } from './hooks/feedModel';
-import type { ShellLayout } from './layout';
+import { hasTaskDock, type ShellLayout } from './layout';
 import { headRisk, SLA_WINDOW } from './queue/risk';
 import { TaskIcon, taskTitle } from './queue/taskText';
 import { TaskRewards } from './queue/TaskFacts';
@@ -49,7 +49,7 @@ export function QueueStrip() {
   const risk = running && !!head && !head.committed && headRisk(q.met, q.failed, q.checking, q.slaWindow);
   const first = L.cards[0], width = L.strip.x + L.strip.w - first.x;
   const slide = useQueueSlide(width), incoming = q.window.slice(research ? 0 : 1, research ? 50 : 51);
-  return <section className="queue task-market" aria-label="Task market" data-testid="queue">
+  return <section className={`queue task-market${hasTaskDock(L) ? ' task-market-compact' : ''}`} aria-label="Task market" data-testid="queue">
     <div className={`panel head-slot${blocked ? ' blocked' : ''}${risk ? ' risk' : ''}${research ? ' research-head' : ''}`}
       style={{ ...box(L.headSlot), ...taskTypeStyle(head?.family), ...(risk ? { '--rim': 'var(--fault)' } as CSSProperties : {}) }}
       data-k="head-slot" data-testid="head-slot" aria-label="Next task">
