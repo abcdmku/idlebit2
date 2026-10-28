@@ -44,7 +44,7 @@ export const L3: CatalogRow = {
   id: 'l3', scope: 'chip', names: TIERS.map((t) => `${t} L3`), gates: FAB, curve: 'flow',
   base: [64, 65536, 2 ** 26, 2 ** 36], watts: idle(6), price: [2e5, 7e5, 1.7e9, 7.4e11], upgrade: [12, 1.2e5, 1.5e9, 7.7e12],
 };
-/** base = K (concurrency), base2 = Q (queue). Linear, L 1–8 for every g. */
+/** base = K, base2 = Q. Q caps at eight; every generation stops upgrading when it reaches that cap. */
 export const SCHEDULER: CatalogRow = {
   id: 'scheduler', scope: 'chip', names: ['Run queue', 'Multilevel', 'Work queue', 'Cluster runtime'], gates: FAB,
   curve: 'linear', levelMax: 8, base: [1, 2, 3, 4], base2: [2, 4, 6, 8], watts: idle(),

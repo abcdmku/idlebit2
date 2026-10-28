@@ -1,6 +1,5 @@
-// L2 "Control deck" geometry (the approved L2 mockup's layout.js, D15–D17), with the user's 25 Oct
-// return to the first release: the queue strip on top (5 cards, head first), the head task's big
-// card at the bottom above the deck, SLA in the HUD's centre and the currencies stacked top right.
+// The fixed market head and horizontally browsable incoming tasks sit above the world.
+// A task fact/action card anchors the bottom; the HUD keeps SLA central and currencies at the right.
 // Every rect is CSS px relative to the stage. Two grids, one rule: text and boxes sit on the 8 px
 // grid; art sits on N (one art px). Boxes the art fills snap to lcm(8, N). Geometry depends only on
 // the viewport, never on game state, so controls never move.
@@ -8,8 +7,8 @@
 // Desktop (N = 3, cell 24, from 1200 × 760; N = 2, cell 16, below that):
 //   band: ladder | SLA (centre) | Data over Credits (right); the strip; the world;
 //   deck: one row, Research at the left beside the head card (Dismiss).
-// Phone (N = 2, 8 px): band (ladder and the stacked currencies, then SLA), the strip, the world, then the
-//   same one row: Research beside the head card. Buying is done on the world's parts (user, 26 Oct).
+// Phone (N = 2, 8 px): band, market, world, then a full-width task card with menu keys in its action row.
+// Landscape keeps the market and deck in a left column beside the world.
 import type { Rect } from '../render/core';
 
 export interface SafeInsets { readonly top: number; readonly right: number; readonly bottom: number; readonly left: number }
@@ -32,14 +31,14 @@ interface Common {
   readonly band: Rect;
   /** The whole queue strip: tasks slide inside it. */
   readonly strip: Rect;
-  /** The head's place in the strip (first of five). */
+  /** The market head's fixed place in the strip. */
   readonly headSlot: Rect;
-  /** Second to fifth in line, front first. */
+  /** Incoming card geometry; cards continue horizontally beyond the visible viewport. */
   readonly cards: readonly [Rect, Rect, Rect, Rect];
   /** The head task's big card above the deck, and its Dismiss (Return to market between rounds). */
   readonly now: Rect;
   readonly dismiss: Rect;
-  /** The Research tile, left of the head card at its height. */
+  /** Research has a stable reserved key beside the card or inside its action row. */
   readonly research: Rect;
   /** Settings always has its own reserved key beside or below Research. */
   readonly settings: Rect;
@@ -74,18 +73,15 @@ const inset = (a: Rect, d: number): Rect => r(a.x + d, a.y + d, a.w - 2 * d, a.h
 const snap8 = (v: number) => Math.floor(v / 8) * 8;
 /** Keys are at least 44 px tall (touch) on every layout. */
 const KEY_H = 48;
-/**
- * The phone's head card (and the Research tile beside it): its name line, a 48 px fix key and the notice line, each on
- * the 8 px grid (R16b: the fix key is a whole touch target while the countdown and a failure show beside it).
- */
-const NOW_PHONE = 96;
+/** Name/rewards, hardware facts, pickup state, 48px actions, then a reserved platform notice. */
+const NOW_PHONE = 160;
 
 /**
  * The N = 3 desktop from 1200 × 760 (50 × 31 cells of 24); the N = 2 desktop from 960 × 592
  * (60 × 37 cells of 16); below that, the phone.
  */
 const DESKTOP3 = { cols: 50, rows: 31 }, DESKTOP2 = { cols: 60, rows: 37 };
-/** The deck row is five text lines of at least 24 px: the head card's three lines, its notice line and padding. */
+/** Desktop rows keep at least 24px of vertical rhythm. */
 const LINE_MIN = 24;
 
 export function shellLayout(vw: number, vh: number, safe: SafeInsets = NO_INSETS): ShellLayout {
@@ -98,23 +94,11 @@ export function shellLayout(vw: number, vh: number, safe: SafeInsets = NO_INSETS
   return phone(aw, ah, safe);
 }
 
-/**
- * The head card's reserved rows, relative to the card (R16): the name line, then two text lines or the fix key
- * (its label and price, then the requirement), then the notice line that carries the failure ticker. The take
- * clock has its own row over Dismiss, level with the name. A blocked head shows its clock, its fix and a failure
- * at once without any of them overlapping, and nothing moves when they come and go. The fix key is a whole 48 px
- * touch target everywhere, and every row sits on the 8 px grid (R16b).
- */
+/** The platform notice has its own row below task facts and actions in every state. */
 export function nowRows(L: ShellLayout): {
-  readonly lines: readonly [number, number, number]; readonly nameH: number; readonly fixH: number; readonly notice: number;
+  readonly notice: number;
 } {
-  const d = L.kind === 'desktop', top = nowTop(L.now.h, L.lh, d), nameH = L.lh, fixH = d ? Math.max(48, 2 * L.lh) : KEY_H;
-  return { lines: [top, top + nameH, top + nameH + L.lh], nameH, fixH, notice: top + nameH + fixH };
-}
-
-/** Balance the name, action and notice rows while keeping DOM boxes on the 8 px grid. */
-function nowTop(height: number, lh: number, desktop: boolean): number {
-  return desktop ? snap8((height - 2 * lh - Math.max(KEY_H, 2 * lh)) / 2) : 8;
+  return { notice: L.now.h - L.lh - 8 };
 }
 
 /** Short, wide screens keep the CPU at 2×. Queue and deck share the left column. */
@@ -123,13 +107,13 @@ function landscape(aw: number, ah: number, safe: SafeInsets): PhoneLayout {
   const band = r(8, 8, W - 16, 48), band0 = rungs(band, 48, 0);
   const wallet = r(W - 128, 8, 112, 48), endKey = r(wallet.x - 88, 8, 80, 48);
   const sla = r(256, 8, endKey.x - 264, 48);
-  const headSlot = r(8, 64, 128, 128);
-  const card = (i: number) => r(136 + i % 2 * 48, 64 + Math.floor(i / 2) * 64, 48, 64);
-  const research = r(8, H - 56, 224, 48), now = r(8, research.y - 8 - NOW_PHONE, 224, NOW_PHONE);
-  const view = r(248, 56, W - 256, H - 56);
+  const headSlot = r(8, 64, 136, 80);
+  const card = (i: number) => r(144 + i * 144, 64, 144, 80);
+  const research = r(8, H - 56, 288, 48), now = r(8, research.y - 8 - NOW_PHONE, 288, NOW_PHONE);
+  const view = r(312, 56, W - 320, H - 56);
   return { kind: 'phone', N: 2, lat: 8, gutter: 8, x, y, w: W, h: H, body: 13, lh: 16, big: 24, mid: 18,
-    world: view, view, band, strip: r(8, 64, 224, 128), headSlot, cards: [card(0), card(1), card(2), card(3)],
-    now, dismiss: r(now.x + now.w - 88, now.y + 24, 80, 48), ...menuKeys(research), lab: r(8, band.y + band.h, W - 16, H - band.y - band.h - 8),
+    world: view, view, band, strip: r(8, 64, 288, 80), headSlot, cards: [card(0), card(1), card(2), card(3)],
+    now, dismiss: r(now.x + 148, now.y + 88, 132, 48), ...menuKeys(research), lab: r(8, band.y + band.h, W - 16, H - band.y - band.h - 8),
     rungs: band0, rungRow: 48, rungLabel: r(256, 8, 0, 48), sla, endKey, wallet,
     pipeSrc: { x: headSlot.x + headSlot.w, y: headSlot.y + 24 }, pipeRunY: view.y + 8,
     calloutBounds: inset(view, 8), callout: { w: Math.min(288, view.w - 16), h: 104 } };
@@ -152,13 +136,12 @@ function desktop(N: 2 | 3, aw: number, ah: number, safe: SafeInsets): DesktopLay
   const W = Math.floor(aw / U) * U, H = Math.floor(ah / U) * U;
   const x = safe.left + Math.floor((aw - W) / 2), y = safe.top + Math.floor((ah - H) / 2);
   const body = N === 3 ? 16 : 13, lh = N === 3 ? 24 : 16;
-  const deckH = 5 * Math.max(U, LINE_MIN), deckY = H - U - deckH;
+  const deckH = 7 * Math.max(U, LINE_MIN), deckY = H - U - deckH;
   const world = r(U, U, W - 2 * U, deckY - 2 * U);
   const band = r(U, U, world.w, 2 * U);
-  const strip = r(U, band.y + band.h, world.w, 2 * U);
-  // Five cards, head first: the head keeps room for the longest name and its state on one line ("Replicated
-  // Write restarting"); the next 4 share the rest on the lattice and the head takes what is left over.
-  const headMin = N === 3 ? 14 * U : 16 * U, cardW = Math.floor((world.w - headMin) / 4 / U) * U, headW = world.w - 4 * cardW;
+  const strip = r(U, band.y + band.h, world.w, N === 3 ? 3 * U : 4 * U);
+  // Incoming cards retain readable names; a partial next card makes the horizontal browsing visible.
+  const headW = N === 3 ? 11 * U : 14 * U, cardW = N === 3 ? 11 * U : 13 * U;
   const headSlot = r(U, strip.y, headW, strip.h);
   const card = (i: number) => r(headSlot.x + headW + i * cardW, strip.y, cardW, strip.h);
   const top = strip.y + strip.h;
@@ -175,8 +158,7 @@ function desktop(N: 2 | 3, aw: number, ah: number, safe: SafeInsets): DesktopLay
   return {
     kind: 'desktop', N, lat, gutter: U, x, y, w: W, h: H, body, lh, big: N === 3 ? 32 : 24, mid: N === 3 ? 20 : 16,
     world, view, band, strip, headSlot, cards: [card(0), card(1), card(2), card(3)],
-    // The head card's key is wide enough for "Return to market" on one line; Dismiss keeps the same box.
-    now, dismiss: r(now.x + now.w - lat - 144, now.y + nowTop(now.h, lh, true) + lh, 144, KEY_H),
+    now, dismiss: r(now.x + now.w - 128, now.y + 80, 112, KEY_H),
     ...menuKeys(research), lab: r(world.x, top, world.w, H - U - top),
     rungs: band0, rungRow: band.h, rungLabel, sla, endKey, wallet,
     pipeSrc: { x: headSlot.x + lat + 8 * N, y: top }, pipeRunY: top + U,
@@ -193,21 +175,20 @@ function phone(aw: number, ah: number, safe: SafeInsets): PhoneLayout {
   // The band: the ladder row (48 px rungs, a primary tap) with Data over Credits at its right, then SLA and End round.
   const rungRow = 48, band = r(U, U, world.w, rungRow + 48);
   const band0 = rungs(band, rungRow, 0), walletX = band0[4].x + band0[4].w + 8;
-  // The strip: the head first, then the next 4.
-  const strip = r(U, band.y + band.h, world.w, 64);
-  // The head keeps room for the longest task name on its own line ("Replicated Write"); the next 4 share the rest.
-  const headSlot = r(U, strip.y, Math.min(144, world.w - 4 * 48), 64);
-  const cardW = Math.floor((world.w - headSlot.w) / 4 / U) * U;
-  const card = (i: number) => r(headSlot.x + headSlot.w + i * cardW, strip.y, i === 3 ? world.w - headSlot.w - 3 * cardW : cardW, 64);
+  // The head is fixed; incoming cards retain their width and scroll through the remaining strip.
+  const strip = r(U, band.y + band.h, world.w, 80);
+  const headSlot = r(U, strip.y, W < 360 ? 136 : 152, 80);
+  const cardW = 144;
+  const card = (i: number) => r(headSlot.x + headSlot.w + i * cardW, strip.y, cardW, 80);
   const top = strip.y + strip.h;
-  // The deck: one row, Research at the left (the thumb), then the head card.
-  const research = r(U, nowY, world.w < 352 ? 88 : 112, nowH), now = r(research.x + research.w + U, nowY, world.w - research.w - U, nowH);
+  // Full-width facts above a stable row of Research, Settings, Details/fix, and Dismiss.
+  const now = r(U, nowY, world.w, nowH), research = r(U + 8, nowY + 88, 72, 48), settings = r(U + 88, nowY + 88, 48, 48);
   const view = r(world.x, top, world.w, world.y + world.h - top);
   return {
     kind: 'phone', N, lat, gutter: U, x, y, w: W, h: H, body: 13, lh: 16, big: 24, mid: 18,
     world, view, band, strip, headSlot, cards: [card(0), card(1), card(2), card(3)],
-    now, dismiss: r(now.x + now.w - 8 - 80, now.y + 24, 80, KEY_H),
-    ...menuKeys(research), lab: r(U, H < 640 ? band.y + band.h : top, world.w, H - U - (H < 640 ? band.y + band.h : top)),
+    now, dismiss: r(now.x + now.w / 2 + 72, now.y + 88, now.w / 2 - 80, KEY_H),
+    research, settings, lab: r(U, H < 640 ? band.y + band.h : top, world.w, H - U - (H < 640 ? band.y + band.h : top)),
     rungs: band0, rungRow, rungLabel: r(walletX, band.y, 0, rungRow),
     sla: r(band.x, band.y + rungRow, band.w - 88, 48), endKey: r(band.x + band.w - 80, band.y + rungRow, 80, 48), wallet: r(walletX, band.y, band.x + band.w - U - walletX, rungRow),
     pipeSrc: { x: headSlot.x + 8 + 16, y: top }, pipeRunY: top + U,

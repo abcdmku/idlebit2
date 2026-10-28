@@ -10,10 +10,10 @@ import type { Rect } from '../../core';
 type G = CanvasRenderingContext2D;
 
 /** The task type colour of the shard a core runs (D23), or null when it runs none. */
-export const coreColor = (c: CoreView): string | null => c.activity === 'cacheLoad' || c.activity === 'cacheAccess'
+export const coreColor = (c: CoreView): string | null => c.activity === 'preload' ? P.preload : c.activity === 'cacheLoad' || c.activity === 'cacheAccess'
   ? P.cacheOn : c.family === null ? null : typeColor(typeOf(familyId(c.family)));
 /** Two cores run one shard: the same task and shard index. */
-export const sameShard = (a: CoreView, b: CoreView): boolean => a.taskId !== null && a.taskId === b.taskId && a.shard === b.shard;
+export const sameShard = (a: CoreView, b: CoreView): boolean => a.taskId !== null && a.taskId === b.taskId && a.shard === b.shard && (a.activity === 'preload') === (b.activity === 'preload');
 /** A progress gauge: an ink well filling left to right in the task's colour. */
 export function drawPiece(g: G, x: number, y: number, w: number, h: number, progress: number, colour: string): void {
   R(g, x, y, w, h, P.ink); R(g, x + 1, y + 1, w - 2, h - 2, P.logicLo);

@@ -5,7 +5,7 @@ import { MODE, startTransition } from '../core/timers';
 import { touchRack } from '../core/touch';
 import type { World } from '../core/world';
 import { drainQueue, landPipe, pullLone, startQueued } from './alloc';
-import { axisAt, fillSpan, newSpan, nextDueTick, setRate, type Span } from './clocks';
+import { axisAt, clockAt, fillSpan, newSpan, nextDueTick, setRate, type Span } from './clocks';
 import { anchorAccelDomains } from './accelerators';
 import { integrateAccelerators, resetAccelUsage, resetSystemAccelUsage } from './accelUsage';
 import { publishRunBoundary } from './boundary';
@@ -18,6 +18,7 @@ import { stealThreads } from './stealing';
 import { leaveStage, promoteIo, releaseRunning, enterStage } from './stages';
 import { CPU, GPU, IO, NRES, RAM, shapeOf } from './shape';
 import { diskRate, firstLoadPart, firstPart, isLoadingPart } from './memory';
+import { activeLoaders, finishPreload, handoffBatch, prepareQueued, stopPreload } from './preload';
 
 /**
  * Run phase: allocate, then process completion events, stage transitions and in-tick chaining.
@@ -46,7 +47,7 @@ export const isLone = (w: World, s: number): boolean => w.compiled.rack.opened[w
 /** Σ threads of the tasks in a compute stage (time slicing shares the cores among them). */
 function cpuThreads(w: World, s: number): number {
   const rec = w.hot.rec;
-  let sum = 0;
+  let sum = activeLoaders(w, s);
   for (let r = w.hot.sys.head[s * NRES + CPU]!; r >= 0; r = rec.next[r]!) sum += rec.count[r]! * rec.threads[r]!;
   return sum;
 }
@@ -76,7 +77,12 @@ function pull(w: World, s: number, tau: number): void {
 /** Allocation at τ (spec §6.7 steps 1 and 3): the lone system's take, then queued starts. */
 function allocate(w: World, s: number, tau: number): number {
   pull(w, s, tau);
-  return startQueued(w, s, tau, span);
+  const preload = w.compiled.sys.queuePreload[s] === 1 && !strategyOf(w, s).timeSlice;
+  if (!preload) stopPreload(w, s, clockAt(w, s, CPU, axisAt(span, CPU, tau)));
+  let changed = preload && prepareQueued(w, s, tau, span) ? 1 : 0;
+  changed += startQueued(w, s, tau, span);
+  if (!preload && !strategyOf(w, s).timeSlice && prepareQueued(w, s, tau, span)) changed++;
+  return changed;
 }
 
 /** τ at which s's pipe transfer lands within this tick, or Infinity. */
@@ -129,13 +135,23 @@ function runEvents(w: World, s: number, share: number): number {
       }
     }
     const pipeTau = pipeLandTau(w, s, cursor);
+    const x0 = clockAt(w, s, CPU, span.x0[CPU]!), x1 = clockAt(w, s, CPU, span.x1[CPU]!);
+    const preloadTau = h.preloadThread[s]! >= 0 && x1 > x0 && h.preloadFinish[s]! <= x1
+      ? Math.max(cursor, (h.preloadFinish[s]! - x0) / (x1 - x0)) : Infinity;
+    if (preloadTau < tau && preloadTau <= pipeTau) {
+      integrateAccelerators(w, s, cursor, preloadTau, span, share, true);
+      cursor = preloadTau; events++;
+      finishPreload(w, s);
+      if (chain) allocate(w, s, cursor);
+      continue;
+    }
     if (pipeTau < tau) {
       integrateAccelerators(w, s, cursor, pipeTau, span, share, true);
       cursor = pipeTau;
       events += 1;
       landPipe(w, s, pipeTau);
       pull(w, s, pipeTau);
-      if (chain) startQueued(w, s, pipeTau, span);
+      if (chain) allocate(w, s, pipeTau);
       continue;
     }
     if (res < 0) {
@@ -164,6 +180,7 @@ function runEvents(w: World, s: number, share: number): number {
       enterStage(w, s, r, tau, span, res, doneW);
     } else {
       const domain = rec.accelDomain[r]!;
+      handoffBatch(w, s, r, tau, span);
       releaseRunning(w, s, r);
       completeRecord(w, s, r, tau, domain);
       if (chain) allocate(w, s, tau);
@@ -236,6 +253,7 @@ function skipCache(w: World, log: TouchLog): SkipCache {
 /** No completion, stage end or pipe landing of system s falls within this tick's span (runEvents' tests). */
 function nothingDue(w: World, s: number): boolean {
   const h = w.hot.sys;
+  if (h.preloadThread[s]! >= 0 && h.preloadFinish[s]! <= clockAt(w, s, CPU, span.x1[CPU]!)) return false;
   if (h.pipeRec[s]! >= 0) return false;
   const base = s * NRES;
   if (h.due[base + CPU]! <= span.x1[CPU]! || h.due[base + RAM]! <= span.x1[RAM]! || h.due[base + IO]! <= span.x1[IO]!) return false;

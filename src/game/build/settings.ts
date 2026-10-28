@@ -1,5 +1,5 @@
 import { FILTER_NAMES, QUEUE_NAMES, ROUTE_NAMES } from '../view/labels';
-import type { BuildState, RouterBuild, SystemSettings } from '../types/build';
+import type { BuildState, QueueOptimization, RouterBuild, SystemSettings } from '../types/build';
 import { QUEUE_STRATEGY_IDS, type FilterId, type QueueStrategyId, type RouteStrategyId } from '../types/catalog';
 import type { PartRef, RackId, RoomId, ScopeRef, SystemId } from '../types/ids';
 import type { GameState } from '../types/state';
@@ -13,6 +13,13 @@ import { fail, locked, planned, type Plan } from './plan';
 
 export const SETPOINT_MIN_F = 55;
 export const SETPOINT_MAX_F = 80;
+
+export function planQueueLoaderLimit(state: GameState, system: SystemId, limit: 1 | 2 | 4): Plan {
+  const spec = state.build.systems[system]?.spec;
+  if (!spec?.scheduler) return fail('invalid', 'Needs a queue');
+  if (![1, 2, 4].includes(limit) || limit > state.compiled.sys.preloadLoaders[system]!) return fail('locked', 'Research more parallel loaders');
+  return planned({ build: withSpec(state.build, system, { ...spec, settings: { ...spec.settings, queueLoaderLimit: limit } }), price: 0n }, 'Cache loader budget');
+}
 
 function routerOf(build: BuildState, unit: ScopeRef): RouterBuild | null {
   switch (unit.kind) {
@@ -56,6 +63,17 @@ export function planStrategy(state: GameState, unit: ScopeRef, strategy: QueueSt
   return editRouter(state, unit, (lb) => ({ ...lb, strategy: strategy as RouteStrategyId }), name);
 }
 
+/** Free, hot scheduler choices, available as soon as a queue is installed. */
+export function planQueueSetting(state: GameState, system: SystemId, setting: 'optimization' | 'batching', value: QueueOptimization | boolean): Plan {
+  const spec = state.build.systems[system]?.spec;
+  if (!spec?.scheduler) return fail('invalid', 'Needs a queue');
+  if (setting === 'optimization' ? value !== 'utilization' && value !== 'preload' : typeof value !== 'boolean')
+    return fail('invalid', 'Invalid queue setting');
+  const scheduler = setting === 'optimization' ? { ...spec.scheduler, optimization: value as QueueOptimization }
+    : { ...spec.scheduler, batching: value as boolean };
+  return planned({ build: withSpec(state.build, system, { ...spec, scheduler }), price: 0n }, 'Queue');
+}
+
 export function planFilter(state: GameState, unit: ScopeRef, filter: FilterId, on: boolean): Plan {
   const name = FILTER_NAMES[filter].name;
   const lock = on ? optionLock(state.research.unlocks, filter, 'filter') : null;
@@ -63,7 +81,7 @@ export function planFilter(state: GameState, unit: ScopeRef, filter: FilterId, o
   return editRouter(state, unit, (lb) => ({ ...lb, filters: toggle(lb.filters, filter, on) }), name);
 }
 
-/** D25.7: the router's queue one slot larger, L → L + 1 (at most 32). Hot; never research-gated (spec §12.7). */
+/** The router's queue one slot larger, L → L + 1 (at most 8). Hot; never research-gated. */
 export function planRouterQueue(state: GameState, unit: ScopeRef): Plan {
   const lb = routerOf(state.build, unit);
   if (!lb || unit.kind === 'system') return fail('invalid', 'No router here');

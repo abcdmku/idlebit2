@@ -7,7 +7,7 @@ import { commitPlan } from './plan';
 import { planAddPort, planAddUplink, planReplaceLadder, planSameSpeed, planUpgradePort, planUpgradeUplink } from './ports';
 import { researchHandlers } from './research/actions';
 import {
-  planCStateLimit, planFilter, planPowerCap, planRouterQueue, planSetpoint, planStrategy, planSystemSetting,
+  planCStateLimit, planFilter, planPowerCap, planQueueLoaderLimit, planQueueSetting, planRouterQueue, planSetpoint, planStrategy, planSystemSetting,
 } from './settings';
 import { planAddRow, planAddUnit, planRemoveUnit } from './units';
 import { planInstallGpu } from './gpuPlans';
@@ -16,6 +16,7 @@ import { planRamEcc } from './eccPlans';
 
 /** Part, unit, configuration, port, setting and research actions (architecture §4). Every handler re-plans and re-prices. */
 export const buildHandlers: HandlerMap = {
+  setQueueLoaderLimit: (s, a) => commitPlan(s, planQueueLoaderLimit(s, a.system, a.limit)),
   convertRamToEcc: (s, a) => commitPlan(s, planRamEcc(s, a.system)),
   installGpu: (s, a) => commitPlan(s, planInstallGpu(s, a.system, a.model, a.index)),
   upgradePart: (s, a) => commitPlan(s, planUpgrade(s, a.part)),
@@ -40,6 +41,8 @@ export const buildHandlers: HandlerMap = {
   addPorts: (s, a) => commitPlan(s, planAddPort(s, a.sw)),
   addUplink: (s, a) => commitPlan(s, planAddUplink(s, a.sw)),
   setStrategy: (s, a) => commitPlan(s, planStrategy(s, a.unit, a.strategy)),
+  setQueueOptimization: (s, a) => commitPlan(s, planQueueSetting(s, a.system, 'optimization', a.optimization)),
+  setQueueBatching: (s, a) => commitPlan(s, planQueueSetting(s, a.system, 'batching', a.on)),
   setFilter: (s, a) => commitPlan(s, planFilter(s, a.unit, a.filter, a.on)),
   setStartConfig: (s, a) => commitPlan(s, planStartConfig(s, a.unit, a.startWith, a.headWaitS, a.busyPct, a.order)),
   upgradeRouterQueue: (s, a) => commitPlan(s, planRouterQueue(s, a.unit)),

@@ -1,4 +1,5 @@
 import type { Curve } from '../../types/catalog';
+import { MAX_SCHED_Q } from '../../core/constants';
 import type { CatalogRow, LadderDef } from './types';
 import { linkWatts, networkStepPrice as rawStepPrice, type NetworkLadderDef } from './network';
 
@@ -33,7 +34,10 @@ export const levelMax = (row: CatalogRow, g: number, bonus = 0): number =>
 export const capacity = (row: CatalogRow, g: number, level: number): number =>
   row.base[g]! * (row.capacityTable ? row.capacityTable[Math.min(row.capacityTable.length, Math.max(1, level)) - 1]! : levelFactor(row.curve, level));
 /** Secondary capacity (RAM bandwidth, VRAM, IO rate, scheduler Q) scales by the same x. */
-export const capacity2 = (row: CatalogRow, g: number, level: number): number => (row.base2?.[g] ?? 0) * levelFactor(row.curve, level);
+export const capacity2 = (row: CatalogRow, g: number, level: number): number => {
+  const value = (row.base2?.[g] ?? 0) * levelFactor(row.curve, level);
+  return row.id === 'scheduler' ? Math.min(MAX_SCHED_Q, value) : value;
+};
 
 /** RAM and drives are rated by bandwidth / IO (secondary); every other rate part by its primary capacity. */
 export const ratedRate = (row: CatalogRow, g: number, level: number): number =>

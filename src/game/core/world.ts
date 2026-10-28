@@ -7,6 +7,7 @@ import type { GameState, LedgerSample, MarketState, QueuedTask, ResearchState, R
 import { cloneHot, type CompiledBuffers, type HotBuffers } from './buffers';
 import type { TouchLog } from './touch';
 import { completionLog, type CompletionLog } from './completions';
+import type { RoundRewardsState } from '../types/roundRewards';
 
 export type Mutable<T> = { -readonly [K in keyof T]: T[K] };
 /** The market draft: the window is an owned array the tick shifts and refills in place. */
@@ -66,6 +67,7 @@ export interface World {
   readonly round: Mutable<RoundState>;
   readonly market: MarketWork;
   readonly research: Mutable<ResearchState>;
+  readonly roundRewards: Mutable<RoundRewardsState>;
   readonly ledger: LedgerWork;
   readonly events: EventWork;
   readonly report: ReportWork;
@@ -96,6 +98,7 @@ export function openWorld(state: GameState, owned = false): World {
     round: { ...state.round },
     market: { ...state.market, window: [...state.market.window] },
     research: { ...state.research },
+    roundRewards: { ...state.roundRewards },
     late: false,
     ledger: {
       credits: big(state.wallet.credits), data: big(state.wallet.data),
@@ -130,6 +133,7 @@ export function commitWorld(state: GameState, w: World, carryMs: number): GameSt
     round: { ...w.round, gross: toAmount(l.roundGross), energy: toAmount(l.roundEnergy), data: toAmount(l.roundData) },
     market: { ...w.market, window: [...w.market.window] },
     research: { ...w.research },
+    roundRewards: { ...w.roundRewards },
     build: w.build,
     compiled: w.compiled,
     hot: w.hot,

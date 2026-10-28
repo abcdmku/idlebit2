@@ -19,6 +19,12 @@ const GRAIN = { serial: 65536, coarse: 4096, medium: 256, fine: 64, tile: 16 } a
 /** Default grain per band (BANDS order); a family row may override it. */
 const BAND_GRAIN = [GRAIN.coarse, GRAIN.coarse, GRAIN.fine, GRAIN.medium, GRAIN.fine, GRAIN.coarse, GRAIN.fine, GRAIN.fine, GRAIN.fine, GRAIN.fine];
 
+/** Introduce simple recipes before larger cache requirements, without waiting for a size budget. */
+const OPENING_FROM: Readonly<Record<string, number>> = {
+  bitFlip: 0, bitCopy: 1.2, parity: 2, bitShift: 2.6,
+  andMask: 3.8, orMerge: 4.1, xorMix: 4.4, compare: 4.7, intAdd: 5, bitSwap: 5.3,
+};
+
 interface Extra {
   /** The pre-D25 thread maximum, kept only so rows stay a verbatim copy of the model. Unused. */
   readonly th?: number;
@@ -42,11 +48,11 @@ function fam(key: string, _name: string, band: number, from: number, to: number,
     || (gpuCoresMin > 0 || (o.vram ?? 0) > 0 || o.tensor) && gpuWork <= 0) throw new Error(`Invalid accelerator requirements: ${key}`);
   // Affinity reads the model's own working-set column (before D26 folds disk into it).
   const accelerator = (o.tensor ?? false) || gpuCoresMin > 0 || 2 * gpuWork >= pay || (o.wsP ?? 0) >= 4;
-  // A complete recipe must fit the offered-work envelope before it joins a band.
-  const delay = Math.max(0, Math.log2(factor) / 0.85 - from - 1);
+  // Starter recipes can vary in size immediately. Larger tiers retain their authored hardware ramp.
+  const delay = band === 0 ? 0 : Math.max(0, Math.log2(factor) / 0.85 - from - 1);
   rows.push({
     id: familyId(rows.length), key, name: recipe.label, band: BANDS[band]!, note: recipe.note,
-    window: { from: from + delay, to: to + delay }, weight, stages: st, marketWork,
+    window: { from: OPENING_FROM[key] ?? from + delay, to: to + delay }, weight, stages: st, marketWork,
     grain: Math.max(1, Math.floor((o.g ?? BAND_GRAIN[band]!) / factor)),
     workingSet: { fixed: o.wsF ?? 0, perSize: Math.ceil(((o.wsP ?? 0) + (o.disk ?? 0)) * factor) },
     vramBits: { fixed: 0, perSize: Math.ceil((o.vram ?? 0) * factor) },
@@ -114,9 +120,10 @@ for (const [key, source] of Object.entries(EXTRA_FAMILIES)) {
   const base = rows.find(row => row.key === source)!;
   const { window: interval } = base;
   const totals = recipeTotals(key), factor = Number(totals.ops) / Number(recipeTotals(source).ops);
-  const recipe = workRecipe(key), delay = Math.max(0, Math.log2(Number(totals.ops) / base.marketWork) / 0.85 - interval.from - 1);
+  const recipe = workRecipe(key), delay = base.band === 'bits' ? 0
+    : Math.max(0, Math.log2(Number(totals.ops) / base.marketWork) / 0.85 - interval.from - 1);
   rows.push({ ...base, id: familyId(rows.length), key, name: recipe.label, note: recipe.note,
-    stages: recipeStages(key), window: { from: interval.from + delay, to: interval.to + delay },
+    stages: recipeStages(key), window: { from: OPENING_FROM[key] ?? interval.from + delay, to: interval.to + delay },
     grain: Math.max(1, Math.floor(base.grain / factor)),
     workingSet: { fixed: base.workingSet.fixed, perSize: Math.ceil(base.workingSet.perSize * factor) },
     vramBits: { fixed: base.vramBits.fixed, perSize: Math.ceil(base.vramBits.perSize * factor) },

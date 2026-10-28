@@ -24,9 +24,17 @@ export interface CpuBuild {
 }
 /** general: ≤ 4 CPUs, ≤ 4 RAM, ≤ 2 GPUs. accelerator: ≤ 2 CPUs, 8 RAM, 8 GPUs, no DIMM penalty (D7.6). */
 export type BoardKind = 'general' | 'accelerator';
-export interface SchedulerBuild extends PartLevel { readonly strategy: QueueStrategyId }
+export type QueueOptimization = 'utilization' | 'preload';
+export interface SchedulerBuild extends PartLevel {
+  readonly strategy: QueueStrategyId;
+  /** Missing on hand-built fixtures: keep cores busy, without batching. */
+  readonly optimization?: QueueOptimization;
+  readonly batching?: boolean;
+}
 export interface RamModuleBuild extends PartLevel { readonly ecc: boolean }
 export interface SystemSettings {
+  /** Upper bound on researched cache loaders; omitted means use the researched budget. */
+  readonly queueLoaderLimit?: 1 | 2 | 4;
   readonly dvfs: boolean;
   readonly turbo: boolean;
   /** C-state enabled (1) or disabled (0); research supplies the idle-power factor. */
@@ -66,7 +74,7 @@ export interface SystemBuild {
 export interface RouterBuild extends PartLevel {
   readonly strategy: RouteStrategyId;
   readonly filters: readonly FilterId[];
-  /** D25.7: router queue slots, 1–32 (`upgradeRouterQueue`, one slot per level). */
+  /** D25.7: router queue slots, 1–8 (`upgradeRouterQueue`, one slot per level). */
   readonly queueLevel: number;
 }
 export interface SwitchBuild {

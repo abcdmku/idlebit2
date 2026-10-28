@@ -21,20 +21,6 @@ export function effectText(e: EffectPreview | null): string {
 const isUpgrade = (q: Quote) => q.action.type === 'upgradePart' || q.action.type === 'upgradeAll';
 const isReplace = (q: Quote) => q.action.type === 'replacePart' || q.action.type === 'replaceCpu';
 
-/** A task fix can quote upgradePartTo for the same purchase as a normal upgrade key. */
-export function samePurchase(a: Quote | null | undefined, b: Quote | null | undefined): boolean {
-  if (!a || !b || a.cost !== b.cost || a.currency !== b.currency) return false;
-  if (JSON.stringify(a.action) === JSON.stringify(b.action)) return true;
-  const target = (q: Quote): string | null => {
-    const action = q.action;
-    if (action.type !== 'upgradePart' && action.type !== 'upgradePartTo') return null;
-    const { unit, slot } = action.part;
-    return `${unit.kind}:${'id' in unit ? unit.id : ''}:${slot.kind}:${'socket' in slot ? slot.socket : ''}:${'index' in slot ? slot.index : ''}`;
-  };
-  const left = target(a), right = target(b);
-  return left !== null && left === right;
-}
-
 export function partQuotes(quotes: readonly Quote[]) {
   const replaces = quotes.filter(isReplace);
   return {

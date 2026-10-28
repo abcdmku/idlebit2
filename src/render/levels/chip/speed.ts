@@ -16,6 +16,7 @@ export const coreSleep = (c: CoreView): string | null => c.sleep;
 export const coreSpeedText = (c: CoreView): string => coreSleep(c) ?? formatHertz(coreHz(c));
 /** Small grid cores use the short cache phase names; big cards spell out the operation. */
 export function coreActivityText(c: CoreView, compact = false): string {
+  if (c.activity === 'preload') return 'Preload';
   if (c.activity === 'cacheLoad') return compact ? 'Load' : 'Cache load';
   if (c.activity === 'cacheAccess') return compact ? 'Cache' : 'Cache read';
   if (c.activity === 'compute') return 'Compute';

@@ -10,6 +10,7 @@ import { executionBoundary } from './boundary';
 import { canAdmit, noteAdmit, noteAdmitted } from './slots';
 import { CPU, GPU, IO, NRES, shapeOf } from './shape';
 import { firstLoadPart, firstPart, partClock, partWork, placeRecord, releaseMemory } from './memory';
+import { activeLoaders, stopPreload, takePreload } from './preload';
 
 /**
  * Record mechanics on one system: start, stage entry and exit, release. All at a fraction τ of the
@@ -78,6 +79,7 @@ export function startRecord(w: World, s: number, r: number, tau: number, span: S
   const shape = shapeOf(rec.family[r]!);
   const selected = choice ?? chooseAccel(w.compiled, w.hot, s, accelNeed(shape.def, rec.units[r]!), k);
   if (!selected || selected.take < k) throw new Error('startRecord: no accelerator capacity');
+  takePreload(w, s, r, tau, span);
   holdAccel(w, s, r, selected);
   rec.loc[r] = LOC.running;
   rec.owner[r] = s;
@@ -91,7 +93,7 @@ export function startRecord(w: World, s: number, r: number, tau: number, span: S
   h.busyThreads[s] = h.busyThreads[s]! + threads;
   w.hot.g[G.busyThreads] = w.hot.g[G.busyThreads]! + threads;
   noteAdmit(w, s, before);
-  bindThreads(w, s, r, threads);
+  bindThreads(w, s, r, threads, clockAt(w, s, CPU, axisAt(span, CPU, tau)));
   placeRecord(w, s, r, selected.held);
   const load = firstLoadPart(w, r);
   rec.part[r] = load >= 0 ? load : firstPart(w, r, shape, rec.stage[r]!, 0);
@@ -104,10 +106,11 @@ export function startRecord(w: World, s: number, r: number, tau: number, span: S
  * so a task never moves to another core when an earlier one finishes. Exact, and O(running on s).
  */
 const occupied: Uint8Array = new Uint8Array(512);
-function bindThreads(w: World, s: number, r: number, n: number): void {
+function bindThreads(w: World, s: number, r: number, n: number, at: number): void {
   const rec = w.hot.rec, h = w.hot.sys;
   const total = Math.min(occupied.length, Math.max(1, w.compiled.sys.threads[s]!));
   occupied.fill(0, 0, total);
+  for (let q = h.queueHead[s]!; q >= 0; q = rec.next[q]!) if (rec.loaderThread[q]! >= 0) occupied[rec.loaderThread[q]!] = 1;
   const mark = (x: number) => {
     const t0 = rec.thread0[x]!;
     if (t0 < 0) return;
@@ -125,6 +128,12 @@ function bindThreads(w: World, s: number, r: number, n: number): void {
   for (let t = 0; t < total; t += 1) {
     run = occupied[t] ? 0 : run + 1;
     if (run >= n) { first = t - n + 1; break; }
+  }
+  // A wide task gets priority over speculative loaders when their cores fragment its free block.
+  if (first < 0 && activeLoaders(w, s) > 0) {
+    stopPreload(w, s, at);
+    bindThreads(w, s, r, n, at);
+    return;
   }
   if (first < 0) for (let t = 0; t < total; t += 1) if (!occupied[t]) { first = t; break; }
   rec.thread0[r] = Math.max(0, first);
@@ -156,7 +165,10 @@ export function releaseRunning(w: World, s: number, r: number): void {
   releaseAccel(w, s, r);
   releaseMemory(w, s, r);
   // The last running shard leaves nothing held: clear subtraction roundoff (a storage node's disk is held by others).
-  if (h.running[s] === 0) { h.usedCache[s] = 0; h.usedRam[s] = 0; h.usedDisk[s] = 0; h.usedVram[s] = 0; }
+  if (h.running[s] === 0) {
+    if (h.preloadRec[s]! < 0) h.usedCache[s] = h.residentBits[s]!;
+    h.usedRam[s] = 0; h.usedDisk[s] = 0; h.usedVram[s] = 0;
+  }
   noteAdmitted(w, s, -k, r);
   noteAdmit(w, s, before);
 }

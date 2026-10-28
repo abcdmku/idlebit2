@@ -5,7 +5,7 @@ import { graceOf, prepareQueue } from './queue';
 /** Testkit hook: open the running round at an endgame intensity, as the offset start would (D12.1). */
 export const PRIME_INTENSITY = 53;
 
-/** Re-prepares the running round's queue at `intensity`: five tasks drawn there, the grace prior from them, a fresh head clock. */
+/** Re-prepares the running round's queue at `intensity`, with grace from its first five tasks and a fresh head clock. */
 export function primeMarket(state: GameState, intensity: number = PRIME_INTENSITY): GameState {
   if (state.round.phase !== 'running') throw new Error('primeMarket: the round must be running');
   const hot = cloneHot(state.hot);

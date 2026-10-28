@@ -1,6 +1,6 @@
 # Tasks and market
 
-D50, 27 October 2026. This is the current task model. Recipe definitions in `src/game/market/recipes/` own operation counts; `families.ts` owns hardware gates and market calibration. Earlier coefficient tables are superseded.
+D53, 27 October 2026. This is the current task model. Recipe definitions in `src/game/market/recipes/` own operation counts; `families.ts` owns hardware gates and market calibration. Earlier coefficient tables are superseded.
 
 ## 1. Work and payment
 
@@ -20,28 +20,44 @@ Recipe and reward arithmetic uses exact whole-number strings and bigint operatio
 
 One logical task pays once, when its final shard completes. Child subtotals and non-final shards are contributions, not extra payouts. Retries, placement copies of fixed shard data and unified-memory spill overhead do not create another logical task or enlarge its promised reward. RAM/disk traffic and network transfer retain their own units and rates.
 
+### 1.1 Round rewards and Data dividends, D56
+
+The first reward needs 50 completed logical tasks in one round. The endless count ladder repeats `1, 1.5, 2, 3, 5, 7.5` per decade, starting at 50, 75, 100, 150, 200, 300, 500 and 750. Each threshold earns once per save, on first-ever reach, and requires a manual claim.
+
+Freeze 100% of the base task Credits and Data earned since the preceding reward threshold in that round, with floors of `20 × count` Credits and `2 × count` Data. The first 50 includes tasks 1 through 50. Bonuses never enter the match. Pending grants and exact claimed receipts persist across rounds and saves. Claims add wallet currency without entering operating income, dividends or later grant calculations.
+
+Claiming 75 grants 10% extra Data from completed market tasks; claiming 1,500 adds another 10%, capped at 20% total. Fractional dividends carry forward. Grants receive no dividend. Other capped perks and research blueprints are listed in D56 and game-spec §4.8.
+
 ## 2. Execution and hardware
 
 The recipe compiler totals read bits, CPU arithmetic, GPU arithmetic and write bits without expanding repetitions. It executes those batched phases in that order. A GPU recipe promotes compatible arithmetic to GPU work; a parent containing CPU and GPU subtasks retains both volumes. Initial placement still loads cache, RAM and disk before those phases under D46. Cache reads/loading use the CPU clock; RAM and disk use their bandwidth and IO clocks. No new fixed processing timers exist.
 
 A size unit is one whole recipe. Hardware gates retain fixed working sets, size-dependent memory and VRAM, GPU core floors, tensor/ECC, minimum systems, zones and region restrictions. Existing memory/VRAM densities and grain classes are converted to recipe units. Grain is at least one recipe. A task may split into at most 256 shards, preserving whole units and the full task's one payment.
 
+Queue preparation starts with one target and one loader. D56 claims raise targets to 2 at 50 and 4 at 300; research opens 2 then 4 loaders at 50 and 500. Each loader needs a separate idle physical core and one CPU op per loaded cache bit. Installed queue space and cache remain binding. Resident workspace research at 150 retains one family's fixed cache across unlike tasks with batching enabled, never private inputs. These rewards change no frequencies or generations.
+
 ## 3. Market quantities and progression
 
-Each round starts at intensity I = 0. Hardware never changes the draws or intensity. One draw advances I by 1 / k(I). The quick recipe-market rebalance uses:
+Each round starts at intensity I = 0. Hardware never changes the draws or intensity. One draw advances I by 1 / k(I). Intensity introduces hardware requirements and raises the upper quantity range. It does not force every task to be larger than the previous one.
 
 ```text
 k(I) = 7 + 0.25 I + 0.025 I² + 0.25 max(0,I−14)³
 U(I) = 2^(0.85 I)
-s = max(minimum split × grain, round(U(I) × jitter × marketWork / workPerRecipe))
 workPerRecipe = recipeOps + wsPerRecipe
+sizeI = min(I, family.to) for a family retiring at or before I54; otherwise I
+targetUnits = U(sizeI) × marketWork / workPerRecipe
+minimum = members × grain for a minimum-split task; otherwise 1
+maximum = max(2 × minimum, floor(8 × targetUnits))
+s = clamp(floor(exp(log(minimum) + u × (log(maximum + 1) − log(minimum)))), minimum, maximum)
 ```
 
-For a task without a minimum split, the size floor is one. `marketWork` is an offered-work budget. It affects quantities, never the one-Credit price of an operation. A recipe's window shifts later when its smallest complete instance exceeds the initial budget. The existing family's weight is shared among its added variants so adding names does not multiply that hardware band's total demand.
+The seeded uniform draw `u` samples whole recipe quantities across a logarithmic range. Each doubling has comparable probability. Small jobs remain possible beside large jobs, and even a newly introduced recipe has multiple quantities. The first offer is always one Bit Flip recipe, four operations including input loading. `marketWork` controls offered quantities, never the one-Credit price of an operation.
 
-The queue contains five tasks. Each task draw consumes two seeded RNG draws, family then size jitter. Each round prepares one weight jitter and one Data-ratio jitter per family in catalog order. Size jitter is ±20%, weight jitter ±30%, Data-ratio jitter ±10%. Saving, selectors, library navigation and snapshots draw no randomness. Existing family IDs stay in their old order; the 50 additions follow them.
+Bit Copy, Parity Check and Bit Shift enter at I1.2, I2 and I2.6. The remaining bit recipes introduce larger fixed cache requirements from I3.8 onward. Larger tiers retain their recipe-budget delay and hardware requirements. Family weight ramps in over one intensity unit, then tapers toward 3% of its authored weight at retirement. Older families stay in the mix with their quantity ceiling frozen at retirement. Their weight remains shared across the template's variants.
 
-The late mix holds at I = 58.9 while quantities continue growing. Recipes are shared, so increasing repeat counts does not expand an operation list or add a designed final task size. Execution units and hardware clocks retain their finite floating-point representation; arbitrary-precision rewards do not make the simulator mathematically unbounded.
+The market holds a fixed head plus 50 frozen incoming offers under D54. Hardware waiting queues are separate and capped at eight under D57. Each task draw consumes two seeded RNG draws, family then quantity. Each round prepares one weight jitter and one Data-ratio jitter per family in catalog order. Weight jitter is ±30% and Data-ratio jitter ±10%. Completion windows retain ±20% variation using the same quantity draw; the broad quantity range does not multiply their deadlines. Saving, selectors, library navigation and snapshots draw no randomness. Existing family IDs stay in their old order; the 50 additions follow them.
+
+The late family mix holds at I54, where all final-tier families have entered. Final-tier quantity ceilings continue growing while retired work remains smaller. Recipes are shared, so increasing repeat counts does not expand an operation list or add a designed final task size. Execution units and hardware clocks retain their finite floating-point representation; arbitrary-precision rewards do not make the simulator mathematically unbounded.
 
 The 10-second pickup deadline, count-based rolling SLA, 120-second no-completion deadline and late task completion windows remain. There is no auto-skip. Data uses the existing 10–100 family ratios with per-round jitter. A failed task pays neither currency.
 
@@ -207,6 +223,12 @@ The following child counts are per recipe, before market repetition. Input loadi
 
 ## 6. Saves and verification
 
-Save version 29 resets older saves without migrations because family count, completion tally layout and in-flight work meanings changed. Use the existing five invariant test files, typecheck/build, a public-barrel simulation proving exact payment and recipe sums, campaign samples and four-size QA. No new test files are required.
+Save version 32 resets older saves without migrations. It includes frozen reward grants, exact claim receipts and canonical per-record loader state alongside the current market and queue layout. Use the existing five invariant test files, typecheck/build, a public-barrel simulation proving exact payment and recipe sums, campaign samples and four-size QA. No new test files are required.
 
-Quick balance evidence after the whole core-price reduction: seeds 42 and 7 reach System at 21:43 and 23:18; their first rounds end at 8:33 and 7:25. The user accepts this System timing. The six-hour seed-42 sample reaches a GPU at 30:45 and starts generation-two GPU research at 5:35:56, completing it at 5:57:12, but does not reach Rack and temporarily goes insolvent. The older round-length, choice-gap and Rack campaign targets remain unmet; this short pass does not establish long-run campaign balance.
+D53 changed future draws without changing the save shape at that revision. Existing queued offers stay frozen. The campaign bot does not claim D56 rewards, so its runs do not validate reward-inclusive long-campaign balance.
+
+Offer sampling across seeds 42 and 7 finds 8–9 families and 18–19 distinct operation totals in the first 50 offers, spanning 4–330 operations. The previous seed-42 opening had only Bit Flip and two operation totals in the first 25. At fixed I20, 1,000 draws contain 45 families and 353 totals from 4 to 13,534,011 operations. These are seeded offer samples, not timing forecasts.
+
+One-hour active campaign samples with the final D53 tuning reach System at 24:58 and 24:38, first GPU at 33:18 and 28:54, and end their first rounds at 6:00 and 5:48. First purchases remain at six seconds. Choice-gap targets still fail and both bots enter insolvency after System. This short pass does not establish long-run campaign balance; the older D50 timing measurements are superseded.
+
+Frame benchmarks pass for boot, rack and maximum fleet. The offline worker takes 27.172 seconds for the fleet and 7.001 seconds for the room, within D24's fallback time limits. The fleet sample spends 69,282 of 72,000 ticks active across 18 rounds, below the required 70,000 active ticks, so the offline benchmark remains failed. Its active-work requirement is unchanged.

@@ -7,7 +7,7 @@ import { drawTaskIcon } from '../art/deckArt';
 import { clockTone, useHeadSeconds, useWindowLeft, windowText } from '../hooks/headClock';
 import { familyName, sizeText, transferText } from '../hooks/feedModel';
 import { clockText } from '../hooks/format';
-import { blockedText, taskBits } from '../hooks/taskRequirements';
+import { blockedText, taskBits, waitingText } from '../hooks/taskRequirements';
 import { shallowEqual, useGameSelector } from '../storeHooks';
 import { restartKey, restartOf } from './restart';
 
@@ -36,7 +36,7 @@ export function needShort(task: QueueEntryView, tiny = false): string {
 
 export function taskTitle(task: QueueEntryView): string {
   const blocked = blockedText(task);
-  return `${familyName(task.family)}: ${sizeText(task)}${task.transferS === null ? '' : `, lands in ${transferText(task.transferS)}`}${blocked ? `. ${blocked}` : ''}`;
+  return `${familyName(task.family)}: ${sizeText(task)}${task.transferS === null ? '' : `, lands in ${transferText(task.transferS)}`}. ${blocked ?? waitingText(task)}`;
 }
 
 export const roundOf = (s: RenderSnapshot) => ({ phase: s.round.state, can: s.round.canReturn, auto: s.round.autoReturn.inMs });

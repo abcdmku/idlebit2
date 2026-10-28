@@ -27,16 +27,26 @@ function slot(s: ChipSnapshot, out: HitTarget[], i: number, id: TargetId, r: Rec
 
 export function createChipRenderer(_registry: LevelRegistry): LevelRenderer<'chip'> {
   let lastFrame: WorldFrame | null = null;
+  let restForm: WorldForm = 'desktop', restHeight = Infinity;
   return {
     id: 'chip', name: 'CPU',
     /** The die grows with its cores (user): it keeps 3× desktop / 2× phone and pans down rather than shrink. */
     panAtRestScale: true,
     size: (s, out, form) => copyRect(chipFloor(s, form).world, out),
-    focus: (s, _vp, out, form) => copyRect(chipFloor(s, form).focus, out),
+    focus(s, _vp, out, form, area) {
+      restForm = form ?? 'desktop';
+      if (area) restHeight = area.h / area.scale;
+      return copyRect(chipFloor(s, restForm).focus, out);
+    },
     miniRect: (s, out, form) => copyRect(chipFloor(s, form).pkg, out),
     entry(s, out, form) { const f = chipFloor(s, form); out.x = f.inp.x; out.y = f.inp.y; return out; },
-    /** A die too tall for the view at 2 pans (core restPan): it rests on its top (the pipe, queue, cache, first cores). */
-    restCentre(s, out) { const f = chipFloor(s, lastFrame?.form); out.x = f.pkg.x + f.pkg.w / 2; out.y = f.focus.y; },
+    /** Short phones open on the clock and working cores. The full queue/cache remain reachable by panning. */
+    restCentre(s, out) {
+      const f = chipFloor(s, restForm), first = coreSites(f, siteCount(s))[0];
+      out.x = f.pkg.x + f.pkg.w / 2;
+      out.y = restForm === 'phone' && first && restHeight < first.y + first.h - f.focus.y
+        ? (f.clock.y + first.y + first.h) / 2 : f.focus.y;
+    },
     draw(g, s, view, frame) { lastFrame = frame; drawWorld(g, s, frame, frame.form ?? 'desktop', view); },
     labels: (s, view, frame, out) => chipLabels(s, frame, out, frame.form ?? 'desktop', view),
     drawMini: drawChipMini,

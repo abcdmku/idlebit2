@@ -7,8 +7,9 @@ import type { Layout } from '../core/table';
 /** Retains the v3 envelope; earlier layouts reset without migration (AGENTS.md). */
 export const SAVE_SCHEMA = 'bitrouge-v3' as const;
 /** Bumps on any layout or plain-state shape change; a different version is rejected. */
-// Pre-live reset: composable work recipes, 100 families, exact completion tallies and new market quantities.
-export const SAVE_VERSION = 29;
+// Pre-live reset: freeze the head and 50 incoming tasks instead of five offers.
+// Queue preparation adds CPU work-clock state and reserved cache. Earlier pre-live saves reset.
+export const SAVE_VERSION = 32;
 
 export interface SaveEnvelope {
   readonly schema: typeof SAVE_SCHEMA;

@@ -5,6 +5,7 @@ import { amount } from '../../amount';
 import { EFFECT_TEXT, SHORT_TEXT } from './tree.text';
 import { deferredHardwareResearch } from './runtimeCompatibility';
 import { LEVEL_RESEARCH } from './levels';
+import { REWARD_RESEARCH } from '../../rewards/research';
 
 const creditsOnly = new Set(CREDITS_ONLY);
 
@@ -20,7 +21,7 @@ export const RESEARCH: readonly ResearchDef[] = [...TREE_ROWS.map(([id, name, ca
     work: WORK_TIER_OPS[tier], creditCost: amount((BigInt(price) * BigInt(CREDITS_PER_DATA)).toString()), effects: runtime?.effects ?? effects,
     effect: runtime?.effect ?? EFFECT_TEXT[id] ?? '', summary: SHORT_TEXT[id] ?? '', answers, implemented: true,
   };
-}), ...LEVEL_RESEARCH];
+}), ...LEVEL_RESEARCH, ...REWARD_RESEARCH];
 
 const BY_ID = new Map<string, ResearchDef>(RESEARCH.map((node) => [node.id, node]));
 /** Tree order index, used for deterministic effect merging. */

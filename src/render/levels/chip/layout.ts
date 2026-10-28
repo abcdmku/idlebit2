@@ -36,8 +36,8 @@ const rowsOf = (count: number, cols: number): number => (count <= 2 ? 0 : Math.c
 function floorplan(s: Spec, rows: number): Floor {
   const cx = s.w / 2, pkgX = cx - s.pkgW / 2, rim = s.inset / 2, dieY = s.top + rim;
   const x0 = pkgX + s.inset, inner = s.pkgW - 2 * s.inset;
-  const queue = r(x0, dieY + rim, inner, s.cw);
-  const cache = r(x0, queue.y + s.cw + s.gapY, inner, s.cw);
+  const queue = r(x0, dieY + rim, inner, 32);
+  const cache = r(x0, queue.y + queue.h + s.gapY, inner, s.cw);
   // phone: the Clock is a row of its own under the cache, so the cores span the die
   const clockRow = s.clockAbove ? r(x0, cache.y + s.cw + s.gapY, inner, s.cw) : null;
   const coresY = (clockRow ?? cache).y + s.cw + s.gapY;
@@ -94,12 +94,12 @@ export function gridCells(f: Floor, count: number): readonly Rect[] {
 export const labelledSites = (count: number): boolean => count <= 2;
 
 const wells = new Map<string, readonly Rect[]>();
-/** Queue slot wells, left to right after the block's label (L2). 13 art tall; the icon cell overhangs 2 art. */
+/** Eight readable family icons below the queue label, on the native art grid. */
 export function queueWells(f: Floor, q: number, form: WorldForm = 'desktop'): readonly Rect[] {
-  const n = Math.max(1, Math.min(32, q)), key = `${form}:${n}`, found = wells.get(key);
+  const n = Math.max(1, Math.min(8, q)), key = `${form}:${n}`, found = wells.get(key);
   if (found) return found;
-  const r = f.queue, x0 = r.x + (form !== 'phone' ? 40 : 44), y = r.y + 7;
-  const room = r.x + r.w - 4 - x0, gap = n > 16 ? 1 : 2, w = Math.max(1, Math.min(40, Math.floor((room - (n - 1) * gap) / n)));
+  const r = f.queue, x0 = r.x + 4, y = r.y + 14;
+  const room = r.w - 8, gap = 2, w = Math.max(16, Math.min(40, Math.floor((room - (n - 1) * gap) / n)));
   const out = Array.from({ length: n }, (_, i) => r_(x0 + i * (w + gap), y, w, 13));
   wells.set(key, out);
   return out;

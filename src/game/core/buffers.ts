@@ -52,6 +52,8 @@ const ROUTER = { lbStrategy: u8, lbFilters: u8, lbQueueSlots: u8, lbIdleW: f64, 
 export const SYS_COMPILED = {
   alive: u8, kind: u8, intent: u8, rack: i32, room: i32, site: i32, slot: u8,
   port: neg1, threads: u16, cores: u16, sockets: u8, K: u16, Q: u16, keff: u16, slots: u16, strategy: u8,
+  queuePreload: u8, queueBatching: u8,
+  preloadTargets: u8, preloadLoaders: u8, residentWorkspace: u8,
   /**
    * D26.1 memory tiers: cacheBits (Σ L1+L2+L3), ramCap (Σ modules), storageCap (Σ own drives) and diskNode, the
    * rack's storage node whose free capacity extends the disk tier (sharedStorage; -1 none). memCap is the whole
@@ -109,6 +111,10 @@ export const SYS_HOT = {
   wAnchor: { t: 'f64', stride: R }, eAnchor: { t: 'f64', stride: R }, rate: { t: 'f64', stride: R },
   due: { t: 'f64', stride: R, fill: Infinity }, head: { t: 'i32', stride: R, fill: -1 }, active: { t: 'u16', stride: R },
   busyThreads: u16,
+  /** One queued task may reserve cache and load it on one actual core, using the CPU work clock. */
+  preloadRec: neg1, preloadThread: neg1, preloadStart: f64, preloadFinish: { t: 'f64', fill: Infinity }, batchSavedBits: f64,
+  /** One optional reusable fixed workspace, occupying actual cache until consumed or evicted. */
+  residentFamily: neg1, residentBits: f64,
   /** D26.1: bits held per tier by running shards (and unified-memory VRAM overflow); a storage node's usedDisk includes servers' spill onto it. */
   usedCache: f64, usedRam: f64, usedDisk: f64, usedVram: f64, queueHead: neg1, queueTail: neg1, queueLen: u16,
   running: u16, reserved: u16, ioHolds: u8, busy: f64, researchOps: f64,
@@ -195,6 +201,10 @@ export const RECORD = {
    * vramR/vramD (vramN on the node): unified-memory VRAM overflow (D26.4). `part`: stage part 0–2 or initial load 3–5.
    */
   memC: f64, memR: f64, memD: f64, memN: f64, trafR: f64, trafD: f64, vramR: f64, vramD: f64, vramN: f64, part: u8,
+  /** Queued cache reservation, loaded prefix, and its reused recipe-workspace portion (bits per task). */
+  preloadBits: f64, preloadDone: f64, batchBits: f64,
+  /** Canonical per-record loader state. System fields summarize its earliest active loader. */
+  loaderThread: neg1, loaderStart: f64, loaderFinish: { t: 'f64', fill: Infinity },
   loc: u8, owner: neg1, target: neg1, prev: neg1, next: neg1, parent: neg1, threads: u16,
 } as const satisfies Layout;
 /**

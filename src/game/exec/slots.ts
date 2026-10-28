@@ -39,13 +39,12 @@ export const admittedOf = (w: World, s: number): number => {
 };
 
 /**
- * D26 (spec §6.4): while a task waits in the queue with a running slot free (memory or threads hold it
- * back), the system admits only while queued + reserved < Q, so the queue never holds more than Q.
+ * Queue space includes incoming reservations, so simultaneous arrivals cannot overfill the waiting queue.
  * Derived from live counts, never stored.
  */
 export function queueCapped(w: World, s: number): boolean {
   const h = w.hot.sys, q = w.compiled.sys.Q[s]!;
-  return q > 0 && h.queueLen[s]! > 0 && h.running[s]! < keffOf(w, s) && h.queueLen[s]! + h.reserved[s]! >= q;
+  return q > 0 && h.queueLen[s]! + h.reserved[s]! >= q;
 }
 
 /** Without a rack switch port a system has no link and gets no tasks (spec §7.2). Before Rack the link is integrated. */

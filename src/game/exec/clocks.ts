@@ -77,6 +77,11 @@ export function resetClocks(w: World, s: number): void {
 export function nextDueTick(w: World, s: number, span: Span): number {
   const h = w.hot.sys;
   let best = Infinity;
+  const cpu = s * NRES + CPU;
+  if (h.preloadThread[s]! >= 0 && h.rate[cpu]! > 0) {
+    const due = h.eAnchor[cpu]! + (h.preloadFinish[s]! - h.wAnchor[cpu]!) / h.rate[cpu]!;
+    best = w.tick + 1 + Math.max(0, Math.floor((due - span.x1[CPU]!) / (EFF_MAX * DT_S)) - 1);
+  }
   for (let r = 0; r < NRES; r += 1) {
     const due = h.due[s * NRES + r]!;
     if (due === Infinity) continue;

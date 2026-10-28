@@ -7,6 +7,7 @@ import type { ResearchState } from '../../types/state';
 import { deriveUnlocks, openContainers, sizePsusForSystem } from './effects';
 import { researchDef } from './tree';
 import { reconcileAccelerators } from '../../exec';
+import { researchCosts } from '../../rewards/research';
 
 /**
  * Research step (tick step 12, spec §11): exec has tallied this tick's research ops in
@@ -55,7 +56,7 @@ function complete(w: World, id: ResearchId): void {
   // System activates supplies; size the existing fleet for its full load.
   if (!hadSystem && r.unlocks.levels.system) opened = sizePsusForSystem(opened, r.unlocks);
   w.build = { ...opened, revision: w.build.revision + 1 };
-  w.compiled = compileAll(w.build, r);
+  w.compiled = compileAll(w.build, r, w.roundRewards);
   syncHotSizes(w.hot, w.compiled);
   pushEvent(w, { kind: 'researchCompleted', project: id });
   w.report.researchCompleted.push(id);
@@ -69,8 +70,8 @@ function startNext(w: World, carry: number): boolean {
   const def = researchDef(head)!;
   const parked = r.parked[head];
   if (parked === undefined) {
-    const cost = BigInt(def.data);
-    const credits = BigInt(def.creditCost ?? '0');
+    const costs = researchCosts(def, w.roundRewards);
+    const cost = BigInt(costs.data), credits = BigInt(costs.credits);
     if (w.ledger.data < cost || credits > 0n && w.ledger.credits < credits) { r.needsData = true; return false; }
     w.ledger.data -= cost;
     w.ledger.dataSpent += cost;

@@ -29,6 +29,7 @@ export const P = {
   bit: '#a6f6ff', bitLo: '#3fb6d6',      // job packets, cache reads
   op: '#e6dcff',                          // compute ops
   cacheOn: '#8ef5ff', sram: '#25506e', sramLo: '#1b3a52',
+  preload: '#77a7ff',                    // queued cache preparation, distinct from running work
   ram: '#ffa94d', gpu: '#ff7ad9', net: '#7be38f', stor: '#e0b07a',
 
   // metals

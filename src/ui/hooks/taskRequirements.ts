@@ -1,5 +1,6 @@
 ﻿import type { FailDetail, QueueEntryView, TaskRequirementsView } from '../../game';
 import { formatOps, formatSize, regionName } from '../../game';
+import type { TaskWaitReason } from '../../game';
 
 /** Sizes print through the shared formatter: "2 b", "21.4 kb" (one string everywhere). */
 export const taskBits = (n: number): string => formatSize(n);
@@ -37,6 +38,24 @@ export const OUTAGE_TEXT: Readonly<Partial<Record<FailDetail, string>>> = {
   psu: 'Power supply down', pdu: 'PDU down', ups: 'UPS down', grid: 'Grid down',
   rack: 'Rack overheated', room: 'Zone overheated', offline: 'No server online',
 };
+
+const WAIT_TEXT: Readonly<Record<TaskWaitReason, string>> = {
+  round: 'Next round', head: 'Waiting for earlier tasks', research: 'Waiting for CPU cores used by research',
+  cores: 'Waiting for a free CPU core', queue: 'Task queue full', routerQueue: 'Routing queue full',
+  transfer: 'Waiting for an input transfer', restart: 'Waiting for CPU restart', wake: 'Waiting for a server to wake',
+  link: 'Needs a connected input link', routing: 'Waiting for routing', pickup: 'Awaiting pickup',
+};
+const WAIT_SHORT: Readonly<Record<TaskWaitReason, string>> = {
+  round: 'next', head: 'in line', research: 'CPU researching', cores: 'CPU cores busy', queue: 'queue full',
+  routerQueue: 'router full', transfer: 'transferring', restart: 'restarting', wake: 'waking', link: 'no link',
+  routing: 'routing', pickup: 'pickup pending',
+};
+export const waitingText = (task: QueueEntryView): string => WAIT_TEXT[task.waitingFor ?? 'pickup'];
+const WAIT_TINY: Readonly<Record<TaskWaitReason, string>> = {
+  round: 'next', head: 'in line', research: 'research', cores: 'CPU busy', queue: 'queue', routerQueue: 'router',
+  transfer: 'input', restart: 'restart', wake: 'waking', link: 'no link', routing: 'routing', pickup: 'pending',
+};
+export const waitingShort = (task: QueueEntryView, tiny = false): string => (tiny ? WAIT_TINY : WAIT_SHORT)[task.waitingFor ?? 'pickup'];
 
 export function blockedText(task: QueueEntryView): string | null {
   switch (task.blockedBy) {

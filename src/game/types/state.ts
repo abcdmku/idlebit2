@@ -6,6 +6,7 @@ import type { EventRing } from './events';
 import type { FamilyId, LevelId, ResearchId } from './ids';
 import type { RoundReport } from './report';
 import type { FrontierState, RunwayMark } from './frontier';
+import type { RoundRewardsState } from './roundRewards';
 
 export type { CompiledBuffers, HotBuffers } from '../core/buffers';
 
@@ -25,6 +26,7 @@ export interface GameState {
   readonly market: MarketState;
   readonly build: BuildState;
   readonly research: ResearchState;
+  readonly roundRewards: RoundRewardsState;
   readonly configs: SavedConfigs;
   /** Derived from build + research; replaced copy-on-write when hardware or research changes. */
   readonly compiled: CompiledBuffers;

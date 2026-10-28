@@ -9,8 +9,10 @@ export const secondsToTicks = (s: number) => Math.round(s * TICKS_PER_SECOND);
 /** D10.3: the head must be taken by the end of tick headTick + HEAD_TICKS − 1 (10 s). A market deadline, not hardware time. */
 export const HEAD_TICKS = 100;
 export const headDeadlineTick = (headTick: number) => headTick + HEAD_TICKS - 1;
-/** The visible window of the endless queue, head first (spec §5.2). */
-export const QUEUE_VISIBLE = 5;
+/** The head plus the next 50 incoming tasks, all frozen in the saved queue. */
+export const QUEUE_VISIBLE = 51;
+/** Keep the opening SLA grace based on the same five tasks as before. */
+export const GRACE_WINDOW = 5;
 
 /** Base boot latency; Boot loader levels lower it. */
 export const BOOT_TICKS_BASE = secondsToTicks(10);
@@ -49,7 +51,7 @@ export const MAX_RACK_PORTS = 12;
 export const MAX_ROOM_PORTS = 24;
 export const MAX_UPLINKS = 4;
 export const MAX_SCHED_K = 32;
-export const MAX_SCHED_Q = 32;
+export const MAX_SCHED_Q = 8;
 /* D7: CPUs, boards and configuration efficiency. */
 export const MAX_CORES_PER_CPU = 32;
 export const MAX_CPUS = 4;
@@ -73,7 +75,7 @@ export const RES_CLOCKS = 4;
 /** D26.5 deadline ring buckets (architecture §1.4); every window (at most 288 s × size jitter) is shorter. */
 export const DEADLINE_BUCKETS = 4096;
 /** D25.7: router queue levels run 1 … ROUTER_QUEUE_MAX, one slot per level. */
-export const ROUTER_QUEUE_MAX = 32;
+export const ROUTER_QUEUE_MAX = 8;
 /** D25.9 Gather: a queued entry dispatches anyway after this many ticks (10 s). A deadline, not hardware time. */
 export const GATHER_WAIT_TICKS = secondsToTicks(10);
 /** D25 checkpointing: a lost shard's replacement must be picked up within this many ticks (10 s). */

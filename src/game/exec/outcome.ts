@@ -18,6 +18,7 @@ import { queueUnlink } from './lists';
 import { hasRule } from './rules';
 import { canAdmit, noteAdmit, noteAdmitted } from './slots';
 import { leaveStage, releaseRunning } from './stages';
+import { releaseQueuedPreload } from './preload';
 
 /**
  * Outcomes (spec §6.8, §6.9, D25.5): pay for the full task once, when its last shard completes;
@@ -103,6 +104,7 @@ export function abortRecord(w: World, r: number): void {
   switch (rec.loc[r]) {
     case LOC.queue: {
       const s = rec.owner[r]!;
+      releaseQueuedPreload(w, s, r);
       const before = canAdmit(w, s);
       queueUnlink(w.hot, s, r);
       h.queueLen[s] = h.queueLen[s]! - k;

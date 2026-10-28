@@ -15,6 +15,8 @@ export { selectRunway, tierOf, tierValue } from './view/frontier';
 export { ROUTE_NAMES, FILTER_NAMES, QUEUE_NAMES, rackLetter, zoneLetter, regionName } from './view/labels';
 export { selectResearchTree, selectContextualResearchTree, selectSavedConfigs, selectQueuePage, selectUnitLabel } from './view/selectors';
 export { queueWindow as selectMarketQueue } from './view/feed';
+export { selectSystemQueue } from './view/systemQueue';
+export { selectRoundRewards } from './view/roundRewards';
 export { serializeSave, deserializeSave, SAVE_SCHEMA } from './save/serialize';
 export { offlineCapMs } from './build/research/effects';
 export { netPerMinute } from './core/ledger';

@@ -158,7 +158,11 @@ export function queueBlock(g: G, r: Rect, wells: readonly Rect[], queue: readonl
   for (let i = 0; i < wells.length; i++) {
     const w = wells[i]!, e = queue[i];
     R(g, w.x - 1, w.y - 1, w.w + 2, w.h + 2, P.ink); R(g, w.x, w.y, w.w, w.h, mix(P.logicLo, P.ink, 0.45));
-    if (e) { if (w.w >= 16) drawFamilyIcon(g, e.family, w.x, w.y - 2); else R(g, w.x, w.y, w.w, w.h, P.bitLo); continue; }
+    if (e) {
+      if (w.w >= 16) drawFamilyIcon(g, e.family, w.x, w.y - 2); else R(g, w.x, w.y, w.w, w.h, e.preloading ? P.preload : P.bitLo);
+      if (e.preloading) R(g, w.x, w.y + w.h - 2, Math.round(w.w * Math.max(0, Math.min(1, e.preloadProgress ?? 0))), 2, P.preload);
+      continue;
+    }
     const k = i - queue.length;
     if (k >= reserved) continue;
     // Incoming: the first reserved well is the task on the pipe now (its icon, dimmed, and its progress).

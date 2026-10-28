@@ -1,11 +1,11 @@
 import { G, LOC, type HotBuffers } from '../core/buffers';
-import { DT_S, headDeadlineTick, QUEUE_VISIBLE, RATE_RING_TICKS, SLA_GRACE_TASKS } from '../core/constants';
+import { DT_S, GRACE_WINDOW, headDeadlineTick, QUEUE_VISIBLE, RATE_RING_TICKS, SLA_GRACE_TASKS } from '../core/constants';
 import { allocRecord, forEachInList, freeRecord, frontList, insertBefore, splitRecord, unlink } from '../core/pool';
 import { nextFloat, reseedForRound, roundSeed, seedRng } from '../core/rng';
 import type { World } from '../core/world';
 import { NO_DETAIL } from '../types/events';
 import type { QueuedTask } from '../types/state';
-import { baseWeight, CURVE, nextIntensity, sizeJitter, taskSize } from './curve';
+import { baseWeight, CURVE, deadlineJitter, nextIntensity, sizeScale, taskSize } from './curve';
 import { FAMILIES, payoutAt } from './families';
 import { recipeTotals } from './recipes';
 import { canRunFleet, detailIndex, DETAIL_CODE, isDownGate } from './fleet';
@@ -14,17 +14,17 @@ import { researchQueued } from '../exec/researchTask';
 import { noteTaken } from './frontier';
 
 /**
- * The endless queue (program D10, spec §5.2, §14.1 steps 2 and 7). The window holds the next five
+ * The endless queue (program D10, spec §5.2, §14.1 steps 2 and 7). The window holds the head and next 50
  * untaken tasks; taken work that comes back waits at the front as committed records. Only the head
  * has a clock. Hardware takes the head (net before admission, exec before Rack) through
  * probeHead → takeHead; every task that leaves the window draws one replacement at the back.
  */
 
 const JITTER_SALT = 0x5eed1e55;
-/** Past the last family window, the mix of this I holds while sizes keep growing (docs/tasks.md §3.4). */
-export const MIX_CAP_I = 58.9;
+/** Hold a full final-tier mix while its quantity ceiling keeps growing (docs/tasks.md §3). */
+export const MIX_CAP_I = 54;
 
-/** One queue draw at I (spec §14.3): a family by seeded weight, then a size jitter. Reserves the next ID. */
+/** One queue draw at I: a seeded family, then a broad recipe quantity. Reserves the next ID. */
 export function drawTask(hot: HotBuffers, I: number): QueuedTask {
   const mixI = Math.min(I, MIX_CAP_I);
   let total = 0;
@@ -36,19 +36,24 @@ export function drawTask(hot: HotBuffers, I: number): QueuedTask {
     draw -= baseWeight(f, mixI) * hot.fam.weightJitter[f.id]!;
     if (draw < 0) { family = f; break; }
   }
-  const j = sizeJitter(nextFloat(hot));
+  const u = nextFloat(hot);
   const workPerRecipe = Number(recipeTotals(family.key).ops) + family.workingSet.perSize;
-  const size = taskSize(I, j * family.marketWork / workPerRecipe, family.members, family.grain);
+  // Retired families keep their smaller quantities. Final-tier work has no authored last size.
+  const { window: { to } } = family;
+  const sizeI = to <= MIX_CAP_I ? Math.min(I, to) : I;
+  const targetUnits = sizeScale(sizeI) * family.marketWork / workPerRecipe;
+  // The first task remains a quick, runnable introduction on the starting one-bit CPU.
+  const size = I === 0 ? 1 : taskSize(targetUnits, u, family.members, family.grain);
   const taskId = hot.g[G.nextTaskId]!;
   hot.g[G.nextTaskId] = taskId + 1;
-  // D26.5: the completion window scales with the same frozen jitter; no extra RNG draw.
-  const deadline = family.windowS === null ? null : Math.ceil((family.windowS * j) / DT_S);
+  // D26.5: keep completion deadlines within ±20% despite the wide quantity range.
+  const deadline = family.windowS === null ? null : Math.ceil((family.windowS * deadlineJitter(u)) / DT_S);
   return { taskId, family: family.id, size, deadline };
 }
 
 /**
  * Round preparation, once, at initialization or the previous round's end: seed, jitters, and the first
- * five tasks from I, each draw advancing I (D30). Returns the tasks and the intensity of the next draw.
+ * QUEUE_VISIBLE tasks from I, each draw advancing I (D30). Returns the tasks and the intensity of the next draw.
  */
 export function prepareQueue(hot: HotBuffers, seed: number, roundIndex: number, I: number): { tasks: QueuedTask[]; intensity: number } {
   reseedForRound(hot, seed, roundIndex);
@@ -65,9 +70,9 @@ export function prepareQueue(hot: HotBuffers, seed: number, roundIndex: number, 
 }
 
 /** The SLA grace prior G (spec §4.2): 10 × the largest work among the five opening tasks. */
-export function graceOf(window: readonly QueuedTask[]): number {
+export function graceOf(tasks: readonly QueuedTask[]): number {
   let max = 0;
-  for (const t of window) max = Math.max(max, payoutAt(FAMILIES[t.family]!, t.size));
+  for (const t of tasks.slice(0, GRACE_WINDOW)) max = Math.max(max, payoutAt(FAMILIES[t.family]!, t.size));
   return SLA_GRACE_TASKS * max;
 }
 

@@ -167,7 +167,7 @@ export interface TaskView extends TaskRequirementsView {
   readonly resource: Resource;
   /** Fraction of the current stage, 0..1. */
   readonly progress: number;
-  /** D26.1: where this shard's working set sits, bits per tier; all 0 while queued (queued shards hold no memory). */
+  /** D26.1: running placement, bits per tier. Queued preparation is exposed separately by the scheduler. */
   readonly placement: { readonly cache: number; readonly ram: number; readonly disk: number };
   /** D26.2: the tier its current mem part runs on (a GPU stage's unified-memory parts too); null otherwise. */
   readonly memTier: MemTier | null;
@@ -178,7 +178,7 @@ export interface TaskView extends TaskRequirementsView {
 export interface MemTierView {
   readonly tier: MemTier;
   readonly capacityBits: number;
-  /** Bits held by running shards (and unified-memory VRAM overflow) in this tier. */
+  /** Bits held by running shards, unified-memory overflow, and queued cache preparation. */
   readonly usedBits: number;
   /** Of usedBits, bits that sit here because they didn't fit a faster tier. */
   readonly spilledBits: number;
@@ -369,10 +369,18 @@ export interface TaskRequirementsView {
 export interface ChipQueueEntryView {
   readonly taskId: number;
   readonly family: FamilyId;
+  readonly preloading?: boolean;
+  readonly preloadProgress?: number;
 }
+
+/** Temporary pickup waits, separate from hardware incompatibility and failure details. */
+export type TaskWaitReason = 'round' | 'head' | 'research' | 'cores' | 'queue' | 'routerQueue' | 'transfer' | 'restart' | 'wake' | 'link' | 'routing' | 'pickup';
 
 /** One queue entry (spec §16.2): a stable identity, its work and requirements, and whether it can be dismissed. */
 export interface QueueEntryView extends TaskRequirementsView {
+  /** Simulation-owned core demand and current availability; optional for older view fixtures. */
+  readonly cpuCoresWanted?: number;
+  readonly cpuCoresAvailable?: number;
   /** Data contribution using this round's seeded ratio. Fractions accumulate in the wallet meter. */
   readonly dataReward: number;
   readonly kind: 'task';
@@ -384,6 +392,8 @@ export interface QueueEntryView extends TaskRequirementsView {
   readonly dismissible: boolean;
   /** First missing requirement on current hardware, or null. */
   readonly blockedBy: FailDetail | null;
+  /** Why pickup waits now; null when blockedBy already names the missing hardware. */
+  readonly waitingFor: TaskWaitReason | null;
   /** Approximate CPU-equivalent work for rates. cpuOps is the exact payout; payloadBits excludes local loading. */
   readonly work: number;
   /** Seconds to transfer payloadBits at the current first-link speed; null without a link. */
@@ -395,6 +405,23 @@ export interface QueueEntryView extends TaskRequirementsView {
   readonly capableSystems: number;
   /** D26.5: for taken work returned to the front, the last tick it may be met (takeTick + deadline − 1); null when untaken or the family has none. */
   readonly windowEndTick: number | null;
+}
+
+/** Every actual task waiting in a CPU/system's bounded hardware queue. */
+export interface SystemQueueTaskView {
+  readonly key: string;
+  readonly taskId: number;
+  readonly family: FamilyId;
+  readonly label: string;
+  readonly credits: Amount;
+  readonly dataReward: number;
+  readonly coresWanted: number;
+  readonly coresAvailable: number;
+  readonly workingSetBits: number;
+  readonly cacheTargetBits: number;
+  readonly loadedBits: number;
+  readonly preloading: boolean;
+  readonly waitingFor: 'cores' | 'memory' | 'device' | 'slots' | 'ready' | 'preload';
 }
 /**
  * D27: the research task in the market line. While `running` is false it is the head: it waits at
@@ -479,6 +506,8 @@ export type ResearchTabId = 'cpu' | 'system' | 'rack' | 'room' | 'global';
 /** A node's concrete before → after on the part it upgrades, as display strings ("Cores per CPU", "1", "2"). */
 export interface ResearchChangeView { readonly label: string; readonly before: string; readonly after: string }
 export interface ResearchNodeView {
+  /** Unclaimed reward required by a blueprint; null for ordinary or already unlocked research. */
+  readonly rewardMilestone?: number | null;
   readonly purchase?: { readonly series: 'cstate' | 'memoryVoltage' | 'bootLoader'; readonly level: number; readonly maxLevel: number };
   /** The root it grows from, and that root's hardware tab (a CPU part's node is on the CPU tab in every era). */
   readonly part: ResearchPartId;

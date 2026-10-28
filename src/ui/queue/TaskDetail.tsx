@@ -10,7 +10,7 @@ import { actionable, WALL_ROWS, type Offer, type Offers } from '../deck/offers';
 import { offerAction, useTapOffer } from '../deck/offerUi';
 import { familyName, taskKey, transferText } from '../hooks/feedModel';
 import { wholeText } from '../hooks/format';
-import { blockedText, taskBits } from '../hooks/taskRequirements';
+import { blockedText, taskBits, waitingText } from '../hooks/taskRequirements';
 import { pointAt, pointFix } from '../input/pointAt';
 import { PlateFrame } from '../plates/PlateFrame';
 import { useLayout } from '../shell/geometry';
@@ -53,11 +53,10 @@ export const capableText = (n: number): string =>
 const lowerFirst = (s: string) => (/^[A-Z][a-z]/.test(s) ? s[0]!.toLowerCase() + s.slice(1) : s);
 
 /** Status in plain words. */
-export function statusLine(t: QueueEntryView, running: boolean): { text: string; tone: '' | 'warn' | 'mute' } | null {
+export function statusLine(t: QueueEntryView, running: boolean): { text: string; tone: '' | 'warn' | 'mute' } {
   if (!running) return { text: 'Next round', tone: 'mute' };
   if (t.blockedBy) return { text: keepUnits(`Blocked: ${lowerFirst(blockedText(t) ?? '')}`), tone: 'warn' };
-  if (t.committed) return { text: 'Waiting for a free system', tone: '' };
-  return null;
+  return { text: waitingText(t), tone: 'mute' };
 }
 
 /**
@@ -100,8 +99,8 @@ function OpenTask({ taskKey: key }: { taskKey: string }) {
   }, shallowEqual, 250);
   // One line per missing component, each at its minimal level (the sim's meet quote).
   const meet = useMeet(f.t);
-  const card = f.slot === 0 ? L.headSlot : L.cards[f.slot - 1] ?? L.headSlot;
-  const readAnchor = useMemo(() => anchorOf(card), [card.x, card.y, card.w, card.h]);
+  const card = f.slot === 0 ? L.headSlot : L.cards[f.slot - 1] ?? L.cards[0];
+  const readAnchor = useMemo(() => anchorOf(card, key), [card.x, card.y, card.w, card.h, key]);
   const primaryMeet = meet.find(q => !q.locked && q.affordable) ?? meet[0];
   // A task that left the line (taken, met or dismissed) closes its detail.
   if (!f.t) { queueMicrotask(() => { if (shell.view.getState().task === key) shell.view.dispatch({ type: 'back' }); }); return null; }
@@ -115,7 +114,7 @@ function OpenTask({ taskKey: key }: { taskKey: string }) {
   return <PlateFrame title={familyName(t.family)} sub={<span style={{ color }}>{typeName(typeOf(t.family))}</span>}
     className="task-detail" bounds={L.view} readAnchor={readAnchor} tip onClose={close}
     head={<span className="td-ic"><TaskIcon task={t} n={L.N} /></span>}>
-    {status && <p className={`p-line td-status ${status.tone}`} data-testid="td-status">{status.text}</p>}
+    <p className={`p-line td-status ${status.tone}`} data-testid="td-status">{status.text}</p>
     <dl className="td-facts">
       <dt>Pays</dt><dd data-testid="td-pays"><span className="gold" title={`${t.cpuOps} Credits`}><CoinIcon />{wholeText(t.cpuOps)}</span>
         {dataOf(t) > 0 && <span className="data" title="Whole Data contribution. Partial Data adds up across tasks."><GemIcon />{wholeText(dataOf(t))}</span>}</dd>
@@ -124,7 +123,7 @@ function OpenTask({ taskKey: key }: { taskKey: string }) {
       {head && f.running && t.committed && <><dt>Taken</dt><dd><InQueue task={t} /></dd></>}
     </dl>
     <TaskWork key={key} task={t} />
-    {(t.blockedBy || (head && f.running && t.dismissible)) && <div className="keys">
+    {(t.blockedBy || t.dismissible) && <div className="keys">
       {/* One line per missing component or research; each buys every level it needs in one tap. */}
       {primaryMeet && <MeetKey quote={primaryMeet} n={L.N} onAction={a => shell.dispatch(a)}
         onResearch={id => shell.view.dispatch({ type: 'openResearch', project: id })} />}
@@ -135,7 +134,7 @@ function OpenTask({ taskKey: key }: { taskKey: string }) {
       {/* Every way to fix it is its own key here (R16: two taps from play), not behind Details. */}
       {meet.filter(q => q !== primaryMeet).map((q, i) => <MeetKey key={i} quote={q} n={L.N} onAction={a => shell.dispatch(a)}
         onResearch={id => shell.view.dispatch({ type: 'openResearch', project: id })} />)}
-      {head && f.running && t.dismissible && <button type="button" className="key quiet" data-qa-target data-testid="td-dismiss"
+      {t.dismissible && <button type="button" className="key quiet" data-qa-target data-testid="td-dismiss"
         onClick={() => { shell.dispatch({ type: 'dismissTask', task: t.task }); close(); }}>Dismiss</button>}
     </div>}
     <div className="task-notes" data-testid="td-details">
@@ -147,6 +146,15 @@ function OpenTask({ taskKey: key }: { taskKey: string }) {
 }
 
 /** Right under the tapped card, on phone and desktop alike (it never covers the strip: bounds are the world). */
-function anchorOf(card: Rect) {
-  return (out: Rect) => { out.x = card.x; out.y = card.y; out.w = card.w; out.h = card.h; return true; };
+function anchorOf(card: Rect, key: string) {
+  return (out: Rect) => {
+    const el = document.querySelector<HTMLElement>(`.tag[data-task="${key}"]`), stage = el?.closest('.stage');
+    if (el && stage) {
+      const r = el.getBoundingClientRect(), origin = stage.getBoundingClientRect();
+      const viewport = el.closest('.slots')?.getBoundingClientRect() ?? r;
+      const left = Math.max(r.left, viewport.left), right = Math.min(r.right, viewport.right);
+      if (right > left) { out.x = left - origin.left; out.y = r.top - origin.top; out.w = right - left; out.h = r.height; return true; }
+    }
+    out.x = card.x; out.y = card.y; out.w = card.w; out.h = card.h; return true;
+  };
 }

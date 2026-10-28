@@ -13,6 +13,7 @@ import { reseedForRound } from './rng';
 import { MODE } from './timers';
 import { compileAll, syncHotSizes } from './topology';
 import { runwayMark } from '../build/research/runway';
+import { initialRoundRewards } from '../rewards/progress';
 
 /** D39: L2, L3 and the scheduler are bought from the start; research never unlocks a part type. */
 const START_GENS: readonly PartId[] = ['cpu', 'core', 'clock', 'l1', 'l2', 'l3', 'scheduler', 'psu'];
@@ -72,14 +73,14 @@ export function initialHot(state: Pick<GameState, 'compiled' | 'seed' | 'round'>
 
 /**
  * The prepared queue of round `roundIndex` at intensity I (spec §5.2), its head on the clock from
- * `headTick`. Draws the round seed, jitters and five tasks from `hot`.
+ * `headTick`. Draws the round seed, jitters and the head plus 50 incoming tasks from `hot`.
  */
 export function preparedMarket(hot: HotBuffers, seed: number, roundIndex: number, I = 0, headTick = 0): MarketState {
   const { tasks, intensity } = prepareQueue(hot, seed, roundIndex, I);
   return { roundIndex, window: tasks, headTick, intensity };
 }
 
-/** A new game: round 1 running with its five tasks saved, so the first screen is playable (spec §4.1). */
+/** A new game: round 1 running with its queue saved, so the first screen is playable (spec §4.1). */
 export function createInitialState(seed: number = DEFAULT_SEED): GameState {
   const build = bootBuild();
   const research = baseResearch();
@@ -97,7 +98,7 @@ export function createInitialState(seed: number = DEFAULT_SEED): GameState {
     },
     round,
     market,
-    build, research,
+    build, research, roundRewards: initialRoundRewards(),
     configs: { system: [], rack: [], room: [], site: [] },
     compiled,
     hot,

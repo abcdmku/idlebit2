@@ -2,18 +2,16 @@
 // option is its own priced key, so the second tap buys (one or two taps from play). The main option (Upgrade, the
 // CPU's being its clock) is pinned with its full consequence; Add (another module or CPU), Replace (a newer
 // generation) and the other routine generations are one-line keys. The CPU also opens its own view, on request.
-import { useContext, type ReactNode } from 'react';
+import { type ReactNode } from 'react';
 import type { PartRef, Quote, QuoteRequest, SystemSnapshot } from '../../game';
 import { useQuote } from '../storeHooks';
-import { MeetKey } from '../queue/MeetKey';
 import { hertz } from './format';
-import { partQuotes, samePurchase } from './PartKeys';
+import { partQuotes } from './PartKeys';
 import { eccToDo, improves, OptionList, OptionRow, perGeneration, routine, sameGeneration, type Option } from './OptionRow';
 import { PlateFrame } from './PlateFrame';
 import type { PartFacts } from './partFacts';
 import type { PlateCommon } from './types';
 import { Lines } from './widgets';
-import { LayoutContext } from '../shell/geometry';
 
 export type BoardSlot = 'cpu' | 'ram' | 'drive';
 const NOUN: Record<BoardSlot, string> = { cpu: 'CPU', ram: 'RAM', drive: 'Drive' };
@@ -84,10 +82,9 @@ export interface BoardPartView { readonly title: string; readonly sub: string; r
  * The content of a CPU, RAM module or drive plate. `active` false asks nothing and returns null (an empty site that
  * may become this part after its Add keeps calling the same hooks).
  */
-export function useBoardPart({ active, slot, focus, facts, onOpenCpu, quotes, unblock, unblocks = 0, onAction, onResearch, researchName, wide }:
+export function useBoardPart({ active, slot, focus, facts, onOpenCpu, quotes, unblock, unblocks = 0, onAction, onResearch, researchName }:
   Omit<BoardPartPlateProps, 'part' | 'facts' | 'onClose' | 'bounds'> & { active: boolean; facts: PartFacts | null; wide: boolean }): BoardPartView | null {
   const unit = { kind: 'system' as const, id: focus.systemId };
-  const artScale = useContext(LayoutContext)?.N ?? (wide ? 3 : 2);
   const clock = useQuote(active && slot === 'cpu' ? { kind: 'part', part: { unit, slot: { kind: 'clock', socket: 0 } } } : null);
   const adds = useQuote(active ? addRequest(focus, slot) : null);
   if (!active || !facts) return null;
@@ -104,10 +101,9 @@ export function useBoardPart({ active, slot, focus, facts, onOpenCpu, quotes, un
   const head = onOpenCpu && <button type="button" className="key ghost open-cpu" aria-label="Open CPU: cores, cache and queue"
     onClick={(e) => { e.stopPropagation(); onOpenCpu(); }}>Open CPU</button>;
   return { title: facts.title, sub: `${facts.sub} · ${facts.status}`, head,
-    footer: main && (eccFirst || !samePurchase(main.quote, unblock)) && <OptionRow option={main} primary {...row} />,
+    footer: main && <OptionRow option={main} primary {...row} />,
     body: <>
       <Lines lines={lines} slots={onOpenCpu ? 1 : slot === 'ram' ? 2 : 1} />
-      {unblock && !eccFirst && <div className="keys"><MeetKey quote={unblock} n={artScale} onAction={onAction} onResearch={onResearch} researchName={researchName} /></div>}
       {unblocks > 0 && <p className="p-hint payback">Needed by {unblocks} queued {unblocks === 1 ? 'task' : 'tasks'}</p>}
       <OptionList options={rest} {...row} />
     </> };

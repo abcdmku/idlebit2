@@ -2,6 +2,8 @@ import { compileUnits } from '../build/compile';
 import type { BuildState } from '../types/build';
 import { REGION_IDS } from '../types/catalog';
 import type { ResearchState } from '../types/state';
+import type { RoundRewardsState } from '../types/roundRewards';
+import { roundRewardBonuses } from '../rewards/bonuses';
 import {
   LINK_HOT, RACK_HOT, ROOM_HOT, SITE_HOT, SYS_HOT, allocCompiled, type CompiledBuffers, type FleetSize, type HotBuffers,
 } from './buffers';
@@ -53,10 +55,19 @@ export function writeTopology(c: CompiledBuffers, build: BuildState): void {
 }
 
 /** Full compile: structural columns, then build/compile's values. Returns fresh buffers. */
-export function compileAll(build: BuildState, research: ResearchState): CompiledBuffers {
+export function compileAll(build: BuildState, research: ResearchState, rewards?: RoundRewardsState): CompiledBuffers {
   const compiled = allocCompiled(fleetSize(build));
   writeTopology(compiled, build);
   compileUnits(compiled, build, research);
+  const targets = rewards ? roundRewardBonuses(rewards.claimed).preparedTargets : 1;
+  const completed = new Set<string>(research.completed);
+  const loaders = completed.has('parallelLoaderController') ? 4 : completed.has('parallelLoaders') ? 2 : 1;
+  const resident = completed.has('residentWorkspace');
+  for (let s = 0; s < compiled.sys.len; s++) {
+    compiled.sys.preloadTargets[s] = Math.min(targets, compiled.sys.Q[s]!);
+    compiled.sys.preloadLoaders[s] = loaders;
+    compiled.sys.residentWorkspace[s] = resident ? 1 : 0;
+  }
   return compiled;
 }
 

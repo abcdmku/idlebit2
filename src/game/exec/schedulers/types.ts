@@ -32,7 +32,9 @@ export function keyedStrategy(id: QueueStrategyId, key: QueueKey, timeSlice = fa
       for (let r = w.hot.sys.queueHead[s]!; r >= 0; r = next[r]!) {
         if (!startable(w, s, r, timeSlice)) continue;
         const k = key(w, s, r);
-        if (best < 0 || k < bestKey || (k === bestKey && earlier(w, r, best))) { best = r; bestKey = k; }
+        const batch = w.compiled.sys.queueBatching[s] === 1 && w.hot.rec.batchBits[r]! > 0;
+        const bestBatch = best >= 0 && w.compiled.sys.queueBatching[s] === 1 && w.hot.rec.batchBits[best]! > 0;
+        if (best < 0 || batch && !bestBatch || batch === bestBatch && (k < bestKey || k === bestKey && earlier(w, r, best))) { best = r; bestKey = k; }
       }
       return best;
     },

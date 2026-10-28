@@ -5,6 +5,7 @@ import type { World } from '../core/world';
 import { failParent } from '../exec/outcome';
 import { hasRule } from '../exec/rules';
 import { queueUnlink } from '../exec/lists';
+import { releaseQueuedPreload } from '../exec/preload';
 import { canAdmit, keffOf, noteAdmit, noteAdmitted, reserve } from '../exec/slots';
 import { addTransit } from './fifo';
 import { forward } from './links';
@@ -141,6 +142,7 @@ function stealIn(w: World): void {
     }
     if (victim < 0) continue;
     const before = canAdmit(w, victim);
+    releaseQueuedPreload(w, victim, shard);
     queueUnlink(w.hot, victim, shard);
     h.queueLen[victim] = h.queueLen[victim]! - 1;
     w.hot.g[G.queued] = w.hot.g[G.queued]! - 1;

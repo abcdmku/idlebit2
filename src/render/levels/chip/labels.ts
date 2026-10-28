@@ -68,7 +68,7 @@ export function chipLabels(chip: ChipSnapshot, frame: WorldFrame, out: LabelWrit
       if (!tileLabelFits(core, r, frame)) continue;
       out.label(LABEL_IDS[i]!, r.x + r.w / 2, r.y + 2, 'center').text(readySpeedText(core, chip, live), coreSleep(core) || !live ? 'dim' : 'value');
       if (live) out.label(`${LABEL_IDS[i]}a`, r.x + r.w / 2, r.y + 10, 'center')
-        .text(coreActivityText(core, true), core.activity === 'cacheLoad' || core.activity === 'cacheAccess' ? 'cyan' : core.activity ? 'value' : 'dim');
+        .text(coreActivityText(core, true), core.activity === 'preload' ? 'preload' : core.activity === 'cacheLoad' || core.activity === 'cacheAccess' ? 'cyan' : core.activity ? 'value' : 'dim');
     }
     return;
   }
@@ -84,14 +84,14 @@ export function chipLabels(chip: ChipSnapshot, frame: WorldFrame, out: LabelWrit
     // A18: "Core 1 · 1 Hz" on one line, or name then Hz on their own lines, never "Core 11 Hz".
     out.label(LABEL_IDS[i]!, x, r.y + c.pad, 'left').text(CORE_NAMES[i]!, 'name', true);
     if (!wide && live && core.activity) out.text(`· ${coreActivityText(core, r.w < 70)}`,
-      core.activity === 'cacheLoad' || core.activity === 'cacheAccess' ? 'cyan' : 'value');
+      core.activity === 'preload' ? 'preload' : core.activity === 'cacheLoad' || core.activity === 'cacheAccess' ? 'cyan' : 'value');
     // A core shows its own live speed (user), or its C-state asleep.
     const sp = readySpeedText(core, chip, live), spTone = coreSleep(core) || !live ? 'dim' : 'mute';
     if (wide) out.text(`· ${sp}`, spTone); else out.br().text(sp, spTone);
     const busy = live && core.busy > 0, lent = live && lentCore(core), idle = !busy && !lent;
     // The running task: its family icon and name, and its progress (task numbers are never shown).
     if (busy && core.family !== null) {
-      const phase = coreActivityText(core), tone = core.activity === 'cacheLoad' || core.activity === 'cacheAccess' ? 'cyan' : 'value';
+      const phase = coreActivityText(core), tone = core.activity === 'preload' ? 'preload' : core.activity === 'cacheLoad' || core.activity === 'cacheAccess' ? 'cyan' : 'value';
       if (wide) {
         out.label(`${LABEL_IDS[i]}s`, c.id.x, c.id.y, 'left').text(familyName(familyId(core.family)), 'value');
         out.label(`${LABEL_IDS[i]}f`, x, r.y + 32, 'left').text(phase, tone);

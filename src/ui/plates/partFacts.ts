@@ -43,7 +43,7 @@ export function partFacts(focus: LevelSnapshot, slot: PartSlot, siteId?: number)
     if (slot.kind === 'scheduler') {
       const s = focus.scheduler;
       if (!s) return null;
-      return { title: 'Scheduler', sub: QUEUE_NAMES[s.strategy], level: s.level, status: `${s.queued} of ${s.q} queued · runs ${s.k} at once`, lines: [] };
+      return { title: 'Queue', sub: QUEUE_NAMES[s.strategy], level: s.level, status: `${s.queued} of ${s.q} waiting · ${s.running} running`, lines: [] };
     }
     return null;
   }

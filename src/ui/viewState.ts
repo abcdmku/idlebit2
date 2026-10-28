@@ -11,7 +11,7 @@ import type { LevelId, LevelSnapshot, NodeRef, RenderSnapshot, ResearchId, Snaps
 export { LEVEL_NAMES } from '../game';
 
 /** A page over the world. */
-export type Sheet = 'research' | 'settings';
+export type Sheet = 'research' | 'settings' | 'roundRewards';
 
 export interface ViewState {
   readonly focus: NodeRef;
@@ -26,6 +26,7 @@ export interface ViewState {
   readonly plate: boolean;
   readonly sheet: Sheet | null;
   readonly researchProject: ResearchId | null;
+  readonly rewardMilestone: number | null;
   /** A queue card's task detail is open: its task key (`epoch:round:taskId`, never shown). */
   readonly task: string | null;
   readonly reducedMotion: boolean;
@@ -39,6 +40,7 @@ export type ViewCommand =
   | { readonly type: 'select'; readonly target: HitTarget; readonly plate?: boolean }
   | { readonly type: 'openPlate' }
   | { readonly type: 'openResearch'; readonly project?: ResearchId | null }
+  | { readonly type: 'openRoundRewards'; readonly milestone?: number | null }
   | { readonly type: 'toggleSheet'; readonly sheet: Sheet }
   | { readonly type: 'openTask'; readonly task: string }
   /** Phone back, browser Back and Escape: close the research sheet, then its retained task or hardware origin. */
@@ -57,7 +59,7 @@ export interface ViewStore {
   reset(next: ViewState): void;
 }
 
-const CLEAR = { selectedId: null, selected: null, plate: false, task: null } as const;
+const CLEAR = { selectedId: null, selected: null, plate: false, task: null, rewardMilestone: null } as const;
 const same = (a: NodeRef | null, b: NodeRef | null) => a === b || (!!a && !!b && a.level === b.level && a.id === b.id);
 
 export function initialView(snapshot: RenderSnapshot, level: LevelId = 'chip', reducedMotion = false): ViewState {
@@ -122,7 +124,9 @@ export function createViewStore(read: () => RenderSnapshot, initial: ViewState):
       case 'openPlate':
         return state.selected && !state.plate ? { ...state, plate: true } : state;
       case 'openResearch':
-        return { ...state, sheet: 'research', researchProject: command.project ?? null };
+        return { ...state, sheet: 'research', researchProject: command.project ?? null, rewardMilestone: state.sheet === 'roundRewards' ? state.rewardMilestone : null };
+      case 'openRoundRewards':
+        return { ...state, sheet: 'roundRewards', rewardMilestone: command.milestone ?? null };
       case 'toggleSheet':
         return state.sheet === command.sheet ? { ...state, sheet: null, researchProject: null }
           : { ...state, sheet: command.sheet, researchProject: null };
@@ -132,8 +136,9 @@ export function createViewStore(read: () => RenderSnapshot, initial: ViewState):
       case 'openTask':
         return { ...state, ...CLEAR, sheet: null, researchProject: null, task: command.task };
       case 'back':
+        if (state.sheet === 'research' && state.rewardMilestone !== null) return { ...state, sheet: 'roundRewards', researchProject: null };
         // Research returns to the hardware or task that opened it.
-        if (state.sheet) return { ...state, sheet: null, researchProject: null };
+        if (state.sheet) return { ...state, sheet: null, researchProject: null, rewardMilestone: null };
         if (state.task) return { ...state, task: null };
         if (state.selected) return { ...state, ...CLEAR };
         return state;

@@ -1779,3 +1779,72 @@ The user sets the first extra Hz core to 1,000 Credits and explicitly requires s
 The user supplied five MP3s and requested a settings icon, music volume and a new song at each tier. The gear has a reserved deck key beside Research. Settings uses the shared close key and modal keyboard behavior, with Play/Pause, a 0–100% volume slider and a track list that names each locked tier.
 
 The two Fax Tones attachments become Clock Tones for CPU and System Handshake for System. Rack Mount, Dial Tone and Global Bit unlock at Rack, Room and Global respectively. The game catalog reads existing research tier unlocks; there is no second progression counter. Songs loop, and unlocking one preserves the selected song. Browser playback starts after an interaction and pauses while hidden. Volume defaults to 35%. Enabled state, volume and track persist separately from the game save. A selected song that is locked in a loaded or reset game falls back to CPU after hydration. No save schema change is required.
+
+## D53, 27 Oct: broad task quantities and recurring smaller work
+
+The user rejects repetitive task sizes and requires wide operation ranges even early. Progression introduces hardware limits while task sizes can vary substantially.
+
+Replace the narrow ±20% size draw with logarithmic sampling of whole recipe repetitions. Each doubling has comparable probability. The lower bound is one recipe, or the minimum systems times grain for a split task. The upper bound is the larger of twice that minimum and eight times the family's intensity work budget in recipe units. The first offer stays one Bit Flip recipe. Bit Copy, Parity Check and Bit Shift enter earlier, followed by recipes needing larger fixed caches. Larger bands retain their hardware gates and recipe-budget introduction delays.
+
+Families taper toward 3% of their authored weight instead of disappearing. Retired families keep their quantity ceilings at their retirement intensity, leaving small work beside newer tasks. Hold the final family mix at I54 and continue growing its quantity ceiling. Installed hardware never changes or filters a draw. Keep two RNG draws per task; the quantity draw also supplies the existing ±20% completion-deadline variation.
+
+Every quantity is actual executable work. The operation tree, input-load count and exact one-Credit-per-operation payment all use the same frozen units. No reward multiplier, new timer or save field is added. Existing queued offers keep their descriptors, and save version remains 29. The D50 short-run timing measurements are superseded by the D53 samples in `docs/tasks.md`; long-run balance remains incomplete.
+
+## D54, 27 Oct: explain pickup waits and browse 50 incoming tasks
+
+The user requires a reason whenever a task has not been picked up, including when CPU cores are busy. Keep static hardware gates as `blockedBy` and publish temporary pickup waits separately. Read live admission, thread, research, queue, mode and input-link state. Task details always show the reason; the head strip and main task card show the current wait. Waiting behind earlier tasks and waiting for the next pickup step are explicit states. These observations do not change eligibility, failure causes or hardware timing.
+
+The user also requires sliding through the next 50 incoming tasks without a scrollbar. Save the head plus 50 frozen offers and refill one at the back when any leaves. Keep the head fixed while touch swipes, mouse drags, wheel input and keyboard arrows browse the incoming cards. Browsing does not generate work or draw RNG. Cards keep their positions when work advances, and any incoming card can open its details or be dismissed while uncommitted. Keep the opening SLA grace based on the first five tasks. Save version 30 resets earlier pre-live saves because the queue now reserves 51 offers.
+
+## D55, 27 Oct: CPU-paid queue preparation and matching-recipe batches
+
+The user requires queued work to preload into cache using a real CPU core, and wants a choice between preloading and keeping cores busy. A queue provides both policies from its first level, without new research. Keep cores busy retains immediate partial-width starts and reserves no core for speculative loading. Preload and wait for cores gives one free core to loading and waits for the task's desired width, capped by installed cores. A four-core task can stay queued while three cores are available, prepare its cache and let smaller tasks through. Time slicing keeps its existing shared-thread allocation.
+
+Each prepared cache bit costs one CPU op at the core's effective hardware rate. One queued task per system may reserve real cache; the loader returns its core when it finishes. Starting preserves the loaded prefix and pays only for the remaining initial load. Transfers, private recipe operations, rewards and completion counts are unchanged. Drain, failure, stealing and removal return the core and cache, and round end clears preparation. Event-clock scheduling preserves delta invariance and allows event-free systems to be skipped.
+
+Batch matching recipes is a separate, free queue setting, off by default. A completed task can pass its resident fixed recipe workspace to one queued task of the same family. The next compatible, runnable task gets batch priority. Reuse is bounded by the family's fixed working set and the completed task's cache placement. Per-unit inputs remain private and are loaded normally; every task retains its identity, recipe work, deadline, payment and logical completion. Batches do not wait for more arrivals. No arbitrary speed or reward multiplier is added.
+
+The queue plate exposes both policies, batching, measured reused bits, active preparation and desired/available cores. The preloading core and prepared queue well use a distinct blue state color and actual loaded-bit progress; ordinary cache work stays cyan. Task-card redesigns are presented as five prototypes inside the actual game before choosing a final layout. The user's legacy icon-and-number reference calls for concise reward values on incoming cards and rewards plus core/cache requirements on the next task, while retaining D54 pickup reasons and the 50-task sliding strip.
+
+Save version 31 resets earlier pre-live saves because queue settings, prepared cache ownership and CPU work-clock state are saved. No migrations are written. Advanced parallel loaders, several prepared queue entries and retention across different recipes are reserved ideas, not baseline features or added research IDs.
+
+## D56, 27 Oct: first-reach round rewards
+
+Complete 50 logical tasks in one round for the first reward. Counts then follow the endless `1, 1.5, 2, 3, 5, 7.5` ladder per decade: 50, 75, 100, 150, 200, 300, 500, 750 and onward. Each count earns once per save on its first-ever reach. Claims are manual; reaching the same count in another round pays nothing again.
+
+At reach, freeze a grant matching 100% of base task Credits and Data earned in that round since the previous reward threshold. The first 50 includes tasks 1 through 50. Minimums are `20 × count` Credits and `2 × count` Data. Exclude dividends and all other bonuses from the match. Claims credit the wallet without becoming operating income or feeding dividends or later grants. Pending grants and exact claimed receipts persist across rounds, Return, offline play and saves.
+
+Claimed milestones also grant these permanent totals:
+
+| Count | Effect |
+|---:|---|
+| 50 | 2 prepared targets; open `parallelLoaders` research. |
+| 75 | 10% extra market-task Data. |
+| 100 | 1 extra waiting research slot. |
+| 150 | Open `residentWorkspace` research. |
+| 200 | 5% energy Credit discount. |
+| 300 | 4 prepared targets. |
+| 500 | Open `parallelLoaderController` research. |
+| 750 | 2 extra waiting research slots total. |
+| 1,000 | 10% research Data discount. |
+| 1,500 | 20% extra market-task Data total. |
+| 2,000 | 10% energy Credit discount total. |
+| 3,000 | 10% ordinary research Credit discount. |
+| 5,000 | 15% energy Credit discount total. |
+| 7,500 | 20% research Data discount total. |
+
+Later thresholds continue currency grants. Modifiers remain capped and do not compound. Research keeps one active project; extra slots hold waiting projects alongside normal queue upgrades. Discounts apply when funding new processor research, round positive prices up to at least 1 and never refund paid projects or change purchase-series prices. Energy discounts change Credits billed, never watts, heat or supply limits.
+
+Blueprint claims open eligibility only. Normal costs, processor work and prerequisites remain. `parallelLoaders` requires `sjf` and enables 2 actual idle-core loaders. `residentWorkspace` requires `parallelLoaders` and retains one family's fixed workspace in real cache across unlike tasks, with batching enabled; private inputs stay separate and cache pressure can evict it. `parallelLoaderController` requires `parallelLoaders` and enables 4 loaders. The queue offers a researched core budget of 1, 2 or 4. Each active loader occupies a separate idle physical core and pays one CPU op per loaded cache bit. Installed queue space and cache still limit prepared targets. These extend D55's baseline; no frequency or generation changes apply.
+
+Beside the total round `R`, show the ready reward count as a number in the in-game font. Clicking it opens the game's reward list and details, with frozen amounts for earned rewards and exact receipts for claims.
+
+Save version 32 includes receipts and canonical per-record loader state; older pre-live saves reset without migrations. Long-campaign balance is unvalidated because the campaign bot does not claim rewards.
+
+## D57, 27 Oct: eight waiting tasks and readable production task cards
+
+The user caps hardware queues at eight tasks and requires the waiting tasks to be visible. CPU scheduler queues and router queues stop at eight, superseding D7.2 and D25.7's 32-entry caps. Running tasks remain separate. Incoming reservations count against waiting capacity so simultaneous transfers cannot exceed the queue's real size. Scheduler generations begin with 2, 4, 6 and 8 waiting slots and stop upgrading at levels 4, 2, 2 and 1. The MHz generation's second level is capped at eight. Queue prices and effects stop at the same limit. Save version 32 resets earlier saves under the pre-live policy.
+
+The CPU queue shows eight readable family icons at full art scale. Opening it starts on Waiting tasks: one row per slot with the real task name, concise Credits/Data payment, desired core count, working-set bits and live readiness. Prepared work has blue loaded-bit progress. Queue policies and batching remain on the Settings tab. Empty slots retain their positions. These facts come from simulation selectors.
+
+The market remains a fixed head plus 50 browsable incoming offers under D54. Incoming cards retain full task names and compact native reward icons. The next-task card groups title/payment, core/cache facts, pickup reason and stable action keys. Portrait phones use the full bottom width, with Research and Settings in its action row; landscape keeps a side column. Desktop uses the available width for the same groups. Short phone CPU framing includes the clock and working cores while keeping the queue and cache reachable by panning. The redesign is production UI inside the actual game.

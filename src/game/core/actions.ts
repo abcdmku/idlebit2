@@ -4,6 +4,7 @@ import { marketHandlers } from '../market/actions';
 import type { ActionOf, ActionOutcome, GameAction, GameActionType, RejectionCode } from '../types/actions';
 import type { GameState } from '../types/state';
 import { coreHandlers } from './coreActions';
+import { roundRewardHandlers } from '../rewards/actions';
 
 export type ActionHandler<A extends GameAction> = (state: GameState, action: A) => ActionOutcome;
 export type HandlerMap = { readonly [T in GameActionType]?: ActionHandler<ActionOf<T>> };
@@ -13,7 +14,7 @@ export const reject = (state: GameState, code: RejectionCode, reason: string): A
   ({ ok: false, state, rejection: { code, reason } });
 
 /** Domains register handlers by action type. A type nobody handles is rejected as `invalid`. */
-const HANDLERS: HandlerMap = { ...marketHandlers, ...buildHandlers, ...coreHandlers };
+const HANDLERS: HandlerMap = { ...marketHandlers, ...buildHandlers, ...coreHandlers, ...roundRewardHandlers };
 
 /**
  * Applies one player action between ticks (architecture §4). Validates against the current

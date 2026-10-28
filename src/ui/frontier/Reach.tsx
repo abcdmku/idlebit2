@@ -7,6 +7,7 @@ import { tierOf, tierValue, type Amount, type ResearchId, type RoundReport, type
 import { CoinIcon, GemIcon } from '../plates/icons';
 import { amountText, wholeText } from '../hooks/format';
 import { familyName } from '../hooks/feedModel';
+import { useShell } from '../storeHooks';
 
 /** Shorter labels for some milestones; every other milestone shows its research tree name. */
 const ERA_SHORT: Readonly<Record<string, string>> = { fabKhz: 'kHz', fabMhz: 'MHz', fabGhz: 'GHz' };
@@ -25,16 +26,18 @@ export function reportBadge(report: RoundReport): string | null {
  * endless ladder 10, 15, 20, 30, 50, 75, 100 …): the one reached and the next two. Reached marks are lit.
  */
 export function goalBar(met: number) {
-  const t = Math.max(1, tierOf(met)), goals = [t, t + 1, t + 2].map(tierValue);
-  return { hi: goals[2]!, marks: goals.map(at => ({ at, reached: met >= at })), next: tierValue(tierOf(met) + 1) };
+  const t = Math.max(5, tierOf(met)), goals = [t, t + 1, t + 2].map(tierValue);
+  return { hi: goals[2]!, marks: goals.map(at => ({ at, reached: met >= at })), next: tierValue(Math.max(4, tierOf(met)) + 1) };
 }
 
 /** This round's one bar: the counts above, an unbroken gold fill to this round's count, seams where the marks fall. */
 export function GoalBar({ report }: { report: RoundReport }) {
+  const shell = useShell();
   const met = report.met, bar = goalBar(met), pct = (v: number) => `${(Math.min(1, v / bar.hi) * 100).toFixed(2)}%`;
-  return <div className="rb" data-testid="rp-goal-bar" role="img" aria-label={`${wholeText(met)} tasks this round; next goal ${wholeText(bar.next)}`}>
-    <div className="rb-marks">{bar.marks.map((m, i) => <span key={m.at} className={`rb-mark${m.reached ? ' on' : ''}${i === bar.marks.length - 1 ? ' end' : ''}`}
-      style={{ left: pct(m.at) }}>{wholeText(m.at)}</span>)}</div>
+  return <div className="rb" data-testid="rp-goal-bar" role="group" aria-label={`${wholeText(met)} tasks this round; next goal ${wholeText(bar.next)}`}>
+    <div className="rb-marks">{bar.marks.map((m, i) => <button type="button" key={m.at} className={`rb-mark${m.reached ? ' on' : ''}${i === bar.marks.length - 1 ? ' end' : ''}`}
+      aria-label={`${wholeText(m.at)} tasks: view reward`} onClick={() => shell.view.dispatch({ type: 'openRoundRewards', milestone: m.at })}
+      style={{ left: pct(m.at) }}>{wholeText(m.at)}</button>)}</div>
     <div className="rb-bar" data-free="art">
       <b className="rb-fill" style={{ width: pct(met) }} />
       {bar.marks.slice(0, -1).map(m => <i key={m.at} className={`rb-seam${m.reached ? ' on' : ''}`} style={{ left: pct(m.at) }} />)}

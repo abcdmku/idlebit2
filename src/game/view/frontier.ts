@@ -3,21 +3,14 @@ import { researchDef } from '../build/research/tree';
 import type { FrontierView, RunwayPace, RunwayView } from '../types/frontier';
 import type { RoundReport } from '../types/report';
 import type { GameState } from '../types/state';
+import { researchCosts } from '../rewards/research';
 
 /**
  * The tier ladder of tasks completed in one round (D40): 10, 15, 20, 30, 50, 75, 100, 150 … six steps per ×10,
  * without end. A round's task count grows from tens to millions over the campaign (docs/tasks.md §3), so the
  * report always has a next tier to show.
  */
-const TIER_STEPS = [1, 1.5, 2, 3, 5, 7.5];
-/** Tier i's task count, i ≥ 1. */
-export const tierValue = (i: number): number => TIER_STEPS[(i - 1) % TIER_STEPS.length]! * 10 ** (1 + Math.floor((i - 1) / TIER_STEPS.length));
-/** The highest tier `met` tasks reach; 0 below the first. */
-export function tierOf(met: number): number {
-  let i = 0;
-  while (tierValue(i + 1) <= met) i += 1;
-  return i;
-}
+export { tierOf, tierValue } from '../rewards/ladder';
 
 let memo: { reports: readonly RoundReport[]; best: number; view: FrontierView } | null = null;
 
@@ -55,15 +48,16 @@ export function selectRunway(state: GameState): RunwayView {
   const node = nextMilestone(r.completed), def = node ? researchDef(node) : undefined;
   if (!node || !def) return { eras, cpuTiers, next: null, pace: null };
   const data = Number(state.wallet.data), credits = Number(state.wallet.credits);
-  const mark = runwayMark(r, data, credits)!, paid = mark.phase === 'research';
+  const cost = researchCosts(def, state.roundRewards);
+  const mark = runwayMark(r, data, credits, state.roundRewards.claimed)!, paid = mark.phase === 'research';
   return {
     eras,
     cpuTiers,
     next: {
-      node, name: def.name, data: def.data, credits: def.creditCost, work: def.work,
+      node, name: def.name, data: Number(cost.data), credits: cost.credits, work: def.work,
       needs: def.requires.filter(id => !r.completed.includes(id)).map(id => ({ node: id, name: researchDef(id)?.name ?? id })),
       mark, paid, progressOps: paid ? (r.active === node ? r.activeProgress : r.parked[node] ?? 0) : 0,
     },
-    pace: paid ? null : runwayPace(state.round.reports, node, data, credits, def.data, Number(def.creditCost)),
+    pace: paid ? null : runwayPace(state.round.reports, node, data, credits, Number(cost.data), Number(cost.credits)),
   };
 }

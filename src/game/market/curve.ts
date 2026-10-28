@@ -1,6 +1,6 @@
 import type { FamilyDef } from '../types/catalog';
 
-/** Task-count difficulty and seeded variation (docs/tasks.md §3, D30). */
+/** Task-count difficulty and seeded variation (docs/tasks.md §3, D30/D53). */
 export const CURVE = {
   /**
    * D30: every round starts at I = 0 and each task drawn advances I by 1 / k(I): k tasks per unit of I,
@@ -9,9 +9,11 @@ export const CURVE = {
    */
   k0: 7, k1: 0.25, k2: 0.025,
   fleetFrom: 14, fleetK: 0.25,
-  sizeJit: 0.2, weightJit: 0.3, dataJit: 0.1,
+  deadlineJit: 0.2, weightJit: 0.3, dataJit: 0.1,
   ramp: 1,
   sizeExp: 0.85,
+  sizeCeiling: 8, minimumSizeChoices: 2,
+  legacyWeight: 0.03,
 } as const;
 
 /** Tasks per unit of I at I (D30). */
@@ -22,17 +24,24 @@ export const nextIntensity = (I: number): number => I + 1 / tasksPerUnit(I);
 export const sizeScale = (I: number): number => 2 ** (CURVE.sizeExp * I);
 
 /**
- * Frozen task size s in whole units (D25.1, docs/tasks.md §2): round(U(I) × j), and at least
- * members × grain for a minimum-split task so every one of its shards holds a grain. An ordinary
- * task may be smaller than its grain: it is then one shard.
+ * Sample whole recipe repetitions across a logarithmic range, including small jobs at every I.
+ * Each doubling has comparable probability. Minimum-split tasks still hold a grain per member.
+ * Give even the smallest recipe multiple quantities instead of clamping most draws to one.
  */
-export const taskSize = (I: number, jitter: number, members: number, grain: number): number =>
-  Math.max(members > 1 ? members * grain : 1, Math.round(sizeScale(I) * jitter));
-export const sizeJitter = (u: number): number => 1 + CURVE.sizeJit * (2 * u - 1);
+export function taskSize(targetUnits: number, u: number, members: number, grain: number): number {
+  const min = members > 1 ? members * grain : 1;
+  const max = Math.max(min * CURVE.minimumSizeChoices, Math.floor(targetUnits * CURVE.sizeCeiling));
+  const logSize = Math.log(min) + u * (Math.log(max + 1) - Math.log(min));
+  return Math.max(min, Math.min(max, Math.floor(Math.exp(logSize))));
+}
+/** Completion windows retain ±20% variation from the same seeded draw. */
+export const deadlineJitter = (u: number): number => 1 + CURVE.deadlineJit * (2 * u - 1);
 
 /** Authored family weight at I, before round jitter. */
 export function baseWeight(f: FamilyDef, I: number): number {
   const { from, to } = f.window;
-  if (I <= from || I >= to) return 0;
-  return f.weight * Math.min(1, (I - from) / CURVE.ramp, (to - I) / CURVE.ramp);
+  if (I <= from) return 0;
+  const entering = Math.min(1, (I - from) / CURVE.ramp);
+  const retiring = Math.max(CURVE.legacyWeight, Math.min(1, (to - I) / CURVE.ramp));
+  return f.weight * entering * retiring;
 }

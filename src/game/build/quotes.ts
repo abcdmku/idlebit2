@@ -1,5 +1,6 @@
 import { newestGen } from './research/unlocks';
 import { POWER_SCALE, viewW } from '../core/constants';
+import { researchCosts } from '../rewards/research';
 import type { GpuPowerPoint, GpuPowerPreview } from '../types/quotes';
 import { meetLines } from './meet';
 import { POWER_SLOTS } from './partAccess';
@@ -82,7 +83,7 @@ function powerQuotes(state: GameState, unit: ScopeRef): Quote[] {
   return slot ? partQuotes(state, { unit, slot: { kind: slot } } as PartRef) : [];
 }
 
-/** D25.7: the router queue's next level, effect `slots` L → L + 1; locked ('cap') at 32. */
+/** D57: the router queue's next level, effect `slots` L → L + 1; locked ('cap') at eight. */
 function routerQueueQuotes(state: GameState, unit: ScopeRef): Quote[] {
   const plan = planRouterQueue(state, unit);
   if (!plan.ok && plan.code === 'invalid') return [];
@@ -342,10 +343,11 @@ export function infraQuotes(state: GameState, unit: { kind: 'rack' | 'room'; id:
 export function researchQuote(state: GameState, project: ResearchId): Quote {
   const def = researchDef(project);
   const r = state.research;
-  const lock = researchLock(r, project);
+  const lock = researchLock(r, project, [], state.roundRewards.claimed);
   const paid = r.active === project || r.parked[project] !== undefined;
-  const cost = amount(paid || !def ? 0 : def.data);
-  const creditCost = paid ? amount(0) : def?.creditCost ?? amount(0);
+  const costs = def ? researchCosts(def, state.roundRewards) : { data: amount(0), credits: amount(0) };
+  const cost = paid ? amount(0) : costs.data;
+  const creditCost = paid ? amount(0) : costs.credits;
   return {
     action: { type: 'startResearch', project }, label: def?.name ?? project, cost, currency: 'data',
     affordable: amountCompare(state.wallet.data, cost) >= 0 && (amountCompare(creditCost, 0) === 0 || amountCompare(state.wallet.credits, creditCost) >= 0),

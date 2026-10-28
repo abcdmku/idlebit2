@@ -17,7 +17,7 @@ export function noteTaken(w: World, family: number): void {
   w.round.frontier = { ...f, taken: [...f.taken, familyId(family)] };
 }
 
-const runwayNow = (w: World) => runwayMark(w.research, Number(w.ledger.data), Number(w.ledger.credits));
+const runwayNow = (w: World) => runwayMark(w.research, Number(w.ledger.data), Number(w.ledger.credits), w.roundRewards.claimed);
 
 /** At Return: the baseline this round's report compares against. */
 export function openFrontier(w: World): void {

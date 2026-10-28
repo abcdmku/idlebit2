@@ -4,6 +4,7 @@ import { dirtySystem } from '../core/touch';
 import type { World } from '../core/world';
 import type { CompiledBuffers } from '../core/buffers';
 import { hasRule } from './rules';
+import { evictWorkspace } from './residentWorkspace';
 import { CPU, GPU, IO, RAM, shapeOf, stageWorkAt, workingSetOf, type Shape } from './shape';
 
 /**
@@ -26,7 +27,7 @@ export const PART_LOAD_DISK = 5;
 export const isLoadingPart = (part: number): boolean => part >= PART_LOAD_CACHE;
 
 const nodeOf = (w: World, s: number): number => w.compiled.sys.diskNode[s]!;
-export const freeCache = (w: World, s: number): number => Math.max(0, w.compiled.sys.cacheBits[s]! - w.hot.sys.usedCache[s]!);
+export const freeCache = (w: World, s: number): number => Math.max(0, w.compiled.sys.cacheBits[s]! - w.hot.sys.usedCache[s]! + w.hot.sys.residentBits[s]!);
 export const freeRam = (w: World, s: number): number => Math.max(0, w.compiled.sys.ramCap[s]! - w.hot.sys.usedRam[s]!);
 export const freeLocalDisk = (w: World, s: number): number => Math.max(0, w.compiled.sys.storageCap[s]! - w.hot.sys.usedDisk[s]!);
 export function freeNodeDisk(w: World, s: number): number {
@@ -79,10 +80,12 @@ export function placeRecord(w: World, s: number, r: number, vramHeld: number): v
   const rec = w.hot.rec, k = rec.count[r]!;
   const shape = shapeOf(rec.family[r]!);
   const ws = workingSetOf(shape, rec.units[r]!);
+  if (ws * k > Math.max(0, w.compiled.sys.cacheBits[s]! - w.hot.sys.usedCache[s]!)) evictWorkspace(w, s);
   const c = Math.min(ws, freeCache(w, s) / k);
   const rest = spill(w, s, (ws - c) * k);
   const ramB = rest[0]! / k, diskB = rest[1]! / k, nodeB = rest[2]! / k;
   rec.memC[r] = c; rec.memR[r] = ramB; rec.memD[r] = diskB; rec.memN[r] = nodeB;
+  rec.preloadDone[r] = Math.min(c, rec.preloadDone[r]!);
   rec.flags[r] = rec.flags[r]! | PLACED;
   hold(w, s, c * k, ramB * k, diskB * k, nodeB * k);
   const fr = ws > 0 ? ramB / ws : 0, fd = ws > 0 ? diskB / ws : 0;
@@ -142,7 +145,7 @@ export function partClock(shape: Shape, stage: number, part: number): number {
 /** Work of record r's stage part per task: ops, or bits touched in that tier (D26.2, D26.4). */
 export function partWork(w: World, r: number, shape: Shape, stage: number, part: number): number {
   const rec = w.hot.rec, res = shape.res[stage]!;
-  if (part === PART_LOAD_CACHE) return rec.memC[r]!;
+  if (part === PART_LOAD_CACHE) return Math.max(0, rec.memC[r]! - rec.preloadDone[r]!);
   if (part === PART_LOAD_RAM) return rec.memR[r]! + rec.vramR[r]!;
   if (part === PART_LOAD_DISK) return rec.memD[r]! + rec.vramD[r]!;
   const work = stageWorkAt(shape, stage, rec.units[r]!);
@@ -159,7 +162,7 @@ export function partWork(w: World, r: number, shape: Shape, stage: number, part:
 /** First initial load with work, or -1 once the placement has loaded. */
 export function firstLoadPart(w: World, r: number, from = PART_LOAD_CACHE): number {
   const rec = w.hot.rec;
-  if (from <= PART_LOAD_CACHE && rec.memC[r]! > 0) return PART_LOAD_CACHE;
+  if (from <= PART_LOAD_CACHE && rec.memC[r]! > rec.preloadDone[r]!) return PART_LOAD_CACHE;
   if (from <= PART_LOAD_RAM && rec.memR[r]! + rec.vramR[r]! > 0) return PART_LOAD_RAM;
   if (from <= PART_LOAD_DISK && rec.memD[r]! + rec.vramD[r]! > 0) return PART_LOAD_DISK;
   return -1;

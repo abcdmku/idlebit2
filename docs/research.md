@@ -17,7 +17,7 @@ Implementation status during the GPU wave: §5 and §9 are the accepted referenc
    - Filters: toggles on a load balancer that remove candidates before the strategy picks. These are capability, health, power, thermal, region and local. A filter that would remove every candidate is skipped for that decision.
    - Split rules (D25): how a router cuts a task into shards. The base is FIFO first-fit spread: equal shares to every child with room. Gather, shard stealing and cross-rack stealing are researched rules. Distributed tasks need no placement research: their `members` is a minimum split, gated by owning enough systems, zones and regions.
    A network strategy or filter, once researched, is available at every network scope the player has opened: rack load balancer, room load balancer, site data plane and backbone scheduler.
-6. **No income multipliers.** Every effect changes a rate, a capacity, a watt figure, a loss fraction, a time constant, a ceiling, a routing decision or a latency. Payouts are authored and never touched.
+6. **Research leaves base task payouts unchanged.** Every research effect changes a rate, a capacity, a watt figure, a loss fraction, a time constant, a ceiling, a routing decision or a latency. D56's claimed Data dividends and currency grants are separate round rewards.
 7. **Every node answers something the player can see.** That is a market band entering the feed, or a failure cause in the round report.
 
 ### Base behavior before any research
@@ -154,6 +154,22 @@ C-state, Memory voltage and Boot loader each use one visible entry and 36 levels
 
 These prices replace the CSV unlock and level prices. CPU CSV manual/manualcost columns are unused test data. The runtime appends generated level definitions from src/game/build/research/levels.ts to the ordinary tree in section 9; they replace the old separate sleep, voltage and boot nodes. DVFS requires C-state level 1; Package C-states requires level 36. Earlier campaign timing examples below predate D45 and are not validation of these prices.
 
+### 3.5 Round-reward blueprints and funding, D56
+
+Runtime `RESEARCH` appends these three blueprints from `src/game/rewards/research.ts` alongside the ordinary tree and purchase levels. Claim the indicated first-reach round reward to open eligibility, then meet prerequisites, pay the normal project costs and perform all processor work. A claim does not complete research.
+
+| ID | Claim | Requires | Base Data / Credits / ops | Effect |
+|---|---:|---|---|---|
+| `parallelLoaders` | 50 | `sjf` | 100 / 1,000 / 600 | Up to 2 actual idle-core cache loaders. |
+| `residentWorkspace` | 150 | `parallelLoaders` | 2,500 / 25,000 / 5,000 | With batching enabled, retain one family's fixed workspace in real cache across unlike tasks. |
+| `parallelLoaderController` | 500 | `parallelLoaders` | 8,000 / 80,000 / 300,000 | Up to 4 actual idle-core cache loaders. |
+
+Each loader occupies a separate idle physical core and pays one CPU op per loaded cache bit. Queue settings offer the researched budget choices 1, 2 and 4. Prepared-target caps are separate, rising from 1 to 2 with claim 50 and to 4 with claim 300. Installed queue space and cache remain binding. Retained workspace never shares private inputs and can be evicted under cache pressure. These projects change no frequencies or generations.
+
+Claim 100 adds one waiting research slot; claim 750 raises that to two extra slots total, added to normal queue upgrades. Only one project is active. Claim 1,000 discounts newly funded processor research Data by 10%; claim 7,500 raises it to 20% total. Claim 3,000 discounts ordinary research Credits by 10%. Round each discounted price up once, keeping positive prices at least 1. Work and prerequisites remain unchanged; paid projects get no refund. Purchase-series prices, including C-state, Memory voltage and Boot loader, are never discounted.
+
+Reward grants, claims and exact receipts persist in save version 32; older saves reset without migrations. Campaign timing below does not validate D56 balance, because the bot does not claim rewards.
+
 ## 4. Generation ladders and ceilings
 
 ### 4.1 Part generations
@@ -204,7 +220,7 @@ Fleet caps follow `docs/architecture.md` §1.9. The largest fleet is 8 sites × 
 | Rack switch ports | 4 | Up to 12, bought on the switch (D39) |
 | Room switch ports | 4 | Up to 24, bought on the switch (D39) |
 | Uplinks per switch | 1 | Up to 4, bought on the switch (D39) |
-| Research queue | 1 | 3 `researchQueue` |
+| Research queue, active plus waiting | 1 | 3 with `researchQueue`, plus D56's +1 at claimed 100 or +2 total at claimed 750; one active project. |
 | Racks per room | 16 (2 rows of 8) | 24: the third row is bought (D39) |
 | Zones per site | 2 | 3: the third zone is bought (D39) |
 | Sites, one per region | 1 | All 8 regions open with `regions`; each site is bought (D39) |

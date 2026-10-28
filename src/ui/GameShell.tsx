@@ -22,6 +22,7 @@ import { PlateLayer } from './plates';
 import { QueueStrip } from './QueueStrip';
 import { ResearchScreen } from './research';
 import { RoundPlate } from './RoundPlate';
+import { RoundRewardsScreen } from './rewards/RoundRewardsScreen';
 import { box, LayoutContext } from './shell/geometry';
 import { ShellContext, createShellValue, type ShellContextValue, type ShellSurface } from './storeHooks';
 import { PlatformLine } from './shell/PlatformLine';
@@ -159,6 +160,7 @@ export function GameShell({ store, registry, level, view, size, saveNow, childre
             <TaskDetail />
           </OffersScope>
           <SettingsScreen />
+          <RoundRewardsScreen />
           <LeaveDialog guard={guard} />
           {children}
         </div>

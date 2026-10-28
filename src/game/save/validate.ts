@@ -7,6 +7,8 @@ import { FAIL_CAUSES, FAIL_DETAILS } from '../types/events';
 import { COMPILED_TABLES, HOT_TABLES, SAVE_SCHEMA } from './schema';
 import { FAMILIES } from '../market/families';
 import { validateAccelBuilds, validateAccelRuntime } from './accelerators';
+import { validatePreload } from './preload';
+import { validateRoundRewards } from './roundRewards';
 
 type Obj = Record<string, unknown>;
 class SaveError extends Error {}
@@ -98,10 +100,12 @@ function check(raw: unknown): GameState {
   validateQueue(raw as GameState);
   validateAccelBuilds(raw as GameState, fail);
   validateAccelRuntime(raw as GameState, fail);
+  validatePreload(raw as GameState, fail);
+  validateRoundRewards(raw as GameState, fail);
   return raw as GameState;
 }
 
-/** The endless queue (spec §5.2): five unique reserved IDs, known families, finite sizes, head ordering. */
+/** The endless queue (spec §5.2): unique reserved IDs, known families, finite sizes, head ordering. */
 function validateQueue(state: GameState): void {
   const path = 'market';
   const m = obj(state.market, path);
@@ -113,7 +117,7 @@ function validateQueue(state: GameState): void {
   if (state.round.phase === 'running' && (headTick < state.round.startTick || headTick > state.clock.tick))
     fail(path, 'head clock must start inside the running round');
   const tasks = arr(m.window, `${path}.window`);
-  if (tasks.length !== QUEUE_VISIBLE) fail(path, 'expected five queued tasks');
+  if (tasks.length !== QUEUE_VISIBLE) fail(path, `expected ${QUEUE_VISIBLE} queued tasks`);
   const nextTaskId = int(state.hot.g[G.nextTaskId], 'hot.g.nextTaskId', 1);
   const ids = new Set<number>();
   for (let i = 0; i < tasks.length; i += 1) {

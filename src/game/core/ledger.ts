@@ -6,6 +6,8 @@ import { MAX_FAMILIES, NET_WINDOW_TICKS, REGIONS, DT_S, TICKS_PER_SECOND } from 
 import { pushEvent } from './events';
 import { toAmount, type World } from './world';
 import { FAMILIES, payoutCreditsAt } from '../market/families';
+import { recordRewardWork } from '../rewards/progress';
+import { roundRewardBonuses } from '../rewards/bonuses';
 
 /**
  * Ledger phase (spec §9.8), once per tick:
@@ -21,7 +23,10 @@ export function ledgerPhase(w: World): void {
   let gross = 0n;
   const tally = hot.tally;
   for (let i = 0; i < tally.len; i += 1) {
-    gross += BigInt(payoutCreditsAt(FAMILIES[tally.family[i]!]!, tally.units[i]!)) * BigInt(tally.count[i]!);
+    const family = FAMILIES[tally.family[i]!]!, credits = BigInt(payoutCreditsAt(family, tally.units[i]!));
+    const count = tally.count[i]!;
+    gross += credits * BigInt(count);
+    recordRewardWork(w, credits, count, hot.fam.dataRatio[family.id] || family.dataRatio);
   }
   tally.len = 0;
 
@@ -33,6 +38,10 @@ export function ledgerPhase(w: World): void {
   }
   const wholeData = Math.floor(dataMeter);
   l.dataMeter = dataMeter - wholeData;
+  const dividend = BigInt(wholeData) * BigInt(roundRewardBonuses(w.roundRewards.claimed).dataPercent)
+    + BigInt(w.roundRewards.dataDividendRemainder);
+  const bonusData = dividend / 100n;
+  w.roundRewards.dataDividendRemainder = Number(dividend % 100n);
 
   let energyMeter = l.energyMeter;
   const bill = hot.bill;
@@ -41,7 +50,7 @@ export function ledgerPhase(w: World): void {
     if (watts !== 0) { energyMeter += watts * DT_S * REGIONS[r]!.energyPrice; bill[r] = 0; }
   }
   l.energyMeter = energyMeter;
-  settleLedger(w, gross, BigInt(wholeData));
+  settleLedger(w, gross, BigInt(wholeData) + bonusData);
 }
 
 /** Settles accumulated energy and tick earnings, or a between-tick battery refill, immediately. */
@@ -49,7 +58,10 @@ export function settleLedger(w: World, gross = 0n, data = 0n): void {
   const l = w.ledger;
   const wholeEnergy = Math.floor(l.energyMeter);
   l.energyMeter -= wholeEnergy;
-  const energy = BigInt(wholeEnergy);
+  const discount = BigInt(wholeEnergy) * BigInt(roundRewardBonuses(w.roundRewards.claimed).energyPercent)
+    + BigInt(w.roundRewards.energyDiscountRemainder);
+  const energy = BigInt(wholeEnergy) - discount / 100n;
+  w.roundRewards.energyDiscountRemainder = Number(discount % 100n);
   if (gross !== 0n || data !== 0n || energy !== 0n) {
     l.credits += gross - energy;
     l.data += data;

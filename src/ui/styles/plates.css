@@ -10,7 +10,7 @@
   box-shadow: 0 0 0 2px #e8e1ff, 0 0 0 4px #0e0b1c, 6px 8px 0 2px rgba(5, 3, 12, 0.55);
   pointer-events: auto; touch-action: pan-y; user-select: none;
 }
-.plate-content { overflow-y: auto; overscroll-behavior: contain; scrollbar-width: thin; scrollbar-color: #74679f #1b1437; }
+.plate-content { overflow-y: hidden; overscroll-behavior: contain; scrollbar-width: thin; scrollbar-color: #74679f #1b1437; }
 .plate-footer { padding-top: var(--s2); }
 .v3-plate * { font-size: var(--pb); }
 .v3-plate p { margin: var(--s1) 0 0; }
@@ -317,6 +317,7 @@
    whole or clipped by the body. While measuring (data-measure) nothing limits the plate, to read its natural height. */
 .v3-plate:has(> .plate-content) { display: grid; grid-template-rows: auto minmax(0, 1fr) auto auto; grid-template-columns: minmax(0, 1fr); max-height: none; overflow: visible; }
 .v3-plate > .plate-content { min-height: 0; max-height: none; }
+.v3-plate[data-scrolls="true"] > .plate-content { overflow-y: auto; }
 .v3-plate > .plate-more { height: 0; overflow: hidden; display: flex; align-items: center; justify-content: center; color: #efeaff; visibility: hidden; pointer-events: none; }
 .v3-plate[data-scrolls="true"] > .plate-more { height: 24px; }
 .v3-plate[data-more="true"] > .plate-more { visibility: visible; }

@@ -2,7 +2,7 @@ import { G, LOC } from '../core/buffers';
 import { headDeadlineTick, QUEUE_VISIBLE, RECENT_OUTCOMES } from '../core/constants';
 import type { World } from '../core/world';
 import { FAMILIES, familyKey, payoutAt, payloadAt } from '../market/families';
-import { canRunFleet, classesOf, detailIndex, gateOn, isEligibleMode } from '../market/fleet';
+import { classesOf, detailIndex, gateOn, isEligibleMode } from '../market/fleet';
 import { MODE } from '../core/timers';
 import type { FamilyDef } from '../types/catalog';
 import { FIRST, nextLink } from '../net/paths';
@@ -16,6 +16,9 @@ import { researchOpsPerSec } from './research';
 import { feedRates } from './feedRates';
 import { linkName, linkTransfer, pipeTransfer } from './flows';
 import { taskRequirements } from './taskRequirements';
+import { pickupWait } from './pickup';
+import { fleetGates } from './capability';
+import { taskCpuCounter } from './taskCpu';
 
 /** Static per-family feed facts: label and icons. Built once per family. */
 interface FamilyFace { readonly label: string; readonly icons: readonly TaskIcon[] }
@@ -80,16 +83,19 @@ function capableCounter(state: GameState): (def: FamilyDef | undefined) => numbe
 }
 
 function entry(state: GameState, roundIndex: number, taskId: number, family: number, size: number, committed: boolean, speed: number,
-  deadline: number | null, windowEndTick: number | null, capable: (def: FamilyDef | undefined) => number): QueueEntryView {
+  deadline: number | null, windowEndTick: number | null, capable: (def: FamilyDef | undefined) => number, head: boolean,
+  gateFor: (def: FamilyDef, size: number) => number, coresFor: ReturnType<typeof taskCpuCounter>): QueueEntryView {
   const face = familyFace(family);
   const def = FAMILIES[family];
-  const gate = state.round.phase === 'running' && def ? canRunFleet(state, def, size) : 0;
+  const gate = state.round.phase === 'running' && def ? gateFor(def, size) : 0;
   const work = def ? payoutAt(def, size) : 0;
   return {
     ...taskRequirements(familyId(family), size, deadline),
+    ...(def ? coresFor(def, size) : { cpuCoresWanted: 1, cpuCoresAvailable: 0 }),
     kind: 'task', task: { epoch: state.epoch, roundIndex, taskId }, key: taskId, icons: face.icons,
     committed, dismissible: !committed,
     blockedBy: gate !== 0 ? FAIL_DETAILS[detailIndex(gate)] ?? null : null,
+    waitingFor: gate !== 0 ? null : state.round.phase !== 'running' ? 'round' : head && def ? pickupWait(state, def, size) : 'head',
     work, dataReward: work / (state.hot.fam.dataRatio[family] || def?.dataRatio || 1),
     transferS: speed > 0 && def ? payloadAt(def, size) / speed : null, windowEndTick, capableSystems: capable(def),
   };
@@ -98,15 +104,15 @@ function entry(state: GameState, roundIndex: number, taskId: number, family: num
 /** The first QUEUE_VISIBLE queue entries, head first: the front (returned work), then the window tasks. */
 export function queueWindow(state: GameState): QueueEntryView[] {
   const out: QueueEntryView[] = [];
-  const hot = state.hot, m = state.market, speed = firstLinkSpeed(state), capable = capableCounter(state);
+  const hot = state.hot, m = state.market, speed = firstLinkSpeed(state), capable = capableCounter(state), gateFor = fleetGates(state), coresFor = taskCpuCounter(state);
   for (let r = hot.g[G.frontHead] ?? -1; r >= 0 && out.length < QUEUE_VISIBLE; r = hot.rec.next[r] ?? -1) {
     const deadline = hot.rec.deadline[r]! >= 0 ? hot.rec.deadline[r]! : null;
     out.push(entry(state, m.roundIndex, hot.rec.taskId[r]!, hot.rec.family[r]!, hot.rec.units[r]!, true, speed,
-      deadline, deadline === null ? null : hot.rec.taken[r]! + deadline - 1, capable));
+      deadline, deadline === null ? null : hot.rec.taken[r]! + deadline - 1, capable, out.length === 0, gateFor, coresFor));
   }
   for (const t of m.window) {
     if (out.length >= QUEUE_VISIBLE) break;
-    out.push(entry(state, m.roundIndex, t.taskId, t.family, t.size, false, speed, t.deadline, null, capable));
+    out.push(entry(state, m.roundIndex, t.taskId, t.family, t.size, false, speed, t.deadline, null, capable, out.length === 0, gateFor, coresFor));
   }
   return out;
 }

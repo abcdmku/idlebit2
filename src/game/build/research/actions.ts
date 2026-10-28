@@ -1,4 +1,4 @@
-import { amount, amountCompare } from '../../amount';
+import { amountCompare } from '../../amount';
 import { accept, debitCredits, debitData, reject, type HandlerMap } from '../../core/actions';
 import type { ActionOutcome } from '../../types/actions';
 import type { ResearchId } from '../../types/ids';
@@ -9,11 +9,13 @@ import { deriveUnlocks } from './effects';
 import { compileAll, syncHotSizes } from '../../core/topology';
 import { commitWorld, openWorld } from '../../core/world';
 import { pushEvent } from '../../core/events';
+import { researchCosts } from '../../rewards/research';
+import { roundRewardBonuses } from '../../rewards/bonuses';
 
 /** Level purchases apply their rule now and leave any processor research running. */
 function purchase(state: GameState, id: ResearchId): ActionOutcome {
   const def = researchDef(id)!;
-  const lock = researchLock(state.research, id);
+  const lock = researchLock(state.research, id, [], state.roundRewards.claimed);
   if (lock) return reject(state, lock.code, lock.reason);
   const paid = debitCredits(state, def.creditCost);
   if (!paid.ok) return paid;
@@ -23,7 +25,7 @@ function purchase(state: GameState, id: ResearchId): ActionOutcome {
     ? state.build.systems.map(s => s && ({ ...s, spec: { ...s.spec, settings: { ...s.spec.settings, cStateLimit: 1 as const } } }))
     : state.build.systems;
   const build = { ...state.build, systems, revision: state.build.revision + 1 };
-  const compiled = compileAll(build, research);
+  const compiled = compileAll(build, research, state.roundRewards);
   const next = { ...paid.state, research, build, compiled };
   const w = openWorld(next);
   syncHotSizes(w.hot, compiled);
@@ -33,10 +35,12 @@ function purchase(state: GameState, id: ResearchId): ActionOutcome {
 }
 
 /** Why `id` can't be researched now, or null. Prerequisites may be satisfied by `pending` (active or queued earlier). */
-export function researchLock(r: ResearchState, id: ResearchId, pending: readonly ResearchId[] = []): { code: 'invalid' | 'locked'; reason: string; node: ResearchId | null } | null {
+export function researchLock(r: ResearchState, id: ResearchId, pending: readonly ResearchId[] = [], claimed: readonly number[] = []): { code: 'invalid' | 'locked'; reason: string; node: ResearchId | null } | null {
   const def = researchDef(id);
   if (!def || !def.implemented) return { code: 'invalid', reason: 'No such project', node: null };
   if (r.completed.includes(id)) return { code: 'invalid', reason: 'Already researched', node: null };
+  if (def.rewardMilestone && !claimed.includes(def.rewardMilestone))
+    return { code: 'locked', reason: `Claim the ${def.rewardMilestone}-task reward`, node: null };
   const missing = def.requires.find((p) => !r.completed.includes(p) && !pending.includes(p));
   if (missing) return { code: 'locked', reason: `Needs ${researchDef(missing)?.name ?? missing}`, node: missing };
   return null;
@@ -50,15 +54,15 @@ function start(state: GameState, id: ResearchId): ActionOutcome {
   if (researchDef(id)?.purchase) return purchase(state, id);
   const r = state.research;
   if (r.active === id) return accept(state);
-  const lock = researchLock(r, id);
+  const lock = researchLock(r, id, [], state.roundRewards.claimed);
   if (lock) return reject(state, lock.code, lock.reason);
   let next = state;
   if (r.parked[id] === undefined) {
     const def = researchDef(id)!;
-    const fee = def.creditCost ?? amount(0);
+    const costs = researchCosts(def, state.roundRewards), fee = costs.credits;
     const credits = amountCompare(fee, 0) > 0 ? debitCredits(state, fee) : accept(state);
     if (!credits.ok) return credits;
-    const paid = debitData(credits.state, amount(def.data));
+    const paid = debitData(credits.state, costs.data);
     if (!paid.ok) return reject(state, paid.rejection.code, paid.rejection.reason);
     next = paid.state;
   }
@@ -79,9 +83,10 @@ export const researchHandlers: HandlerMap = {
     const id = action.project;
     if (r.active === id || r.queue.includes(id)) return accept(state);
     const pending = [...(r.active ? [r.active] : []), ...r.queue];
-    const lock = researchLock(r, id, pending);
+    const lock = researchLock(r, id, pending, state.roundRewards.claimed);
     if (lock) return reject(state, lock.code, lock.reason);
-    if (pending.length >= r.unlocks.ceilings.researchQueue) return reject(state, 'cap', 'Research queue is full');
+    if (pending.length >= r.unlocks.ceilings.researchQueue + roundRewardBonuses(state.roundRewards.claimed).researchSlots)
+      return reject(state, 'cap', 'Research queue is full');
     if (r.active === null && r.queue.length === 0) {
       const started = start(state, id);
       if (started.ok || started.rejection.code !== 'funds') return started;

@@ -63,8 +63,13 @@ export function PlateFrame({ title, sub, pips, head, footer, className = '', clo
     // body is the only thing that scrolls and its own row clips it, so nothing paints under the cue or the footer.
     // Cramped (the head and the main option alone fill the room), the whole plate scrolls, main option first.
     const more = () => {
-      const box = root.dataset.cramped === 'true' ? root : content;
-      root.dataset.scrolls = String(content.scrollHeight - content.clientHeight > 2);
+      const cramped = root.dataset.cramped === 'true';
+      const box = cramped ? root : content;
+      // A visible cue takes space from the body. Include that space when deciding whether the cue is still needed,
+      // otherwise it can keep itself and the scrollbar visible after the content shrinks.
+      const cue = root.querySelector<HTMLElement>(':scope > .plate-more');
+      const reclaimed = root.dataset.scrolls === 'true' ? cue?.offsetHeight ?? 0 : 0;
+      root.dataset.scrolls = String(!cramped && content.scrollHeight > content.clientHeight + reclaimed + 1);
       // (A whole-plate scroll counts only real content below, not its few px of padding.)
       root.dataset.more = String(box.scrollHeight - box.scrollTop - box.clientHeight > (box === root ? 8 : 2));
     };
@@ -96,19 +101,20 @@ export function PlateFrame({ title, sub, pips, head, footer, className = '', clo
       const a = !pinTop && readAnchor?.(target) ? target : null;
       // A plate beside its part may be narrower than its own width (place.ts); its natural width is read unset.
       if (!root.style.width) natural = root.offsetWidth;
-      let best: { safe: Rect; full: number; at: ReturnType<typeof placePlate>; head: number; footer: number; content: number; width: string } | null = null;
-      for (const area of areas) {
+      let best: { safe: Rect; full: number; at: ReturnType<typeof placePlate>; head: number; footer: number; content: number; width: string; covers: boolean } | null = null;
+      // Keep the part visible when possible. If that would force scrolling, try the same areas centered over it.
+      const placements = a && !pinTop ? [false, true] : [false];
+      search: for (const covers of placements) for (const area of areas) {
         root.style.setProperty('--plate-safe-width', `${Math.max(0, area.w)}px`);
         root.style.width = '';
-        // Never over the tapped part (place.ts): the natural height is measured first, then the place and its room.
         let full = naturalHeight();
-        let at = placePlate(a, natural, full, area, { beside, pinTop });
-        if (at.w < natural) { root.style.width = `${at.w}px`; full = naturalHeight(); at = placePlate(a, natural, full, area, { beside, pinTop }); }
-        const candidate = { safe: area, full, at, ...measured, width: root.style.width };
+        let at = placePlate(covers ? null : a, natural, full, area, { beside, pinTop });
+        if (at.w < natural) { root.style.width = `${at.w}px`; full = naturalHeight(); at = placePlate(covers ? null : a, natural, full, area, { beside, pinTop }); }
+        const candidate = { safe: area, full, at, ...measured, width: root.style.width, covers };
         if (!best || Math.min(full, at.room) > Math.min(best.full, best.at.room)) best = candidate;
-        if (at.room >= full) { best = candidate; break; }
+        if (at.room >= full) { best = candidate; break search; }
       }
-      const { safe, full, at, head: headH, footer: footerH, content: contentH, width } = best!;
+      const { safe, full, at, head: headH, footer: footerH, content: contentH, width, covers } = best!;
       root.style.setProperty('--plate-safe-width', `${Math.max(0, safe.w)}px`);
       root.style.width = width;
       const height = Math.max(0, Math.min(full, at.room));
@@ -120,9 +126,10 @@ export function PlateFrame({ title, sub, pips, head, footer, className = '', clo
       root.dataset.cramped = String(footerH > 0 && body < Math.min(CRAMPED_BODY, contentH));
       root.style.left = `${Math.round(at.x)}px`;
       // Above its part, the plate's foot sits 8 px over the part.
-      root.style.top = `${Math.round(a && at.y + at.h <= a.y ? Math.max(safe.y, a.y - 8 - height) : at.y)}px`;
+      const top = !covers && a && at.y + at.h <= a.y ? a.y - 8 - height : at.y;
+      root.style.top = `${Math.round(Math.max(safe.y, Math.min(safe.y + safe.h - height, top)))}px`;
       root.dataset.anchored = String(Boolean(a));
-      const under = !!tip && !!a && at.y >= a.y + a.h;
+      const under = !covers && !!tip && !!a && at.y >= a.y + a.h;
       root.dataset.tip = under ? 'up' : 'none';
       if (under) root.style.setProperty('--tip-x', `${Math.round(Math.max(16, Math.min(at.w - 16, a!.x + a!.w / 2 - at.x)))}px`);
       more();
@@ -136,6 +143,9 @@ export function PlateFrame({ title, sub, pips, head, footer, className = '', clo
     position();
     const observer = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(position);
     observer?.observe(root);
+    // The body keeps its size while open, so changes inside it need their own overflow check.
+    const changes = new MutationObserver(more);
+    changes.observe(content, { childList: true, subtree: true, characterData: true, attributes: true });
     const resize = () => {
       held = false; stable = 0; lastAnchor = '';
       root.style.width = ''; root.style.height = ''; delete root.dataset.held;
@@ -144,7 +154,7 @@ export function PlateFrame({ title, sub, pips, head, footer, className = '', clo
     window.addEventListener('resize', resize);
     const stop = subscribeFrame?.(position);
     observer?.observe(content);
-    return () => { stop?.(); observer?.disconnect(); window.removeEventListener('resize', resize); content.removeEventListener('scroll', more); root.removeEventListener('scroll', more); };
+    return () => { stop?.(); observer?.disconnect(); changes.disconnect(); window.removeEventListener('resize', resize); content.removeEventListener('scroll', more); root.removeEventListener('scroll', more); };
   }, [bounds, readAnchor, subscribeFrame, pinTop, beside, tip, spill]);
 
   const body = <>

@@ -1,4 +1,4 @@
-import { amount, amountCompare, ZERO_AMOUNT, type Amount } from '../amount';
+import { amountCompare } from '../amount';
 import { effectText, RESEARCH, researchDef } from '../build/research/tree';
 import { G } from '../core/buffers';
 import { MODE } from '../core/timers';
@@ -14,6 +14,8 @@ import { researchPartSpecs } from './researchSpecs';
 import { researchCreditsPerMinute, researchLenders } from './lenders';
 import { answerTypes } from '../market/taskTypes';
 import { DVFS_CLOCK } from '../phys/constants';
+import { researchCosts } from '../rewards/research';
+import { roundRewardBonuses } from '../rewards/bonuses';
 
 /** The trailing window of the recent income rate (round time). */
 const RECENT_MS = 30_000;
@@ -159,14 +161,6 @@ export function nodeState(r: ResearchState, done: ReadonlySet<string>, def: Rese
   return def.requires.every((p) => done.has(p)) ? 'available' : 'locked';
 }
 
-/** Data costs are static: one Amount per node, built once. */
-const DATA_COST = new Map<string, Amount>();
-const dataCost = (def: ResearchDef): Amount => {
-  let v = DATA_COST.get(def.id);
-  if (v === undefined) { v = amount(def.data); DATA_COST.set(def.id, v); }
-  return v;
-};
-
 const LEVEL_ORDER: readonly LevelId[] = ['chip', 'system', 'rack', 'room', 'global'];
 /** Highest opened level. */
 export const researchHorizon = (state: GameState): LevelId =>
@@ -186,13 +180,13 @@ export function researchTree(state: GameState, at: NodeRef | null = null): Resea
   for (const def of RESEARCH) {
     if (!def.implemented) continue;
     if (def.purchase && def.purchase.level !== Math.min(def.purchase.maxLevel, (levels.get(def.purchase.series) ?? 0) + 1)) continue;
-    const st = nodeState(r, done, def);
+    const rewardMilestone = def.rewardMilestone && !state.roundRewards.claimed.includes(def.rewardMilestone) ? def.rewardMilestone : null;
+    const st = rewardMilestone && !done.has(def.id) ? 'locked' : nodeState(r, done, def);
     const ops = st === 'active' ? r.activeProgress : st === 'parked' ? (r.parked[def.id] ?? 0) : st === 'done' ? def.work : 0;
-    const cost = dataCost(def);
-    const creditCost = def.creditCost ?? ZERO_AMOUNT;
+    const costs = researchCosts(def, state.roundRewards), cost = costs.data, creditCost = costs.credits;
     const feePending = st === 'available' || st === 'queued' || st === 'locked';
     nodes.push({
-      id: def.id, name: def.name, category: def.category, state: st, progress: progressOf(def, ops), purchase: def.purchase,
+      id: def.id, name: def.name, category: def.category, state: st, progress: progressOf(def, ops), purchase: def.purchase, rewardMilestone,
       dataCost: cost, workOps: def.work, requires: def.requires,
       requiredResearch: def.requires.filter(id => !done.has(id)).map(id => {
         const required = researchDef(id)!;
@@ -209,7 +203,7 @@ export function researchTree(state: GameState, at: NodeRef | null = null): Resea
       ...researchRoot(def.id), change: researchChange(state, def),
     });
   }
-  const slots = r.unlocks.ceilings.researchQueue;
+  const slots = r.unlocks.ceilings.researchQueue + roundRewardBonuses(state.roundRewards.claimed).researchSlots;
   return {
     nodes, parts: researchPartSpecs(state, at), income: recentIncome(state), active: r.active, opsPerSec: researchOpsPerSec(state), holdOpsPerSec: holdOpsPerSec(state), takenOpsPerSec: takenOpsPerSec(state), queue: r.queue,
     ...modeRates(state), queueSlots: slots > 1 ? slots : 0, horizon: researchHorizon(state),

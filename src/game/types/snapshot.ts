@@ -1,8 +1,9 @@
 import type { Amount } from '../amount';
 import type { BoardKind } from './build';
+import type { QueueOptimization } from './build';
 import type { QueueStrategyId, RegionId } from './catalog';
 import type { FailCause, FailCounts, FailDetail, GameEvent } from './events';
-import type { LevelId, NodeRef, RackId, ResearchId, RoomId, SiteId, SystemId } from './ids';
+import type { FamilyId, LevelId, NodeRef, RackId, ResearchId, RoomId, SiteId, SystemId } from './ids';
 import type { RoundReport } from './report';
 import type { FrontierView } from './frontier';
 import type { RoundPhase } from './state';
@@ -158,7 +159,7 @@ export interface CoreView {
   readonly taskId: number | null;
   readonly family: number | null;
   /** CPU work on this core; null while it has no CPU-stage task. */
-  readonly activity: 'cacheLoad' | 'cacheAccess' | 'compute' | null;
+  readonly activity: 'cacheLoad' | 'cacheAccess' | 'compute' | 'preload' | null;
   readonly progress: number;
   readonly threads: number;
   /** D25: the shard index of that task (null when idle); cores with equal taskId and shard run one shard. */
@@ -171,6 +172,11 @@ export interface CoreView {
 export interface SchedulerView {
   readonly generation: number; readonly level: number; readonly strategy: QueueStrategyId;
   readonly q: number; readonly queued: number; readonly k: number; readonly running: number; readonly reserved: number;
+  readonly optimization?: QueueOptimization;
+  readonly batching?: boolean;
+  readonly preparation?: { readonly taskId: number; readonly family: FamilyId; readonly loadedBits: number; readonly targetBits: number;
+    readonly requiredCores: number; readonly availableCores: number; readonly active: boolean } | null;
+  readonly batchSavedBits?: number;
 }
 export interface ChipSnapshot {
   readonly level: 'chip';

@@ -1,5 +1,6 @@
 import type { CSSProperties, ReactNode } from 'react';
 import type { FilterId, LbView, Quote, RouteStrategyId, ScopeRef } from '../../game';
+import { ROUTER_QUEUE_MAX } from '../../game';
 import { typeColor, typeOf } from '../../render/core';
 import { useWindowLeft } from '../hooks/headClock';
 import { clockText } from '../hooks/format';
@@ -19,7 +20,7 @@ export interface LbBodyProps extends Pick<PlateCommon, 'quotes' | 'onAction' | '
 }
 
 /** The router queue's ladder top (D25.7). */
-export const QUEUE_MAX = 32;
+export const QUEUE_MAX = ROUTER_QUEUE_MAX;
 
 const lockText = (q: Quote | undefined) => (q?.locked ? q.locked.text : null);
 

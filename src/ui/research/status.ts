@@ -19,6 +19,7 @@ export interface LineState {
 export const NO_LINE: LineState = { id: null, name: '', running: false, stopped: false, progress: 0, opsPerSec: 0 };
 
 export type NodeStatus =
+  | { readonly kind: 'milestone'; readonly count: number }
   | { readonly kind: 'done' }
   | { readonly kind: 'running' | 'next' | 'stopped' | 'paused'; readonly progress: number }
   | { readonly kind: 'queued' }
@@ -52,6 +53,7 @@ export function firstStep(n: ResearchNodeView, byId: StatusContext['byId'], seen
 }
 
 export function nodeStatus(n: ResearchNodeView, c: StatusContext): NodeStatus {
+  if (n.rewardMilestone && n.state !== 'done') return { kind: 'milestone', count: n.rewardMilestone };
   switch (n.state) {
     case 'done': return { kind: 'done' };
     case 'active': return { kind: c.line.stopped ? 'stopped' : c.line.running ? 'running' : 'next', progress: n.progress };
@@ -76,6 +78,7 @@ const nameOf = (id: ResearchId, byId: StatusContext['byId']) => byId.get(id)?.na
 /** The row's status word. */
 export function statusText(s: NodeStatus, byId: StatusContext['byId']): string {
   switch (s.kind) {
+    case 'milestone': return `Claim the ${wholeText(s.count)}-task reward`;
     case 'done': return 'Done';
     case 'running': return `Running ${pct(s.progress)}`;
     case 'next': return 'Next in line';
@@ -115,6 +118,7 @@ export function keyFor(n: ResearchNodeView, s: NodeStatus, c: KeyContext): KeyMo
   const pause = { label: 'Pause', action: { type: 'cancelResearch' } as const };
   const other = c.line.id && c.line.id !== n.id ? c.line.name : null;
   switch (s.kind) {
+    case 'milestone': return key(`Claim ${wholeText(s.count)}-task reward`, 'off');
     case 'done': return key('Done', 'off');
     case 'running': {
       return key(`Running ${pct(s.progress)}`, 'run', { progress: s.progress, aside: pause });

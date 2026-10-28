@@ -31,7 +31,7 @@ export function researchRateOf(w: World, s: number, _share: number): number {
   const c = w.compiled.sys, h = w.hot.sys;
   const threads = hwThreads(w, s);
   const held = h.researchThreads[s]!;
-  let working = held;
+  let working = held + activeLoaders(w, s);
   const rec = w.hot.rec;
   for (let r = h.head[s * 4]!; r >= 0; r = rec.next[r]!) working += rec.count[r]! * rec.threads[r]!;
   h.busy[s] = threads > 0 ? (Math.min(threads, working) / threads) * c.cores[s]! : 0;
@@ -43,3 +43,4 @@ export function researchRateOf(w: World, s: number, _share: number): number {
 
 /** Accelerators never research under D27: the work is compute. */
 export const acceleratorResearchOn = (_w: World, _s: number): boolean => false;
+import { activeLoaders } from './preloadState';

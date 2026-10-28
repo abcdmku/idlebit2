@@ -16,6 +16,7 @@ import { coreOccupancy } from './common';
 import { spilledOutOfCache } from './memory';
 import { PART_LOAD_CACHE } from '../exec/memory';
 import { FAMILIES } from '../market/families';
+import { preloadForRecord, preloadView } from './preload';
 
 const cstateOf = (v: number | undefined): CoreView['cstate'] => v === 1 ? 1 : 0;
 const genOpen = (state: GameState, part: PartId, gen = 0): boolean => ((state.research.unlocks.gens[part] ?? 0) & (1 << gen)) !== 0;
@@ -90,6 +91,19 @@ export function chipSnapshot(state: GameState, id: SystemId, parent: NodeRef | n
   const prog = new Float64Array(nCores);
   const activity: CoreView['activity'][] = Array(nCores).fill(null);
   const shardIx = new Int32Array(nCores).fill(-1), group = new Int32Array(nCores);
+  let loadedBits = 0;
+  const preparation = preloadView(state, id);
+  for (let q = h.queueHead[id] ?? -1; q >= 0; q = rec.next[q] ?? -1) {
+    const prepared = preloadForRecord(state, id, q);
+    if (!prepared) continue;
+    loadedBits += prepared.loadedBits;
+    const core = rec.loaderThread[q] ?? -1;
+    if (core >= 0 && core < nCores) {
+      fam[core] = rec.family[q]!; taskIds[core] = rec.taskId[q]!; activity[core] = 'preload';
+      prog[core] = prepared.targetBits > 0 ? prepared.loadedBits / prepared.targetBits : 1; group[core] = 1;
+    }
+  }
+  loadedBits += h.residentBits[id] ?? 0;
   const rack = c.rack[id] ?? 0;
   const show = (r: number, core: number, held: number) => {
     fam[core] = rec.family[r] ?? 0; taskIds[core] = rec.taskId[r]!; prog[core] = stageProgress(state.hot, state.clock.tick, r, rack, id, 0);
@@ -98,10 +112,10 @@ export function chipSnapshot(state: GameState, id: SystemId, parent: NodeRef | n
     shardIx[core] = shardOf(state.hot, r).shard; group[core] = held;
   };
   const unbound: number[] = [];
-  let loadedBits = 0;
   forEachRunning(state, id, (r, res) => {
     const loaded = rec.part[r] === PART_LOAD_CACHE ? stageProgress(state.hot, state.clock.tick, r, rack, id, 0) : 1;
-    loadedBits += (rec.memC[r] ?? 0) * (rec.count[r] ?? 1) * loaded;
+    const cached = rec.preloadDone[r] ?? 0;
+    loadedBits += (cached + Math.max(0, (rec.memC[r] ?? 0) - cached) * loaded) * (rec.count[r] ?? 1);
     if (res !== 0) return;
     const held = (rec.threads[r] ?? 1) * (rec.count[r] ?? 1), t0 = rec.thread0[r] ?? -1;
     if (t0 < 0) { unbound.push(r); return; }
@@ -139,6 +153,7 @@ export function chipSnapshot(state: GameState, id: SystemId, parent: NodeRef | n
   const scheduler: SchedulerView | null = sched ? {
     generation: sched.gen, level: sched.level, strategy: QUEUE_STRATEGY_IDS[c.strategy[id] ?? 0] ?? sched.strategy,
     q: c.Q[id] ?? 0, queued: h.queueLen[id] ?? 0, k: c.K[id] ?? 0, running: h.running[id] ?? 0, reserved: h.reserved[id] ?? 0,
+    optimization: sched.optimization ?? 'utilization', batching: sched.batching ?? false, preparation, batchSavedBits: h.batchSavedBits[id] ?? 0,
   } : null;
   const queued: number[] = [];
   if (scheduler) {
@@ -155,7 +170,9 @@ export function chipSnapshot(state: GameState, id: SystemId, parent: NodeRef | n
       loadedBits: Math.min(capacityBits, loadedBits / Math.max(1, cpus)),
       spilledOutBits: spilledOutOfCache(state, id),
     },
-    scheduler, queue: queued.slice(0, scheduler?.q ?? 0).map((r) => ({ taskId: rec.taskId[r]!, family: familyId(rec.family[r]!) })),
+    scheduler, queue: queued.slice(0, scheduler?.q ?? 0).map((r) => ({ taskId: rec.taskId[r]!, family: familyId(rec.family[r]!),
+      preloading: preparation?.taskId === rec.taskId[r]!,
+      preloadProgress: preparation?.taskId === rec.taskId[r]! && preparation.targetBits > 0 ? preparation.loadedBits / preparation.targetBits : 0 })),
     researchShare: share, slots: st.slots,
     pipe: {
       speed: c.pipeSpeed[id] ?? 0, transfer: inboundTransfer(state, id),

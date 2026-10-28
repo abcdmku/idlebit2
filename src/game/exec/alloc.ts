@@ -15,6 +15,7 @@ import { memberPayload, shapeOf, wantThreads, workingSetOf } from './shape';
 import { admittedOf, keffOf, noteAdmit, noteAdmitted, noteTake, queueCapped, reserve, slotsOf, takesLeft, canAdmit } from './slots';
 import { startRecord } from './stages';
 import { CAUSE, returnTask } from './outcome';
+import { releaseQueuedPreload } from './preload';
 
 /**
  * Allocation (spec §6.4, §6.5, §6.7 steps 1 and 3): before Rack the lone system takes the head
@@ -108,9 +109,10 @@ export function startQueued(w: World, s: number, tau: number, span: Span): numbe
     let k = Math.min(rec.count[r]!, keff - h.running[s]!);
     if (!strategy.timeSlice) k = Math.min(k, Math.floor(freeThreads / perTask));
     // D26.1: the free hierarchy (cache + RAM + disk) must hold the working set; it is placed at start.
-    if (ws > 0) k = Math.min(k, Math.floor(freeHierarchy(w, s) / ws));
+    const needed = Math.max(0, ws - rec.preloadBits[r]!);
+    if (needed > 0) k = Math.min(k, Math.floor(freeHierarchy(w, s) / needed));
     if (k <= 0) break;
-    const choice = chooseAccel(w.compiled, w.hot, s, accelNeed(shape.def, rec.units[r]!), k, unifiedRoom(w, s, ws));
+    const choice = chooseAccel(w.compiled, w.hot, s, accelNeed(shape.def, rec.units[r]!), k, unifiedRoom(w, s, needed));
     if (!choice) break;
     k = choice.take;
     if (k < rec.count[r]!) queueInsertAfter(w.hot, s, r, splitRecord(w.hot, r, rec.count[r]! - k));
@@ -133,6 +135,7 @@ export function drainQueue(w: World, s: number): void {
   for (let r = h.queueHead[s]!; r >= 0; r = h.queueHead[s]!) {
     if (rec.parent[r]! >= 0) { returnTask(w, r, CAUSE.swap); continue; }
     const k = rec.count[r]!;
+    releaseQueuedPreload(w, s, r);
     queueUnlink(w.hot, s, r);
     h.queueLen[s] = h.queueLen[s]! - k;
     w.hot.g[G.queued] = w.hot.g[G.queued]! - k;

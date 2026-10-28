@@ -95,6 +95,8 @@ function Wallet() {
  */
 function Sla() {
   const L = useLayout(), d = L.kind === 'desktop', n = L.N;
+  const shell = useShell();
+  const rewards = useGameSelector(() => shell.store.getState().roundRewards.pending.length, Object.is, 100);
   const g = useGameSelector(s => ({ phase: s.round.state, percent: s.hud.sla.percent, met: s.hud.sla.met, failed: s.hud.sla.failed,
     checking: s.hud.sla.checking, round: s.hud.roundIndex, seconds: Math.floor(s.hud.roundElapsedMs / 1000) }), shallowEqual, 250);
   const tone = !g.checking ? 'mute' : g.percent >= 90 ? 'ok' : g.percent >= 80 ? 'warn' : 'bad';
@@ -102,19 +104,26 @@ function Sla() {
   const when = g.phase === 'running' ? clockText(g.seconds * 1000) : g.phase === 'ended' ? 'over' : 'break';
   const counts = `${g.met} / ${g.met + g.failed}`, meterW = 32 * n;
   // Where the band is narrow (End round beside it), the meter gives way first; the percent carries the same reading.
-  const roomy = 2.2 * L.body + 3.4 * L.big + 3.6 * L.body + meterW + (d ? 7 : 2) * L.body + 4 * 8 <= L.sla.w;
+  const roundW = (d ? 7 : 2) * L.body + 28;
+  const fixedW = 2.2 * L.body + 3.4 * L.big + roundW + 3 * 8;
+  const showCounts = fixedW + 3.6 * L.body + 8 <= L.sla.w;
+  const roomy = fixedW + (showCounts ? 3.6 * L.body + 8 : 0) + meterW + 8 <= L.sla.w;
   // Reserved widths ("100.0%", "50 / 50", the meter, "R99 · 1:59:59"), so nothing moves while the numbers change.
   return <span className="figrow sla" role="status" aria-label={`SLA ${slaText(g.percent)}, ${counts} completed, round ${g.round}, ${when}`} data-testid="sla-gauge"
     title="Completed tasks out of the last 50 resolved. Below 80% ends the round after 10 tasks. Dismissals do not count."
     style={{ left: L.sla.x, top: L.sla.y, width: L.sla.w, height: d ? L.sla.h : 32, justifyContent: 'center' }}>
     <span className="mute">SLA</span>
     <b className={`fig big ${tone}`} data-testid="sla" style={{ minWidth: 3.4 * L.big, textAlign: 'right' }}>{slaText(g.percent)}</b>
-    <span className="mute" data-testid="sla-counts" style={{ minWidth: 3.6 * L.body, textAlign: 'center' }}>{counts}</span>
+    {showCounts && <span className="mute" data-testid="sla-counts" style={{ minWidth: 3.6 * L.body, textAlign: 'center' }}>{counts}</span>}
     {!roomy ? null : g.checking
       ? <i className="g-meter hud-meter" data-free="art" aria-hidden="true" title="80% ends the round" style={{ flex: 'none', width: meterW, height: 2 * n }}>
         <b style={{ width: `${slaFill(g.percent).toFixed(1)}%` }} /><em style={{ top: -n, height: 4 * n, width: n }} /></i>
       : <span className="dim" data-testid="sla-warming" style={{ width: meterW, textAlign: 'center' }} title="The 80% floor applies after 10 tasks">warming up</span>}
-    <span className="dim" data-testid="round" style={{ width: d ? 7 * L.body : 2 * L.body }}>{d ? `R${g.round} · ${when}` : `R${g.round}`}</span>
+    <button type="button" className="round-rewards-key" data-testid="round-rewards-key" style={{ width: roundW }}
+      aria-label={`Round ${g.round}, ${rewards} rewards ready. Open round rewards.`} onClick={() => shell.view.dispatch({ type: 'openRoundRewards' })}>
+      <span data-testid="round">{d ? `R${g.round} · ${when}` : `R${g.round}`}</span>
+      <b className={`round-rewards-badge${rewards ? '' : ' empty'}`} data-testid="round-rewards-count">{rewards > 99 ? '99+' : rewards}</b>
+    </button>
   </span>;
 }
 

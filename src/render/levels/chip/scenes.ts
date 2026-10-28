@@ -53,7 +53,7 @@ export function chipScene(scene: CpuScene, simTimeMs = 2000): ChipSnapshot {
     cache: { capacityBits: bits, usedBits: boot ? 0 : max ? 2 ** 26 : 48, loadedBits: boot ? 0 : max ? 2 ** 26 : 48,
       spilledOutBits: 0, levels: [{ kind: 'l1', bits, generation: 0, level: 1 }] },
     queue: boot ? [] : Array.from({ length: max ? 20 : 2 }, (_, i) => ({ taskId: 400 + i, family: familyId([4, 0, 1, 3][i % 4]!) })),
-    scheduler: boot ? null : { generation: 0, level: 1, strategy: 'fifo', q: max ? 32 : 4, k: 2, queued: max ? 20 : 2, running: 2, reserved: 0 },
+    scheduler: boot ? null : { generation: 0, level: 1, strategy: 'fifo', q: max ? 8 : 4, k: 2, queued: max ? 8 : 2, running: 2, reserved: 0 },
     slots: boot ? [{ kind: 'core', index: 1, locked: true }, { kind: 'scheduler', index: 0, locked: true }]
       : grid ? Array.from({ length: grid - (ring ? 10 : 20) }, (_, i) => ({ kind: 'core' as const, index: (ring ? 10 : 20) + i, locked: true })) : [],
     psu: { kind: 'psu', generation: 0, level: 1, capacityW: 64, deliveredW: 0.65, usage: 0.01, overloadS: 0, failed: false,

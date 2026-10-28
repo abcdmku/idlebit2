@@ -75,7 +75,7 @@ export function commitBuild(state: GameState, change: BuildChange): ActionOutcom
     next = paid.state;
   }
   const build: BuildState = { ...change.build, revision: state.build.revision + 1 };
-  const compiled = compileAll(build, state.research);
+  const compiled = compileAll(build, state.research, state.roundRewards);
   const after: GameState = { ...next, build, compiled };
   const w = openWorld(after);
   syncHotSizes(w.hot, compiled);

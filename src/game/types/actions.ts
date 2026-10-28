@@ -1,4 +1,4 @@
-import type { BoardKind, StartOrder } from './build';
+import type { BoardKind, QueueOptimization, StartOrder } from './build';
 import type { FilterId, QueueStrategyId, RouteStrategyId } from './catalog';
 import type { PartRef, RackId, ResearchId, RoomId, ScopeRef, SwitchRef, SystemId, UnitKind, UnitRef } from './ids';
 import type { GameState, TaskRef } from './state';
@@ -21,6 +21,8 @@ export type GameAction =
   | { readonly type: 'returnToMarket' }
   | { readonly type: 'endRound' }
   | { readonly type: 'dismissReport' }
+  | { readonly type: 'claimRoundReward'; readonly milestone: number }
+  | { readonly type: 'setQueueLoaderLimit'; readonly system: SystemId; readonly limit: 1 | 2 | 4 }
   | { readonly type: 'dismissTask'; readonly task: TaskRef }
   | { readonly type: 'setAutoReturn'; readonly on: boolean }
   | { readonly type: 'setOnline'; readonly unit: UnitRef; readonly online: boolean }
@@ -47,6 +49,8 @@ export type GameAction =
   | { readonly type: 'addPorts'; readonly sw: SwitchRef }
   | { readonly type: 'addUplink'; readonly sw: SwitchRef }
   | { readonly type: 'setStrategy'; readonly unit: ScopeRef; readonly strategy: QueueStrategyId | RouteStrategyId }
+  | { readonly type: 'setQueueOptimization'; readonly system: SystemId; readonly optimization: QueueOptimization }
+  | { readonly type: 'setQueueBatching'; readonly system: SystemId; readonly on: boolean }
   | { readonly type: 'setFilter'; readonly unit: ScopeRef; readonly filter: FilterId; readonly on: boolean }
   /** D31.2: a start controller's configuration (hot), validated against the part's generation. Rack, room or global. */
   | { readonly type: 'setStartConfig'; readonly unit: ScopeRef; readonly startWith: number; readonly headWaitS: number; readonly busyPct: number | null; readonly order: StartOrder }

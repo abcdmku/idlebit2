@@ -117,6 +117,8 @@ export function compileSystem(c: CompiledBuffers, build: SystemBuild, u: Unlocks
   const keff = !server ? 0 : strategy === 'timeSlice' && sched ? 2 * Math.max(K, threads) : hasRule(u, 'dma') ? Math.max(K, threads) : Math.max(1, threads);
   s.K[i] = K; s.Q[i] = server ? Q : 0; s.keff[i] = keff; s.slots[i] = server ? keff + Q : 0;
   s.strategy[i] = QUEUE_STRATEGY_IDS.indexOf(strategy);
+  s.queuePreload[i] = sched?.optimization === 'preload' ? 1 : 0;
+  s.queueBatching[i] = sched?.batching ? 1 : 0;
   if (sched) {
     uncoreIdle += partWatts(PARTS.scheduler, sched.gen, sched.level).idle;
   }

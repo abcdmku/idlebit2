@@ -60,9 +60,11 @@ b, .b { font-weight: 700; }
 .rim-fill[data-tone="warn"] { background: var(--warn); } .rim-fill[data-tone="bad"] { background: #ff3b3b; }
 .rim-fill[data-tone="rnd"] { background: #ff6bd6; }
 
-/* the queue strip: five fixed frames (the next 4 abut, dividers on the lattice), each holding its task;
-   cards update in place (user, 25 Oct: no sliding). */
-.slots { position: absolute; }
+/* The head stays fixed; incoming cards slide only with user input and update in place as work advances. */
+.slots { position: absolute; overflow-x: auto; overflow-y: hidden; scrollbar-width: none; touch-action: pan-x;
+  overscroll-behavior-x: contain; cursor: grab; }
+.slots::-webkit-scrollbar { display: none; }
+.slots[data-dragging] { cursor: grabbing; }
 .slot { position: absolute; }
 .slot + .slot { box-shadow: inset var(--n) 0 0 0 var(--ink), inset calc(2 * var(--n)) 0 0 0 #2a2350; }
 .tag { position: absolute; pointer-events: auto; }

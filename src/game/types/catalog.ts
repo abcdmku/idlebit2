@@ -82,7 +82,7 @@ export interface FamilyDef {
   readonly name: string;
   readonly band: BandId;
   readonly note: string;
-  /** Intensity window [from, to) in which the family is in the mix. */
+  /** Main intensity interval; after `to`, the family remains occasional smaller work. */
   readonly window: { readonly from: number; readonly to: number };
   readonly weight: number;
   /** Per unit of size, run in order: a shard of u units has stage work perSize × u (D25.1). */
@@ -110,7 +110,7 @@ export interface FamilyDef {
   readonly affinity: 'general' | 'accelerator';
   /** Credits per Data, 10 to 100 (D3.2). Jittered per round by the market. */
   readonly dataRatio: number;
-  /** D26.5 completion window in seconds from take, before size jitter; null before rackDist. */
+  /** D26.5 completion window in seconds from take, before deadline jitter; null before rackDist. */
   readonly windowS: number | null;
 }
 
@@ -150,6 +150,8 @@ export type ResearchEffect =
 export type AnswerCode =
   | BandId | 'pickup' | 'misroute' | 'gate' | 'overload' | 'heat' | 'energy' | 'transfer' | 'downtime' | 'density' | 'idle';
 export interface ResearchDef {
+  /** Claim this completed-task milestone before this optional blueprint can be researched. */
+  readonly rewardMilestone?: number;
   /** Repeated efficiency purchases apply immediately, without occupying the research processor. */
   readonly purchase?: { readonly series: 'cstate' | 'memoryVoltage' | 'bootLoader'; readonly level: number; readonly maxLevel: number };
   /** D32: whole Credits paid once when research starts, 10 × the node's price. */

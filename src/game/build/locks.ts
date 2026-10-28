@@ -4,6 +4,7 @@ import type { Unlocks } from '../types/state';
 import { isLadder, LADDERS, levelMax, PARTS, type LeveledPartId } from './catalog';
 import { genUnlocked, hasRule } from './research/unlocks';
 import { nodeForCeiling, nodeForGen, nodeForOption, nodeForRule } from './research/tree';
+import { MAX_SCHED_K, MAX_SCHED_Q } from '../core/constants';
 
 /** Lock reasons name the first missing research node (spec §13.3), e.g. "Needs Rear-door water". */
 const needs = (node: { id: LockReason['node'] & string; name: string } | null, fallback: string): LockReason =>
@@ -36,7 +37,7 @@ export function maxLevel(u: Unlocks, part: LeveledPartId, g: number, ecc = false
   const row = PARTS[part];
   const bonus = part === 'ram' && ecc ? u.ceilings.ramLevelBonus : part === 'l3' ? u.ceilings.l3LevelBonus : 0;
   let top = levelMax(row, g, bonus);
-  if (part === 'scheduler') top = Math.min(top, Math.floor(32 / row.base[g]!), Math.floor(32 / (row.base2?.[g] ?? 1)));
+  if (part === 'scheduler') top = Math.min(top, Math.floor(MAX_SCHED_K / row.base[g]!), Math.ceil(MAX_SCHED_Q / (row.base2?.[g] ?? 1)));
   return top;
 }
 

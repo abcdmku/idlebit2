@@ -14,7 +14,7 @@ import { hasRule, ruleParam } from './research/unlocks';
  *   leak         rack 0.1 × the roomLeak factor (hotColdAisle 0.6, containment 0.5); room 0.1
  *   *CapW, *Loss supply capacity W and final loss fraction (lossPerLevel folded in)
  *   lbStrategy   index in ROUTE_STRATEGY_IDS; lbFilters bit mask (no routing capacity, D12.5)
- *   lbQueueSlots the router queue's level L, 1–32 (D25.7)
+ *   lbQueueSlots the router queue's level L, 1–8
  *   ports, uplinks  switch counts; 0 for a hidden container (no network before its level opens)
  *   dpSpeed, dpLatencyTicks  data plane k → bit/s; generation latency in whole ticks
  */

@@ -165,7 +165,7 @@ export function RoundPlate() {
   const shell = useShell(), view = useViewState();
   const r = useGameSelector(s => (s.round.state === 'ended' && s.round.lastReport ? s.round.lastReport : null));
   // A round may end while Settings is open; show its report after the player closes Settings.
-  if (!r || view.sheet === 'settings') return null;
+  if (!r || view.sheet === 'settings' || view.sheet === 'roundRewards') return null;
   return <RoundReportPlate report={r}
     onReturn={() => returnToMarket(shell)} onClose={() => shell.dispatch({ type: 'dismissReport' })} />;
 }

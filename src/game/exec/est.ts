@@ -87,7 +87,12 @@ export function startable(w: World, s: number, r: number, timeSlice: boolean): b
   const h = w.hot.sys;
   if (!timeSlice && h.busyThreads[s]! >= hwThreads(w, s)) return false;
   const shape = shapeOf(w.hot.rec.family[r]!), size = w.hot.rec.units[r]!;
+  if (!timeSlice && w.compiled.sys.queuePreload[s] === 1) {
+    if (w.hot.rec.loaderThread[r]! >= 0) return false;
+    if (hwThreads(w, s) - h.busyThreads[s]! < Math.min(hwThreads(w, s), wantThreads(shape, size))) return false;
+  }
   const ws = workingSetOf(shape, size);
-  if (ws > freeHierarchy(w, s)) return false;
-  return chooseAccel(w.compiled, w.hot, s, accelNeed(shape.def, size), 1, unifiedRoomOf(w, s, ws)) !== null;
+  const needed = Math.max(0, ws - w.hot.rec.preloadBits[r]!);
+  if (needed > freeHierarchy(w, s)) return false;
+  return chooseAccel(w.compiled, w.hot, s, accelNeed(shape.def, size), 1, unifiedRoomOf(w, s, needed)) !== null;
 }

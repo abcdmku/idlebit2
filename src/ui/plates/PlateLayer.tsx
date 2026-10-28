@@ -15,6 +15,7 @@ import { SystemPower } from './SystemPower';
 import { NetworkRackPlate } from './NetworkRackPlate';
 import { CoresPlate } from './CoresPlate';
 import { PartPlate } from './PartPlate';
+import { QueuePlate } from './QueuePlate';
 import { LinkPlate } from './LinkPlate';
 import { BoardPartPlate } from './BoardPartPlate';
 import { GpuPlate } from './GpuPlate';
@@ -162,12 +163,13 @@ export function plateArea(layout: ShellLayout, bounds: Rect | null): Rect | null
 }
 
 /**
- * Where a phone plate may spill to fit its contents: first over the strip and the deck, then over the HUD too.
+ * Where a plate may spill to fit its contents: first over the strip and the deck, then over the HUD too.
  * A plate that fits keeps `plateArea`.
  */
 export function plateSpill(layout: ShellLayout, area: Rect | null): Rect[] | null {
-  if (!area || layout.kind !== 'phone') return null;
-  const landscape = layout.w >= 640 && layout.h < 480, x = landscape ? 8 : area.x, w = landscape ? layout.w - 16 : area.w;
+  if (!area) return null;
+  const wide = layout.kind === 'desktop' || (layout.w >= 640 && layout.h < 480);
+  const x = wide ? 8 : area.x, w = wide ? layout.w - 16 : area.w;
   const all = { x, y: 8, w, h: layout.h - 16 };
   const top = layout.band.y + layout.band.h + 8;
   return area.y > top ? [{ x, y: top, w, h: layout.h - 8 - top }, all] : [all];
@@ -315,6 +317,10 @@ function TargetPlate({ target: t, focus }: { target: HitTarget; focus: LevelSnap
       const chip = { level: 'chip', id: focus.systemId } as const;
       return <BoardPartPlate {...common} quotes={quotes} slot={s.kind} part={t.part} focus={focus} facts={facts} unblocks={unblocks} unblock={unblock}
         onOpenCpu={s.kind === 'cpu' ? () => view.dispatch({ type: 'drill', ref: chip }) : undefined} />;
+    }
+    if (s.kind === 'scheduler' && (focus.level === 'chip' || focus.level === 'system')) {
+      const scheduler = focus.level === 'chip' ? focus.scheduler : focus.chip.scheduler;
+      if (scheduler) return <QueuePlate {...common} quotes={quotes} system={focus.systemId} view={scheduler} />;
     }
     if (facts) return <PartPlate {...common} quotes={quotes} {...facts} compactStatus={s.kind === 'cpu'} unblocks={unblocks} unblock={unblock}>
       {s.kind === 'dataPlane' && siteRouter && lbUnit && <section className="site-routing"><p className="cfg-lab">Routing</p><LbBody unit={lbUnit} view={siteRouter} child="zone"

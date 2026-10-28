@@ -1,11 +1,9 @@
-import { useContext, type ReactNode } from 'react';
+import { type ReactNode } from 'react';
 import { PlateFrame } from './PlateFrame';
-import { PartKeys, partMain, samePurchase } from './PartKeys';
-import { MeetKey } from '../queue/MeetKey';
+import { PartKeys, partMain } from './PartKeys';
 import type { Quote } from '../../game';
 import { Lines, Status, type Line, type Tone } from './widgets';
 import type { PlateCommon } from './types';
-import { LayoutContext } from '../shell/geometry';
 
 export interface PartPlateProps extends PlateCommon {
   title: string;
@@ -34,17 +32,14 @@ export interface PartPlateProps extends PlateCommon {
 export function PartPlate({ title, sub, level, pips, status, statusTone = '', progress, lines = [], lineSlots = 0,
   className = '', children, beforeKeys = false, compactStatus = false, quotes, onAction, onResearch, researchName, unblocks, unblock, ...frame }: PartPlateProps) {
   const keys = { quotes, level, onAction, onResearch, researchName, unblocks, eccPriority: unblock?.action.type === 'convertRamToEcc' };
-  const n = useContext(LayoutContext)?.N ?? 2;
   const main = partMain(quotes?.quotes ?? [], level, keys.eccPriority);
-  const meet = unblock && unblock.action.type !== 'convertRamToEcc' ? unblock : null;
   // The main option and its consequence (effect, downtime, supply warning and fix) stay pinned with its key, so the
   // key never shows without what it does; the other options and details scroll above it.
   return <PlateFrame {...frame} title={title} sub={compactStatus ? `${sub} · ${status}` : sub} pips={pips} className={`part ${className}`}
-    footer={main && !samePurchase(main.quote, meet) && <PartKeys {...keys} part="primary" />}>
+    footer={main && <PartKeys {...keys} part="primary" />}>
     {!compactStatus && <Status text={status} tone={statusTone} progress={progress} />}
     <Lines lines={lines} slots={lineSlots} />
     {beforeKeys && children}
-    {meet && <div className="keys"><MeetKey quote={meet} n={n} onAction={onAction} onResearch={onResearch} researchName={researchName} /></div>}
     <PartKeys {...keys} part="rest" />
     {!beforeKeys && children}
   </PlateFrame>;
