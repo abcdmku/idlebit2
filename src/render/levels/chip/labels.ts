@@ -15,12 +15,6 @@ import { coreActivityText, coreActivityTone, coreSleep, labelFits, readySpeedTex
 import { chipFloor, isLive, lentCore, queueOpen, siteCount, spilledOut } from './world';
 
 const LEVEL_NAMES: Readonly<Record<'l1' | 'l2' | 'l3', string>> = { l1: 'L1', l2: 'L2', l3: 'L3' };
-/** Speed and activity, centred in the space above the 8-art gauge. A line is 8 art px at both rest scales. */
-function gridTextY(r: { y: number; h: number }): readonly [number, number] {
-  const line = 8, start = Math.max(0, Math.round((r.h - 8 - line * 2) / 2 / 4) * 4);
-  const first = r.y + start + line / 2;
-  return [first, first + line];
-}
 const CORE_NAMES = Array.from({ length: 32 }, (_, i) => `Core ${i + 1}`);
 const LABEL_IDS = Array.from({ length: 32 }, (_, i) => `core${i}`);
 /** The add-core quote among the tray quotes the UI holds: its price text and whether it is affordable now, or null. */
@@ -72,9 +66,8 @@ export function chipLabels(chip: ChipSnapshot, frame: WorldFrame, out: LabelWrit
     for (let i = 0; i < Math.min(sites.length, chip.cores.length); i++) {
       const r = sites[i]!, core = chip.cores[i]!;
       if (!tileLabelFits(core, r, frame)) continue;
-      const [speedY, activityY] = gridTextY(r);
-      out.label(LABEL_IDS[i]!, r.x + r.w / 2, speedY, 'center').text(readySpeedText(core, chip, live), coreSleep(core) || !live ? 'dim' : 'value');
-      if (live) out.label(`${LABEL_IDS[i]}a`, r.x + r.w / 2, activityY, 'center')
+      out.label(LABEL_IDS[i]!, r.x + r.w / 2, r.y + 2, 'center').text(readySpeedText(core, chip, live), coreSleep(core) || !live ? 'dim' : 'value');
+      if (live) out.label(`${LABEL_IDS[i]}a`, r.x + r.w / 2, r.y + 10, 'center')
         .text(coreActivityText(core, true), coreActivityTone(core));
     }
     return;
