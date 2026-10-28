@@ -1453,6 +1453,8 @@ All randomness goes through `src/game/core/rng.ts` with its state threaded expli
 
 The mockups decide the look. This section lists only the data each surface needs from the sim, through `RenderSnapshot` and plate selectors. Every light and animation is driven by one of these values at its real rate.
 
+The read-only `?rescue` entry bypasses the game runtime and downloads the original stored save envelope without parsing or simulating it. It never writes, clears or resets the player's saved progress (D60).
+
 ### 16.1 HUD
 
 Core and component progress bars fill from 0% at the start to 100% at completion, using measured stage progress. CPU miniatures follow the same direction. Research uses the same close-button appearance and 44 px target as the other popups.

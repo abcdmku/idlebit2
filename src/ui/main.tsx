@@ -4,7 +4,11 @@ import { installBootBridge } from '../dev/boot';
 import type { LiveBridge } from '../dev/bridge';
 
 const early = import.meta.env.DEV ? installBootBridge<LiveBridge>() : null;
-import('./App').then(({ boot }) => boot()).catch((error: unknown) => {
+// Recovery must work even when loading or advancing the saved game would hang.
+const boot = new URLSearchParams(window.location.search).has('rescue')
+  ? import('./recovery/SaveRecovery').then(({ bootRecovery }) => bootRecovery())
+  : import('./App').then(({ boot }) => boot());
+boot.catch((error: unknown) => {
   early?.failBoot(error);
   console.error(error);
 });

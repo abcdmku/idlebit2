@@ -1,0 +1,11 @@
+html,body,#root { margin:0; min-height:100%; background:#0e0b1c; }
+.save-recovery { min-height:100dvh; display:grid; align-items:center; box-sizing:border-box;
+  padding:max(24px,env(safe-area-inset-top)) max(16px,env(safe-area-inset-right)) max(24px,env(safe-area-inset-bottom)) max(16px,env(safe-area-inset-left));
+  background:var(--ink); color:var(--paper); font-family:var(--font); font-weight:500; line-height:1.6; }
+.save-recovery>section { width:100%; max-width:400px; margin:auto; }
+.save-recovery h1 { font-size:18px; margin:0 0 16px; }
+.save-recovery p { margin:0 0 16px; }
+.save-recovery button { width:100%; min-height:48px; padding:12px 16px; border:2px solid var(--cyan);
+  background:var(--panel); color:var(--paper); font:inherit; cursor:pointer; }
+.save-recovery button:focus-visible { outline:2px solid var(--focus); outline-offset:4px; }
+.save-recovery .recovery-status { min-height:24px; margin-top:16px; color:var(--cyan); }
