@@ -29,6 +29,8 @@ export function advanceGame(state: GameState, elapsedMs: number): AdvanceResult;
 - Player actions apply between ticks. An action dispatched mid-carry takes effect at the start of the next tick.
 - `state.clock.tick` is the canonical time (`simTimeMs = tick × 100 + carryMs`). The store's publish revision is store metadata, not game state, as in v2.
 
+The foreground runtime passes at most 100 ms of simulation time per main-thread advance, including save and departure boundaries. Excess time stays owed. A visible stall over 2 s uses worker catch-up; an action or pause with more than one tick owed also settles through that path. Dispatch rechecks catch-up before applying an action, and queued replay does not run the foreground boundary again. Save timestamps represent confirmed simulation state. Pausing during a pending worker result does not move that checkpoint into the future. Unhandled foreground simulation errors stop scheduling and saving, reject further live actions and ask the player to reload the last save. This bounds catch-up work per call; it does not preempt an individual tick.
+
 **Quiescent skip.** If the round is not running, no research runs, no timer is pending, no task record exists and every thermal lump is settled, a tick changes nothing except `tick`. The loop then jumps straight to `min(target, nextWakeTick)`, where the next wake is, for example, auto-return. Settling is a spec rule: a lump within 0.05 °F of its equilibrium snaps to it. Every skipped tick would have been a no-op, so the skip keeps delta invariance. An absent player's paused hours cost O(1).
 
 ### 1.2 Tick phases

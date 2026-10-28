@@ -49,8 +49,8 @@ export interface RuntimeStore extends GameStore {
   setCatchUp(progress: CatchUpProgress | null): void;
   setOfflineReport(report: AdvanceReport | null): void;
   setNotice(notice: string | null): void;
-  /** Runs before every applied action, so the runtime can pass owed foreground time first. */
-  setActionBoundary(callback: (() => void) | null): void;
+  /** Settles a live dispatch before applying it; may start catch-up or return false after a fatal error. Queued replay skips it. */
+  setActionBoundary(callback: (() => boolean | void) | null): void;
   /** Notifies once, after the outermost batch. */
   batch<T>(operation: () => T): T;
   dispose(): void;
@@ -73,7 +73,7 @@ export function createGameStore(options: StoreOptions = {}): RuntimeStore {
   let snapshot: RenderSnapshot | null = null, stale = true;
   let lifecycle: Lifecycle = { hydrated: false, catchingUp: false, saveDriver: 'memory' };
   let catchUp: CatchUpProgress | null = null, offlineReport: AdvanceReport | null = null, notice: string | null = null;
-  let depth = 0, dirty = false, disposed = false, boundary: (() => void) | null = null;
+  let depth = 0, dirty = false, disposed = false, boundary: (() => boolean | void) | null = null;
   /**
    * True once `state` came from the store's own ticking advance, so no one else can hold its hot
    * buffers and the next advance may update them in place (decisions D9). A state handed in, or
@@ -89,7 +89,6 @@ export function createGameStore(options: StoreOptions = {}): RuntimeStore {
   };
   const changed = (rebuild: boolean) => { if (rebuild) stale = true; dirty = true; publish(); };
   const apply = (action: GameAction): ActionOutcome => {
-    boundary?.();
     const outcome = applyAction(state, action);
     if (outcome.ok) {
       state = outcome.state; owned = false;
@@ -114,8 +113,12 @@ export function createGameStore(options: StoreOptions = {}): RuntimeStore {
     getNotice: () => notice,
     dispatch(action) {
       if (disposed) return null;
-      if (!lifecycle.hydrated || lifecycle.catchingUp) { queued.push(action); return null; }
-      return store.batch(() => apply(action));
+      return store.batch(() => {
+        if (lifecycle.hydrated && !lifecycle.catchingUp && boundary?.() === false) return null;
+        // The boundary may start catch-up. Queue the action against its confirmed result.
+        if (!lifecycle.hydrated || lifecycle.catchingUp) { queued.push(action); return null; }
+        return apply(action);
+      });
     },
     subscribe(listener) {
       if (disposed) return () => {};
