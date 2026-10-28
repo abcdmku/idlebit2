@@ -25,7 +25,10 @@ export function syncPreload(w: World, s: number): void {
 export function stopLoader(w: World, s: number, r: number, at: number): void {
   const rec = w.hot.rec;
   if (rec.loaderThread[r]! < 0) return;
-  rec.preloadDone[r] = Math.min(rec.preloadBits[r]!, rec.preloadDone[r]! + Math.max(0, at - rec.loaderStart[r]!));
+  // Reaching the scheduled finish settles the exact target. Subtracting large work
+  // clocks can leave a fractional remainder that would restart at the same instant.
+  rec.preloadDone[r] = at >= rec.loaderFinish[r]! ? rec.preloadBits[r]!
+    : Math.min(rec.preloadBits[r]!, rec.preloadDone[r]! + Math.max(0, at - rec.loaderStart[r]!));
   rec.loaderThread[r] = -1; rec.loaderFinish[r] = Infinity;
   w.hot.sys.busyThreads[s] = w.hot.sys.busyThreads[s]! - 1;
   w.hot.g[G.busyThreads] = w.hot.g[G.busyThreads]! - 1;

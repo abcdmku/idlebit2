@@ -71,7 +71,7 @@ export function prepareQueued(w: World, s: number, tau: number, span: Span): boo
     h.usedCache[s] = h.usedCache[s]! + extra;
     rec.loaderThread[r] = thread;
     rec.loaderStart[r] = clockAt(w, s, CPU, axisAt(span, CPU, tau));
-    rec.loaderFinish[r] = rec.loaderStart[r]! + rec.preloadBits[r]! - rec.preloadDone[r]!;
+    rec.loaderFinish[r] = rec.loaderStart[r]! + (rec.preloadBits[r]! - rec.preloadDone[r]!);
     h.busyThreads[s] = h.busyThreads[s]! + 1;
     w.hot.g[G.busyThreads] = w.hot.g[G.busyThreads]! + 1;
     active++; if (wasEmpty) prepared++; changed = true;

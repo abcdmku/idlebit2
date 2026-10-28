@@ -1866,3 +1866,9 @@ Saves retain the timestamp of their confirmed state while recovery is pending. P
 ## D60, 28 Oct: read-only save recovery
 
 The user reports a fully unresponsive page with the existing saved game, while a fresh private-tab game works. The entry route `?rescue` opens a backup page before importing or starting the application runtime. It reads the original `idlebit2:save-v3` storage text without parsing, validating or advancing it, and downloads those exact bytes as `idlebit2-save-backup.json`. Reading and downloading never change storage. An empty browser profile explains that the page must be opened where the affected save is stored. This supports reproducing a save-dependent failure without resetting the player's progress or assuming that the saved state itself is corrupt.
+
+## D61, 28 Oct: settle completed preload work exactly
+
+The uploaded version-32 save reproduces an infinite event loop on the first tick after Return: a completed one-bit loader settles to `0.9999999999999998`, restarts for the remainder and completes again at the same work-clock instant. Foreground batch limits cannot interrupt a synchronous tick.
+
+When stopping a loader at or beyond its scheduled finish, settle its exact reserved-bit target. Interrupted loaders still settle only the work actually performed. Compute remaining work before adding the start clock when scheduling a loader. This removes repeated completion at one instant without a time limit, an epsilon, free unfinished work or a change to CPU cost. Existing saves and progress load unchanged; version 32 remains current. Verify against the uploaded save, repeated rounds, split advances, owned/pure equivalence and save/resume.
