@@ -46,3 +46,26 @@
 .task-market-compact .market-task-heading canvas { grid-column:1; grid-row:1 / 3; }
 .task-market-compact .market-task-heading b { grid-column:2; grid-row:1; white-space:nowrap; }
 .task-market-compact .market-task>.task-rewards,.task-market-compact .research-market>.rnd { grid-column:2; grid-row:2; padding:0; gap:8px; }
+
+/* An unsupported head is an active warning. Busy-core and queue waits do not flash. */
+.head-slot.blocked .market-task.is-head {
+  background-color:#775722; color:var(--paper); animation:blocked-task-alert 1.2s step-end infinite;
+}
+.head-slot.blocked .market-task.is-head * { color:var(--paper); }
+.task-now.blocked .task-state > [data-testid="now-wait"],
+.task-dock.blocked .task-peek-state > :first-child {
+  color:var(--gold); animation:blocked-task-text 1.2s step-end infinite;
+}
+@keyframes blocked-task-alert {
+  0%,100% { background-color:#2b1a14; }
+  50% { background-color:#775722; }
+}
+@keyframes blocked-task-text {
+  0%,100% { color:var(--paper); }
+  50% { color:var(--gold); }
+}
+@media (prefers-reduced-motion:reduce) {
+  .head-slot.blocked .market-task.is-head,
+  .task-now.blocked .task-state > [data-testid="now-wait"],
+  .task-dock.blocked .task-peek-state > :first-child { animation:none; }
+}

@@ -212,7 +212,7 @@ SLA = met / (met + failed)        over the round's last 50 resolved tasks (all o
 - A task counts once when it resolves: met when its last shard completes, failed with exactly one cause. A split task counts once, never per shard (D25.5). A late task counts once; its aborted siblings don't count.
 - Dismissed tasks, tasks dropped at round end, and the research task (D27) are outside it.
 - Within one tick, the tick's met tasks enter the window before its failed tasks, so the window is the same however an advance is cut.
-- **Warm-up.** The 80% check starts once 10 tasks have resolved this round (met + failed ≥ 10). Before that the HUD shows the ratio as "warming up", and the round can't end on SLA.
+- **Warm-up.** The 80% check starts once 10 tasks have resolved this round (met + failed ≥ 10). Before that the HUD percentage is muted and its accessible status says "warming up". The round can't end on SLA.
 - **Why a window.** Over the whole round, hundreds of early small tasks would keep the ratio above 80% long after the hardware hit its wall (each failing head takes its full 10 s). The window ends the round within about a minute of the wall, at any fleet size.
 - SLA is global and resets at Return to market. It is evaluated once per tick, after all completions and failures of that tick.
 - The HUD shows `floor(SLA × 1000) / 10` percent and the window's counts ("SLA 92.0% · 46 / 50"), so a value just below 80% never reads 80.0%. The round report keeps the whole round's met, failed and dismissed totals, and the met and failed work.
@@ -355,7 +355,7 @@ Frozen at round end:
 
 The last 20 reports are kept **(s)**.
 
-**Frontier (D40).** Every round restarts at `I = 0` (D30). Progress shows at round end only, with no added HUD track or feed events. The measure is tasks completed in one round, with an endless ladder of counts (10, 15, 20, 30, 50, 75, 100, then six per ×10). This supports thousands, tens of thousands and millions of tasks without adding named tiers to learn. The save keeps the best tasks per round and its round, the best peak `I` and its round, and every family ever taken. The report opens with "Round N over" and its duration, then the task count as its lead heading and one ruler from 0. Marks show the reached goal and the next two, labelled by task count; the gold fill ends at this round's count. Below, "Best" shows the previous record, or "Previous best" with a NEW BEST badge when beaten. Best has its own row and no line across the bar. "Next era" shows the milestone's saved-cost or research-work progress across the round, such as "Rack 59% → 71%". Round details holds the end reason, Net and Data against the last round, first-taken families, SLA, earnings, energy, failed and dismissed counts, causes and spill. Auto return and Return to market stay in the footer. There is no Next goal row, failure summary or fix key (user, 26 Oct).
+**Frontier (D40, HUD amended by D62).** Every round restarts at `I = 0` (D30). The detailed progress ruler shows at round end, with no added HUD track or feed events. D62 adds only the inline completed-task count and next unearned reward milestone beside SLA. The measure is tasks completed in one round, with an endless ladder of counts (10, 15, 20, 30, 50, 75, 100, then six per ×10). This supports thousands, tens of thousands and millions of tasks without adding named tiers to learn. The save keeps the best tasks per round and its round, the best peak `I` and its round, and every family ever taken. The report opens with "Round N over" and its duration, then the task count as its lead heading and one ruler from 0. Marks show the reached goal and the next two, labelled by task count; the gold fill ends at this round's count. Below, "Best" shows the previous record, or "Previous best" with a NEW BEST badge when beaten. Best has its own row and no line across the bar. "Next era" shows the milestone's saved-cost or research-work progress across the round, such as "Rack 59% → 71%". Round details holds the end reason, Net and Data against the last round, first-taken families, SLA, earnings, energy, failed and dismissed counts, causes and spill. Auto return and Return to market stay in the footer. There is no Next goal row, failure summary or fix key (user, 26 Oct).
 
 The user rejected the 26 Oct skip-based report addition. Do not show its skipped-payout line, wall plot, fit-count routes or "A fit, not pay" copy. Keep the concise report, expandable details and Return. Failure causes remain available inside details.
 
@@ -1463,14 +1463,17 @@ Task popups show their description, processing work and capable-system count dir
 
 On portrait phones, D58 uses a 48px market strip and 56px bottom task bar. Settings comes before Research. The bar shows a core icon and count beside a memory icon and bit value, substitutes a blocking GPU/VRAM icon when relevant, and puts the live pickup wait and head timer on the next line. Tapping it opens a drawer with fixed frame/action positions for full resource requirements, payment and Details/fix. Close, Escape and phone Back close the drawer. Dismiss/Return remains in the bottom bar. The fixed market head plus 50 incoming offers remain browsable. Transient platform notices sit above the bar without shifting its controls.
 
+D62 removes the phone bar's inner start/end padding: Settings and Dismiss align with its outer edges, and the middle requirements field gains that width. The existing button sizes and bar height stay fixed. Top and bottom key bevels are both two art pixels thick. The gear uses a centered 14 × 14 design in its 16 px art cell.
+
 | Field | Source |
 |---|---|
 | Credits | wallet, whole Credits, larger than body text |
 | Data | data balance, whole Data, larger than body text |
-| Net per minute | (payouts − energy debits) over the trailing 60 s (or since load, if shorter), scaled to a minute, whole Credits |
-| SLA | §4.2, one decimal |
-| Round state | `running` / `ended` / `between`, round number, elapsed time |
-| Round rewards | Ready count as an in-game-font number beside total round `R`; click opens the in-game reward list and details, including frozen grants and exact claimed receipts. |
+| Net per minute | Desktop: (payouts − energy debits) over the trailing 60 s (or since load, if shorter), scaled to a minute, whole Credits |
+| SLA | §4.2, one decimal, left-aligned below the SLA title and rolling task ratio. The stack is vertically centered in the existing band. |
+| Tasks | Completed logical tasks this round, inline with a dot and the next unearned reward milestone. Counts compact from 1,000, such as `1k` and `1.5k`, without rounding a not-yet-reached milestone upward. Exact counts are available in the accessible label and tooltip. |
+| Round state | End round / Return actions reflect `running` / `ended` / `between`; the round number and duration remain in the report. No elapsed clock in the HUD. |
+| Round rewards | A stable button centered on `Rewards` when empty, or a count and `rewards` on a yellow background when rewards are ready. Click opens the in-game reward list and details, including frozen grants and exact claimed receipts. |
 | Auto-return | seconds left while counting |
 | Research | project name, progress fraction, mode, `stoppedInsolvent`, missing Data/Credit reason |
 
@@ -1479,7 +1482,7 @@ On portrait phones, D58 uses a 48px market strip and 56px bottom task bar. Setti
 | Field | Notes |
 |---|---|
 | Window | The head and next 50 entries (§5.2): stable IDs, names, numerical work (ops), size, grain, minimum split and requirements, transfer time at the current first-link speed, `committed`/dismissible status and any missing requirement on current hardware. Keep the head fixed; swipe, drag, wheel or use arrow keys through incoming cards, with no visible scrollbar or automatic sliding. Any incoming card opens its details and can be dismissed while uncommitted. Unsupported tasks show without telemetry. Between rounds the next round's saved tasks show as "after Return". |
-| Head clock | The head's real seconds left (`headTick + 100` ticks, minus now). Only the head has one. A blocked head shows its missing requirement. |
+| Head clock | The head's real seconds left (`headTick + 100` ticks, minus now). Only the head has one. A blocked head shows its missing requirement. The top task blinks between dark brown and muted amber with light text. Only the blocked-reason text at the bottom alternates between light text and yellow; its background, border, resource values, countdown and action keys keep their normal appearance. Normal busy-core/queue waits do not blink; clearing the blocker or leaving the round stops the warning. Reduced-motion mode uses steady muted amber on the top task and steady yellow for the bottom reason. |
 | Pickup wait | Every task still in line has a reason: its missing hardware requirement, earlier tasks, research, busy CPU cores, a full task/router queue, input transfer, restart, wake, missing link or routing. A ready head awaiting the next pickup step says so. Temporary waits never become hardware incompatibility or failure details. |
 | In transfer | Each transfer's task ID, shard index and shard count, link, bits sent and bits total, so the pipe can draw the task moving at its real speed. Each level snapshot carries its own links' transfers (§16.4). |
 | Counts | in transfer, queued, running, held in router queues; taken, met and dismissed this round |

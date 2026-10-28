@@ -1,0 +1,22 @@
+/* Every viewport keeps the existing band height. The label and figure form one centered stack. */
+.sla-gauge { position:absolute; display:grid; grid-template-columns:var(--sla-reading) minmax(0,1fr) var(--reward-width);
+  align-items:center; gap:8px; padding-left:4px; box-sizing:border-box; }
+.sla-reading { display:grid; grid-template-rows:16px 24px; align-content:center; min-width:0; height:100%; }
+.sla-title { display:flex; align-items:center; gap:8px; line-height:16px; white-space:nowrap; }
+.sla-reading .fig.big { font-size:var(--big); line-height:24px; text-align:left; }
+.hud-tasks { display:flex; align-items:center; gap:4px; min-width:0; white-space:nowrap; line-height:var(--lh); }
+.round-rewards-key { pointer-events:auto; display:flex; align-items:center; justify-content:center; gap:6px;
+  box-sizing:border-box; height:44px; width:100%; padding:0 4px; border:1px solid var(--panel-hi);
+  background:#211c35; color:var(--dim); font:inherit; white-space:nowrap; cursor:pointer; }
+.round-rewards-key.ready { background:var(--gold); border-color:var(--gold-lo); color:var(--ink);
+  box-shadow:inset 0 2px 0 #fff1a6,inset 0 -3px 0 var(--gold-lo); }
+.round-rewards-key:focus-visible { outline:2px solid var(--focus); outline-offset:2px; }
+.round-rewards-count { font-weight:700; line-height:16px; }
+.l-phone .round-rewards-key { flex-direction:column; gap:0; line-height:16px; }
+.l-phone .sla-gauge { gap:4px; }
+.l-phone .hud-tasks { gap:3px; }
+@media (max-width:359px) { .l-phone .hud-tasks { gap:2px; } }
+.sla-gauge.compact .sla-reading { grid-template-rows:12px 18px; }
+.sla-gauge.compact .sla-title { line-height:12px; }
+.sla-gauge.compact .fig.big { font-size:var(--big); line-height:18px; }
+.sla-gauge.compact .round-rewards-key { height:32px; }

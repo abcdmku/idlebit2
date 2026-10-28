@@ -58,7 +58,7 @@ export function TaskDock(props: DockProps) {
   return <>
     <section className={`panel task-dock${blocked ? ' blocked' : ''}`} style={box(L.now)} aria-label="Next task">
       <button ref={peek} type="button" className="task-peek" data-testid="task-peek" data-qa-target
-        style={{ left: 120, top: 0, width: L.now.w - 200, height: L.now.h }} disabled={!head && !research}
+        style={{ left: 112, top: 0, width: L.now.w - 184, height: L.now.h }} disabled={!head && !research}
         aria-expanded={expanded && !otherOpen} aria-controls="task-drawer" aria-haspopup="dialog"
         aria-label={`${research?.name ?? head?.label ?? 'Next task'}: ${head ? `up to ${cores} CPU cores, ${fact?.label} ${fact?.value}. ` : ''}${status}. Open requirements and details.`}
         title={head ? `Up to ${cores} CPU cores. ${fact?.label} ${fact?.value}. ${status}` : status}

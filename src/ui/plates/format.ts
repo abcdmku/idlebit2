@@ -27,6 +27,18 @@ export function compactWhole(n: number): string {
   return grouped(String(n));
 }
 
+/** Task counts compact from 1,000, with one decimal at most and no premature milestone rounding. */
+export function shortCount(n: number): string {
+  if (n < 1000) return wholeText(n);
+  if (n >= SCIENTIFIC) {
+    const exponent = Math.floor(Math.log10(n));
+    return `${Math.floor(n / 10 ** exponent * 10) / 10}e${exponent}`;
+  }
+  const [scale, suffix] = COMPACT.find(([scale]) => n >= scale)!;
+  const coefficient = n / scale, precision = coefficient < 10 ? 10 : 1;
+  return `${Math.floor(coefficient * precision) / precision}${suffix}`;
+}
+
 const grouped = (digits: string) => digits.replace(/\B(?=(\d{3})+(?!\d))/g, ',');
 const trimZeros = (s: string) => (s.includes('.') ? s.replace(/0+$/, '').replace(/\.$/, '') : s);
 

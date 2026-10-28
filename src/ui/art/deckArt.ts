@@ -90,17 +90,20 @@ export function drawFlask(g: G): void {
   R(g, 4, 9, 1, 3, '#edfbff'); px(g, 5, 8, '#ffffff'); px(g, 6, 10, '#ffd8f7'); px(g, 9, 11, '#ffb8ea');
 }
 
-/** 16 × 16 toothed gear, with a round bore and a shaded metal rim. */
+/** A 14 × 14 toothed gear centered in its 16 px cell, with a round bore and shaded metal rim. */
 export function drawGear(g: G): void {
   g.clearRect(0, 0, 16, 16);
-  const mask = ['0000001111000000', '0000001111000000', '0011001111001100', '0011111111111100',
-    '0001111111111000', '0001110000111000', '1111100000011111', '1111100000011111',
-    '1111100000011111', '1111100000011111', '0001110000111000', '0001111111111000',
-    '0011111111111100', '0011001111001100', '0000001111000000', '0000001111000000'];
+  const mask = ['00000111100000', '00000111100000', '00110111101100', '00111111111100',
+    '00011111111000', '11111111111111', '11111100111111', '11111100111111',
+    '11111111111111', '00011111111000', '00111111111100', '00110111101100',
+    '00000111100000', '00000111100000'];
   const solid = (x: number, y: number) => mask[y]?.[x] === '1';
-  for (let y = 0; y < 16; y++) for (let x = 0; x < 16; x++) if (solid(x, y)) {
-    const edge = !solid(x - 1, y) || !solid(x + 1, y) || !solid(x, y - 1) || !solid(x, y + 1);
-    px(g, x, y, edge ? P.ink : y < 7 ? '#dfdcff' : y > 10 ? '#776caa' : '#b2a9df');
+  for (let y = 0; y < 14; y++) for (let x = 0; x < 14; x++) if (solid(x, y)) {
+    const boreEdge = (x === 5 || x === 8) && (y === 6 || y === 7)
+      || (y === 5 || y === 8) && (x === 6 || x === 7);
+    const lit = !solid(x - 1, y) || !solid(x, y - 1);
+    const shaded = !solid(x + 1, y) || !solid(x, y + 1);
+    px(g, x + 1, y + 1, boreEdge ? '#51466f' : lit ? '#dfdcff' : shaded ? '#776caa' : '#b2a9df');
   }
 }
 

@@ -52,9 +52,9 @@ interface Common {
   readonly rungRow: number;
   /** The level name, right of the ladder (desktop). */
   readonly rungLabel: Rect;
-  /** SLA, its 80% meter and the round clock: the HUD's centre. */
+  /** SLA, round task count, next reward milestone and reward key: the HUD's centre. */
   readonly sla: Rect;
-  /** End round, right of the round clock: reserved in every phase, so nothing moves. */
+  /** End round, right of the SLA group: reserved in every phase, so nothing moves. */
   readonly endKey: Rect;
   /** Data over Credits, right-aligned. */
   readonly wallet: Rect;
@@ -153,7 +153,7 @@ function desktop(N: 2 | 3, aw: number, ah: number, safe: SafeInsets): DesktopLay
   const view = r(world.x, top, world.w, world.y + world.h - top);
   // The band: the ladder at the left, the currencies stacked at the right, SLA centred between them.
   const band0 = rungs(band, 16 * N, U), rungLabel = r(band0[4].x + band0[4].w + 16, band.y, N === 3 ? 152 : 128, band.h);
-  const walletW = 200, wallet = r(band.x + band.w - U - walletW, band.y, walletW, band.h);
+  const walletW = N === 3 ? 200 : 168, wallet = r(band.x + band.w - U - walletW, band.y, walletW, band.h);
   // SLA and End round as one block, centred between the level name and the wallet.
   const keyW = N === 3 ? 112 : 96, free0 = rungLabel.x + rungLabel.w + 8, free1 = wallet.x - 8;
   const slaW = snap8(Math.min(N === 3 ? 480 : 368, free1 - free0 - keyW - 8));
@@ -184,17 +184,19 @@ function phone(aw: number, ah: number, safe: SafeInsets): PhoneLayout {
   const cardW = 200;
   const card = (i: number) => r(headSlot.x + headSlot.w + i * cardW, strip.y, cardW, 48);
   const top = strip.y + strip.h;
+  // Compact keys leave room for inline task count and milestone without adding a HUD row.
+  const endW = W < 360 ? 48 : 64, hudGap = 8;
   // Settings, Research, labelled resources/wait, then Dismiss; all controls keep their boxes.
   const now = r(U, nowY, world.w, nowH);
-  const settings = r(U + 8, nowY, 48, nowH), research = r(U + 64, nowY, 48, nowH);
+  const settings = r(now.x, nowY, 48, nowH), research = r(now.x + 56, nowY, 48, nowH);
   const view = r(world.x, top, world.w, world.y + world.h - top);
   return {
     kind: 'phone', N, lat, gutter: U, x, y, w: W, h: H, body: 13, lh: 16, big: 24, mid: 18,
     world, view, band, strip, headSlot, cards: [card(0), card(1), card(2), card(3)],
-    now, dismiss: r(now.x + now.w - 72, now.y, 64, nowH),
+    now, dismiss: r(now.x + now.w - 64, now.y, 64, nowH),
     research, settings, lab: r(U, H < 640 ? band.y + band.h : top, world.w, H - U - (H < 640 ? band.y + band.h : top)),
     rungs: band0, rungRow, rungLabel: r(walletX, band.y, 0, rungRow),
-    sla: r(band.x, band.y + rungRow, band.w - 88, 48), endKey: r(band.x + band.w - 80, band.y + rungRow, 80, 48), wallet: r(walletX, band.y, band.x + band.w - U - walletX, rungRow),
+    sla: r(band.x, band.y + rungRow, band.w - endW - hudGap, 48), endKey: r(band.x + band.w - endW, band.y + rungRow, endW, 48), wallet: r(walletX, band.y, band.x + band.w - U - walletX, rungRow),
     pipeSrc: { x: headSlot.x + 8 + 16, y: top }, pipeRunY: top + U,
     calloutBounds: inset(view, lat), callout: { w: 288, h: 104 },
   };
