@@ -86,8 +86,7 @@ export function mergeSpec(have: SystemSpec, want: SystemSpec): { spec: SystemSpe
     if (c && have.cpuCount > 0) {
       cpu = {
         cpu: mergePart(PARTS.cpu, c.cpu, want.cpu.cpu, per)!, cores: mergeList(() => PARTS.core, c.cores, want.cpu.cores, per),
-        clock: mergePart(PARTS.clock, c.clock, want.cpu.clock, per, 1, cpuCores(want.cpu))!, l1: mergePart(PARTS.l1, c.l1, want.cpu.l1, per)!,
-        l2: mergePart(PARTS.l2, c.l2, want.cpu.l2, per), l3: mergePart(PARTS.l3, c.l3, want.cpu.l3, per),
+        clock: mergePart(PARTS.clock, c.clock, want.cpu.clock, per, 1, cpuCores(want.cpu))!, cache: mergePart(PARTS.cache, c.cache, want.cpu.cache, per)!,
       };
       m.price += per.price * BigInt(Math.min(have.cpuCount, want.cpuCount));
       if (want.cpuCount > have.cpuCount) m.price += cpuPrice(cpu) * BigInt(want.cpuCount - have.cpuCount);

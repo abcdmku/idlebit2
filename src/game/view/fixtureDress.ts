@@ -45,7 +45,7 @@ function dressCompiled(state: GameState): CompiledBuffers {
     if (!c.sys.K[s]) c.sys.K[s] = b.scheduler ? Math.min(32, cores) : 1;
     if (!c.sys.Q[s]) c.sys.Q[s] = b.scheduler ? 16 : 0;
     if (!c.sys.clockHz[s]) c.sys.clockHz[s] = 2 ** (b.cpu?.clock.level ?? 1);
-    if (!c.sys.cacheBits[s]) c.sys.cacheBits[s] = 8 * 2 ** (b.cpu?.l1.level ?? 1);
+    if (!c.sys.cacheBits[s]) c.sys.cacheBits[s] = 8 * 2 ** (b.cpu?.cache.level ?? 1);
     if (!c.sys.psuCapW[s]) c.sys.psuCapW[s] = 4;
   }
   for (let r = 0; r < c.rack.len; r += 1) {

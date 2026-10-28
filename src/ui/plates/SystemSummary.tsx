@@ -15,7 +15,7 @@ export function summaryRows(f: Sys): SummaryRow[] {
   const cores = f.chip.cores.length;
   return [
     { key: 'cpu', label: 'CPU', value: `${hertz(f.chip.clock.effectiveHz)} · ${cores} ${cores === 1 ? 'core' : 'cores'}`, part: { unit, slot: { kind: 'cpu', socket: 0 } } },
-    { key: 'cache', label: 'Cache', value: mem('cache'), part: { unit, slot: { kind: 'l1', socket: 0 } } },
+    { key: 'cache', label: 'Cache', value: mem('cache'), part: { unit, slot: { kind: 'cache', socket: 0 } } },
     { key: 'ram', label: 'RAM', value: mem('ram'), part: f.ram.length ? { unit, slot: { kind: 'ram', index: 0 } } : null },
     { key: 'drive', label: 'Storage', value: mem('disk'), part: f.storage.length ? { unit, slot: { kind: 'drive', index: 0 } } : null },
     { key: 'gpu', label: 'GPU', value: f.gpu.length ? `${f.gpu.length} ${f.gpu.length === 1 ? 'card' : 'cards'}` : 'none', part: f.gpu.length ? { unit, slot: { kind: 'gpu', index: f.gpu[0]!.slot } } : null },

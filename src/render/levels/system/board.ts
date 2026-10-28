@@ -58,7 +58,7 @@ export function boardStatic(kind: BoardKind): HTMLCanvasElement {
     }
     for (let i = 0; i < 3; i++) choke(g, 108 + i * 9, 56);
     for (const [x, y] of b.dimm === 'h' ? [[155, 166], [155, 194]] : [[155, 120], [155, 166]]) cap(g, x!, y!);
-    for (const [hx, hy] of [[14, 34], [154, 34], [14, 209], [154, 209]] as const) { R(g, hx - 2, hy - 2, 5, 5, P.padLo); R(g, hx - 1, hy - 1, 3, 3, P.ink); }
+    for (const [hx, hy] of [[14, 34], [154, 34], [14, BOARD.y + BOARD.h - 11], [154, BOARD.y + BOARD.h - 11]] as const) { R(g, hx - 2, hy - 2, 5, 5, P.padLo); R(g, hx - 1, hy - 1, 3, 3, P.ink); }
     silk(g, 58, 31, b.silk, mix(P.mask, P.silk, 0.45));
     frame(g, SAVE.x - 2, SAVE.y - 2, 11, 11, mix(P.mask, P.silk, 0.3));
     if (b.dimm === 'v') {

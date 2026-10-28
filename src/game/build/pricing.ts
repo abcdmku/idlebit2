@@ -27,9 +27,7 @@ export function cpuPrice(cpu: CpuBuild, coreGrowth = EXTRA_CORE_GROWTH): bigint 
   let total = partFromNothing(PARTS.cpu, cpu.cpu);
   cpu.cores.forEach((core, n) => { total += partFromNothing(PARTS.core, core, n, coreGrowth); });
   total += partFromNothing(PARTS.clock, cpu.clock, 0, EXTRA_UNIT_GROWTH, cpuCores(cpu));
-  total += partFromNothing(PARTS.l1, cpu.l1);
-  if (cpu.l2) total += partFromNothing(PARTS.l2, cpu.l2);
-  if (cpu.l3) total += partFromNothing(PARTS.l3, cpu.l3);
+  total += partFromNothing(PARTS.cache, cpu.cache);
   return total;
 }
 

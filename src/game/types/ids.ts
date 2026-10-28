@@ -35,7 +35,7 @@ export type ScopeRef = UnitRef | GlobalRef;
 export type LevelId = 'chip' | 'system' | 'rack' | 'room' | 'global';
 /** chip and system: SystemId; rack: RackId; room: RoomId; global: 0. */
 export type NodeRef =
-  | { readonly level: 'chip'; readonly id: SystemId }
+  | { readonly level: 'chip'; readonly id: SystemId; readonly socket?: number }
   | { readonly level: 'system'; readonly id: SystemId }
   | { readonly level: 'rack'; readonly id: RackId }
   | { readonly level: 'room'; readonly id: RoomId }
@@ -43,7 +43,7 @@ export type NodeRef =
 
 /** Where a part sits inside its owning unit. Socket and index are 0-based. */
 export type PartSlot =
-  | { readonly kind: 'cpu' | 'clock' | 'l1' | 'l2' | 'l3'; readonly socket: number }
+  | { readonly kind: 'cpu' | 'clock' | 'cache'; readonly socket: number }
   | { readonly kind: 'core'; readonly socket: number; readonly index: number }
   | { readonly kind: 'scheduler' | 'psu' }
   | { readonly kind: 'ram' | 'gpu' | 'drive'; readonly index: number }

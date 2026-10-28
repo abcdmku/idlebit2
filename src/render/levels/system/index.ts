@@ -1,6 +1,6 @@
 // System level: the original motherboard (mockup v3 levels/system.js, D15.2), whole and on its own.
-// Tap a part to select it (the UI opens its upgrade callout); a CPU target also carries `drill`, so
-// a second tap or Open dives into the socket. The PSU is a fixed board part; nothing on a board cools.
+// Parts open their component plate; a CPU target drills into its own socket. The system summary
+// also opens CPU upgrade options. The PSU is a fixed board part; nothing on a board cools.
 import type { SystemSnapshot } from '../../../game';
 import { P, R, copyRect, partVersionOf, resetHitTarget, setRect } from '../../core';
 import type { HitTarget, LevelRegistry, LevelRenderer, Rect } from '../../core';
@@ -11,10 +11,11 @@ import { drawSystemMini } from './mini';
 import { drawBoard } from './world';
 
 const owner = (s: SystemSnapshot) => ({ level: 'system', id: s.systemId }) as const;
-const chipRefs = new Map<number, { readonly level: 'chip'; readonly id: SystemSnapshot['systemId'] }>();
-function chipRef(s: SystemSnapshot) {
-  let ref = chipRefs.get(s.systemId);
-  if (!ref) { ref = { level: 'chip', id: s.systemId }; chipRefs.set(s.systemId, ref); }
+const chipRefs = new Map<string, { readonly level: 'chip'; readonly id: SystemSnapshot['systemId']; readonly socket: number }>();
+function chipRef(s: SystemSnapshot, socket: number) {
+  const key = `${s.systemId}:${socket}`;
+  let ref = chipRefs.get(key);
+  if (!ref) { ref = { level: 'chip', id: s.systemId, socket }; chipRefs.set(key, ref); }
   return ref;
 }
 const CPU_IDS = ['cpu0', 'cpu1', 'cpu2', 'cpu3'];
@@ -43,9 +44,12 @@ export function createSystemRenderer(registry: LevelRegistry): LevelRenderer<'sy
     draw: (g, s, view, frame) => drawBoard(g, s, view, frame, registry),
     drawMini: drawSystemMini,
     children(s, out) {
-      const c = out[0]!;
-      c.ref = chipRef(s); packageRect(boardModel(s).b, 0, c.rect);
-      return 1;
+      const n = Math.min(s.cpuCount, out.length), b = boardModel(s).b;
+      for (let socket = 0; socket < n; socket++) {
+        const c = out[socket]!;
+        c.ref = chipRef(s, socket); packageRect(b, socket, c.rect);
+      }
+      return n;
     },
     targets(s, _view, out, from) {
       const m = boardModel(s), b = m.b;
@@ -62,9 +66,9 @@ export function createSystemRenderer(registry: LevelRegistry): LevelRenderer<'sy
       for (const site of m.sites) {
         if (site.state !== 'part' || i >= out.length) continue;
         if (site.type === 'cpu') {
-          // Same rect as the core's child target, and in front of it: the first tap selects, Open drills.
+          // Same package rect and socket identity as the core's child target.
           const t = resetHitTarget(out[i++]!, CPU_IDS[site.index]!, 'part', owner(s));
-          t.part = boardPartRef(s.systemId, 'cpu', site.index); t.drill = chipRef(s); packageRect(b, site.index, t.rect);
+          t.part = boardPartRef(s.systemId, 'cpu', site.index); t.drill = chipRef(s, site.index); packageRect(b, site.index, t.rect);
           continue;
         }
         const p = site.part!;
@@ -100,7 +104,7 @@ export function createSystemRenderer(registry: LevelRegistry): LevelRenderer<'sy
       if (id.startsWith('cpu')) return Number(id.slice(3)) < s.cpuCount ? partVersionOf(s.cpu) : null;
       const list = id.startsWith('ram') ? s.ram : id.startsWith('gpu') ? s.gpu : id.startsWith('drive') ? s.storage : null;
       if (!list) return null;
-      const slot = Number(id.replace(/^D+/, ''));
+      const slot = Number(id.replace(/^\D+/, ''));
       for (const p of list) if (p.slot === slot) return partVersionOf(p);
       return null;
     },

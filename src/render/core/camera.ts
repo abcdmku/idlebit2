@@ -18,10 +18,10 @@ export function restCam(focus: Rect, vp: Rect, ratio: PixelRatio, out: Camera, s
   out.cx = (vx - ox) / s; out.cy = (vy - oy) / s; out.s = s;
   return out;
 }
-/** Layout form: the L2 desktop deck or the folded phone deck. Levels may lay out per form. */
+/** Layout form: the Control deck desktop deck or the folded phone deck. Levels may lay out per form. */
 export type WorldForm = 'desktop' | 'phone';
 /**
- * L2 rest framing (D17, A05). Every rest draws 1:1 at an integer art scale: one art px is n CSS px.
+ * Control deck rest framing (D17, A05). Every rest draws 1:1 at an integer art scale: one art px is n CSS px.
  * The focus is contain-fitted, whole, in the free world: the viewport below `top` (the HUD band and
  * the queue strip) minus the gutters. n is the shell's N (3 desktop, 2 phone) when the focus fits,
  * else the largest lower integer that fits (D15.2: never cropped). The focus centres in the free

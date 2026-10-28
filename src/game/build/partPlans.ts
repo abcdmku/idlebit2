@@ -32,11 +32,9 @@ export function planReplaceCpu(state: GameState, system: SystemId): Plan {
     return null;
   };
   const cores = cpu.cores.map((c) => keep('core', c));
-  const l1 = keep('l1', cpu.l1);
-  const l2 = cpu.l2 ? keep('l2', cpu.l2) : null;
-  const l3 = cpu.l3 ? keep('l3', cpu.l3) : null;
-  if (cores.some((c) => !c) || !l1 || (cpu.l2 && !l2) || (cpu.l3 && !l3)) return fail('cap', 'A part would lose capacity', label);
-  const next: CpuBuild = { cpu: { gen: g, level: 1 }, cores: cores as PartLevel[], clock: { gen: g, level: 1 }, l1, l2, l3 };
+  const cache = keep('cache', cpu.cache);
+  if (cores.some((c) => !c) || !cache) return fail('cap', 'A part would lose capacity', label);
+  const next: CpuBuild = { cpu: { gen: g, level: 1 }, cores: cores as PartLevel[], clock: { gen: g, level: 1 }, cache };
   const price = cpuPrice(next, 1) * BigInt(spec.cpuCount);
   return planned({ build: withSpec(state.build, system, { ...spec, cpu: next }), price, cold: coldScopes(state, { kind: 'system', id: system }) }, label);
 }
@@ -113,7 +111,7 @@ export function planUpgradeTo(state: GameState, ref: PartRef, level: number): Pl
 }
 
 /**
- * Cold replace with generation g (spec §12.4): L1, or with `preserveCapacity` the lowest native
+ * Cold replace with generation g (spec §12.4): levelOne, or with `preserveCapacity` the lowest native
  * level whose primary capacity holds the current one, priced as install plus the upgrades to it.
  */
 export function planReplace(state: GameState, ref: PartRef, g: number, preserveCapacity: boolean, minimumCapacity = 0): Plan {
@@ -161,39 +159,35 @@ export function planAdd(state: GameState, system: SystemId, kind: BoardPartKind,
     }
     return planned({ build: withSpec(state.build, system, next), price }, label);
   };
-  const L1: PartLevel = { gen: g, level: 1 };
+  const levelOne: PartLevel = { gen: g, level: 1 };
   if (kind === 'socket') {
     if (!cpu) return fail('invalid', 'No CPU');
     return commit({ ...spec, cpuCount: n + 1 }, cpuPrice(cpu), `CPU ${n + 1}`, { have: n, limit: boardLimit(spec, u, 'socket'), key: 'cpuSockets' }, null);
   }
-  if (kind === 'core' || kind === 'l2' || kind === 'l3') {
+  if (kind === 'core') {
     if (!cpu) return fail('invalid', 'No CPU');
-    if (kind === 'core') {
-      const price = scalePrice(installPrice(PARTS.core, g), extraFactor(cpu.cores.length, EXTRA_CORE_GROWTH)) * BigInt(n);
-      return commit({ ...spec, cpu: { ...cpu, cores: [...cpu.cores, L1] } }, price, `${partName('core', g)}`, { have: cpu.cores.length, limit: boardLimit(spec, u, 'core'), key: 'coreSites' }, 'core');
-    }
-    if (cpu[kind]) return fail('occupied', `${kind.toUpperCase()} already built`);
-    return commit({ ...spec, cpu: { ...cpu, [kind]: L1 } }, installPrice(PARTS[kind], g) * BigInt(n), partName(kind, g), null, kind);
+    const price = scalePrice(installPrice(PARTS.core, g), extraFactor(cpu.cores.length, EXTRA_CORE_GROWTH)) * BigInt(n);
+    return commit({ ...spec, cpu: { ...cpu, cores: [...cpu.cores, levelOne] } }, price, `${partName('core', g)}`, { have: cpu.cores.length, limit: boardLimit(spec, u, 'core'), key: 'coreSites' }, 'core');
   }
   if (kind === 'scheduler') {
     if (spec.scheduler) return fail('occupied', 'Scheduler already built');
-    return commit({ ...spec, scheduler: { ...L1, strategy: 'fifo' } }, installPrice(PARTS.scheduler, g), partName('scheduler', g), null, 'scheduler');
+    return commit({ ...spec, scheduler: { ...levelOne, strategy: 'fifo' } }, installPrice(PARTS.scheduler, g), partName('scheduler', g), null, 'scheduler');
   }
   if (kind === 'ram') {
     const price = scalePrice(scalePrice(installPrice(PARTS.ram, g), extraFactor(spec.ram.length)), ecc ? ECC_PRICE_FACTOR : 1);
     if (ecc) { const lock = ruleLock(u, 'ecc'); if (lock) return locked(lock, 'ECC', price); }
-    return commit({ ...spec, ram: [...spec.ram, { ...L1, ecc }] }, price, partName('ram', g), { have: spec.ram.length, limit: boardLimit(spec, u, 'ram'), key: 'ramSlots' }, 'ram');
+    return commit({ ...spec, ram: [...spec.ram, { ...levelOne, ecc }] }, price, partName('ram', g), { have: spec.ram.length, limit: boardLimit(spec, u, 'ram'), key: 'ramSlots' }, 'ram');
   }
   if (kind === 'npu') {
     const have = spec.accels.filter((a) => a.kind === kind).length;
     const price = scalePrice(installPrice(PARTS[kind], g), extraFactor(have));
-    return commit({ ...spec, accels: [...spec.accels, { ...L1, kind }] }, price, partName(kind, g), { have: spec.accels.length, limit: boardLimit(spec, u, 'gpu'), key: 'gpuSlots' }, kind);
+    return commit({ ...spec, accels: [...spec.accels, { ...levelOne, kind }] }, price, partName(kind, g), { have: spec.accels.length, limit: boardLimit(spec, u, 'gpu'), key: 'gpuSlots' }, kind);
   }
   const price = scalePrice(installPrice(PARTS.storage, g), extraFactor(spec.drives.length));
-  return commit({ ...spec, drives: [...spec.drives, L1] }, price, partName('storage', g), { have: spec.drives.length, limit: boardLimit(spec, u, 'drive'), key: 'driveSlots' }, 'storage');
+  return commit({ ...spec, drives: [...spec.drives, levelOne] }, price, partName('storage', g), { have: spec.drives.length, limit: boardLimit(spec, u, 'drive'), key: 'driveSlots' }, 'storage');
 }
 
-/** Cold remove, scrapped (spec §4.5). A CPU's package, clock, L1, last core and the PSU stay. */
+/** Cold remove, scrapped (spec §4.5). A CPU's package, clock, levelOne, last core and the PSU stay. */
 export function planRemove(state: GameState, ref: PartRef): Plan {
   if (ref.unit.kind !== 'system') return fail('invalid', 'Only board parts can be removed');
   const id = ref.unit.id;
@@ -205,7 +199,6 @@ export function planRemove(state: GameState, ref: PartRef): Plan {
   let next: SystemSpec | null = null;
   if (slot.kind === 'cpu' && spec.cpuCount > 1) next = { ...spec, cpuCount: spec.cpuCount - 1 };
   else if (slot.kind === 'core' && cpu && cpu.cores.length > 1) next = { ...spec, cpu: { ...cpu, cores: drop(cpu.cores, slot.index) } };
-  else if ((slot.kind === 'l2' || slot.kind === 'l3') && cpu) next = { ...spec, cpu: { ...cpu, [slot.kind]: null } };
   else if (slot.kind === 'scheduler') next = { ...spec, scheduler: null };
   else if (slot.kind === 'ram') next = { ...spec, ram: drop(spec.ram, slot.index) };
   else if (slot.kind === 'gpu') next = { ...spec, accels: drop(spec.accels, slot.index) };

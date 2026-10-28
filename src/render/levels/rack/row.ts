@@ -2,7 +2,7 @@
 //
 // Row data: RackSnapshot's `slot` (room slot, row-major) and `row` (the row's slot views), R36.
 //
-// Scroll, for agent U (the UI owns pointer input; L2 README "Rack row"):
+// Scroll, for agent U (the UI owns pointer input; Control deck README "Rack row"):
 //   import { rackRowScroll } from 'src/render/levels/rack' (or this file)
 //   - once per layout: rackRowScroll.setStep(lattice / N)   (desktop 24 / 3 = 8, phone 8 / 2 = 4 art px)
 //   - pointerdown on the world while the Rack level rests: remember x0 and s0 = rackRowScroll.offset

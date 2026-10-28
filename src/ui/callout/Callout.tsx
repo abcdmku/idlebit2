@@ -13,7 +13,7 @@ import { useGameSelector, useQuote, useShell, useViewState } from '../storeHooks
 import { calloutModel } from './model';
 import { placePlate } from '../plates/place';
 
-/** On the CPU the callout sits beside the package (L2): the cache spans the die, 16 art px in from the package, plus its 3 px frame. */
+/** On the CPU the callout sits beside the package (Control deck): the cache spans the die, 16 art px in from the package, plus its 3 px frame. */
 const PACKAGE_INSET_ART = 19;
 /** A10: after a purchase the Buy key ignores taps this long, so the next level isn't bought by a double tap. */
 const REARM_MS = 250;

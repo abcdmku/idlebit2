@@ -6,7 +6,9 @@ The renderer consumes `RenderSnapshot` level snapshots and draws them; it owns c
 
 - Import the sim only through `src/game` (types and constants). Tests and dev pages may also import `src/game/fixtures`.
 - Import render helpers from `../../core` (the core barrel), never from `src/render/index.ts`, because that barrel imports the levels.
+- Each CPU has one `cache` part. Its snapshot is a single generation/level/capacity, with no cache-part list. The System board reserves its memory rows below the hardware.
 - A level only displays state. It reads its level snapshot and returns hit targets. It never computes prices or game values, requests quotes or changes state.
+- CPU refs include `socket` (omitted means zero). Include it in identity and zoom keys; every installed socket supplies its own child anchor. A System snapshot carries `chips` for per-socket minis, with `chip` as the first-socket alias. Shared CPU hardware upgrades still follow D7.3.
 - Keep files under 300 lines.
 
 ## Plug in
@@ -61,7 +63,7 @@ The renderer does not emit commands. `renderer.hit(x, y)` returns a borrowed `Hi
 - Rects are in focus-world art px. Do not pad them; the core pads every target to 44 CSS px. Overlaps: exact hits win, then the nearest, then the frontmost.
 - CPU targets: `clock`, `cache`, `queue` (part, or slot before a scheduler), `core<i>` (part), `site<i>` (slot), `pipe` (link). System targets: see `levels/system/index.ts` (`cpu<k>` with drill, `ram<i>`, `gpu<i>`, `drive<i>`, `psu`, `pipe`, `slot-*`, `save`, `unit`).
 
-## Rest framing (L2, D17)
+## Rest framing (Control deck, D17)
 
 `renderer.resize(w, h, dpr, viewport, framing)` takes a `RestFraming` (`DESKTOP_FRAMING`, `PHONE_FRAMING` in `core/camera.ts`):
 
@@ -114,7 +116,7 @@ Work pays on the component that ran it. Nothing flows out to the deck or the HUD
 - **No spray.** Completions on one component within 250 ms sum into one pop. Each component has at most one live pop; a later completion replaces it. A plate that would cover another component's pop in its first half waits, and keeps summing, until it fits. Anything older than 1 s is dropped. There are at most 24 pops.
 - Reduced motion: no rise or fade; the pop shows for its second.
 - **Pay is per whole task (user).** A pop means a task completed and paid. A task run on several members, or (D25) split into shards, pays once, with its whole payout, on the component that finished its last member or shard; the sim lists only those completions. A shard that finishes earlier shows only its piece emptying, with no currency. A level's `payoutAnchor` rects are also the targets a split task's pieces flow to.
-- L2 harness: `l2.html?level=<id>&pops=<age ms>` holds QA pops at that age on the level's first components.
+- Control deck harness: `frame.html?level=<id>&pops=<age ms>` holds QA pops at that age on the level's first components.
 - **Other feedback (`core/feedback.ts`).** A failure (`snapshot.failures`, by `seq`) beats its red cause mark at the pipe mouth for 0.4 s (A11). A part whose `partVersion` rises, or that appears, flashes gold with a 1·N bracket for 0.3 s, once (A10).
 
 ## Split tasks (D25)
@@ -149,5 +151,5 @@ Work pays on the component that ran it. Nothing flows out to the deck or the HUD
 
 ## Try it
 
-- `/src/render/core/l2.html`: the real levels over the sim's view fixtures in the L2 D17 frame (N, lattice, band, strip, pipe). Query: `form=desktop|phone`, `level=chip|system|rack|room|global`, `zoom=<from level>&hold=<0..1>`, `scene=boot|landing|mid|max|paused` (CPU QA scenes), `boot` (boot fixtures: a general board). Captures: `MSYS_NO_PATHCONV=1 node scripts/qa/capture.mjs --manifest=artifacts/qa/port/ra/manifest.json --out=artifacts/qa/port/ra --game-path=/src/render/core/l2.html`.
+- `/src/render/core/frame.html`: the real levels over the sim's view fixtures in the Control deck D17 frame (N, lattice, band, strip, pipe). Query: `form=desktop|phone`, `level=chip|system|rack|room|global`, `zoom=<from level>&hold=<0..1>`, `scene=boot|landing|mid|max|paused` (CPU QA scenes), `boot` (boot fixtures: a general board). Captures: `MSYS_NO_PATHCONV=1 node scripts/qa/capture.mjs --manifest=artifacts/qa/port/ra/manifest.json --out=artifacts/qa/port/ra --game-path=/src/render/core/frame.html`.
 - `/src/render/core/harness.html`: every registered level over `LEVEL_FIXTURES`, with zoom buttons and a hold slider. `window.__r1` exposes `go(level)` and `hold(progress)`.

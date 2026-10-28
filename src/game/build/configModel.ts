@@ -116,10 +116,8 @@ export function systemLock(u: Unlocks, spec: SystemSpec): LockReason | null {
   if (spec.board === 'accelerator') checks.push(() => ruleLock(u, 'accelBoard' as RuleId));
   const cpu = spec.cpu;
   if (cpu) {
-    checks.push(...partOk(u, 'cpu', cpu.cpu), ...partOk(u, 'clock', cpu.clock), ...partOk(u, 'l1', cpu.l1));
+    checks.push(...partOk(u, 'cpu', cpu.cpu), ...partOk(u, 'clock', cpu.clock), ...partOk(u, 'cache', cpu.cache));
     for (const c of cpu.cores) checks.push(...partOk(u, 'core', c));
-    if (cpu.l2) checks.push(...partOk(u, 'l2', cpu.l2));
-    if (cpu.l3) checks.push(...partOk(u, 'l3', cpu.l3));
     checks.push(slots(u, cpu.cores.length, boardLimit(spec, u, 'core'), 'coreSites'), slots(u, spec.cpuCount, boardLimit(spec, u, 'socket'), 'cpuSockets'));
   }
   if (spec.scheduler) checks.push(...partOk(u, 'scheduler', spec.scheduler), () => (spec.scheduler!.strategy === 'fifo' ? null : optionLock(u, spec.scheduler!.strategy, 'queue')));

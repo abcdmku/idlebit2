@@ -1,4 +1,4 @@
-// Display text for world labels (L2 dom.js). Formatting only: every value comes from the snapshot.
+// Display text for world labels (Control deck dom.js). Formatting only: every value comes from the snapshot.
 // Sizes, speeds and ops use the game's shared formatters (formatSize, formatHertz, formatOps), so the
 // board, the deck, the callouts and the cards print one string per quantity.
 const GROUP = new Intl.NumberFormat('en-US', { maximumFractionDigits: 0 });

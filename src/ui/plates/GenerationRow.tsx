@@ -8,7 +8,7 @@ export const GENERATION_NAMES: Readonly<Record<GenerationView['kind'], string>> 
 };
 const FUELLED = new Set<GenerationView['kind']>(['fuelCell', 'ownPlant']);
 
-/** "Solar farm L2", "40 kW of 64 kW used", "No fuel" or "Fuel billed". */
+/** "Solar farm Control deck", "40 kW of 64 kW used", "No fuel" or "Fuel billed". */
 export function generationLines(g: GenerationView | null): [string, string] {
   if (!g) return ['Generation: none', 'Grid only: every watt at the region price'];
   const use = `${watts(g.usedW)} of ${watts(g.outputW)} used`;

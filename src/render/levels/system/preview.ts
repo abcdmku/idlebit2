@@ -16,7 +16,7 @@ registry.register(createChipRenderer(registry)); registry.register(createSystemR
 const root = document.querySelector('#root')!, canvas = root.querySelector('canvas')!;
 const renderer = createCanvasRenderer(canvas, registry);
 
-// L2 world viewports: desktop 1392 x 648 at N = 3, phone 368 x 600 at N = 2, the band over the top.
+// Control deck world viewports: desktop 1392 x 648 at N = 3, phone 368 x 600 at N = 2, the band over the top.
 const W = innerWidth, Hh = innerHeight, desk = shape === 'land' || shape === 'desktop';
 const viewport: Rect = desk ? rect(24, 24, W - 48, Math.min(648, Hh - 48)) : rect(8, 8, Math.min(368, W - 16), 600);
 const framing = desk ? DESKTOP_FRAMING : PHONE_FRAMING;

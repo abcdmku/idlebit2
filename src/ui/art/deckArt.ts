@@ -1,4 +1,4 @@
-// L2 shell art in art px (layout-L2/art.js partIcon, deck-art.js mini, flask). The deck draws these
+// Control deck shell art in art px (control-deck/art.js partIcon, deck-art.js mini, flask). The deck draws these
 // at the art scale N, one canvas per icon. Level art and the zoom-rung icons belong to the renderer.
 import type { FamilyId } from '../../game';
 import { P, R, drawFamilyIcon, mix, px } from '../../render/core';
@@ -107,7 +107,7 @@ export function drawGear(g: G): void {
   }
 }
 
-/** 16 × 16 task icon: the family's L2 icon (14 × 14 in its 16 px cell), in its band colour. */
+/** 16 × 16 task icon: the family's Control deck icon (14 × 14 in its 16 px cell), in its band colour. */
 export function drawTaskIcon(g: G, family: FamilyId): void {
   g.clearRect(0, 0, 16, 16);
   drawFamilyIcon(g, family, 0, 0);

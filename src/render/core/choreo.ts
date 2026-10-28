@@ -13,8 +13,8 @@ import { idOf } from './types';
 const KEYS: Record<LevelId, string[]> = { chip: [], system: [], rack: [], room: [], global: [] };
 /** The zoom path key of a level snapshot (`level:id`), cached so per-frame lookups never allocate. */
 export function keyOf(s: LevelSnapshot): string {
-  const id = idOf(s), row = KEYS[s.level];
-  return row[id] ??= `${s.level}:${id}`;
+  const id = idOf(s), row = KEYS[s.level], index = s.level === 'chip' ? id * 4 + s.socket : id;
+  return row[index] ??= `${s.level}:${id}${s.level === 'chip' ? `:${s.socket}` : ''}`;
 }
 
 /** Where a level sits on the zoom in progress, relative to its child on the path. */

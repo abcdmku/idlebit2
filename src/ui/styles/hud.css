@@ -20,3 +20,6 @@
 .sla-gauge.compact .sla-title { line-height:12px; }
 .sla-gauge.compact .fig.big { font-size:var(--big); line-height:18px; }
 .sla-gauge.compact .round-rewards-key { height:32px; }
+.rung.newly-unlocked { animation: level-unlocked 1s steps(2,end) infinite; }
+@keyframes level-unlocked { 0%,100% { background:#6b5324; box-shadow:inset 0 0 0 2px var(--gold); } 50% { background:#211c35; box-shadow:inset 0 0 0 2px #9d7d36; } }
+@media (prefers-reduced-motion:reduce) { .rung.newly-unlocked { animation:none; background:#6b5324; box-shadow:inset 0 0 0 2px var(--gold); } }

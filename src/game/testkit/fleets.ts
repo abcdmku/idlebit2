@@ -23,7 +23,7 @@ const core = lvl(3, 4);
 /** Shared by every top server, as a copied or config-built fleet shares its spec (R20). */
 const TOP_SPEC: SystemSpec = {
   kind: 'server', board: 'accelerator',
-  cpu: { cpu: lvl(3, 1), cores: Array.from({ length: 32 }, () => core), clock: flowTop(3), l1: flowTop(3), l2: flowTop(3), l3: lvl(3, 16) },
+  cpu: { cpu: lvl(3, 1), cores: Array.from({ length: 32 }, () => core), clock: flowTop(3), cache: flowTop(3), },
   cpuCount: 2,
   scheduler: { gen: 3, level: 11, strategy: 'mlfq' },
   ram: Array.from({ length: 8 }, () => ({ gen: 5, level: 20, ecc: true })),
@@ -108,6 +108,5 @@ export const FLEETS = {
   fleetMaxHot: (): GameState => primeMarket(buildState({
     ...MAX_FLEET,
     rack: (rack) => ({ ...topRack(rack), cooler: { gen: 0, level: 1, setpointF: 70 }, pdu: { gen: 0, level: 1, capped: false } }),
-  }), FLEET_MARKET_INTENSITY),
-} as const;
+  }), FLEET_MARKET_INTENSITY), } as const;
 export type FleetName = keyof typeof FLEETS;

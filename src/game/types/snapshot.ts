@@ -13,7 +13,6 @@ import type {
   ServerSlotView, ShardDoneView, SiteView, SupplyView, SwitchView, TaskView, TransferView, UnitMode,
 } from './views';
 
-export interface CacheLevelView { readonly kind: 'l1' | 'l2' | 'l3'; readonly bits: number; readonly generation: number; readonly level: number }
 
 /** What is on screen: the focus level and, during a zoom transition, its partner. */
 export interface SnapshotScope { readonly focus: NodeRef; readonly partner: NodeRef | null }
@@ -180,6 +179,7 @@ export interface SchedulerView {
 }
 export interface ChipSnapshot {
   readonly level: 'chip';
+  readonly socket: number;
   /** The node one level up (its system), or null when that level is not opened. Same on every level below global. */
   readonly parent: NodeRef | null;
   readonly systemId: SystemId;
@@ -196,7 +196,7 @@ export interface ChipSnapshot {
   readonly coreSites: number;
   readonly cores: readonly CoreView[];
   /** usedBits reserves capacity; loadedBits fills as actual loading completes, then stays held until release. */
-  readonly cache: { readonly levels: readonly CacheLevelView[]; readonly usedBits: number; readonly loadedBits: number; readonly capacityBits: number; readonly spilledOutBits: number };
+  readonly cache: { readonly generation: number; readonly level: number; readonly usedBits: number; readonly loadedBits: number; readonly capacityBits: number; readonly spilledOutBits: number };
   readonly scheduler: SchedulerView | null;
   /** Occupied scheduler wells, oldest taken first then taskId; remaining wells are empty. */
   readonly queue: readonly ChipQueueEntryView[];
@@ -223,8 +223,9 @@ export interface SystemSnapshot {
   readonly ramSlots: number;
   /** Configuration efficiency η_cfg (compiled.sys.etaCfg), shown on the system plate. */
   readonly etaCfg: number;
-  /** The CPU level's snapshot of CPU 1 (every CPU is an identical copy), for the package minis. */
+  /** First-socket alias; hardware builds are shared, while chips carries each socket's live activity. */
   readonly chip: ChipSnapshot;
+  readonly chips: readonly ChipSnapshot[];
   /** Busy fraction per CPU, length cpuCount (hot sys.sockBusy). */
   readonly cpuBusy: readonly number[];
   readonly online: UnitMode;

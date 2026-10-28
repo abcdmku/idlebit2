@@ -39,9 +39,9 @@ function partNoun(q: Quote): string | null {
   const a = q.action;
   const kind = a.type === 'addPart' ? a.kind : a.type === 'upgradePart' || a.type === 'replacePart' ? a.part.slot.kind : a.type === 'replaceCpu' ? 'cpu' : null;
   switch (kind) {
-    case 'ram': return 'RAM';
-    case 'drive': return 'Drive';
-    case 'l1': case 'l2': case 'l3': return 'Cache';
+    case 'ram': return a.type === 'addPart' ? 'Total RAM' : 'Module capacity';
+    case 'drive': return a.type === 'addPart' ? 'Total storage' : 'Drive capacity';
+    case 'cache': return 'Cache';
 
     case 'clock': case 'cpu': return 'Clock';
     case 'socket': case 'core': return 'Work';
@@ -76,10 +76,10 @@ export function EffectDetail({ quote: q, brief = false }: { quote: Quote; brief?
     {e.marginalLoss && e.unit !== 'W' && <><br /><span className="option-warning">Energy costs more than the extra income</span></>}
     {e.researchCooling && <><br /><span className="option-warning">Research heat {watts(e.researchCooling.heatW)} &gt; rack cooling {watts(e.researchCooling.capacityW)}: may overheat</span></>}
   </>;
-  // Brief (an alternate's one-line key): the headline change, and its warnings, which are never dropped.
+  // Alternates keep capacity, bandwidth and warnings beside their own priced action.
   if (brief) return <><Change label={noun} before={e.capacityBefore} after={e.capacityAfter} unit={e.unit} />
-    {e.throughputBefore !== undefined && e.throughputAfter !== undefined && e.throughputAfter < e.throughputBefore
-      && <> · <Change label={drive ? 'IO' : 'Bandwidth'} before={e.throughputBefore} after={e.throughputAfter} unit="bit/s" /></>}{warnings}</>;
+    {e.throughputBefore !== undefined && e.throughputAfter !== undefined
+      && <><br /><Change label={drive ? 'IO' : 'Bandwidth'} before={e.throughputBefore} after={e.throughputAfter} unit="bit/s" /></>}{warnings}</>;
   return <>
     <Change label={noun} before={e.capacityBefore} after={e.capacityAfter} unit={e.unit} />
     {e.throughputBefore !== undefined && e.throughputAfter !== undefined

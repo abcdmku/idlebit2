@@ -131,7 +131,7 @@ Rules for numbers:
 The saved tree is `World → Site → Zone → Rack → System → Socket`.
 
 - A **system** is one server: a board (`general` or `accelerator`) with 1–4 CPU sockets, RAM modules, GPUs, drives and a fixed power supply.
-- A **socket** holds one CPU: a package, cores, a clock, L1, and optionally L2 and L3. Every CPU in a system is identical. A system's single scheduler serves all of them.
+- A **socket** holds one CPU: a package, cores, a clock, one cache. Every CPU in a system is identical. A system's single scheduler serves all of them.
 - A **rack** has 5 infrastructure slots, top to bottom: cooler, **power control** (D31: battery and smart start, under the cooler), PDU, load balancer, switch. It also has 12 server slots. A server slot holds a system or a storage node (§6.10).
 - A **zone** is one room, one data hall and one availability zone. It has a network rack in the top-left slot (room switch and room load balancer), rows of rack slots, room cooling, one UPS (two with `dualFeed`).
 - A **site** is one data center in one region. It has zones, a data plane that links them, and a grid feed.
@@ -145,7 +145,7 @@ Fleet caps are set in `docs/architecture.md` §1.9: 12 servers per rack, 2 then 
 
 | Zoom level | Opened by (research effect) | What the player gets for free |
 |---|---|---|
-| CPU (formerly Chip) | start | One system: socket 1 with package gen 0, one core gen 0 L1 (1 lane), clock gen 0 L1 (1 Hz), L1 cache gen 0 L1 (1 bit). Power supply gen 0 L1 (dormant until System, §9.2). No scheduler, RAM, GPU or storage. |
+| CPU (formerly Chip) | start | One system: socket 1 with package gen 0, one core gen 0 L1 (1 lane), clock gen 0 L1 (1 Hz), CPU cache gen 0 L1 (1 bit). Power supply gen 0 L1 (dormant until System, §9.2). No scheduler, RAM, GPU or storage. |
 | System | `view: system` | The same system, now shown as a board. |
 | Rack | `view: rack` | A barebones rack (§13.2) holding the existing system in server slot 1. |
 | Room | `view: room` | A barebones zone holding the existing rack in its first rack slot. |
@@ -305,7 +305,7 @@ While a round runs, every online/offline change takes `bootSeconds` (10 s at bas
 | Level upgrade of any part; port speed step; port count step; uplink step | hot | none |
 | Strategy, filter, router queue level (§12.7), setpoint, toggle, C-state limit, DVFS or turbo switch | hot | none (program D1.6) |
 | Replace a part with a newer generation (never the same or a lower one, D39) | cold | the unit that owns it |
-| Add a part into an empty slot (socket, core, RAM module, GPU, NPU, drive, scheduler, L2, L3) | hot | none |
+| Add a part into an empty slot (socket, core, RAM module, GPU, NPU, drive, scheduler) | hot | none |
 | Add a second UPS; remove a part | cold | the owning unit |
 | Scrap a system, storage node or rack | cold | that unit; removal is permanent |
 | Load a configuration onto an existing unit (§13.4) | cold if a part is installed or removed, otherwise hot | that unit |
@@ -472,11 +472,10 @@ Program D10, restored by the user's 26 Oct correction. The market is an **endles
 | Part | Count | Notes |
 |---|---|---|
 | board | 1 | `general`: up to 4 sockets (`cpuSockets` ceiling), up to 4 RAM modules (`ramSlots` ceiling, at most 4), up to 2 GPUs/NPUs (`gpuSlots` ceiling, at most 2). `accelerator` (with `systemBoard`, D39): 1–2 sockets, up to 8 RAM modules, up to 8 GPUs/NPUs, no DIMM penalty. Changing board type is a cold change. |
-| CPU package (`cpu`) | 1 per socket | **All CPUs are identical** (program D7.3): an added CPU copies CPU 1's parts, generations and levels, and every CPU action (upgrade, replace, add a core, add L2 or L3) applies to all CPUs at once. |
+| CPU package (`cpu`) | 1 per socket | **All CPUs are identical** (program D7.3): an added CPU copies CPU 1's parts, generations and levels, and every CPU action (upgrade, replace, add a core) applies to all CPUs at once. |
 | core | 1 to `coreSites` per CPU, at most 32 | Each core has its own generation and level (mirrored across CPUs). |
 | clock | 1 per socket | Shared by that socket's cores. |
-| `l1` | 1 per socket | |
-| `l2`, `l3` | 0 or 1 per socket | Need their research. |
+| `cache` | Exactly 1 per CPU | One generation, level and capacity; upgrades and replacements apply to the identical CPUs together. |
 | scheduler | 0 or 1 per system | One queue and one set of running slots for every core of every CPU. |
 | RAM module | 0 to the board's RAM slots | Each has its own generation, level and ECC flag. Channels (dual, quad) stay bandwidth technology (§6.2). |
 | GPU or NPU | 0 to the board's GPU slots | GPU saves `{kind: 'gpu', model: GpuModelId, upgrades}`. Legacy NPU saves `{kind: 'npu', gen, level}`. |
@@ -494,7 +493,7 @@ Program D10, restored by the user's 26 Oct correction. The market is an **endles
 | `Q` (queue) | scheduler `Q`; 0 with no scheduler |
 | `Keff` | Every core runs a task (D34 fix, 25 Oct): hardware threads. `timeSlice`: `2 × max(K, threads)`. With `dma`: `max(K, threads)`. The scheduler's `K` no longer caps running tasks below the core count; its levels raise `Q`. |
 | `slots` | `Keff + Q` |
-| cache | `Σ` over sockets of L1 + L2 + L3 capacity: the cache tier. Loading and touching each cache bit consumes one CPU op (D46). |
+| cache | `Σ` over sockets of CPU cache capacity: the cache tier. Loading and touching each cache bit consumes one CPU op (D46). |
 | RAM | `Σ` module capacity: the RAM tier |
 | disk | `Σ` drive capacity, plus the rack storage node's free capacity with `sharedStorage` (§6.10): the disk tier |
 | `memCap` | the hierarchy, cache + RAM + disk (D26.1). The only memory gate. |
@@ -936,7 +935,7 @@ actualW = idleW × idleFactor + loadW × u × loadFactor
 | Part | `u` |
 |---|---|
 | core | busy time (tasks and research) / `dt` |
-| clock, L1, L2, L3, package | mean `u` of the socket's cores |
+| clock, cache, package | mean `u` of the socket's cores |
 | scheduler | `(running + queued) / slots` |
 | RAM module, GPU, NPU, drive | its pool's consumption / budget |
 | switch port, uplink, data plane port, backbone link | sending time / `dt`, mean over channels |
@@ -1062,7 +1061,7 @@ A rack's **Power control** unit (its fifth infrastructure slot, under the cooler
 - **Discharge.** While the round runs and the rack is powered, the rack PDU's input for the tick (servers in any mode, cooler, switch, LB and losses) is drawn from the battery first: `fromBattery = min(batteryJ, pduInput × dt)`, `batteryJ −= fromBattery`. Only the rest is billed (§9.8). A battery adds no capacity: PDU usage, `tOver`, losses and heat are unchanged.
 - **Battery time** shown on the rack plate and LCD: `batteryJ / pduInput` seconds at current draw, while discharging.
 - **Recharge.** At Return to market (and auto-return) every battery refills to capacity, billed immediately at `refillJ × 0.25 × the site's marginal price` (§9.10). Whole Credits settle before the action returns, leaving the fractional energy meter in `[0, 1)` so an immediate save is valid. The next tick does not charge the refill again.
-- **Size.** L1 capacity is 60 s of a fresh era rack at full draw **(s)**: about 10 min of an idle awake rack, so it covers boots, wakes and the D30 climb.
+- **Size.** cache capacity is 60 s of a fresh era rack at full draw **(s)**: about 10 min of an idle awake rack, so it covers boots, wakes and the D30 climb.
 - A `standby` rack draws nothing and keeps its charge.
 
 ### 9.10 Off-grid generation (D31)
@@ -1217,7 +1216,7 @@ Each part type has generations `g = 0, 1, …` and levels `L >= 1`. A generation
 | `linear` | `L` | `1 … 8 + g` | `base[g] × L` |
 | `fixed` | 1 | 1 | — |
 
-RAM capacity factors by level are `[1, 2, 4, 6, 8, 12, 16, 20, 24, 28, 32, 40, 48, 56, 64, 80, 96, 112, 128, 160, 192, 224, 256, 320, 384, 448, 512, 640, 768, 896, 1024, 1280, 1536, 1792, 2048, 3072]`. Its bandwidth has its own factor. Registered DIMM research multiplies ECC module capacity by 2 without changing bandwidth or level. This replaces `ramLevelBonus = 4`; no CPU/RAM upgrade extends beyond L36. `l3LevelBonus` still extends L3. Other secondary capacities follow their catalog curves. CPU/RAM no longer inherit the generic `flow` level or price formulas.
+RAM capacity factors by level are `[1, 2, 4, 6, 8, 12, 16, 20, 24, 28, 32, 40, 48, 56, 64, 80, 96, 112, 128, 160, 192, 224, 256, 320, 384, 448, 512, 640, 768, 896, 1024, 1280, 1536, 1792, 2048, 3072]`. Its bandwidth has its own factor. Registered DIMM research multiplies ECC module capacity by 2 without changing bandwidth or level. This replaces `ramLevelBonus = 4`; no CPU/RAM upgrade extends beyond L36. Other secondary capacities follow their catalog curves. CPU/RAM no longer inherit the generic `flow` level or price formulas.
 
 Old CPU/RAM hardware may run faster than later generations' native parts. Crossing a tier's native rate or becoming loss-making adds no purchase gate. Only L36 is the level ceiling. Show whole-part operating loss without a payoff-time prediction, and leave normally affordable/researched upgrades enabled through L35 → L36.
 
@@ -1254,7 +1253,7 @@ clock or RAM upgrade  = ceil(upgrade[g] × 1.7^(L−1) × drive)
 - `x(L)^1.2` makes each generic flow level cost about 2.3× the last (program D5.6). Clock/RAM instead use 1.7× step prices against 1.5× throughput and declining efficiency, per the later CPU/RAM ruling. Their starting per-generation bases remain in A.1 pending campaign calibration.
 - `drive` is the number of cores on the CPU for a clock (an oscillator retunes every core it drives, D34), and 1 for every other part. CPU parts are then × CPU count (§12.3 Special prices).
 
-- `price[g]` and `upgrade[g]` are per-generation values (Appendix A), calibrated to `scripts/market-model.ts`: a generation's L1→L2 upgrade costs about a quarter of the model's level bundle in that era (3 s of a boot chip's output; 15 s of a kHz system's; 90 s of an MHz system's; 240 s of a GHz system's), and installs track the model's rung costs.
+- `price[g]` and `upgrade[g]` are per-generation values (Appendix A), calibrated to `scripts/market-model.ts`: a generation's L1→Control deck upgrade costs about a quarter of the model's level bundle in that era (3 s of a boot chip's output; 15 s of a kHz system's; 90 s of an MHz system's; 240 s of a GHz system's), and installs track the model's rung costs.
 - `ceil` rounds up to a whole Credit, in exact decimal arithmetic. All prices are whole Credits (program D2).
 
 Every price below, after its multipliers, is rounded up with `ceil` to whole Credits.
@@ -1264,7 +1263,8 @@ Special prices:
 - **CPUs.** Every CPU action costs its single-CPU price × the system's CPU count (program D7.3). Adding a CPU costs a copy of CPU 1: its package, cores, clock and caches at their generations and levels, priced as in §13.3.
 - **Accelerator board.** Installing it costs `acceleratorBoard` (A.4) on top of the parts.
 - **ECC.** An ECC module costs 1.25 × the module price, upgrades included.
-- **Upgrade all.** The RAM and drive plates raise every unit of the same generation one level; price is the sum. A GPU upgrade advances its current model one tier, up to tier 90, at the exact difference in card value (§12.6).
+- **Board upgrade bases (D63).** RAM, drives, power supplies and legacy NPUs start upgrades at no less than 10% of their generation's install price; retain higher existing bases. SDRAM and HDD start at 30,000 Credits, or 37,500 for ECC SDRAM. Existing level growth and extra-unit multipliers still apply.
+- **Upgrade all.** Bulk RAM and drive actions raise every unit of the same generation one level; price is the sum. A selected board module's Upgrade action changes only that module. A GPU upgrade advances its current model one tier, up to tier 90, at the exact difference in card value (§12.6).
 - **Rows.** A zone's `n`th row costs `upgradePrice(row, L = n − 1)`.
 - **Shells** (rack frame, storage node chassis, zone, site) have fixed prices and escalation (Appendix A.4).
 
@@ -1350,7 +1350,7 @@ A configuration is a named, serializable description of a unit. It never stores 
 
 | Kind | Stores |
 |---|---|
-| system | board type; CPU count; for CPU 1 (copied to all): package g; cores (g, L each); clock (g, L); L1, L2, L3 (g, L) or none. Scheduler (g, L, strategy) or none. RAM modules (g, L, ECC). GPUs (kind, model ID encoding tier); legacy NPUs (kind, gen, level). Drives (g, L). PSU (g, L, cap switch). DVFS, turbo and C-state settings. Online switch. |
+| system | board type; CPU count; for CPU 1 (copied to all): package g; cores (g, L each); clock (g, L); cache (g, L) or none. Scheduler (g, L, strategy) or none. RAM modules (g, L, ECC). GPUs (kind, model ID encoding tier); legacy NPUs (kind, gen, level). Drives (g, L). PSU (g, L, cap switch). DVFS, turbo and C-state settings. Online switch. |
 | storage node | drives (g, L); PSU (g, L) |
 | rack | cooler (g, L, setpoint); power control (g, L, start settings: start with, wake trigger, order; D31) or none; PDU (g, L, cap switch); load balancer (g, L, strategy, filters, queue level `L` 1–8); switch (g, ports with `k` each, uplinks with `k` each, toggle); a system or storage-node configuration per occupied server slot; online switch |
 | zone | rows; room switch (as rack switch); room load balancer (as rack); room cooling (g, L, setpoint); UPS(s) (g, L, room start controller and settings, D31); a rack configuration per occupied slot; online switch |
@@ -1495,6 +1495,7 @@ D62 removes the phone bar's inner start/end padding: Settings and Dismiss align 
 The core tray offers physical `Add core`. The Cores popup also offers the CPU's clock upgrade directly, with its normal quoted price and before/after speed. Selecting a core shows facts and task details, without generic core upgrade/replace controls. Clock and cache controls belong to the CPU. A task-fix purchase and a normal part upgrade for the same target and price appear once; omit the duplicate bottom section. Keep existing backend lane research. Reuse `selectContextualResearchTree` for contextual research and preserve `selectResearchTree` for GPU model lookup. Desktop and CPU prototypes do not select a production layout.
 
 - **Part:** name, generation, level, capacities, idle/load/actual watts, utilization, hot or cold label per action, upgrade price, replace price, capacity-preserving replace and locked reasons (§12.4).
+- **Board parts (D64):** RAM and drives show selected-module size, used bits and speed. Upgrade has a compact resulting-size/speed preview and price. Add is one action; Change type holds replacements and ECC. An empty slot has a type picker and one Add key. Two separate rows below the board outline show total RAM/disk size, percent used and usage meters. No size/use values or fills cover components. CPU views show one Cache, its capacity and use.
 - **GPU:** model ID, upgrades, VRAM, cores, actual clock, effective rate, perf/W, per-card duty and reservation. Task GPU requirements show only cores and VRAM. Upgrade/replacement quotes show both capacities, clock, rate, actual system watts and exact price. Controls keep stable geometry.
 - **Supply:** delivered W, capacity, usage, loss W, `m`, `tOver` (once nonzero), cap switch and `capFactor`.
 - **Cooler:** `T`, `Teq`, `H / Qc`, duty, setpoint, watts, `tHot`, throttle state.
@@ -1513,7 +1514,7 @@ The core tray offers physical `Add core`. The Cores popup also offers the CPU's 
 
 | Level | Data per element |
 |---|---|
-| CPU | Exactly four parts (program D7.1): clock, cache (one block, total bits; L1, L2, L3 on its plate), scheduler, cores. Per core: busy fraction, current activity (Cache load, Cache read or Compute), the shard on each thread (task ID, shard index, family, progress fraction, and how many threads that shard holds, so cores running one shard draw as one group), research share, C-state. Effective clock. Cache reserved bits, loaded bits and capacity; its lights fill from actual loading progress, including fractional bits, and remain lit until release. CPU miniatures use the same loaded count. Cache bits used / capacity per level, and the running shards' bits that spilled past cache (D26.7). Scheduler: queue entries, reserved count, running count, `K`, `Q`, strategy. Empty core sites up to `coreSites`. The inbound pipe (D10.4) is the incoming connector, not a fifth part: its speed, the task in transfer with bits sent / total, and whether the core is waiting on it. Tapping it opens the port plate (§16.3): before Rack the fixed 1 kHz and "Upgrade at the Rack switch"; from Rack on, the next step as "x → x". |
+| CPU | Exactly four parts (program D7.1): clock, cache (one block, total bits; cache on its plate), scheduler, cores. Per core: busy fraction, current activity (Cache load, Cache read or Compute), the shard on each thread (task ID, shard index, family, progress fraction, and how many threads that shard holds, so cores running one shard draw as one group), research share, C-state. Effective clock. Cache reserved bits, loaded bits and capacity; its lights fill from actual loading progress, including fractional bits, and remain lit until release. CPU miniatures use the same loaded count. Cache bits used / capacity per level, and the running shards' bits that spilled past cache (D26.7). Scheduler: queue entries, reserved count, running count, `K`, `Q`, strategy. Empty core sites up to `coreSites`. The inbound pipe (D10.4) is the incoming connector, not a fifth part: its speed, the task in transfer with bits sent / total, and whether the core is waiting on it. Tapping it opens the port plate (§16.3): before Rack the fixed 1 kHz and "Upgrade at the Rack switch"; from Rack on, the next step as "x → x". |
 | System | Board type, CPU count, `η_cfg`. The memory tiers filling (D26.7): cache, RAM and disk capacity, used bits, spilled bits (bits that didn't fit a faster tier) and rate. The shard arriving on the system's port and each running shard (task ID, shard index of count, units, threads held, GPU domain), so a shard is drawn splitting between the CPU and the GPU card. PSU usage, `tOver`, loss W. RAM used / capacity and bandwidth use per module. Per-card GPU/NPU duty, VRAM holds and assigned tasks; GPU model ID, upgrades, cores, clock and effective rate. Drive IO use and holds. Mode. |
 | Rack | Power control (under the cooler): battery charge, battery time at current draw, awake count of total, next wake. Per server slot: mode, busy fraction, admitted and reserved shard counts. Every shard transfer on the uplinks and ports (task ID, shard index of count, target slot, bits sent of total), so a task is drawn arriving on the uplink and fanning out to the servers. LB queue entries.
  Per port and uplink: busy flag and speed. Load balancer routes per second. Cooler `T` and duty. PDU usage and `tOver`. `tHot`. |
@@ -1538,7 +1539,7 @@ A reserved gear button beside Research opens Settings. Close, Escape and browser
 | Room | Dial Tone |
 | Global | Global Bit |
 
-CPU music is available from the start. Each later song opens with its existing tier research unlock. Music loops independently of simulation time, begins after a browser interaction, and pauses while the page is hidden. The selected song, enabled state and volume are local preferences, separate from the game save. Initial volume is 35%. Unlocking a song preserves the player's selection. Loading a save with fewer unlocked tiers selects the CPU song if the chosen song is locked.
+CPU music is available from the start. Each later song opens with its existing tier research unlock. Music loops independently of simulation time, begins after a browser interaction, and pauses while the page is hidden. The selected song, enabled state, volume and introduced tiers are local preferences, separate from the game save. Initial volume is 35%. Unlocking a tier flashes its ladder icon until opened and preserves the selected song. The first settled visit to that tier selects its song once, preserving enabled state and volume. Later visits and reloads preserve the player's selection. Loading a save with fewer unlocked tiers selects the CPU song if the chosen song is locked.
 
 ## 17. Removed from v2
 
@@ -1558,7 +1559,7 @@ Do not port these:
 
 **D16 re-price.** Before Rack, income is capped by the 1 kHz pipe at about 700 Credits/s (D15), so the path to Rack is priced to that cap:
 - SDRAM 3e5; DDR 4.5e5.
-- A full kHz CPU (package, core, clock, L1, L2, L3, scheduler) costs 2e6. A barebones kHz server (package, core, clock, L1) costs 5e5.
+- A CPU purchase is the sum of its package, cores, clock and single cache at their quoted generations/levels. The system scheduler is priced separately.
 
 After Rack, each part's install price is scaled by the ratio of the model's re-fitted rung price to its old one, using the rung that first buys that part:
 - Rack infrastructure and shells: 1/85 (`Rack, 12 servers`).
@@ -1584,11 +1585,11 @@ Rate parts draw by §9.1 with the `wPerUnit` listed; "idle" is for non-rate part
 | `core` | Hz, kHz, MHz, GHz core | start, `fabKhz`, `fabMhz`, `fabGhz` | fixed, count growth | one thread at the CPU clock | — | hardware energy ratio §9.1; native 10, 6, 3, 2 | 1000, 20834, 71666667, 31666666667 (D51) | no core level upgrades |
 | `clock` | Hz, kHz, MHz, GHz oscillator | start, `fabKhz`, `fabMhz`, `fabGhz` | clock, 1.5×; L1–36 every generation | Hz 1, 1e3, 1e6, 1e9 | — | idle 0.1, 100, 1e5, 1e8 (core carries the load) | 20, 2e5, 8.6e8, 3.7e11 | 3, 1.5e4, 9e7, 2.4e11 per lane driven; 1.7× per level |
 | `scheduler` | Run queue, Multilevel, Work queue, Cluster runtime | start (D39), `fabKhz`, `fabMhz`, `fabGhz` | linear; max L 4, 2, 2, 1 (D57) | `K` 1, 2, 3, 4 (≤ 32) | `Q` 2, 4, 6, 8 times L, capped at 8 | idle 0.1, 100, 1e5, 1e8 | 1000, 3e5, 4.3e8, 1.9e11 | 100, 1.2e5, 1.5e9, 7.7e12 |
-| `ram` | SDRAM, DDR, DDR2, DDR3, DDR4, DDR5 (per module) | `systemBoard`, `ddr`, `ddr2`, `ddr3`, `ddr4`, `ddr5` | RAM ladder §12.1; bandwidth 1.5×; L1–36, registered ECC capacity ×2 | bits 256, 512, 2^20, 2^30, 2^32, 2^38 | bit/s 16, 32, 3.2e4, 6.4e7, 2.56e8, 1.28e11 | hardware energy ratio §9.1; native 10, 10, 6, 3, 3, 2 | 3e5, 4.5e5, 5e6, 3e10, 5e10, 5e13 | 12, 12, 1.2e5, 1.5e9, 1.5e9, 7.7e12; 1.7× per level |
+| `ram` | SDRAM, DDR, DDR2, DDR3, DDR4, DDR5 (per module) | `systemBoard`, `ddr`, `ddr2`, `ddr3`, `ddr4`, `ddr5` | RAM ladder §12.1; bandwidth 1.5×; L1–36, registered ECC capacity ×2 | bits 256, 512, 2^20, 2^30, 2^32, 2^38 | bit/s 16, 32, 3.2e4, 6.4e7, 2.56e8, 1.28e11 | hardware energy ratio §9.1; native 10, 10, 6, 3, 3, 2 | 3e5, 4.5e5, 5e6, 3e10, 5e10, 5e13 | 3e4, 4.5e4, 5e5, 3e9, 5e9, 7.7e12; 1.7× per level |
 | `gpu` | GSMT generation/type/tier, generations 1..9 | `systemBoard`, then `gpuGen2` through `gpuGen9` | tiers 30→50→60→70→80→90 | cores × tier clock | model VRAM × `vramMult` | tier/model coefficient, §12.6 | exact card value, §12.6 | difference of rounded card values |
-| `npu` | Four explicit legacy rows, g0..3 | `systemBoard`; plus `gpuGen2` / `tensorCores` / `matrixGpu` for g1/2/3 | flow, L1..11+g | ops/s 32, 64000, 128000000, 256000000000 | VRAM bits 64, 524288, 1073741824, 549755813888, × `vramMult` | 0.125 W per op/s, legacy curve | 3000000, 7500000, 45000000000, 75000000000000 | 12, 120000, 1500000000, 7700000000000 |
-| `storage` | HDD, SSD, NVMe, SCM (per drive): the disk tier (D26) | `systemBoard`, `ssd`, `nvme`, `scm` | flow; capacity and IO 2× per level | bits 2048, 2^24, 2^34, 2^44 | IO bit/s 512, 2,000, 1.6e7, 6.4e10 | drive 1 W per bit/s | 3e5, 5e6, 3e10, 5e13 | 12, 1.2e5, 1.5e9, 7.7e12 |
-| `psu` | Bench, 80 Plus, Bronze, Gold, Platinum, Titanium | `systemBoard`, `psu80`, `psuBronze`, `psuGold`, `psuPlatinum`, `psuTitanium` | flow | W 256, 1024, 1e5, 4e5, 2e8, 4e11 | — | supply (loss only) | 1000, 1e5, 1e6, 3e6, 1e10, 1e13 | 12, 12, 1.2e5, 1.2e5, 1.5e9, 7.7e12 |
+| `npu` | Four explicit legacy rows, g0..3 | `systemBoard`; plus `gpuGen2` / `tensorCores` / `matrixGpu` for g1/2/3 | flow, L1..11+g | ops/s 32, 64000, 128000000, 256000000000 | VRAM bits 64, 524288, 1073741824, 549755813888, × `vramMult` | 0.125 W per op/s, legacy curve | 3000000, 7500000, 45000000000, 75000000000000 | 300000, 750000, 4500000000, 7700000000000 |
+| `storage` | HDD, SSD, NVMe, SCM (per drive): the disk tier (D26) | `systemBoard`, `ssd`, `nvme`, `scm` | flow; capacity and IO 2× per level | bits 2048, 2^24, 2^34, 2^44 | IO bit/s 512, 2,000, 1.6e7, 6.4e10 | drive 1 W per bit/s | 3e5, 5e6, 3e10, 5e13 | 3e4, 5e5, 3e9, 7.7e12 |
+| `psu` | Bench, 80 Plus, Bronze, Gold, Platinum, Titanium | `systemBoard`, `psu80`, `psuBronze`, `psuGold`, `psuPlatinum`, `psuTitanium` | flow | W 256, 1024, 1e5, 4e5, 2e8, 4e11 | — | supply (loss only) | 1000, 1e5, 1e6, 3e6, 1e10, 1e13 | 100, 1e4, 1.2e5, 3e5, 1.5e9, 7.7e12 |
 
 - GPU tensor technology grants factor 4 to displayed generations 4+ with `tensorCores`, or factor 8 to generations 6+ with `matrixGpu`, replacing 4. NPU tensor factors are its own fixed 1, 1, 4, 8. No new NPU generations or GPU parity follow from the nine-model-generation ladder.
 - `vramMult` is a total multiplier on GPU and legacy NPU capacity: 1 initially, 4 with `gddr6`, 16 with `hbm`. HBM replaces 4; it never compounds to 64. The retained `vramPerLevel` rule ID sets this total despite its legacy name. VRAM has no separate track.
@@ -1846,7 +1847,7 @@ Points where this spec differs from the research doc, and what the research doc 
 | `lbCapability` | Checks "threads". | `threads` is gone (D25.3); the grain is never a gate (§6.3). | Done under D25. |
 | `rackSetpoint` range | 55–80 °F | 55–80 °F, also used for `roomSetpoint` | none |
 | `price` strategy | none | Allowed by D1.7, defined in §8.3 | Add a node if wanted. |
-| CPUs and boards (D7) | Renamed nodes: `accelSystem`, `lbAffinity`, `quadSocket`; `octaChannel` requires `accelSystem`; `quadGpu` and `gpuBaseboard` removed | up to 2 (`dualSocket`), then up to 4 (`quadSocket`) CPUs per general system; at most 4 RAM and 2 GPUs on a general board; 8 RAM (`octaChannel`) and 8 GPUs only on the `accelerator` board (`accelSystem`); cores per CPU ≤ 32 | Aligned. `stacked3d` is stacked L3 (L3 gen 4, A.1), not cores. |
+| CPUs and boards (D7) | Renamed nodes: `accelSystem`, `lbAffinity`, `quadSocket`; `octaChannel` requires `accelSystem`; `quadGpu` and `gpuBaseboard` removed | up to 2 (`dualSocket`), then up to 4 (`quadSocket`) CPUs per general system; at most 4 RAM and 2 GPUs on a general board; 8 RAM (`octaChannel`) and 8 GPUs only on the `accelerator` board (`accelSystem`); cores per CPU ≤ 32 | Aligned.1), not cores. |
 | Research cost (D3) |
  Work volume only. | Data cost paid at start, plus work volume (§11.1). | Add a whole-Data cost to every node. |
 | Architecture caps | "architecture cap" placeholders | Rows 3, zones 3, room ports 24, sites 8; `regions` opens 4 regions, `intercontinental` all 8 (§3.3) | Cite the numbers. |

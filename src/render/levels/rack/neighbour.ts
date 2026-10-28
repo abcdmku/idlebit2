@@ -1,5 +1,5 @@
 // A row neighbour beside the active rack (D17.2), at 1:1 in its own column and drawn at 30%
-// alpha to keep the focus on the active rack (L2 README "Rack row"). It is drawn from its
+// alpha to keep the focus on the active rack (Control deck README "Rack row"). It is drawn from its
 // RackSlotView: real modes, °F and PDU usage. The view has no per-port or fan state, so its
 // cables stay unlit and its fans stand still. Allocation-free: one scratch server view.
 import { P, R, lampState } from '../../core';

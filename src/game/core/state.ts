@@ -15,8 +15,8 @@ import { compileAll, syncHotSizes } from './topology';
 import { runwayMark } from '../build/research/runway';
 import { initialRoundRewards } from '../rewards/progress';
 
-/** D39: L2, L3 and the scheduler are bought from the start; research never unlocks a part type. */
-const START_GENS: readonly PartId[] = ['cpu', 'core', 'clock', 'l1', 'l2', 'l3', 'scheduler', 'psu'];
+/** D39: Control deck, level 3 and the scheduler are bought from the start; research never unlocks a part type. */
+const START_GENS: readonly PartId[] = ['cpu', 'core', 'clock', 'cache', 'scheduler', 'psu'];
 
 export function baseUnlocks(): Unlocks {
   const gens = Object.fromEntries(PART_IDS.map((p) => [p, START_GENS.includes(p) ? 1 : 0])) as Record<PartId, number>;

@@ -40,7 +40,7 @@ interface Source {
 }
 const SOURCES = new WeakMap<RenderSnapshot, Source>();
 
-const keyOf = (ref: NodeRef): string => `${ref.level}:${ref.id}`;
+const keyOf = (ref: NodeRef): string => `${ref.level}:${ref.id}${ref.level === 'chip' ? `:${ref.socket ?? 0}` : ''}`;
 
 /** The player's first live system, and its containers once their levels are opened. */
 export function homeRefs(state: GameState): Partial<Record<LevelId, NodeRef>> {
@@ -63,7 +63,12 @@ function resolve(state: GameState, ref: NodeRef, home: Partial<Record<LevelId, N
     : ref.level === 'room' ? !!b.rooms[ref.id]
       : ref.level === 'rack' ? !!b.racks[ref.id]
         : !!b.systems[ref.id];
-  return ok ? ref : (home[ref.level] ?? home.chip!);
+  if (!ok) return home[ref.level] ?? home.chip!;
+  if (ref.level === 'chip') {
+    const socket = Number.isInteger(ref.socket) ? Math.max(0, Math.min((b.systems[ref.id]?.spec.cpuCount ?? 1) - 1, ref.socket!)) : 0;
+    return socket === (ref.socket ?? 0) ? ref : { ...ref, socket };
+  }
+  return ref;
 }
 
 /** The node one level up that contains the ref, or null when that level is not opened (zoom out). */
@@ -94,11 +99,11 @@ function buildLevel(state: GameState, ref: NodeRef, prev: LevelSnapshot | null, 
   switch (ref.level) {
     case 'chip': {
       const p = cold && prev?.level === 'chip' && prev.systemId === ref.id ? prev : null;
-      return chipSnapshot(state, ref.id, parent, p ? { slots: p.slots, levels: p.cache.levels } : chipStatic(state, ref.id));
+      return chipSnapshot(state, ref.id, parent, p ? { slots: p.slots } : chipStatic(state, ref.id), ref.socket ?? 0);
     }
     case 'system': {
       const p = cold && prev?.level === 'system' && prev.systemId === ref.id ? prev : null;
-      return systemSnapshot(state, ref.id, parent, p ? { slots: p.slots, chip: { slots: p.chip.slots, levels: p.chip.cache.levels } } : systemStatic(state, ref.id));
+      return systemSnapshot(state, ref.id, parent, p ? { slots: p.slots, chip: { slots: p.chip.slots } } : systemStatic(state, ref.id));
     }
     case 'rack': return rackSnapshot(state, ref.id, parent);
     case 'room': return roomSnapshot(state, ref.id, parent);

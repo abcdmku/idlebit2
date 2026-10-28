@@ -16,7 +16,7 @@ export interface PanHandler {
   /** One wheel step's delta, CSS px. False when this wheel isn't a pan, so it zooms (QA-12). */
   wheel(dxCss: number, dyCss: number): boolean;
 }
-/** A drag longer than this many CSS px is a pan, not a tap (L2). */
+/** A drag longer than this many CSS px is a pan, not a tap (Control deck). */
 export const PAN_SLOP = 6;
 export function wheelUnits(event: Pick<WheelEvent, 'deltaY' | 'deltaMode'>, height: number): number {
   return event.deltaY * (event.deltaMode === 1 ? 16 : event.deltaMode === 2 ? height : 1);

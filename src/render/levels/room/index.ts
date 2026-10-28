@@ -26,7 +26,7 @@ export function createRoomRenderer(registry: LevelRegistry): LevelRenderer<'room
     id: 'room', name: 'Room',
     size: (s, out) => setRect(out, WORLD_X, 0, WORLD_W, worldH(s.rows)),
     focus: (s, _vp, out) => focusRect(s.rows, out),
-    /** The pipe enters at the gateway fibre, top-left, above the network rack (L2 D17). */
+    /** The pipe enters at the gateway fibre, top-left, above the network rack (Control deck D17). */
     entry(_s, out) { out.x = GATEWAY.x + (GATEWAY.w >> 1); out.y = 0; return out; },
     draw: (g, s, view, frame) => drawWorld(g, s, view, frame, ctx),
     drawMini: (g, z, rect) => drawRoomMini(g, z, rect),

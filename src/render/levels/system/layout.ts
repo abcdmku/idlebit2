@@ -8,12 +8,12 @@ import type { Rect, WorldForm } from '../../core';
 
 /** The board world: what a parent's mini of the System shows (miniRect). */
 export const WORLD: Readonly<Rect> = { x: 0, y: 0, w: 168, h: 236 };
-/** Desktop adds 16 art px each side for the label leaders (L2 systemLabels). */
+/** Desktop adds 16 art px each side for the label leaders (Control deck systemLabels). */
 export const MARGIN = 16;
-/** Slab footprint; its top face is z px higher (y 28..214), its front face ends at 220. */
-export const BOARD = { x: 8, y: 34, w: 152, h: 186, z: 6 } as const;
-/** The whole board, rear strip to front edge. */
-export const FOCUS: Readonly<Rect> = { x: 6, y: 24, w: 156, h: 196 };
+/** Slab footprint; its top face is z px higher and its front face ends at 200. */
+export const BOARD = { x: 8, y: 34, w: 152, h: 166, z: 6 } as const;
+/** The board and its separate resource rows below, within the existing view footprint. */
+export const FOCUS: Readonly<Rect> = { x: 6, y: 28, w: 156, h: 192 };
 
 /** Integrated network link at the rear edge; its cable comes down from the world's top edge. */
 /** D35: the pipe from the switch enters the board at a plain connector on its rear edge (no port). */
@@ -28,7 +28,7 @@ export const SAVE = { x: 138, y: 37 } as const;
 /** The system's online lamp, inline after the board silk. */
 export const LAMP = { x: 77, y: 32, w: 12 } as const;
 /** Brownout and dark states dim the board's top face. */
-export const POWERED: Readonly<Rect> = { x: 8, y: 28, w: 152, h: 192 };
+export const POWERED: Readonly<Rect> = { x: 8, y: 28, w: 152, h: 172 };
 export const DIMM_Z = 10;
 
 export type SiteType = 'cpu' | 'ram' | 'gpu' | 'drive';
@@ -46,19 +46,14 @@ export const BOARDS: Readonly<Record<BoardKind, BoardLayout>> = {
       cpu: [S(12, 61, 46, 46), S(60, 61, 46, 46), S(12, 109, 46, 46), S(60, 109, 46, 46)],
       ram: [73, 82, 91, 100].map(y => S(110, y, 46, 3)),
       drive: [S(110, 109, 22, 22), S(134, 109, 22, 22), S(110, 133, 22, 22), S(134, 133, 22, 22)],
-      gpu: [S(12, 158, 71, 26), S(85, 158, 71, 26), S(12, 185, 71, 26), S(85, 185, 71, 26)],
-    },
-  },
+      gpu: [S(12, 158, 71, 18), S(85, 158, 71, 18), S(12, 180, 71, 18), S(85, 180, 71, 18)], }, },
   accelerator: {
     silk: 'AX-8', dimm: 'v',
     sites: {
       cpu: [S(12, 61, 46, 46), S(86, 61, 46, 46)],
       ram: [61, 67, 73, 79, 135, 141, 147, 153].map(x => S(x, 66, 3, 40)),
-      gpu: [117, 161].flatMap(y => [12, 49, 86, 123].map(x => S(x, y, 33, 38))),
-      drive: [12, 48, 84, 120].map(x => S(x + 2, 207, 32, 5)),
-    },
-  },
-};
+      gpu: [117, 151].flatMap(y => [12, 49, 86, 123].map(x => S(x, y, 33, 28))),
+      drive: [12, 48, 84, 120].map(x => S(x + 2, 185, 32, 5)), }, }, };
 export const boardOf = (kind: BoardKind): BoardLayout => BOARDS[kind] ?? BOARDS.general;
 
 /** Hit and highlight rect for a site: its footprint plus what stands above it. Writes `out`. */

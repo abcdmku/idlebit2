@@ -1,4 +1,4 @@
-﻿// CPU floorplan (layout-L2/layout.js `floorplan`, D17). Art px. Top to bottom: IN pad, queue, cache,
+﻿// CPU floorplan (control-deck/layout.js `floorplan`, D17). Art px. Top to bottom: IN pad, queue, cache,
 // cores + clock: a task falls through the die in the order it is handled; it pays on its core. Every block edge
 // sits on the art lattice. The world is wider and taller than any viewport, so the board fills it.
 import type { Point, Rect, WorldForm } from '../../core';
@@ -41,7 +41,7 @@ function floorplan(s: Spec, rows: number): Floor {
   // phone: the Clock is a row of its own under the cache, so the cores span the die
   const clockRow = s.clockAbove ? r(x0, cache.y + s.cw + s.gapY, inner, s.cw) : null;
   const coresY = (clockRow ?? cache).y + s.cw + s.gapY;
-  // The cores area keeps the L2 height and grows downward a row at a time once tiles would be too short.
+  // The cores area keeps the Control deck height and grows downward a row at a time once tiles would be too short.
   const coresH = Math.max(s.S, rows * (TILE_H + TILE_GAP) - TILE_GAP);
   // desktop: the cores area runs to 4 art px short of the Clock beside it (its trace gap)
   const cores = r(x0, coresY, clockRow ? inner : inner - s.clockW - 4, coresH);
@@ -76,7 +76,7 @@ export function coreSites(f: Floor, count: number): readonly Rect[] {
   return out;
 }
 /**
- * Every cell of the grid that holds `count` sites: two big sites (L2), or `f.cols` columns and as many
+ * Every cell of the grid that holds `count` sites: two big sites (Control deck), or `f.cols` columns and as many
  * rows as the sites need, filling the cores area (`f` is the floor for that count). Cells past the sites are bare floor.
  */
 export function gridCells(f: Floor, count: number): readonly Rect[] {
@@ -113,7 +113,7 @@ const r_ = (x: number, y: number, w: number, h: number): Rect => ({ x, y, w, h }
 export type CoreArrangement = 'wide' | 'stacked';
 export const arrangementOf = (scale: number | undefined, form: WorldForm = 'desktop'): CoreArrangement =>
   (scale ?? (form === 'phone' ? 2 : 3)) >= 3 ? 'wide' : 'stacked';
-/** Inside a big core site (L2): the icon cell, the task name beside it (wide), the line under that, the bar. */
+/** Inside a big core site (Control deck): the icon cell, the task name beside it (wide), the line under that, the bar. */
 export function coreText(r: Rect, a: CoreArrangement = 'wide') {
   const wide = a === 'wide', ix = r.x + (wide ? 8 : 4), iy = r.y + (wide ? 16 : 20);
   return { pad: ix - r.x, icon: { x: ix, y: iy }, id: { x: ix + 19, y: iy }, line: wide ? { x: ix + 19, y: iy + 8 } : { x: ix, y: iy + 20 }, bar: r.y + (wide ? 40 : 48) };

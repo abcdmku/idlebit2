@@ -42,8 +42,7 @@ export function researchPartSpecs(state: GameState, at: NodeRef | null = null): 
   const room = rack ? b.rooms[rack.room] ?? null : null, openRoom = room?.opened ? room : null;
   const site = room ? b.sites[room.site] ?? null : null, openSite = site?.opened ? site : null;
 
-  const cacheBits = cpu ? capacity(PARTS.l1, cpu.l1.gen, cpu.l1.level) + (cpu.l2 ? capacity(PARTS.l2, cpu.l2.gen, cpu.l2.level) : 0)
-    + (cpu.l3 ? capacity(PARTS.l3, cpu.l3.gen, cpu.l3.level) : 0) : 0;
+  const cacheBits = cpu ? capacity(PARTS.cache, cpu.cache.gen, cpu.cache.level) : 0;
   const gpus = spec?.accels.filter((a) => a.kind === 'gpu') ?? [], npus = spec?.accels.filter((a) => a.kind === 'npu') ?? [];
   const models = gpus.map(g => g.model);
   const gpuText = models.every(m => m === models[0]) ? `${models[0]}${models.length > 1 ? ` ×${models.length}` : ''}` : models.join(' + ');

@@ -132,9 +132,7 @@ export const EFFECT_TEXT: Readonly<Record<string, string>> = {
   liveMigration: "Moves running tasks to another server in the rack when their server goes offline, changes hardware or crashes.",
   hotSwap: "Lets you replace servers without downtime from the Rack view onward.",
   checkpointing: "Lets a split task survive losing a shard if a replacement is placed within 10 s and restarts that shard's work.",
-  stacked3d: "Unlocks stacked L3 cache with eight times the capacity at the same power draw.",
-  l3Slices: "Lets you upgrade L3 cache one level past its usual top, doubling its largest size.",
-  edramL3: "Lets you upgrade L3 cache 2 levels past its usual top, for 4 times its usual largest size.",
+
 };
 
 /** Compact benefit sentences for views with a short text line. */
@@ -270,7 +268,4 @@ export const SHORT_TEXT: Readonly<Record<string, string>> = {
   liveMigration: "Tasks move off failing servers.",
   hotSwap: "Replace servers with no downtime.",
   checkpointing: "Recovers split tasks after a lost shard.",
-  stacked3d: "Unlocks larger stacked L3 cache.",
-  l3Slices: "Allows 1 extra L3 cache level.",
-  edramL3: "Allows 2 extra L3 cache levels.",
 };

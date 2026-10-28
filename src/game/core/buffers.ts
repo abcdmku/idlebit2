@@ -55,7 +55,7 @@ export const SYS_COMPILED = {
   queuePreload: u8, queueBatching: u8,
   preloadTargets: u8, preloadLoaders: u8, residentWorkspace: u8,
   /**
-   * D26.1 memory tiers: cacheBits (Σ L1+L2+L3), ramCap (Σ modules), storageCap (Σ own drives) and diskNode, the
+   * D26.1 memory tiers: cacheBits (Σ CPU cache), ramCap (Σ modules), storageCap (Σ own drives) and diskNode, the
    * rack's storage node whose free capacity extends the disk tier (sharedStorage; -1 none). memCap is the whole
    * hierarchy, cache + RAM + drives + the node's drives: the only memory gate. ioRate is the disk tier's IO.
    */

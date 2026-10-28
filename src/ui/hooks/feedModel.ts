@@ -18,7 +18,7 @@ export const taskKey = (task: TaskRef): string => `${task.epoch}:${task.roundInd
 /** The head may be taken through the end of `deadlineTick`. */
 export const deadlineMs = (deadlineTick: number) => (deadlineTick + 1) * TICK_MS;
 
-/** Transfer time at the current link speed (L2): "1 ms", "250 ms", "1.3 s", "12.5 s". */
+/** Transfer time at the current link speed (Control deck): "1 ms", "250 ms", "1.3 s", "12.5 s". */
 export function transferText(s: number): string {
   return s < 0.1 ? `${Math.max(1, Math.round(s * 1000))} ms` : `${s.toFixed(1)} s`;
 }

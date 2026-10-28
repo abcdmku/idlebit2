@@ -1,4 +1,4 @@
-﻿// The CPU world (L2, D15/D17): only the CPU. Every mark is a part, a route or a real state:
+﻿// The CPU world (Control deck, D15/D17): only the CPU. Every mark is a part, a route or a real state:
 // queue wells fill with waiting tasks, cache cells with loaded bits, cores with the piece of their
 // shard still to run (D25: it drains; cores of one shard are outlined as one group), the clock lamp
 // ticks with real cycles, the IN pad lights while a transfer lands. Payouts pop on the core that ran
@@ -75,11 +75,11 @@ export function chipAfford(quotes: QuoteResult | null, system: SystemId, out: Ch
     const q = list[i]!, a = q.action;
     if (!q.affordable || q.locked) continue;
     if (a.type === 'addPart' && a.system === system) {
-      if (a.kind === 'core') out.site = true; else if (a.kind === 'scheduler') out.queue = true; else if (a.kind === 'l2' || a.kind === 'l3') out.cache = true;
+      if (a.kind === 'core') out.site = true; else if (a.kind === 'scheduler') out.queue = true;
     } else if (a.type === 'upgradePart' && a.part.unit.kind === 'system' && a.part.unit.id === system) {
       const slot = a.part.slot;
       if (slot.kind === 'clock') out.clock = true;
-      else if (slot.kind === 'l1' || slot.kind === 'l2' || slot.kind === 'l3') out.cache = true;
+      else if (slot.kind === 'cache') out.cache = true;
       else if (slot.kind === 'scheduler') out.queue = true;
     }
   }
@@ -153,7 +153,7 @@ function drawCore(g: G, r: Rect, core: CoreView | undefined, live: boolean, chip
     else if (lent) drawGridPiece(g, r, frame.snapshot.research?.progress ?? 0, P.rnd);
     return;
   }
-  // Big sites (L2): the task's family icon under the name, its piece gauge near the foot.
+  // Big sites (Control deck): the task's family icon under the name, its piece gauge near the foot.
   const c = coreText(r, arr), bw = r.w - 2 * c.pad;
   if (busy && core.family !== null) drawFamilyIcon(g, familyId(core.family), c.icon.x, c.icon.y);
   const ix = c.icon.x, by = c.bar;

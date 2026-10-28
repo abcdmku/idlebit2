@@ -50,7 +50,7 @@ function compileFigures(spec: SystemSpec, u: Unlocks): SysFigures {
 
 const CAPACITY: Record<string, [keyof SysValues, CapacityUnit, boolean]> = {
   cpu: ['rate', 'Hz', true], core: ['rate', 'ops/s', true], clock: ['rate', 'Hz', true],
-  l1: ['cache', 'bits', false], l2: ['cache', 'bits', false], l3: ['cache', 'bits', false], scheduler: ['queue', 'slots', false],
+  cache: ['cache', 'bits', false], scheduler: ['queue', 'slots', false],
   ram: ['mem', 'bits', false], gpu: ['gpu', 'ops/s', true], npu: ['gpu', 'ops/s', true], drive: ['store', 'bits', false], psu: ['psu', 'W', false],
 };
 /**
@@ -60,7 +60,7 @@ const CAPACITY: Record<string, [keyof SysValues, CapacityUnit, boolean]> = {
  * or drive's own bits (PartView.capacityBits). Payback still uses the
  * system figures: an upgrade's gain is the rate it adds.
  */
-const OWN_VALUE = new Set(['cpu', 'clock', 'core', 'l1', 'l2', 'l3', 'ram', 'drive']);
+const OWN_VALUE = new Set(['cpu', 'clock', 'core', 'cache', 'ram', 'drive']);
 function ownValue(build: BuildState, ref: PartRef): number {
   const cpu = ref.unit.kind === 'system' ? build.systems[ref.unit.id]?.spec.cpu : null;
   const hz = cpu ? capacity(PARTS.clock, cpu.clock.gen, cpu.clock.level) : 0;

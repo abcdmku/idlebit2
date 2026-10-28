@@ -27,7 +27,7 @@ import { brackets, setReducedMotion } from './px';
 import { depth } from './registry';
 import { clearSpriteCache, context2d } from './sprites';
 import { ZoomTransition } from './transition';
-import { copyHitTarget, createHitTarget, idOf, isRef, refKey, refOf, resetHitTarget } from './types';
+import { copyHitTarget, createHitTarget, isRef, refKey, refOf, resetHitTarget } from './types';
 import type { CanvasRendererDebug, ChildView, FrameClock, HitTarget, LevelId, LevelRegistry, LevelSnapshot,
   Rect, RenderSnapshot, RestArea, TransitionInfo, ViewPresentation, WorldFrame } from './types';
 import { drawVeil } from './unit';
@@ -55,7 +55,7 @@ export function createCanvasRenderer(canvas: HTMLCanvasElement, registry: LevelR
   const faults: Rect[] = Array.from({ length: MAX_FAULTS }, () => rect());
   let snapshot: RenderSnapshot | null = null, view: ViewPresentation | null = null, frame: MutableFrame | null = null;
   let parentIsFocus = false, framing: RestFraming | null = null, form: WorldForm = 'desktop';
-  let hint: ReturnType<typeof refOf> | null = null, curLevel: LevelId | null = null, curId = -1, epoch = -1, partsFor: LevelSnapshot | null = null, disposed = false, pausedAt: number | null = null;
+  let hint: ReturnType<typeof refOf> | null = null, current: ReturnType<typeof refOf> | null = null, epoch = -1, partsFor: LevelSnapshot | null = null, disposed = false, pausedAt: number | null = null;
   let framingStart = -Infinity, lastNow = 0, held: number | null = null, info: (TransitionInfo & { progress: number }) | null = null;
   let measured = { w: 0, h: 0, dpr: 0 };
   let fontReady = !canvas.ownerDocument.fonts, lastClock: FrameClock | null = null;
@@ -130,12 +130,12 @@ export function createCanvasRenderer(canvas: HTMLCanvasElement, registry: LevelR
     if (frame) frame.zoom = null;
   }
   function navigate(s: RenderSnapshot, nowS: number): void {
-    const focus = s.focus, id = idOf(focus);
-    if (curLevel === focus.level && curId === id) return;
-    const prev = curLevel === null ? null : { level: curLevel, id: curId } as ReturnType<typeof refOf>;
+    const focus = s.focus;
+    if (current && isRef(focus, current)) return;
+    const prev = current;
     // Freeze the outgoing level's rest labels before anything moves (they ride its camera out).
     if (prev && labelType && !zoom.active) frozen.freeze(labels, prev.level, cam, viewport, ratio, labelType); else frozen.clear();
-    hint = prev; curLevel = focus.level; curId = id; pressedId = null; endZoom(nowS); fb.leaveWorld(); restPan.reset();
+    hint = prev; current = refOf(focus); pressedId = null; endZoom(nowS); fb.leaveWorld(); restPan.reset();
     if (!prev || !s.partner || !isRef(s.partner, prev)) { chain.reset(); return; }
     const path = zoomPath(registry, s.partner, focus, viewport, children, form);
     if (!path) { chain.reset(); return; }
@@ -260,7 +260,7 @@ export function createCanvasRenderer(canvas: HTMLCanvasElement, registry: LevelR
     if (epoch !== next.epoch) {
       // A load or reset: its completions and failures are history, consumed without drawing.
       epoch = next.epoch; effects.clear(); fb.reset(next); partsFor = null;
-      endZoom(clock.nowS); chain.reset(); curLevel = null; pausedAt = null;
+      endZoom(clock.nowS); chain.reset(); current = null; pausedAt = null;
     }
     const paused = next.round.state !== 'running' && !(next.feed.research?.running && next.feed.research.opsPerSec > 0);
     const live = next.simTimeMs + Math.max(0, Math.min(MAX_EXTRAPOLATION_MS, clock.sincePublishMs));

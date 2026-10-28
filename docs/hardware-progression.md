@@ -140,6 +140,8 @@ upgrade(g, L -> L + 1) = ceil(upgradeBase[g] × 1.7^(L - 1) × drive)
 
 Use the existing per-generation `upgrade` arrays as initial `upgradeBase`. For clocks, `drive` is the lanes on one CPU, then the total price is multiplied by CPU count. For RAM, `drive = 1`, with existing extra-unit and ECC multipliers. Round once after all multipliers, using exact decimal or rational currency arithmetic. A quote at the cap is unavailable. Other part price curves keep their rules.
 
+D63 corrects board upgrade bases that were still 12 Credits against a 300,000-Credit install. RAM, drives, power supplies and legacy NPUs start upgrades at no less than 10% of the generation's install price. Higher existing bases remain. SDRAM and HDD start at 30,000; ECC SDRAM starts at 37,500. Level growth, capacity and bandwidth formulas stay as above. This catalog correction requires no save reset.
+
 The only level cap for these curves is L36. Reaching a new tier's native speed, `E <= 1`, negative net income, or a negative marginal return never invalidates an upgrade quote. The purchase still needs its normal research, wallet and hardware requirements. Do not add profitability locks, automatic replacement, or automatic shutdown because an efficiency ratio crossed 1. Existing insolvency and supply/thermal failure rules still apply.
 
 The 1.7× cost growth exceeds the 1.5× throughput growth. Within-tier upgrades buy time immediately but take longer to recover their cost as efficiency worsens. Preserve separate **Upgrade**, **Replace** and **Research next generation** choices. Buying a level must not automatically unlock or install a generation.

@@ -27,10 +27,10 @@ const task: TaskView = { ...taskRequirements(familyId(0), 1), taskId: 1, shard: 
   gpuCoresMin: 0, vramBits: 0, accelDomain: null };
 
 const CHIP: ChipSnapshot = {
-    level: 'chip', parent: { level: 'system', id: systemId(0) }, systemId: systemId(0), online: 'onMarket', tier: 0, cpuCount: 1,
+    level: 'chip', socket: 0, parent: { level: 'system', id: systemId(0) }, systemId: systemId(0), online: 'onMarket', tier: 0, cpuCount: 1,
     clock: { hz: 1, effectiveHz: 1, generation: 0, level: 1 }, coreSites: 1,
     cores: [{ socket: 0, generation: 0, level: 1, busy: 1, taskId: 1, family: 0, activity: 'compute', progress: 0.25, threads: 1, shard: 0, shardThreads: 1, research: 0, cstate: 0, hz: 1, sleep: null, rate: 1 }],
-    cache: { levels: [{ kind: 'l1', bits: 1, generation: 0, level: 1 }], usedBits: 1, loadedBits: 1, capacityBits: 1, spilledOutBits: 0 },
+    cache: { generation: 0, level: 1, usedBits: 1, loadedBits: 1, capacityBits: 1, spilledOutBits: 0 },
     scheduler: null, queue: [], researchShare: 0, pipe: { speed: 1000, transfer: null, waiting: false }, psu: supply('psu', 4, 0.4), slots: [{ kind: 'core', index: 1, locked: true }],
 };
 
@@ -43,7 +43,7 @@ export const LEVEL_FIXTURES: { readonly [L in LevelId]: Extract<LevelSnapshot, {
   chip: CHIP,
   system: {
     level: 'system', parent: { level: 'rack', id: rackId(0) }, systemId: systemId(0), kind: 'server', board: 'general', cpuCount: 1, ramSlots: 1, etaCfg: 1,
-    online: 'onMarket', timerS: null, timerTotalS: null, chip: CHIP, cpuBusy: [1],
+    online: 'onMarket', timerS: null, timerTotalS: null, chip: CHIP, chips: [CHIP], cpuBusy: [1],
     cpu: { slot: 0, kind: 'cpu', generation: 0, level: 1, active: true, resourceBusy: 1 },
     ram: [], gpu: [], storage: [], psu: supply('psu', 4, 0.4),
     running: [task], queue: { cap: 0, count: 0, sample: [] }, reserved: 0,
@@ -63,8 +63,7 @@ export const LEVEL_FIXTURES: { readonly [L in LevelId]: Extract<LevelSnapshot, {
       systemId: i === 0 ? systemId(0) : null, kind: i === 0 ? ('server' as const) : null, state: i === 0 ? ('onMarket' as const) : ('empty' as const),
       load: i === 0 ? 1 : 0, running: i === 0 ? 1 : 0, family: i === 0 ? task.family : null, admitted: i === 0 ? 1 : 0, reserved: 0, timerS: null, timerTotalS: null, cores: i === 0 ? 1 : 0, busyCores: i === 0 ? 1 : 0, port: i < 4 ? port(i, i === 0) : null,
     })),
-    saveable: true, flows: [],
-  },
+    saveable: true, flows: [], },
   room: {
     level: 'room', parent: { level: 'global', id: 0 }, roomId: roomId(0), siteId: siteId(0), zone: 0, zones: [roomId(0), null, null],
     online: 'onMarket', timerS: null,
@@ -81,6 +80,4 @@ export const LEVEL_FIXTURES: { readonly [L in LevelId]: Extract<LevelSnapshot, {
       grid: i === 0 ? supply('grid', 262_144, 100) : null,
       dataPlane: i === 0 ? { generation: 0, bitsPerSec: 1e6, latencyMs: 200, active: false } : null,
       energyPrice: region.energyPrice, outsideF: region.outsideF, hottestF: i === 0 ? 72 : region.outsideF, timerS: null,
-    })),
-  },
-};
+    })), }, };

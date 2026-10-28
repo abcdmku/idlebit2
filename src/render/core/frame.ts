@@ -1,6 +1,6 @@
-// Renderer harness (dev and QA only) in the L2 D17 frame: the real levels over the sim's view
+// Renderer harness (dev and QA only) in the Control deck D17 frame: the real levels over the sim's view
 // fixtures, at N with the lattice, the band, the queue strip and the core's pipe. Chrome is inert.
-// http://127.0.0.1:6174/src/render/core/l2.html?form=desktop|phone&level=chip|system|rack|room|global
+// http://127.0.0.1:6174/src/render/core/frame.html?form=desktop|phone&level=chip|system|rack|room|global
 //   &zoom=<from level>&hold=<0..1>  hold a zoom from that level into or out of `level`
 //   &scene=boot|landing|mid|max|paused  swap the CPU snapshot for a renderer QA scene
 //   &hover=<target id>  the hover/press bracket on that target (QA)

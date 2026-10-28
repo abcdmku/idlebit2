@@ -60,7 +60,8 @@ export interface ViewStore {
 }
 
 const CLEAR = { selectedId: null, selected: null, plate: false, task: null, rewardMilestone: null } as const;
-const same = (a: NodeRef | null, b: NodeRef | null) => a === b || (!!a && !!b && a.level === b.level && a.id === b.id);
+const same = (a: NodeRef | null, b: NodeRef | null) => a === b || (!!a && !!b && a.level === b.level && a.id === b.id
+  && (a.level !== 'chip' || b.level !== 'chip' || (a.socket ?? 0) === (b.socket ?? 0)));
 
 export function initialView(snapshot: RenderSnapshot, level: LevelId = 'chip', reducedMotion = false): ViewState {
   const home = snapshot.home;

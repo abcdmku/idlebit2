@@ -1,4 +1,4 @@
-﻿// CPU level (L2, D15/D17): only the CPU. The internal node id remains chip. The pipe enters at the
+﻿// CPU level (Control deck, D15/D17): only the CPU. The internal node id remains chip. The pipe enters at the
 // die's IN pad on top (the core draws the pipe); work falls through queue and cache to the cores,
 // and each payout pops on the core that ran it.
 import type { ChipSnapshot } from '../../../game';
@@ -11,11 +11,11 @@ import type { TargetId } from './model';
 import { drawChipMini } from './mini';
 import { chipFloor, coresBlock, drawWorld, siteCount } from './world';
 
-const owner = (s: ChipSnapshot) => ({ level: 'chip', id: s.systemId }) as const;
+const owner = (s: ChipSnapshot) => ({ level: 'chip', id: s.systemId, socket: s.socket }) as const;
 function part(s: ChipSnapshot, out: HitTarget[], i: number, id: Exclude<TargetId, `site${number}` | 'pipe' | 'cores'>, r: Rect): number {
   if (i >= out.length) return i;
   const t = resetHitTarget(out[i]!, id, 'part', owner(s));
-  t.part = partRef(s.systemId, id); copyRect(r, t.rect);
+  t.part = partRef(s.systemId, id, s.socket); copyRect(r, t.rect);
   return i + 1;
 }
 function slot(s: ChipSnapshot, out: HitTarget[], i: number, id: TargetId, r: Rect, index: number): number {
@@ -61,7 +61,7 @@ export function createChipRenderer(_registry: LevelRegistry): LevelRenderer<'chi
       const sites = coreSites(f, siteCount(s));
       if (i < out.length && sites.length) {
         const t = resetHitTarget(out[i++]!, 'cores', 'part', owner(s));
-        t.part = partRef(s.systemId, 'core0'); t.unit = { kind: 'system', id: s.systemId };
+        t.part = partRef(s.systemId, 'core0', s.socket); t.unit = { kind: 'system', id: s.systemId };
         t.slot = sites.length > s.cores.length ? s.cores.length : null; coresBlock(sites, t.rect);
       }
       // The "+" add site: tapping it buys the next core (addPart core on this system, at that index).
@@ -76,10 +76,9 @@ export function createChipRenderer(_registry: LevelRegistry): LevelRenderer<'chi
       }
       return i;
     },
-    // A payout pops on the core that ran it (the view shows CPU 1; every CPU's core i is drawn on
-    // site i). GPU work pops on the System board.
+    // A payout pops only on the selected socket's core. GPU work pops on the System board.
     payoutAnchor(s, c, out, form) {
-      if (c.system !== s.systemId || c.core === null) return -1;
+      if (c.system !== s.systemId || c.core === null || (c.cpu ?? 0) !== s.socket) return -1;
       const f = chipFloor(s, form), sites = coreSites(f, siteCount(s));
       if (c.core >= sites.length) return -1;
       const r = sites[c.core]!;
@@ -88,7 +87,7 @@ export function createChipRenderer(_registry: LevelRegistry): LevelRenderer<'chi
     /** Purchase flash (A10): each part's generation and level. */
     partVersion(s, id) {
       if (id === 'clock') return partVersionOf(s.clock);
-      if (id === 'cache') return sumVersions(s.cache.levels);
+      if (id === 'cache') return partVersionOf(s.cache);
       if (id === 'queue') return partVersionOf(s.scheduler);
       // a core added (or a core's part changed) flashes the whole block
       if (id === 'cores') return s.cores.length * 1000 + sumVersions(s.cores);
@@ -103,6 +102,5 @@ export function createChipRenderer(_registry: LevelRegistry): LevelRenderer<'chi
       for (let i = 0; i < 4; i++) { R(g, 4 + i * 3, 1, 1, 2, P.pad); R(g, 4 + i * 3, 13, 1, 2, P.pad); R(g, 1, 4 + i * 3, 2, 1, P.pad); R(g, 13, 4 + i * 3, 2, 1, P.pad); }
       R(g, 3, 3, 10, 10, P.ink); R(g, 4, 4, 8, 8, P.logic); R(g, 4, 4, 8, 1, P.logicHi); R(g, 4, 4, 1, 8, P.logicHi);
       R(g, 6, 6, 1, 5, P.op); R(g, 9, 6, 1, 5, P.op); R(g, 5, 5, 6, 1, P.cacheOn);
-    },
-  };
+    }, };
 }

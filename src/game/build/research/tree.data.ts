@@ -31,13 +31,10 @@ const filt = (scope: Scope, id: FilterId): ResearchEffect => ({ kind: 'filter', 
 const view = (level: LevelId): ResearchEffect => ({ kind: 'view', level });
 /** Reference rule ids may precede runtime RULE_IDS; tree.ts applies deferred hardware overrides. */
 const rule = (id: RuleId | (string & {}), params?: Record<string, number>): ResearchEffect => (params ? { kind: 'rule', id: id as RuleId, params } : { kind: 'rule', id: id as RuleId });
-const chipGen = (g: number) => (['core', 'clock', 'l1', 'l2', 'l3', 'scheduler', 'cpu'] as const).map((p) => gen(p, g));
+const chipGen = (g: number) => (['core', 'clock', 'cache', 'scheduler', 'cpu'] as const).map((p) => gen(p, g));
 const n = (...row: TreeRow): TreeRow => row;
 
 export const TREE_ROWS: readonly TreeRow[] = [
-  n("stacked3d", "Stacked cache", "compute", ["fabGhz", "dataCenter"], "cpu", "ghz", 13, 4e8, [gen("l3", 4)], ["region", "density"]),
-  n("l3Slices", "L3 slices", "compute", ["fabMhz"], "cpu", "mhz", 10, 4e7, [cap("l3LevelBonus", 1)], ["ram", "rackDist"]),
-  n("edramL3", "eDRAM L3", "compute", ["l3Slices", "fabGhz"], "cpu", "ghz", 12, 2e8, [cap("l3LevelBonus", 2)], ["ram", "roomDist"]),
   n("fabKhz", "kHz fab", "compute", ["systemBoard"], "system", "khz", 4, 27_000, chipGen(1), ["bits", "ints", "threads", "energy"]),
   n("fabMhz", "MHz fab", "compute", ["fabKhz", "rack"], "rack", "mhz", 9, 4.5e7, chipGen(2), ["ram", "rackDist", "energy"]),
   n("fabGhz", "GHz fab", "compute", ["fabMhz", "room"], "room", "ghz", 11, 1.8e8, chipGen(3), ["roomDist", "energy"]),

@@ -1,4 +1,4 @@
-/* The L2 shell (the approved L2 mockup): a stage on the 8 px grid, art at N.
+/* The Control deck shell (the approved Control deck mockup): a stage on the 8 px grid, art at N.
    Every box is placed inline from layout.ts; this file gives faces, tones and text rhythm only.
    D2.1: one body size (--body / --lh); only the Credits and Data figures (--big) and titles (--head) differ. */
 html, body, #root { margin: 0; width: 100%; height: 100%; overflow: hidden; background: var(--ink, #0e0b1c); }

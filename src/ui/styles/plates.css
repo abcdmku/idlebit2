@@ -67,6 +67,21 @@
 .price-short .pz { color: #b9b0df; }
 .option-values { color: #c9c1e5; line-height: var(--lh); }
 .v3-plate .option-cold { margin: 0; color: #ffbf8a; }
+.memory-current { display:flex; justify-content:space-between; gap:8px; }
+.memory-current span, .memory-speed { color:#a99be6; }
+.memory-meter { height:4px; background:#302647; margin-top:6px; }
+.memory-meter i { display:block; height:100%; background:#b9a5ff; }
+.memory-action { padding-top:10px; margin-top:10px; border-top:1px solid #44385f; }
+.memory-action.main { margin:0; padding-top:8px; }
+.v3-plate .memory-change { margin:0 0 6px; color:#8ef5ff; }
+.v3-plate .memory-change.warn, .v3-plate .memory-cold { color:#ffbf8a; }
+.v3-plate .memory-cold { margin:0 0 6px; }
+.memory-extra { margin-top:10px; color:#a99be6; }
+.memory-extra summary { display:flex; align-items:center; min-height:44px; cursor:pointer; }
+.memory-extra summary::before { content:'›'; margin-right:8px; }
+.memory-extra[open] summary::before { content:'⌄'; }
+.memory-add label { display:flex; align-items:center; justify-content:space-between; gap:12px; }
+.memory-add select { min-height:44px; padding:0 8px; background:#29234b; color:#efeaff; border:1px solid #74679f; font:inherit; }
 .option-warning { color: #ffab98; }
 .v3-plate .power-limit { text-align: left; }
 .unsafe-option summary { min-height: 44px; display: flex; align-items: center; cursor: pointer; color: #c9c1e5; }
@@ -296,7 +311,8 @@
 .v3-plate .opts { display: flex; flex-direction: column; gap: var(--s2); margin-top: var(--s2); }
 .v3-plate .opt .option-values { margin: 0; }
 .v3-plate .opt .option-values .fx { white-space: normal; }
-.v3-plate .opt.primary .opt-name { margin: 0; font-weight: 600; }
+.v3-plate .opt .opt-name { margin: 0; font-weight: 600; color: #efeaff; }
+.v3-plate .opts > .opt { border-top: 1px solid #44385f; padding-top: var(--s2); }
 .v3-plate .opt { display: flex; flex-direction: column; gap: var(--s1); }
 .v3-plate .opt .key { margin-top: var(--s1); }
 .v3-plate .cpu-row { display: flex; flex-wrap: wrap; align-items: center; gap: var(--s1) 8px; margin-top: var(--s1); }

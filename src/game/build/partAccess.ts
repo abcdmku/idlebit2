@@ -7,8 +7,8 @@ import { evaluateGpu, gpuAtTierIndex } from './catalog/gpuModels';
 /** A part as the catalog sees it. For the data plane and backbone `level` is the ladder index k; for a switch it is 0. */
 export interface PartAt { readonly id: PartId; readonly gen: number; readonly level: number; readonly gpu?: GpuBuild }
 
-type ChipKind = 'cpu' | 'clock' | 'l1' | 'l2' | 'l3';
-const CHIP: readonly string[] = ['cpu', 'clock', 'l1', 'l2', 'l3', 'core'];
+type ChipKind = 'cpu' | 'clock' | 'cache';
+const CHIP: readonly string[] = ['cpu', 'clock', 'cache', 'core'];
 export const isChipSlot = (ref: PartRef): boolean => CHIP.includes(ref.slot.kind);
 
 const at = (id: PartId, p: PartLevel | null | undefined): PartAt | null => (p ? { id, gen: p.gen, level: p.level } : null);
@@ -23,7 +23,7 @@ export function readPart(build: BuildState, ref: PartRef): PartAt | null {
     if (!sys) return null;
     const cpu = sys.cpu && 'socket' in slot && slot.socket < sys.cpuCount ? sys.cpu : null;
     switch (slot.kind) {
-      case 'cpu': case 'clock': case 'l1': case 'l2': case 'l3': return at(slot.kind, cpu?.[slot.kind]);
+      case 'cpu': case 'clock': case 'cache': return at(slot.kind, cpu?.[slot.kind]);
       case 'core': return at('core', cpu?.cores[slot.index]);
       case 'scheduler': return at('scheduler', sys.scheduler);
       case 'psu': return at('psu', sys.psu);

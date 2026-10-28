@@ -147,6 +147,8 @@ export interface CoolerView {
 
 /** One shard (D25) queued or running on a system. An unsplit task is shard 0 of 1. */
 export interface TaskView extends TaskRequirementsView {
+  /** CPU socket holding the first bound thread, when the shard is running. */
+  readonly socket?: number;
   /** Lifetime assignment: 0..7 physical, 8 linked pool, null while unassigned. */
   readonly accelDomain: number | null;
   readonly taskId: number;
@@ -186,12 +188,14 @@ export interface MemTierView {
   readonly rateBits: number | null;
 }
 
-export type PartViewKind = 'cpu' | 'core' | 'clock' | 'l1' | 'l2' | 'l3' | 'scheduler' | 'ram' | 'gpu' | 'npu' | 'drive' | 'psu';
+export type PartViewKind = 'cpu' | 'core' | 'clock' | 'cache' | 'scheduler' | 'ram' | 'gpu' | 'npu' | 'drive' | 'psu';
 export interface PartView {
   /** Capacity of this RAM stick or drive, in bits. Set for ram and drive. */
   readonly capacityBits?: number;
   /** This RAM stick's channel rate or drive's IO rate, in bit/s. Set for ram and drive. */
   readonly rateBits?: number;
+  /** RAM/drive occupancy, assigned in physical slot order. */
+  readonly usedBits?: number;
   /** Physical memory hold; linked GPU holds are striped in proportion to card capacity. */
   readonly vramUsedBits?: number;
   /** D26.4 unifiedMemory, GPU parts: VRAM need of its running shards placed outside VRAM (in RAM and on disk), bits. */

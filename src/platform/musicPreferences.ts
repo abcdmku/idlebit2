@@ -5,8 +5,9 @@ export interface MusicPreferences {
   readonly enabled: boolean;
   readonly volume: number;
   readonly track: LevelId;
+  readonly introduced: readonly LevelId[];
 }
-export const DEFAULT_MUSIC: MusicPreferences = { enabled: true, volume: 35, track: 'chip' };
+export const DEFAULT_MUSIC: MusicPreferences = { enabled: true, volume: 35, track: 'chip', introduced: ['chip'] };
 
 export function readMusicPreferences(): MusicPreferences {
   try {
@@ -18,7 +19,7 @@ export function readMusicPreferences(): MusicPreferences {
       volume: typeof value.volume === 'number' && Number.isFinite(value.volume)
         ? Math.round(Math.max(0, Math.min(100, value.volume))) : DEFAULT_MUSIC.volume,
       track: MUSIC_TRACKS.find(t => t.id === value.track)?.id ?? DEFAULT_MUSIC.track,
-    };
+      introduced: MUSIC_TRACKS.filter(t => t.id === 'chip' || t.id === value.track || Array.isArray(value.introduced) && value.introduced.includes(t.id)).map(t => t.id), };
   } catch { return DEFAULT_MUSIC; }
 }
 

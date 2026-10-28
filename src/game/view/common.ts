@@ -25,18 +25,14 @@ export function systemLoad(state: GameState, s: number): number {
   return threads > 0 ? Math.min(1, (state.hot.sys.busyThreads[s] ?? 0) / threads) : 0;
 }
 
-/** Task usage in core equivalents; compiled cores and threads span every CPU. */
-/**
- * Busy fraction of each of a system's first `nCores` cores (CPU 1), read from the threads its running records
- * are bound to (rec.thread0); other busy threads (research holders) fill the lowest free ones. Core i is always core i.
- */
 /**
  * Task busy and research, per core. Bound records keep their threads. Research holders take the lowest
- * free threads, then any other unbound busy threads. `researchThreads` are included in `busyThreads`.
+ * free threads, then any other unbound busy threads. Place the whole system first, then read the selected
+ * socket's `firstCore..firstCore+nCores` range. `researchThreads` are included in `busyThreads`.
  */
-export function coreDuty(state: GameState, s: number, nCores: number, tpc: number, busyThreads: number, researchThreads: number): { readonly busy: Float64Array; readonly research: Float64Array } {
+export function coreDuty(state: GameState, s: number, nCores: number, tpc: number, busyThreads: number, researchThreads: number, firstCore = 0): { readonly busy: Float64Array; readonly research: Float64Array } {
   const rec = state.hot.rec, h = state.hot.sys;
-  const total = nCores * tpc;
+  const total = Math.max(nCores + firstCore, state.compiled.sys.cores[s] ?? 0) * tpc;
   const task = new Uint8Array(Math.max(1, total)), research = new Uint8Array(Math.max(1, total));
   const mark = (r: number) => {
     const t0 = rec.thread0[r] ?? -1;
@@ -58,7 +54,7 @@ export function coreDuty(state: GameState, s: number, nCores: number, tpc: numbe
   const busy = new Float64Array(nCores), held = new Float64Array(nCores);
   for (let i = 0; i < nCores; i += 1) {
     let tasks = 0, researching = 0;
-    for (let k = 0; k < tpc; k += 1) { tasks += task[i * tpc + k]!; researching += research[i * tpc + k]!; }
+    for (let k = 0; k < tpc; k += 1) { tasks += task[(firstCore + i) * tpc + k]!; researching += research[(firstCore + i) * tpc + k]!; }
     busy[i] = tasks / tpc; held[i] = researching / tpc;
   }
   return { busy, research: held };
@@ -145,8 +141,7 @@ export function supplyView(kind: SupplyKind, part: PartLevel, n: SupplyNumbers, 
     kind, generation: part.gen, level: part.level, capacityW: viewW(n.capacityW), deliveredW: viewW(deliveredW), usage: n.failed ? 0 : n.usage,
     overloadS: ticksToS(n.overTicks), failed: n.failed, rebootMs: n.failed ? n.rebootTicks * TICK_MS : null,
     loss: n.loss, lossW: viewW(lossW), capped: n.capSwitch, capFactor: n.capFactor,
-    creditsPerMinute: (deliveredW + lossW) * energyPrice * 60,
-  };
+    creditsPerMinute: (deliveredW + lossW) * energyPrice * 60, };
 }
 
 export function psuView(state: GameState, s: number, part: SupplyBuild): SupplyView {
@@ -225,8 +220,7 @@ export function portView(compiled: CompiledBuffers, hot: HotBuffers, link: numbe
     speedHz, rung: compiled.link.rung[link] ?? rung, peer, active: head >= 0,
     family: head >= 0 ? ((hot.rec.family[head] ?? 0) as PortView['family']) : null,
     // TODO(S3): transfer progress needs the record's link start bit clock (R7 covers stages only).
-    progress: 0, queued: Math.max(0, (hot.link.qlen[link] ?? 0) - (head >= 0 ? 1 : 0)),
-  };
+    progress: 0, queued: Math.max(0, (hot.link.qlen[link] ?? 0) - (head >= 0 ? 1 : 0)), };
 }
 
 /** Ports and uplinks of a rack or room switch. `peers[p]` is the child slot behind port p. */

@@ -6,7 +6,7 @@ import type { GpuModelId } from './gpu';
 
 export type TierId = number;
 
-export type BoardPartKind = 'core' | 'socket' | 'l2' | 'l3' | 'scheduler' | 'ram' | 'gpu' | 'npu' | 'drive';
+export type BoardPartKind = 'core' | 'socket' | 'scheduler' | 'ram' | 'gpu' | 'npu' | 'drive';
 
 export type ConfigSource =
   | { readonly kind: 'barebones'; readonly tier?: TierId; readonly storageNode?: boolean; readonly board?: BoardKind }

@@ -1,4 +1,4 @@
-// World level (the L2 World tile): the player's sites, one per region, each with its AZ halls
+// World level (the Control deck World tile): the player's sites, one per region, each with its AZ halls
 // (rooms) as Room minis, joined by the site data plane; the backbone from the scheduler hub
 // beside the gateway; a pip per region. A full Global redesign may come later; this is the
 // mockup's look C, cleaned of decorative motion. Tap a hall to drill into its room.
@@ -76,7 +76,7 @@ export function globalTargets(s: GlobalSnapshot, out: HitTarget[], from: number)
   }
   hubRect(gatewayIndex(s), scratch);
   let t = put('hub', 'part', scratch); if (t) t.part = SCHED;
-  // The pipe's entry (L2 D17): the top of the backbone hub. U anchors the pipe on 'entry'.
+  // The pipe's entry (Control deck D17): the top of the backbone hub. U anchors the pipe on 'entry'.
   setRect(scratch, scratch.x + 4, 0, 3, scratch.y);
   t = put('entry', 'link', scratch); if (t) t.part = SCHED;
   return n;
@@ -91,7 +91,7 @@ export function createGlobalRenderer(registry: LevelRegistry): LevelRenderer<'gl
     focus: (s, _vp, out) => worldFocus(s, out),
     restCentre: (s, out) => worldCentre(s, out),
     panSnap: () => WORLD_SNAP,
-    /** The pipe enters at the top of the backbone hub beside the gateway (L2 D17). */
+    /** The pipe enters at the top of the backbone hub beside the gateway (Control deck D17). */
     entry(s, out) { hubRect(gatewayIndex(s), scratch); out.x = scratch.x + 5; out.y = scratch.y - 1; return out; },
     draw: (g, s, _view, f) => drawGlobal(g, s, f, ctx),
     /** D31: the global start controller's tag (sites on of those it controls). */

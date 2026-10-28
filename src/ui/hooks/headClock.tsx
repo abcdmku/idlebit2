@@ -33,7 +33,7 @@ export function useHeadSeconds(): number | null {
 }
 
 /**
- * The head's 10 s along the top inside edge of its panel (L2 rimBar): `w` CSS px wide, filled in
+ * The head's 10 s along the top inside edge of its panel (Control deck rimBar): `w` CSS px wide, filled in
  * whole art px, coloured by what is left. Width is written per frame, never through React.
  */
 export function RimClock({ w, n, blocked, top }: { w: number; n: number; blocked: boolean; /** Where the bar sits; the top inside edge unless given (the strip head uses its bottom edge). */ top?: number }) {

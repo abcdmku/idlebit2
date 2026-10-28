@@ -30,13 +30,13 @@ export function OptionRow({ option: o, primary = false, onAction, onResearch, re
   const q = o.quote, cold = coldText(q), effect = o.effect ?? (q.effect ? <EffectDetail quote={q} brief={!primary} /> : null);
   const verb = q.overSupply ? `${o.verb} anyway` : o.verb;
   return <section className={`opt${primary ? ' primary' : ''}${className ? ` ${className}` : ''}`}>
-    {primary && <p className="opt-name">{o.name}</p>}
+    <p className="opt-name">{o.name}</p>
     {effect && <p className="option-values">{effect}</p>}
     {cold && <p className="option-cold">{cold}</p>}
     {/* R17: an option over a supply says so in its own words ("With DDR4 · L1: full load …") with its preparation, a
         secondary key, inside the option: never a plate-wide block that reads as the machine as it is now. */}
     <OverSupplyNote quote={q} onAction={onAction} scope={o.name} prepAbove={prepAbove} />
-    <QuoteKey quote={q} label={primary ? verb : `${verb} ${o.name}`} tone={primary && !q.overSupply ? '' : 'replace'} showSupplyNote={false}
+    <QuoteKey quote={q} label={verb} tone={primary && !q.overSupply ? '' : 'replace'} showSupplyNote={false}
       ariaLabel={`${verb}: ${o.name}, ${q.cost} ${q.currency === 'data' ? 'Data' : 'Credits'}`}
       onAction={onAction} onResearch={onResearch} researchName={researchName} />
   </section>;

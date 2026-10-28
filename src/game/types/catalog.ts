@@ -44,7 +44,7 @@ export type MemTier = (typeof MEM_TIERS)[number];
 /* ---------- Parts (spec Appendix A) ---------- */
 
 export const PART_IDS = [
-  'core', 'clock', 'l1', 'l2', 'l3', 'scheduler', 'cpu', 'psu',
+  'core', 'clock', 'cache', 'scheduler', 'cpu', 'psu',
   'ram', 'gpu', 'npu', 'storage', 'storageNode',
   'rackCooler', 'pdu', 'lb', 'switch', 'roomCooler', 'ups', 'row', 'roomLb', 'roomSwitch',
   'dataPlane', 'grid', 'zone', 'site', 'backbone', 'globalScheduler', 'rack', 'acceleratorBoard',
@@ -121,7 +121,7 @@ export type Era = 'hz' | 'khz' | 'mhz' | 'ghz';
 export type WorkTier = 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12 | 13 | 14 | 15;
 export type CeilingId =
   | 'coreSites' | 'threadsPerCore' | 'cpuSockets'
-  | 'ramSlots' | 'ramLevelBonus' | 'l3LevelBonus' | 'gpuSlots' | 'driveSlots'
+  | 'ramSlots' | 'ramLevelBonus' | 'gpuSlots' | 'driveSlots'
   | 'rackPorts' | 'roomPorts' | 'uplinks' | 'researchQueue'
   | 'roomRows' | 'siteZones' | 'sites' | 'regions';
 /** "net" = every network scope the player has opened. */

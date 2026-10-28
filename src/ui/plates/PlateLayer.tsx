@@ -250,7 +250,7 @@ function TargetPlate({ target: t, focus }: { target: HitTarget; focus: LevelSnap
   }
   if (t.kind === 'slot' && !t.part && (focus.level === 'chip' || focus.level === 'system'))
     return <SitePlate {...common} target={t} focus={focus} quotes={quotes}
-      onOpenCpu={focus.level === 'system' ? () => view.dispatch({ type: 'drill', ref: { level: 'chip', id: focus.systemId } }) : undefined} />;
+      onOpenCpu={focus.level === 'system' ? () => view.dispatch({ type: 'drill', ref: { level: 'chip', id: focus.systemId, socket: t.slot ?? 0 } }) : undefined} />;
   if (t.kind === 'save' && t.unit) {
     const unit = t.unit, taken = selectSavedConfigs(shell.store.getState(), unit.kind).names;
     return <SavePrompt unit={unit} bounds={area} defaultName={nextDefaultName(selectUnitLabel(shell.store.getState(), unit), taken)} taken={taken}
@@ -314,7 +314,7 @@ function TargetPlate({ target: t, focus }: { target: HitTarget; focus: LevelSnap
     const facts = partFacts(focus, s, t.part.unit.kind === 'site' ? t.part.unit.id : undefined);
     // CPU, RAM and storage choose between Upgrade, Add and Replace; the CPU's own view opens only from its key.
     if (facts && focus.level === 'system' && (s.kind === 'cpu' || s.kind === 'ram' || s.kind === 'drive')) {
-      const chip = { level: 'chip', id: focus.systemId } as const;
+      const chip = { level: 'chip', id: focus.systemId, socket: s.kind === 'cpu' ? s.socket : 0 } as const;
       return <BoardPartPlate {...common} quotes={quotes} slot={s.kind} part={t.part} focus={focus} facts={facts} unblocks={unblocks} unblock={unblock}
         onOpenCpu={s.kind === 'cpu' ? () => view.dispatch({ type: 'drill', ref: chip }) : undefined} />;
     }

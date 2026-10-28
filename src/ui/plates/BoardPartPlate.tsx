@@ -12,6 +12,7 @@ import { PlateFrame } from './PlateFrame';
 import type { PartFacts } from './partFacts';
 import type { PlateCommon } from './types';
 import { Lines } from './widgets';
+import { memoryPartView } from './MemoryPart';
 
 export type BoardSlot = 'cpu' | 'ram' | 'drive';
 const NOUN: Record<BoardSlot, string> = { cpu: 'CPU', ram: 'RAM', drive: 'Drive' };
@@ -44,12 +45,13 @@ export function boardOptions(slot: BoardSlot, n: number, own: readonly Quote[], 
   const { upgrade: partUp, replace, replaces } = partQuotes(own);
   const upgrade = slot === 'cpu' ? clock.find(q => q.action.type === 'upgradePart') : partUp;
   const add = leadAdd(adds, installed), ecc = own.find(eccToDo);
-  const noun = NOUN[slot], addVerb = slot === 'cpu' ? 'Add CPU' : 'Add';
+  const noun = NOUN[slot], addVerb = slot === 'cpu' ? 'Add CPU' : slot === 'ram' ? 'Add module' : 'Add drive';
   const leads: Option[] = [];
   if (ecc && eccFirst) leads.push({ name: 'on all RAM', verb: 'Enable ECC', quote: ecc });
-  if (upgrade) leads.push({ name: slot === 'cpu' ? `Clock · ${upgrade.label}` : upgrade.label ?? 'Next level', verb: 'Upgrade', quote: upgrade });
+  if (upgrade) leads.push({ name: slot === 'cpu' ? `${n > 1 ? `All ${n} CPUs` : 'CPU clock'} · ${upgrade.label}` : `Next: ${upgrade.label ?? 'next level'}`,
+    verb: slot === 'cpu' ? 'Upgrade clock' : slot === 'ram' ? 'Upgrade module' : 'Upgrade drive', quote: upgrade });
   if (add) leads.push({ name: slot === 'cpu' ? `CPU ${n + 1} · same as CPU 1` : `${noun} ${n + 1} · ${add.label}`, verb: addVerb, quote: add });
-  if (replace) leads.push({ name: genOf(replace), verb: 'Replace', quote: replace });
+  if (replace) leads.push({ name: genOf(replace), verb: slot === 'cpu' && n > 1 ? 'Replace all CPUs' : 'Replace', quote: replace });
   const others: Option[] = [
     ...perGeneration(replaces).filter(q => !sameGeneration(q, replace)).map(q => ({ name: genOf(q), verb: 'Replace', quote: q })),
     ...adds.filter(q => q !== add).map(q => ({ name: `${noun} ${n + 1} · ${q.label}`, verb: addVerb, quote: q })),
@@ -82,16 +84,23 @@ export interface BoardPartView { readonly title: string; readonly sub: string; r
  * The content of a CPU, RAM module or drive plate. `active` false asks nothing and returns null (an empty site that
  * may become this part after its Add keeps calling the same hooks).
  */
-export function useBoardPart({ active, slot, focus, facts, onOpenCpu, quotes, unblock, unblocks = 0, onAction, onResearch, researchName }:
-  Omit<BoardPartPlateProps, 'part' | 'facts' | 'onClose' | 'bounds'> & { active: boolean; facts: PartFacts | null; wide: boolean }): BoardPartView | null {
+export function useBoardPart({ active, slot, part, focus, facts, onOpenCpu, quotes, unblock, unblocks = 0, onAction, onResearch, researchName }:
+  Omit<BoardPartPlateProps, 'part' | 'facts' | 'onClose' | 'bounds'> & { part?: PartRef; active: boolean; facts: PartFacts | null; wide: boolean }): BoardPartView | null {
   const unit = { kind: 'system' as const, id: focus.systemId };
-  const clock = useQuote(active && slot === 'cpu' ? { kind: 'part', part: { unit, slot: { kind: 'clock', socket: 0 } } } : null);
+  const clock = useQuote(active && slot === 'cpu' ? { kind: 'part', part: { unit, slot: { kind: 'clock', socket: part?.slot.kind === 'cpu' ? part.slot.socket : 0 } } } : null);
   const adds = useQuote(active ? addRequest(focus, slot) : null);
   if (!active || !facts) return null;
   const n = slot === 'cpu' ? focus.cpuCount : slot === 'ram' ? focus.ram.length : focus.storage.length;
+  if (slot !== 'cpu') {
+    const module = (slot === 'ram' ? focus.ram : focus.storage)[part && 'index' in part.slot ? part.slot.index : 0];
+    if (!module) return null;
+    return memoryPartView({ module, slot, facts, own: quotes?.quotes ?? [],
+      add: leadAdd(adds?.quotes.filter(q => q.action.type === 'addPart') ?? [], module.generation),
+      eccFirst: unblock?.action.type === 'convertRamToEcc', onAction, onResearch, researchName });
+  }
   const eccFirst = unblock?.action.type === 'convertRamToEcc';
   const { main, rest } = boardOptions(slot, n, quotes?.quotes ?? [], clock?.quotes ?? [], adds?.quotes.filter(q => q.action.type === 'addPart') ?? [], eccFirst,
-    (slot === 'ram' ? focus.ram : slot === 'drive' ? focus.storage : [])[0]?.generation);
+    undefined);
   const buy = (q: Quote) => onAction(q.action);
   const row = { onAction: buy, onResearch, researchName };
   const cores = focus.chip.cores.length;
@@ -100,10 +109,10 @@ export function useBoardPart({ active, slot, focus, facts, onOpenCpu, quotes, un
   // Open CPU is navigation, so it sits in the head and leaves the body to the options.
   const head = onOpenCpu && <button type="button" className="key ghost open-cpu" aria-label="Open CPU: cores, cache and queue"
     onClick={(e) => { e.stopPropagation(); onOpenCpu(); }}>Open CPU</button>;
-  return { title: facts.title, sub: `${facts.sub} · ${facts.status}`, head,
+  return { title: facts.title, sub: `${facts.sub} · L${facts.level}`, head,
     footer: main && <OptionRow option={main} primary {...row} />,
     body: <>
-      <Lines lines={lines} slots={onOpenCpu ? 1 : slot === 'ram' ? 2 : 1} />
+      <Lines lines={lines} slots={onOpenCpu ? 1 : 3} />
       {unblocks > 0 && <p className="p-hint payback">Needed by {unblocks} queued {unblocks === 1 ? 'task' : 'tasks'}</p>}
       <OptionList options={rest} {...row} />
     </> };

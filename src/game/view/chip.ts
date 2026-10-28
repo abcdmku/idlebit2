@@ -1,12 +1,11 @@
-import { capacity, PARTS } from '../build/catalog';
 import { CEILINGS_MAX, MAX_CORES_PER_CPU, MAX_CPUS } from '../core/constants';
-import type { CpuBuild, PartLevel, SystemSpec } from '../types/build';
+import type { SystemSpec } from '../types/build';
 import { QUEUE_STRATEGY_IDS, type PartId } from '../types/catalog';
 import { familyId, type NodeRef, type SystemId } from '../types/ids';
 import { G } from '../core/buffers';
 import { MODE } from '../core/timers';
 import { DRAW_NONE, DRAW_SLEEP, drawKind } from '../phys/draw';
-import type { CacheLevelView, ChipSnapshot, CoreSleep, CoreView, SchedulerView } from '../types/snapshot';
+import type { ChipSnapshot, CoreSleep, CoreView, SchedulerView } from '../types/snapshot';
 import type { GameState } from '../types/state';
 import type { BuildSlotView } from '../types/views';
 import { coreDuty, modeName, psuView, systemTimerS } from './common';
@@ -28,15 +27,6 @@ export function researchShare(state: GameState, s: number): number {
 }
 
 
-/** Cache levels of one CPU, each at its own catalog size (compile sums the same values). */
-function cacheLevels(cpu: CpuBuild | null): CacheLevelView[] {
-  if (!cpu) return [];
-  const parts: [CacheLevelView['kind'], PartLevel][] = [['l1', cpu.l1]];
-  if (cpu.l2) parts.push(['l2', cpu.l2]);
-  if (cpu.l3) parts.push(['l3', cpu.l3]);
-  return parts.map(([kind, p]) => ({ kind, bits: capacity(PARTS[kind], p.gen, p.level), generation: p.gen, level: p.level }));
-}
-
 function chipSlots(state: GameState, spec: SystemSpec | null): BuildSlotView[] {
   const slots: BuildSlotView[] = [];
   const cpu = spec?.cpu ?? null;
@@ -44,8 +34,6 @@ function chipSlots(state: GameState, spec: SystemSpec | null): BuildSlotView[] {
   const cores = cpu?.cores.length ?? 0;
   for (let i = cores; i < sites; i += 1) slots.push({ kind: 'core', index: i, locked: false });
   if (sites < Math.min(CEILINGS_MAX.coreSites, MAX_CORES_PER_CPU)) slots.push({ kind: 'core', index: sites, locked: true });
-  if (cpu && !cpu.l2) slots.push({ kind: 'l2', index: 0, locked: !genOpen(state, 'l2') });
-  if (cpu && !cpu.l3) slots.push({ kind: 'l3', index: 0, locked: !genOpen(state, 'l3') });
   if (spec && !spec.scheduler) slots.push({ kind: 'scheduler', index: 0, locked: !genOpen(state, 'scheduler') });
   return slots;
 }
@@ -58,29 +46,29 @@ const cpuCacheBits = (state: GameState, id: SystemId): number =>
   (state.compiled.sys.cacheBits[id] ?? 0) / Math.max(1, cpuCountOf(state.build.systems[id]?.spec ?? null));
 
 /** Static parts of the CPU view that change only with build, compiled or unlocks. */
-export interface ChipStatic { readonly slots: readonly BuildSlotView[]; readonly levels: readonly CacheLevelView[] }
+export interface ChipStatic { readonly slots: readonly BuildSlotView[] }
 export function chipStatic(state: GameState, id: SystemId): ChipStatic {
   const spec = state.build.systems[id]?.spec ?? null;
-  return { slots: chipSlots(state, spec), levels: cacheLevels(spec?.cpu ?? null) };
+  return { slots: chipSlots(state, spec) };
 }
 
 /**
- * The CPU level (D7.1): one CPU's clock, cache, scheduler and cores. The view shows CPU 1. Its cores
- * fill first from the pooled queue, so the first running records sit on it. With several CPUs its
- * busy threads come from exec's per-socket count.
+ * The selected CPU's clock, cache, shared scheduler and bound core activity.
  */
-export function chipSnapshot(state: GameState, id: SystemId, parent: NodeRef | null, st: ChipStatic = chipStatic(state, id)): ChipSnapshot {
+export function chipSnapshot(state: GameState, id: SystemId, parent: NodeRef | null, st: ChipStatic = chipStatic(state, id), selectedSocket = 0): ChipSnapshot {
   const spec = state.build.systems[id]?.spec ?? null;
   const cpu = spec?.cpu ?? null;
   const c = state.compiled.sys, h = state.hot.sys;
   const cpus = cpuCountOf(spec);
   const threads = c.threads[id] ?? 0;
-  const busyThreads = cpus > 1 ? (h.sockBusy[id * MAX_CPUS] ?? 0) : (h.busyThreads[id] ?? 0);
+  const socket = Math.max(0, Math.min(Math.max(0, cpus - 1), Math.floor(selectedSocket)));
+  const busyThreads = h.busyThreads[id] ?? 0;
   const parts = (cpu?.cores ?? []).slice(0, MAX_CORES_PER_CPU);
   const nCores = parts.length;
   const tpc = nCores > 0 ? Math.max(1, Math.round(threads / (nCores * Math.max(1, cpus)))) : 1;
-  const share = researchShare(state, id);
-  const duty = coreDuty(state, id, nCores, tpc, busyThreads, h.researchThreads[id] ?? 0);
+  const threadOffset = socket * nCores * tpc;
+  const duty = coreDuty(state, id, nCores, tpc, busyThreads, h.researchThreads[id] ?? 0, socket * nCores);
+  const share = nCores > 0 ? duty.research.reduce((sum, value) => sum + value, 0) / nCores : 0;
 
   // Each running record sits on the threads it was bound to at start (rec.thread0): core i shows the task on
   // core i, so a finished task never shifts the others (user, 25 Oct). CPU-stage records show their task.
@@ -98,7 +86,7 @@ export function chipSnapshot(state: GameState, id: SystemId, parent: NodeRef | n
     const prepared = preloadForRecord(state, id, q);
     if (!prepared) continue;
     loadedBits += prepared.loadedBits;
-    const core = rec.loaderThread[q] ?? -1;
+    const core = Math.floor(((rec.loaderThread[q] ?? -1) - threadOffset) / tpc);
     if (core >= 0 && core < nCores) {
       fam[core] = rec.family[q]!; taskIds[core] = rec.taskId[q]!; activity[core] = 'preload';
       prog[core] = prepared.targetBits > 0 ? prepared.loadedBits / prepared.targetBits : 1; group[core] = 1;
@@ -119,8 +107,8 @@ export function chipSnapshot(state: GameState, id: SystemId, parent: NodeRef | n
     loadedBits += (cached + Math.max(0, (rec.memC[r] ?? 0) - cached) * loaded) * (rec.count[r] ?? 1);
     if (res !== 0) return;
     const held = (rec.threads[r] ?? 1) * (rec.count[r] ?? 1), t0 = rec.thread0[r] ?? -1;
-    if (t0 < 0) { unbound.push(r); return; }
-    for (let core = Math.floor(t0 / tpc); core < Math.ceil((t0 + held) / tpc) && core < nCores; core += 1) if (taskIds[core] === null) show(r, core, held);
+    if (t0 < 0) { if (socket === 0) unbound.push(r); return; }
+    for (let core = Math.max(0, Math.floor((t0 - threadOffset) / tpc)); core < Math.ceil((t0 + held - threadOffset) / tpc) && core < nCores; core += 1) if (taskIds[core] === null) show(r, core, held);
   });
   // Records without a binding (hand-built states) fill the lowest free cores, oldest taken first.
   unbound.sort(oldestFirst);
@@ -142,12 +130,11 @@ export function chipSnapshot(state: GameState, id: SystemId, parent: NodeRef | n
     const busy = duty.busy[i]!, research = share > 0 ? duty.research[i]! : 0, occupied = busy + research;
     const sleep: CoreSleep | null = paused ? null : draw === DRAW_SLEEP ? 'S3' : draw !== DRAW_NONE && occupied === 0 && cstate > 0 ? 'C-state' : null;
     return {
-      socket: 0, rate: hz, generation: part.gen, level: part.level, busy,
+      socket, rate: hz, generation: part.gen, level: part.level, busy,
       hz: sleep === null ? liveHz : 0, sleep,
       taskId: taskIds[i]!, family: fam[i]! >= 0 ? familyId(fam[i]!) : null, activity: activity[i]!, progress: prog[i]!, threads: tpc,
       shard: shardIx[i]! >= 0 ? shardIx[i]! : null, shardThreads: group[i]!,
-      research, cstate: occupied > 0 ? 0 : cstate,
-    };
+      research, cstate: occupied > 0 ? 0 : cstate, };
   });
 
   const sched = spec?.scheduler ?? null;
@@ -163,14 +150,13 @@ export function chipSnapshot(state: GameState, id: SystemId, parent: NodeRef | n
   }
   const capacityBits = cpuCacheBits(state, id);
   return {
-    level: 'chip', parent, systemId: id, online: modeName(h.mode[id]), timerS: systemTimerS(state.hot, id), tier: cpu?.cpu.gen ?? 0, cpuCount: cpus,
+    level: 'chip', socket, parent, systemId: id, online: modeName(h.mode[id]), timerS: systemTimerS(state.hot, id), tier: cpu?.cpu.gen ?? 0, cpuCount: cpus,
     clock: { hz, effectiveHz: hz * (h.clockFactor[id] ?? 1), generation: cpu?.clock.gen ?? 0, level: cpu?.clock.level ?? 1 },
     coreSites: Math.min(state.research.unlocks.ceilings.coreSites, MAX_CORES_PER_CPU), cores,
     cache: {
-      levels: st.levels, usedBits: Math.min(capacityBits, (h.usedCache[id] ?? 0) / Math.max(1, cpus)), capacityBits,
+      generation: cpu?.cache.gen ?? 0, level: cpu?.cache.level ?? 1, usedBits: Math.min(capacityBits, (h.usedCache[id] ?? 0) / Math.max(1, cpus)), capacityBits,
       loadedBits: Math.min(capacityBits, loadedBits / Math.max(1, cpus)),
-      spilledOutBits: spilledOutOfCache(state, id),
-    },
+      spilledOutBits: spilledOutOfCache(state, id), },
     scheduler, queue: queued.slice(0, scheduler?.q ?? 0).map((r) => ({ taskId: rec.taskId[r]!, family: familyId(rec.family[r]!),
       preloading: preparation?.taskId === rec.taskId[r]!,
       preloadProgress: preparation?.taskId === rec.taskId[r]! && preparation.targetBits > 0 ? preparation.loadedBits / preparation.targetBits : 0 })),
@@ -179,6 +165,5 @@ export function chipSnapshot(state: GameState, id: SystemId, parent: NodeRef | n
       speed: c.pipeSpeed[id] ?? 0, transfer: inboundTransfer(state, id),
       waiting: (h.pipeRec[id] ?? -1) >= 0 && (h.running[id] ?? 0) === 0 && (h.queueLen[id] ?? 0) === 0,
     },
-    psu: psuView(state, id, spec?.psu ?? { gen: 0, level: 1, capped: false }),
-  };
+    psu: psuView(state, id, spec?.psu ?? { gen: 0, level: 1, capped: false }), };
 }

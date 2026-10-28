@@ -12,6 +12,7 @@ export interface MusicPlayer {
   getSnapshot(): MusicSnapshot;
   update(change: Partial<MusicPreferences>): void;
   play(): void;
+  visitLevel(level: LevelId): void;
   dispose(): void;
 }
 
@@ -72,6 +73,11 @@ export function createMusicPlayer(store: GameStore, onChange: (snapshot: MusicSn
   sync(); onChange(snapshot());
   return {
     getSnapshot: snapshot,
+    visitLevel(level) {
+      if (disposed || !ready() || !available(level) || preferences.introduced.includes(level)) return;
+      persist({ ...preferences, track: level, introduced: [...preferences.introduced, level] });
+      sync();
+    },
     update(change) {
       if (disposed || change.track && !available(change.track)) return;
       const volume = change.volume ?? preferences.volume;

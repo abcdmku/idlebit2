@@ -90,12 +90,12 @@ export const MAX_FAMILIES = 128;
  * its level open); board sockets and slots come with `systemBoard`. One thread per core: no SMT.
  */
 export const CEILINGS_START: Readonly<Record<CeilingId, number>> = {
-  coreSites: 32, threadsPerCore: 1, cpuSockets: 1, ramSlots: 1, ramLevelBonus: 0, l3LevelBonus: 0,
+  coreSites: 32, threadsPerCore: 1, cpuSockets: 1, ramSlots: 1, ramLevelBonus: 0,
   gpuSlots: 1, driveSlots: 1, rackPorts: MAX_RACK_PORTS, roomPorts: MAX_ROOM_PORTS, uplinks: MAX_UPLINKS, researchQueue: 1,
   roomRows: MAX_ROWS, siteZones: MAX_ZONES_PER_SITE, sites: MAX_SITES, regions: MAX_SITES,
 };
 export const CEILINGS_MAX: Readonly<Record<CeilingId, number>> = {
-  coreSites: 32, threadsPerCore: 1, cpuSockets: 4, ramSlots: 4, ramLevelBonus: 4, l3LevelBonus: 2,
+  coreSites: 32, threadsPerCore: 1, cpuSockets: 4, ramSlots: 4, ramLevelBonus: 4,
   gpuSlots: 2, driveSlots: 4, rackPorts: MAX_RACK_PORTS, roomPorts: MAX_ROOM_PORTS, uplinks: MAX_UPLINKS, researchQueue: 3,
   roomRows: MAX_ROWS, siteZones: MAX_ZONES_PER_SITE, sites: MAX_SITES, regions: MAX_SITES,
 };

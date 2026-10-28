@@ -21,7 +21,7 @@ export const PART_TAB: Readonly<Record<Exclude<ResearchPartId, 'structure'>, Res
 
 /** Generation effects: the part a new generation installs into. */
 const GEN: Readonly<Record<string, ResearchPartId>> = {
-  core: 'cores', clock: 'clock', l1: 'cache', l2: 'cache', l3: 'cache', scheduler: 'queue',
+  core: 'cores', clock: 'clock', cache: 'cache', scheduler: 'queue',
   ram: 'ram', gpu: 'gpu', npu: 'gpu', storage: 'drive', storageNode: 'drive', psu: 'psu',
   switch: 'switch', lb: 'lb', rackCooler: 'rackCooling', pdu: 'rackPower',
   roomCooler: 'roomCooling', ups: 'ups', dataPlane: 'dataPlane', backbone: 'backbone', grid: 'site',
@@ -32,7 +32,7 @@ const GEN: Readonly<Record<string, ResearchPartId>> = {
 /** Ceilings: the part whose slots or levels they raise. */
 const CEILING: Readonly<Record<string, ResearchPartId>> = {
   coreSites: 'cores', threadsPerCore: 'cores', cpuSockets: 'cpu',
-  l3LevelBonus: 'cache', ramSlots: 'ram', ramLevelBonus: 'ram', gpuSlots: 'gpu', driveSlots: 'drive',
+  ramSlots: 'ram', ramLevelBonus: 'ram', gpuSlots: 'gpu', driveSlots: 'drive',
   rackPorts: 'switch', roomPorts: 'netRack', uplinks: 'switch', researchQueue: 'board',
   roomRows: 'structure', siteZones: 'structure', sites: 'structure',
 };

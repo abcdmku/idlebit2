@@ -2,7 +2,7 @@ import { researchId as r } from '../../types/ids';
 import type { CatalogRow } from './types';
 
 /** Board parts (spec Appendix A.1, post-D5). */
-const UP = [12, 1.2e5, 1.5e9, 7.7e12];
+// Board upgrades start at no less than 10% of that generation's install price.
 
 /** RAM capacity factor per level (hardware-progression.md §4, the source sheet's capacity column). */
 export const RAM_CAPACITY_FACTOR: readonly number[] = [1, 2, 4, 6, 8, 12, 16, 20, 24, 28, 32, 40, 48, 56, 64, 80, 96, 112,
@@ -19,8 +19,7 @@ export const RAM: CatalogRow = {
   // SDRAM and DDR hold the System era's data-heavy working sets (tens of kbit) at mid levels, before E decays into loss.
   base: [256, 512, 2 ** 20, 2 ** 30, 2 ** 32, 2 ** 38], base2: [16, 32, 3.2e4, 6.4e7, 2.56e8, 1.28e11],
   capacityTable: RAM_CAPACITY_FACTOR, watts: { kind: 'ratio', era: [0, 0, 1, 2, 2, 3] },
-  price: [3e5, 4.5e5, 5e6, 3e10, 5e10, 5e13], upgrade: [12, 12, 1.2e5, 1.5e9, 1.5e9, 7.7e12],
-};
+  price: [3e5, 4.5e5, 5e6, 3e10, 5e10, 5e13], upgrade: [3e4, 4.5e4, 5e5, 3e9, 5e9, 7.7e12], };
 /** GPU metadata for generation adapters. Model evaluation owns specs and prices. */
 export const GPU: CatalogRow = {
   id: 'gpu', scope: 'system', names: ['1 kHz GPU', '10 kHz GPU', '100 kHz GPU', '1 MHz GPU', '10 MHz GPU', '100 MHz GPU', '1 GHz GPU', '10 GHz GPU', '100 GHz GPU'],
@@ -30,14 +29,13 @@ export const GPU: CatalogRow = {
   watts: { kind: 'rate', wPerUnit: 0.5 },
   price: Array.from({ length: 9 }, (_, g) => 4e6 * 10 ** g), upgrade: Array(9).fill(0),
 };
-/** Frozen legacy NPU catalog. Its four generations do not follow GPU models. */
+/** Legacy NPU catalog. Its four generations do not follow GPU models. */
 export const NPU: CatalogRow = {
   id: 'npu', scope: 'system', names: ['Vector NPU', 'SIMT NPU', 'Tensor NPU', 'Matrix NPU'],
   gates: [r('systemBoard'), r('gpuGen2'), r('tensorCores'), r('matrixGpu')], curve: 'flow',
   base: [32, 6.4e4, 1.28e8, 2.56e11], base2: [64, 2 ** 19, 2 ** 30, 2 ** 39],
   tensorFactor: [1, 1, 4, 8], watts: { kind: 'rate', wPerUnit: 0.125 },
-  price: [3e6, 7.5e6, 45e9, 75e12], upgrade: UP,
-};
+  price: [3e6, 7.5e6, 45e9, 75e12], upgrade: [3e5, 7.5e5, 4.5e9, 7.7e12], };
 /** base = bits, base2 = IO bit/s (the rated rate). */
 export const STORAGE: CatalogRow = {
   id: 'storage', scope: 'system', names: ['HDD', 'SSD', 'NVMe', 'SCM'], gates: [r('systemBoard'), r('ssd'), r('nvme'), r('scm')],
@@ -45,13 +43,11 @@ export const STORAGE: CatalogRow = {
   // The HDD is the System-era drive: big and slow, priced like the SDRAM module. Its IO at L1 is about 1/16 of
   // SDRAM at the levels a System-era box holds (L15–L25), so spill slows work 4–16× instead of stalling it.
   curve: 'flow', base: [2048, 2 ** 24, 2 ** 34, 2 ** 44], base2: [512, 2000, 1.6e7, 6.4e10], watts: { kind: 'rate', wPerUnit: 1 },
-  price: [3e5, 5e6, 3e10, 5e13], upgrade: UP,
-};
+  price: [3e5, 5e6, 3e10, 5e13], upgrade: [3e4, 5e5, 3e9, 7.7e12], };
 /** The system's power supply (player-facing "Power supply"; id psu): a supply (capacity W, loss only). */
 export const PSU: CatalogRow = {
   id: 'psu', scope: 'system', names: ['Power supply', '80 Plus power supply', 'Bronze power supply', 'Gold power supply', 'Platinum power supply', 'Titanium power supply'],
   gates: [r('systemBoard'), r('psu80'), r('psuBronze'), r('psuGold'), r('psuPlatinum'), r('psuTitanium')], curve: 'flow',
   // D8: each era's legal levels hold its largest native GPU through u1.
   base: [32768, 65536, 1.25e5, 1.25e6, 4e8, 5e13], watts: { kind: 'supply', loss: [0.3, 0.2, 0.15, 0.1, 0.07, 0.04], lossPerLevel: 0.01 },
-  price: [1000, 1e5, 1e6, 3e6, 1e10, 1e13], upgrade: [12, 12, 1.2e5, 1.2e5, 1.5e9, 7.7e12],
-};
+  price: [1000, 1e5, 1e6, 3e6, 1e10, 1e13], upgrade: [100, 1e4, 1.2e5, 3e5, 1.5e9, 7.7e12], };

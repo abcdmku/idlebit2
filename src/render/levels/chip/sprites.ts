@@ -1,4 +1,4 @@
-﻿// CPU art (layout-L2/art.js): board weave, package and die, and the die blocks. Static parts are
+﻿// CPU art (control-deck/art.js): board weave, package and die, and the die blocks. Static parts are
 // cached per form; per-frame blocks draw only what state changes.
 import type { ChipQueueEntryView, FamilyId } from '../../../game';
 import { P, R, SPR, bandColor, brackets, cached, dotted, drawFamilyIcon, frame, hash, mix, prism, px, shadow, stamp } from '../../core';

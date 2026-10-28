@@ -114,7 +114,7 @@ export function drawPipe(g: CanvasRenderingContext2D, s: RenderSnapshot, timeMs:
   }
   g.restore();
   if (!entry || !rest) return;
-  // Labels in the left gutter under the run, beside the first drop (L2 D17, A05): the link and its
+  // Labels in the left gutter under the run, beside the first drop (Control deck D17, A05): the link and its
   // speed, then the packet tag on the next line, so neither moves with the text. They never touch
   // the focus art (`art`, CSS px): where one line would, each value takes its own line in the gutter.
   tags.clear();

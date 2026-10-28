@@ -66,7 +66,7 @@ function measure(n: number, withCtl: boolean): void {
   let s = grown(n, withCtl);
   const servers = s.build.racks[0]!.servers.filter((x) => x !== null).length;
   s = tryAct(s, { type: 'returnToMarket' });
-  console.log(`\n${servers} servers, ${withCtl ? `Power control L1 (start with ${arg('start-with', '1')}, head wait ${arg('head-wait', '2')} s)` : 'no Power control'}`);
+  console.log(`\n${servers} servers, ${withCtl ? `Power control levelOne (start with ${arg('start-with', '1')}, head wait ${arg('head-wait', '2')} s)` : 'no Power control'}`);
   console.log('| Window | Gross | Energy billed | Net | Battery | Awake | I |');
   console.log('|---|---:|---:|---:|---:|---:|---:|');
   let gross = Number(s.ledger.gross), energy = Number(s.ledger.energy) + s.wallet.energyMeter;

@@ -26,8 +26,8 @@ function addEffect(state: GameState, plan: Plan & { ok: true }, system: number, 
   if (!spec || !next) return null;
   const slot: PartSlot = kind === 'core' ? { kind: 'core', socket: 0, index: 0 } : kind === 'socket' ? { kind: 'cpu', socket: 0 }
     : kind === 'scheduler' ? { kind: 'scheduler' } : { kind, index: 0 };
-  const base = partEffect(state, { unit: { kind: 'system', id: system as never }, slot }, plan.change.build, plan.change.price);
-  if (!base || kind === 'scheduler') return base;
+  const base = partEffect(state, { unit: { kind: 'system', id: system as never }, slot }, plan.change.build, plan.change.price, kind === 'ram' || kind === 'drive');
+  if (!base || kind === 'scheduler' || kind === 'ram' || kind === 'drive') return base;
   const count = (s: typeof spec) => kind === 'core' ? s.cpu?.cores.length ?? 0 : kind === 'socket' ? s.cpu ? s.cpuCount : 0
     : kind === 'ram' ? s.ram.length : s.drives.length;
   return { ...base, capacityBefore: count(spec), capacityAfter: count(next), unit: kind === 'core' ? 'cores' : 'slots' };

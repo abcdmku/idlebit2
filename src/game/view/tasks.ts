@@ -88,7 +88,10 @@ export function runningTasks(state: GameState, s: number, limit: number): TaskVi
   if (limit <= 0) return out;
   const rack = state.compiled.sys.rack[s] ?? 0;
   forEachRunning(state, s, (r, res) => {
-    out.push(taskView(state.hot, r, res, stageProgress(state.hot, state.clock.tick, r, rack, s, res)));
+    const threadsPerCpu = (state.compiled.sys.threads[s] ?? 0) / Math.max(1, state.build.systems[s]?.spec.cpuCount ?? 1);
+    const firstThread = state.hot.rec.thread0[r] ?? -1;
+    out.push({ ...taskView(state.hot, r, res, stageProgress(state.hot, state.clock.tick, r, rack, s, res)),
+      ...(firstThread >= 0 && threadsPerCpu > 0 ? { socket: Math.floor(firstThread / threadsPerCpu) } : {}) });
     return out.length < limit;
   });
   return out;

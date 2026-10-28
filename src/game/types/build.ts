@@ -18,9 +18,7 @@ export interface CpuBuild {
   readonly cpu: PartLevel;
   readonly cores: readonly PartLevel[];
   readonly clock: PartLevel;
-  readonly l1: PartLevel;
-  readonly l2: PartLevel | null;
-  readonly l3: PartLevel | null;
+  readonly cache: PartLevel;
 }
 /** general: ≤ 4 CPUs, ≤ 4 RAM, ≤ 2 GPUs. accelerator: ≤ 2 CPUs, 8 RAM, 8 GPUs, no DIMM penalty (D7.6). */
 export type BoardKind = 'general' | 'accelerator';

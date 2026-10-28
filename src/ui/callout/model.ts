@@ -22,7 +22,7 @@ export function slotSite(t: HitTarget, focus: LevelSnapshot): { name: string; ro
 }
 
 /** The board's own labels where they differ from the plate titles (A07). */
-const BOARD_NAME: Partial<Record<PartSlotKind, string>> = { l1:'Cache', scheduler: 'Queue' };
+const BOARD_NAME: Partial<Record<PartSlotKind, string>> = { cache:'Cache', scheduler: 'Queue' };
 
 export function targetName(t: HitTarget, focus: LevelSnapshot, state: GameState): string {
   if (isPowerCtl(t)) return 'Power control';

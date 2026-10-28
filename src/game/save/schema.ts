@@ -8,8 +8,8 @@ import type { Layout } from '../core/table';
 export const SAVE_SCHEMA = 'bitrouge-v3' as const;
 /** Bumps on any layout or plain-state shape change; a different version is rejected. */
 // Pre-live reset: freeze the head and 50 incoming tasks instead of five offers.
-// Queue preparation adds CPU work-clock state and reserved cache. Earlier pre-live saves reset.
-export const SAVE_VERSION = 32;
+// One cache per CPU replaces the former multi-part cache shape. Earlier pre-live saves reset.
+export const SAVE_VERSION = 33;
 
 export interface SaveEnvelope {
   readonly schema: typeof SAVE_SCHEMA;

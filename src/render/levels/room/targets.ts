@@ -74,7 +74,7 @@ export function roomTargets(s: RoomSnapshot, out: HitTarget[], from: number): nu
   }
   let t = put('thermo', 'part', THERMO); if (t) t.part = refs.cooler;
   for (let i = 0; i < cracCount(s.rows); i++) { t = put(CRAC_IDS[i], 'part', CRAC_HITS[i]); if (t) t.part = refs.cooler; }
-  // The pipe's entry (L2 D17): the gateway fibre from the top. U anchors the pipe on 'entry'.
+  // The pipe's entry (Control deck D17): the gateway fibre from the top. U anchors the pipe on 'entry'.
   t = put('entry', 'link', ENTRY); if (t) t.unit = refs.unit;
   t = put('netrack', 'part', NET_RECT); if (t) { t.part = refs.roomSwitch; t.sw = refs.sw; }
   t = put('roomlb', 'part', LB_RECT); if (t) t.part = refs.roomLb;

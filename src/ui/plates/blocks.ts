@@ -2,8 +2,7 @@
 
 /** What each board part supplies, as the blocks it clears (QA-21). */
 const PART_BLOCKS: Readonly<Partial<Record<string, readonly string[]>>> = {
-  l1: ['cache'], l2: ['cache'], l3: ['cache'], ram: ['ram', 'ecc'], drive: ['disk'], gpu: ['gpu', 'vram', 'gpuCores'],
-};
+  cache: ['cache'], ram: ['ram', 'ecc'], drive: ['disk'], gpu: ['gpu', 'vram', 'gpuCores'], };
 /** Tasks in the visible line waiting on what `part` supplies. */
 export function blockedOn(window: readonly { readonly blockedBy: string | null }[], part: string | undefined): number {
   const clears = part ? PART_BLOCKS[part] : undefined;

@@ -18,17 +18,17 @@ const PARALLEL: Run = { taskId: 700, family: 13, shard: 1, threads: 2 }, ACCEL: 
 export function chipScene(stage: 'boot' | 'chip' | 'system' | 'shard', online: ChipSnapshot['online'] = 'onMarket'): ChipSnapshot {
   coreN = 0;
   if (stage === 'boot') return {
-    level: 'chip', parent: null, systemId: ID, cpuCount: 1, online, tier: 0, psu: psu(0.65), clock: { hz: 1, effectiveHz: 1, generation: 0, level: 1 }, coreSites: 1,
-    cores: [core(false, 0, 0.36)], cache: { levels: [{ kind: 'l1', bits: 1, generation: 0, level: 1 }], usedBits: 0, loadedBits: 0, capacityBits: 1, spilledOutBits: 0 },
+    level: 'chip', socket: 0, parent: null, systemId: ID, cpuCount: 1, online, tier: 0, psu: psu(0.65), clock: { hz: 1, effectiveHz: 1, generation: 0, level: 1 }, coreSites: 1,
+    cores: [core(false, 0, 0.36)], cache: { generation: 0, level: 1, usedBits: 0, loadedBits: 0, capacityBits: 1, spilledOutBits: 0 },
     scheduler: null, queue: [], researchShare: 0.36, pipe: { speed: 1000, transfer: null, waiting: false }, slots: [{ kind: 'core', index: 1, locked: true }, { kind: 'scheduler', index: 0, locked: true }],
   };
   const sys = stage !== 'chip', shard = stage === 'shard';
   const cores = shard ? [core(true, 0.3, 0, PARALLEL), core(true, 0.3, 0, PARALLEL), core(false, 0, 0.4), core(true, 0.6, 0, ACCEL)]
     : sys ? [core(true, 0.3), core(true, 0.6), core(false, 0, 0.4), core(true, 0.2)] : [core(false, 0, 0.51), core(false, 0, 0.51)];
   return {
-    level: 'chip', parent: sys ? PARENT : null, systemId: ID, cpuCount: 1, online, tier: 0, psu: psu(5.5),
+    level: 'chip', socket: 0, parent: sys ? PARENT : null, systemId: ID, cpuCount: 1, online, tier: 0, psu: psu(5.5),
     clock: { hz: sys ? 8 : 4, effectiveHz: sys ? 8 : 4, generation: 0, level: sys ? 4 : 3 }, coreSites: sys ? 4 : 2, cores,
-    cache: { levels: [{ kind: 'l1', bits: sys ? 64 : 8, generation: 0, level: sys ? 7 : 4 }], usedBits: sys ? 32 : 0, loadedBits: sys ? 32 : 0,
+    cache: { generation: 0, level: sys ? 7 : 4, usedBits: sys ? 32 : 0, loadedBits: sys ? 32 : 0,
       capacityBits: sys ? 64 : 8, spilledOutBits: 0 },
     scheduler: { generation: 0, level: sys ? 3 : 2, strategy: 'fifo', q: sys ? 8 : 4, queued: sys ? 3 : 0, k: sys ? 4 : 2, running: sys ? 3 : 0, reserved: 0 },
     queue: sys ? [{ taskId: 390, family: familyId(1) }, { taskId: 391, family: familyId(2) }, { taskId: 392, family: familyId(0) }] : [],
@@ -108,7 +108,7 @@ function baseScene(stage: SystemStage, online: SystemSnapshot['online']): System
   const boot = stage === 'boot', full = stage === 'full', shard = stage === 'shard';
   return {
     level: 'system', parent: null, systemId: ID, kind: 'server', board: full ? 'accelerator' : 'general', cpuCount: 1,
-    ramSlots: full ? 8 : boot ? 1 : 4, etaCfg: 1, chip: chipScene(boot ? 'boot' : shard ? 'shard' : 'system', online), cpuBusy: [boot ? 0 : 0.75],
+    ramSlots: full ? 8 : boot ? 1 : 4, etaCfg: 1, chip: chipScene(boot ? 'boot' : shard ? 'shard' : 'system', online), chips: [chipScene(boot ? 'boot' : shard ? 'shard' : 'system', online)], cpuBusy: [boot ? 0 : 0.75],
     online, timerS: online === 'boot' ? 6 : null, timerTotalS: online === 'boot' ? 10 : null,
     cpu: part('cpu', 0, 1, true),
     ram: boot ? [] : full ? [0, 1, 2, 3, 4, 5].map(i => part('ram', i, 2, i < 2)) : [part('ram', 0, 2, !shard), part('ram', 1, 2, !shard)],

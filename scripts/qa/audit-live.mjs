@@ -1,4 +1,4 @@
-// The live alignment audit for the game, ported from the L2 mockup's audit.js (its "Audit" rules 1
+// The live alignment audit for the game, ported from the Control deck mockup's audit.js (its "Audit" rules 1
 // and 2). It runs in the page, over the shell's
 // `.stage`, and checks:
 // - DOM boxes: every absolutely placed element has its left/top (and right/bottom when sized) on the
@@ -11,7 +11,7 @@
 // - Currencies: Credits and Data never show a fraction (D2.2, D3.3).
 // - Clipped values: a capped run that ends in an ellipsis is listed in `clipped` (not a violation:
 //   it stays inside its box), so long copy is visible in the report.
-// Elements marked [data-free] (art lines, plates that place themselves) are skipped, as in L2.
+// Elements marked [data-free] (art lines, plates that place themselves) are skipped, as in Control deck.
 //
 // Use: `import { auditPage } from './audit-live.mjs'; await auditPage(browser)` with the CDP
 // browser from cdp.mjs (capture.mjs runs it for every case), or paste `liveAudit` into a console.

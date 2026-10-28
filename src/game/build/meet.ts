@@ -29,7 +29,7 @@ function levelLine(state: GameState, ref: PartRef, rest: number, need: number): 
   const part = readPart(state.build, ref);
   if (!part) return null;
   const id = part.id as LeveledPartId, row = PARTS[id];
-  const top = levelMax(row, part.gen, id === 'l3' ? state.research.unlocks.ceilings.l3LevelBonus : id === 'ram' ? state.research.unlocks.ceilings.ramLevelBonus : 0);
+  const top = levelMax(row, part.gen, id === 'ram' ? state.research.unlocks.ceilings.ramLevelBonus : 0);
   for (let level = part.level + 1; level <= top; level += 1) {
     if (rest + capacity(row, part.gen, level) >= need) {
       return { action: { type: 'upgradePartTo', part: ref, level }, plan: planUpgradeTo(state, ref, level) };
@@ -45,22 +45,17 @@ export function meetLines(state: GameState, system: SystemId, need: MeetNeed): M
   if (!spec) return [];
   const c = state.compiled.sys, u = state.research.unlocks;
   const out: MeetLine[] = [];
-  const add = (kind: 'l2' | 'l3' | 'ram' | 'drive' | 'core', ecc = false): MeetLine => {
+  const add = (kind: 'ram' | 'drive' | 'core', ecc = false): MeetLine => {
     const part = kind === 'drive' ? 'storage' : kind;
     const g = Math.max(0, newestGen(u, part, PARTS[part].base.length));
     return { action: { type: 'addPart', system, kind, generation: g, ...(ecc ? { ecc } : {}) }, plan: planAdd(state, system, kind, g, ecc) };
   };
-  // Cache: L1, L2 and L3 sum; one line per cache part that can close the gap.
+  // One cache per CPU. The system's capacity is shared across identical sockets.
   if (need.cacheBits !== undefined && c.cacheBits[system]! < need.cacheBits && spec.cpu) {
-    const total = c.cacheBits[system]!;
-    for (const kind of ['l1', 'l2', 'l3'] as const) {
-      const ref = at(system, { kind, socket: 0 });
-      const part = readPart(state.build, ref);
-      if (part) {
-        const line = levelLine(state, ref, total - capacity(PARTS[kind], part.gen, part.level), need.cacheBits);
-        if (line) out.push(line);
-      } else if (kind !== 'l1' && (kind !== 'l3' || spec.cpu.l2)) out.push(add(kind));
-    }
+    const ref = at(system, { kind: 'cache', socket: 0 });
+    const perCpu = Math.ceil(need.cacheBits / Math.max(1, spec.cpuCount));
+    const line = levelLine(state, ref, 0, perCpu);
+    if (line) out.push(line);
   }
   // RAM: the first module up to the need, or a first module.
   if (need.ramBits !== undefined && c.ramCap[system]! < need.ramBits) {

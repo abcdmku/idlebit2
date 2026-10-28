@@ -1,4 +1,4 @@
-// The die's labels (L2 syncWorldLabels): every block names itself and shows its value. Text only;
+// The die's labels (Control deck syncWorldLabels): every block names itself and shows its value. Text only;
 // the core draws it at the body size. Values come straight from the ChipSnapshot. The core sites
 // arrange their text by the art scale the world rests at (A01): wide at N >= 3, stacked below.
 // Locked sites carry no text (A25): the lock glyph and the callout say it.
@@ -14,7 +14,6 @@ import { arrangementOf, coreSites, coreText } from './layout';
 import { coreActivityText, coreActivityTone, coreSleep, labelFits, readySpeedText, tileLabelFits } from './speed';
 import { chipFloor, isLive, lentCore, queueOpen, siteCount, spilledOut } from './world';
 
-const LEVEL_NAMES: Readonly<Record<'l1' | 'l2' | 'l3', string>> = { l1: 'L1', l2: 'L2', l3: 'L3' };
 const CORE_NAMES = Array.from({ length: 32 }, (_, i) => `Core ${i + 1}`);
 const LABEL_IDS = Array.from({ length: 32 }, (_, i) => `core${i}`);
 /** The add-core quote among the tray quotes the UI holds: its price text and whether it is affordable now, or null. */
@@ -35,21 +34,12 @@ export function chipLabels(chip: ChipSnapshot, frame: WorldFrame, out: LabelWrit
   }
   else if (queueOpen(chip)) out.label('queue', f.queue.x + pad, f.queue.y + 3).text('Queue', 'dim', true).text('none', 'dim');
   out.label('cache', f.cache.x + pad, f.cache.y + 3).text('Cache', 'name', true).text(formatSize(chip.cache.capacityBits), 'cyan');
-  const levels = chip.cache.levels;
-  if (levels.length > 1) {
-    // Several levels (lead ruling): the total, then each level's own size, so the deck's per-level row
-    // ("L2 65.5 → 131 kb") matches a number here. Three levels don't fit one row below N = 3: they stack.
-    if (levels.length > 2 && !wide) out.br();
-    for (let k = 0; k < levels.length; k++) {
-      const run = `${LEVEL_NAMES[levels[k]!.kind]} ${formatSize(levels[k]!.bits)}`;
-      out.text(k || (levels.length > 2 && !wide) ? run : `· ${run}`, 'value');
-      if (k + 1 < levels.length) out.text('·', 'mute');
-    }
-  } else if (form !== 'phone') out.text(`· ${formatSize(live ? chip.cache.usedBits : 0)} in use`, 'mute');
+  if (form !== 'phone') out.text(`? ${formatSize(live ? chip.cache.usedBits : 0)} used`, 'mute');
   // D26: what overflowed out of cache to RAM, as a warning, beside the cache's own numbers.
   if (live && spilledOut(chip) > 0) out.text(`· ${formatSize(spilledOut(chip))} spilled`, 'warn');
   // (One level: the in-use run fits the desktop cache row at either scale; the phone row has no room for it.)
-  const clock = out.label('clock', f.clock.x + pad, f.clock.y + (f.clockAbove ? 8 : pad)).text('Clock', 'name', true);
+  const clockName = form === 'phone' && chip.cpuCount > 1 ? `CPU ${chip.socket + 1} · Clock` : 'Clock';
+  const clock = out.label('clock', f.clock.x + pad, f.clock.y + (f.clockAbove ? 8 : pad)).text(clockName, 'name', true);
   (f.clockAbove ? clock : clock.br()).text(formatHertz(chip.clock.hz), 'value');
 
   const n = siteCount(chip), sites = coreSites(f, n), price = addCorePrice(view, chip);

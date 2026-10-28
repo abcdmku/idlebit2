@@ -189,7 +189,7 @@ export interface TransitionInfo {
   readonly direction: 'in' | 'out'; readonly progress: number;
 }
 export interface CanvasRenderer {
-  /** `framing` sets the L2 rest framing (art scale N, lattice, band); null keeps the largest integer fit. */
+  /** `framing` sets the Control deck rest framing (art scale N, lattice, band); null keeps the largest integer fit. */
   resize(widthCss: number, heightCss: number, dpr: number, viewport: Rect, framing?: RestFraming | null): void;
   draw(snapshot: RenderSnapshot, view: ViewPresentation, clock: FrameClock): void;
   /** Borrowed until the next hit call. Null during a zoom. */
@@ -227,14 +227,15 @@ export function copyHitTarget(source: HitTarget, out: HitTarget): HitTarget {
   return out;
 }
 export function sameRef(a: NodeRef | null, b: NodeRef | null): boolean {
-  return a === b || (!!a && !!b && a.level === b.level && a.id === b.id);
+  return a === b || (!!a && !!b && a.level === b.level && a.id === b.id
+    && (a.level !== 'chip' || b.level !== 'chip' || (a.socket ?? 0) === (b.socket ?? 0)));
 }
 /** Allocates; call at navigation time only. */
-export function refKey(ref: NodeRef): string { return `${ref.level}:${ref.id}`; }
+export function refKey(ref: NodeRef): string { return `${ref.level}:${ref.id}${ref.level === 'chip' ? `:${ref.socket ?? 0}` : ''}`; }
 /** The NodeRef a level snapshot draws. */
 export function refOf(snapshot: LevelSnapshot): NodeRef {
   switch (snapshot.level) {
-    case 'chip': return { level: 'chip', id: snapshot.systemId };
+    case 'chip': return { level: 'chip', id: snapshot.systemId, socket: snapshot.socket };
     case 'system': return { level: 'system', id: snapshot.systemId };
     case 'rack': return { level: 'rack', id: snapshot.rackId };
     case 'room': return { level: 'room', id: snapshot.roomId };
@@ -251,5 +252,6 @@ export function idOf(snapshot: LevelSnapshot): number {
   }
 }
 export function isRef(snapshot: LevelSnapshot | null, ref: NodeRef | null): boolean {
-  return !!snapshot && !!ref && snapshot.level === ref.level && idOf(snapshot) === ref.id;
+  return !!snapshot && !!ref && snapshot.level === ref.level && idOf(snapshot) === ref.id
+    && (snapshot.level !== 'chip' || ref.level !== 'chip' || snapshot.socket === (ref.socket ?? 0));
 }

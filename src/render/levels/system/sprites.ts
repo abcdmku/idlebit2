@@ -59,10 +59,11 @@ export function drawDimm(g: G, f: Rect, level: number, on: boolean): void {
   const n = 2 + Math.min(4, Math.max(1, level)), cw = 4, gap = Math.floor((w - 4 - n * cw) / Math.max(1, n - 1));
   for (let k = 0; k < n; k++) {
     const cx = x + 2 + k * (cw + gap);
-    R(g, cx, f.y - 7, cw, 5, on ? P.ram : '#1f2236');
-    if (on) { const a = g.globalAlpha; g.globalAlpha = a * 0.35; R(g, cx - 1, f.y - 8, cw + 2, 7, P.ram); g.globalAlpha = a; }
+    R(g, cx, f.y - 7, cw, 5, '#1f2236');
+    R(g, cx, f.y - 7, cw, 1, '#3d4262');
   }
   R(g, x + 1, f.y, w - 2, 1, P.padLo);
+  px(g, x + w - 1, f.y - 2, on ? P.ram : P.ledOff);
 }
 export function drawDimmSlotV(g: G, f: Rect): void {
   R(g, f.x, f.y, f.w, f.h, SLOT); for (let y = f.y + 3; y < f.y + f.h - 2; y += 3) px(g, f.x + 1, y, P.padLo);
@@ -73,8 +74,8 @@ export function drawDimmV(g: G, f: Rect, level: number, on: boolean): void {
   const t = prism(g, f.x, f.y + 1, f.w, f.h - 2, 7, { top: '#4a5888', front: '#2f3a5c', sx: 2, sy: 2 });
   const tx = t.x, ty = t.y, tw = t.w, th = t.h;
   const n = 2 + Math.min(4, Math.max(1, level)), seg = Math.floor((th - 2) / n);
-  for (let k = 0; k < n; k++) R(g, tx + 1, ty + 1 + k * seg, 1, seg - 2, on ? P.ram : '#1f2236');
-  if (on) bloom(g, tx, ty, tw, th + 7, P.ram, 0.2 / 0.35);
+  for (let k = 0; k < n; k++) R(g, tx + 1, ty + 1 + k * seg, 1, seg - 2, '#1f2236');
+  px(g, tx + tw - 1, ty, on ? P.ram : P.ledOff);
 }
 
 // ---------- GPU ----------

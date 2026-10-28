@@ -219,7 +219,6 @@ export function partQuotes(state: GameState, ref: PartRef): Quote[] {
   }
   const part = readPart(state.build, ref);
   if (!part) {
-    // An empty L2 / L3 chip slot offers its part (the slot the chip view shows).
     const k = ref.slot.kind;
     // D31: an empty power slot offers each generation's install.
     if (POWER_SLOTS.includes(k)) return powerInstallPlans(state, ref).map(({ action, plan }) => toQuote(state, action, plan, effectOf(state, ref, plan)));
@@ -244,7 +243,6 @@ export function partQuotes(state: GameState, ref: PartRef): Quote[] {
         return toQuote(state, action, plan, effectOf(state, ref, plan));
       });
     }
-    if(ref.unit.kind==='system'&&(k==='l2'||k==='l3')){const g=Math.max(0,newestGen(state.research.unlocks,k,PARTS[k].base.length)),action={type:'addPart' as const,system:ref.unit.id,kind:k,generation:g};return [toQuote(state,action,planAdd(state,ref.unit.id,k,g))];}
     if(ref.unit.kind==='system'&&k==='scheduler'){const g=Math.max(0,newestGen(state.research.unlocks,'scheduler',4)),action={type:'addPart' as const,system:ref.unit.id,kind:'scheduler' as const,generation:g};return [toQuote(state,action,planAdd(state,ref.unit.id,'scheduler',g))];}
     return [];
   }

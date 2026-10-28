@@ -64,7 +64,8 @@ export interface StoreOptions {
 export const DEFAULT_SCOPE: SnapshotScope = { focus: { level: 'chip', id: systemId(0) }, partner: null };
 
 const sameNode = (a: SnapshotScope['focus'] | null, b: SnapshotScope['focus'] | null) =>
-  a === b || (a !== null && b !== null && a.level === b.level && a.id === b.id);
+  a === b || (a !== null && b !== null && a.level === b.level && a.id === b.id
+    && (a.level !== 'chip' || b.level !== 'chip' || (a.socket ?? 0) === (b.socket ?? 0)));
 const sameScope = (a: SnapshotScope, b: SnapshotScope) => sameNode(a.focus, b.focus) && sameNode(a.partner, b.partner);
 
 export function createGameStore(options: StoreOptions = {}): RuntimeStore {

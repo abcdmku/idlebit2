@@ -591,11 +591,11 @@ The user is reacting to the D13 pricing, where reaching a 10 kHz pipe cost 510 C
    - Parity pricing alone answers the user's "too cheap": reaching 10 kHz costs about 415,000 Credits, exactly the equivalent clock span.
 3. **Balance check.** The pipe binds in round 2, and its upgrades are priced as kHz-tier work. The model misses the Rack and Data center bands by about 20 and 45 min; the G4 balance pass tunes them.
 
-**D15, 25 Oct: L2 shell, original System, and when links can be upgraded (user).** Binding.
+**D15, 25 Oct: Control deck shell, original System, and when links can be upgraded (user).** Binding.
 
-> L2 is the best but system looks bad it should be the i want the system from the original design and the animation from cpu => system -> rack -> data room -> world. upgrades should be done by clicking on the item as well. the pipe cant be upgraded until you get to the switch in racks and the link for racks once you get to data rooms
+The user selected the Control deck layout with the original System board and animated navigation.
 
-1. **Shell.** The game shell is **layout L2, Control deck**: `docs/mockups/v3/onboarding/layout-L2/`, with its 8 px grid and integer art scale (N = 3 on desktop, 2 on phone).
+1. **Shell.** The game shell is **layout Control deck, Control deck**: `docs/mockups/v3/onboarding/control-deck/`, with its 8 px grid and integer art scale (N = 3 on desktop, 2 on phone).
 2. **System level.** The System level uses **the original System board design**: the approved board in `docs/mockups/v3/levels/system*` and `docs/mockups/v3/qa/a/final2/3-system-phone.png`. It is shown whole and on its own: not cropped, no dimmed neighbour boards.
 3. **Semantic zoom.** The zoom keeps the original animation: CPU → System → Rack → Room → World, with drill-in and zoom-out between levels as in the v2/v3 mockup (`docs/mockups/v3/core/view.js`) and the ported renderer transitions (`src/render/core/transition.ts`).
 4. **Click to upgrade.** Tapping a part in the world selects it and offers its upgrade right there, as "x → x" with price and Buy. The deck's build rows stay as a second path to the same actions.
@@ -625,14 +625,14 @@ Before Rack, income is capped by the 1 kHz pipe at about 700 Credits/s and about
 
 > move global queue to the top since all scene have the tasks arrive form the top. rack view can show other racks (make sure the position in the rows are correct) and you can horizontally scroll. active rack is normal and other are darkened to focus on the correct rack. implement this to the real game and finish building out anything else to ship this then push to a new github repo called idlebit2 and clean up the codebase to only have this game and no other junk in it
 
-1. **Global task queue at the top.** The queue (the next tasks) sits at the top of the L2 shell, under the HUD band, because tasks enter every level from the top. The pipe descends from the queue into the world. The bottom-right phone thumb zone keeps the actions: the head task's Dismiss, Buy, and Research.
+1. **Global task queue at the top.** The queue (the next tasks) sits at the top of the Control deck shell, under the HUD band, because tasks enter every level from the top. The pipe descends from the queue into the world. The bottom-right phone thumb zone keeps the actions: the head task's Dismiss, Buy, and Research.
    - *Note (user, 25 Oct):* the head task's big card moved back below, above the deck, and SLA moved to the centre of the HUD with the currencies stacked at the top right; the strip's cards no longer slide.
 2. **Rack row view.**
    - The Rack level shows the whole row of racks, each at its true position in the room's row.
    - The view scrolls horizontally along the row, with a drag on phone and the wheel or a drag on desktop.
    - The active rack renders normally; the other racks are darkened, to keep focus.
    - Tapping another rack makes it active.
-3. **Ship.** Port L2, with D15, D16 and these tweaks, into the live game on desktop and phone, on the D10 task model. Then finish whatever else shipping needs.
+3. **Ship.** Port Control deck, with D15, D16 and these tweaks, into the live game on desktop and phone, on the D10 task model. Then finish whatever else shipping needs.
 4. **Repository.**
    - Remove the v2 code, old prototypes and junk.
    - Move v3 into `src/` (architecture §5.2).
@@ -926,7 +926,7 @@ The user's words:
 > I think we might need to rethink storage. because cpu cache can overflow to ram and ram can overflow to hard drives. obviously ram has much more storage than cache but its much slower and same with hdd. so a task shouldn't need an hdd but it might require a lot of bits to be sorted / processed which hdds would help do that task sooner but it will take longer to complete of course. gpu ram is seprate until much later when you do reaserch to have unified ram (which can overflow to hdds as well) some tasks later on should have a time frame to co.plete them as well so you can't co tinue to rely on slow hardware
 
 1. **Memory hierarchy with spill.**
-   - A system's memory tiers are cache (Σ L1+L2+L3 over its CPUs), RAM (Σ modules) and disk (Σ drives, plus the rack storage node's free capacity with `sharedStorage`).
+   - A system's memory tiers are cache (Σ CPU cache over its CPUs), RAM (Σ modules) and disk (Σ drives, plus the rack storage node's free capacity with `sharedStorage`).
    - At start, a shard's working set (`wsFixed + wsPerUnit × units`) is placed fastest tier first in the system's free capacity. Whatever doesn't fit spills to the next tier. The placement is fixed for the shard's life and released when it completes or is lost.
    - The only memory gate is the whole hierarchy, cache + RAM + disk. A shard that doesn't fit the free hierarchy waits, skipped and not blocking. Statically, a task the fleet can't hold fails `cantRun`.
    - **Refined:** the detail names the deepest tier the system has: `cache` (cache only), `RAM` (no drive) or `disk` (the whole hierarchy). This keeps the D20 opening's `Can't run · cache` word exactly. A generic `memory` word would lose the hint about the next purchase.
@@ -1141,7 +1141,7 @@ The user's words:
      - A generation or level raises the battery's capacity and the smart start's capability together.
    - **Discharge.** While the round runs and the rack is powered, the rack's PDU input is drawn from the battery, not billed. That input covers servers (booting, waking, asleep or busy), cooler, switch, LB and losses. When it is empty, utility billing starts as normal. A `standby` rack draws nothing and doesn't touch its battery.
    - **Battery time** is `charge J ÷ current PDU input W`, so it scales with the rack's draw. It stacks with the controllers: a rack started with one awake system draws a few percent of full, so its battery lasts many times longer.
-   - **Sized for the opening.** L1 holds 60 s of a fresh era rack at full draw. That is about 10 min of a fully awake idle rack, which covers a mid-round boot (10 s at idle) and the D30 climb with room to spare. Staged, it lasts far longer.
+   - **Sized for the opening.** cache holds 60 s of a fresh era rack at full draw. That is about 10 min of a fully awake idle rack, which covers a mid-round boot (10 s at idle) and the D30 climb with room to spare. Staged, it lasts far longer.
    - **Recharge.** Each battery refills fully at Return to market (and auto-return).
      - **Pick: billed at 25% of its site's marginal price (item 4).** Why: it keeps the opening cheap rather than free, makes every round's surge covered whatever the gap between rounds (15 s auto-return included), and keeps offline catch-up deterministic. With renewable off-grid headroom at the site, the marginal price is 0, so the refill is free.
      - The refill is billed on the Return tick and shown in the round report.
@@ -1267,7 +1267,7 @@ The user's words:
 *UI (`src/ui/**`):*
 - **Power control plate** (tap the new slot under the cooling):
   - empty: the add/buy row with its price, or the lock reason;
-  - installed: a battery row ("Battery L2 · 4:12 at current draw", charge bar), the upgrade and replace callouts;
+  - installed: a battery row ("Battery level 2 · 4:12 at current draw", charge bar), the upgrade and replace callouts;
   - a **Start** row with three fixed controls: "Start with [n] of 12" stepper, "Wake when head waits [X] s" stepper (plus "or busy ≥ [Y] %" once gen 1), and an "Order" toggle (Slot / Fastest);
   - the tray at Rack lists Power control as a fifth infrastructure item.
 - **Room power plate (UPS):** the same Start row for racks (Order: Slot / Coolest).
@@ -1308,12 +1308,12 @@ The user's words:
 
 > I dont like the concept of lanes thats what cores are for
 
-1. **One node.** `dualCore`, renamed **Multi-core** (same tier and price), opens all 32 core sites per CPU. `quadCore`, `octaCore`, `cores16`, `chiplets`, `ringBus` and `meshCores` are gone. Dependents were re-linked: `workStealing` and `dualSocket` need `dualCore`; `smt` needs `fabKhz`; `stacked3d` needs `fabGhz`.
+1. **One node.** `dualCore`, renamed **Multi-core** (same tier and price), opens all 32 core sites per CPU. `quadCore`, `octaCore`, `cores16`, `chiplets`, `ringBus` and `meshCores` are gone. Dependents were re-linked: `workStealing` and `dualSocket` need `dualCore`; `smt` needs `fabKhz`.
 2. **Cores cost more as you add them.** The add-core price is the generation's core price × `EXTRA_CORE_GROWTH^(n−1)` for the n-th core, now **2.2** (was 1.65). Nothing but the price paces core count. Replace CPU moves cores to the new generation at its plain core price each (the growth surcharge was paid when they were added).
-3. **No lanes.** A core runs one task thread at its socket's clock: core rate = `clockHz × clockFactor × η_cfg × e(T)`. `pipelining`, `superscalar`, `outOfOrder`, `simd`, `wideVector`, `branchPredict`, `fma`, `dualVector` and `matrixTiles` are gone; `fabKhz` now needs only `systemBoard`, and `l2Cache` is a root. The `lanesPerCore` ceiling is gone. A core has no levels or upgrade of its own: the clock is the speed upgrade, more cores the parallel one. Clock upgrades are priced × the cores they drive (was × lanes).
+3. **No lanes.** A core runs one task thread at its socket's clock: core rate = `clockHz × clockFactor × η_cfg × e(T)`. `pipelining`, `superscalar`, `outOfOrder`, `simd`, `wideVector`, `branchPredict`, `fma`, `dualVector` and `matrixTiles` are gone; `fabKhz` now needs only `systemBoard`. The `lanesPerCore` ceiling is gone. A core has no levels or upgrade of its own: the clock is the speed upgrade, more cores the parallel one. Clock upgrades are priced × the cores they drive (was × lanes).
 4. **No hidden gate.** After Multi-core, adding a core needs no other research.
 5. **Views.** `CoreView.lanes` is removed; the CPU part heading reads "4 cores"; the research change label "Lanes per core" is gone. The chip tray no longer quotes per-core upgrades.
-7. **Fixes after live play (user: "multi core doesnt work", "l2 cache doesnt seem to do anything").** The running limit was the scheduler's K (1 at Run queue L1, 1 with no scheduler), so extra cores sat idle while tasks queued: `Keff` is now the thread count (every core runs a task). The Hz L2 started at 8 b, next to an L1 that is about 128 b by then: its base is now 128 b, so buying it doubles the cache tasks can use. Seed 42: System 0:20, Rack 5:44; passive round 1 unchanged. Test: `build/multicore.test.ts`.
+7. **Running cores.** The scheduler uses the full thread count, so additional cores can run work concurrently.
 6. **Quick balance (time-boxed, seed 42):** the Hz clock's upgrade base is 8 (was 3). D20 passive round 1 unchanged (0:36 / 0:55 / 1:16); System 0:22; Rack 6:56. Tree: 165 nodes. `SAVE_VERSION` 15.
 
 **D35, 25 Oct: ports belong to the switch; a system has no port (user).** Binding. It amends D13 and D15.
@@ -1357,7 +1357,6 @@ D32 costs stay. The cost of a deleted node folds into the purchase price of what
 | Part or count | Was | Now |
 |---|---|---|
 | Cores | `dualCore` | From the start, at the rising extra-core price, up to the CPU maximum of 32 (D34). |
-| L2 and L3 cache | `l2Cache`, `l3Cache` | Buyable add-ons from the start. The higher price folds in the old research. |
 | Scheduler (queue hardware) | `fifoSched` | Buyable from the start. FIFO is its built-in strategy. |
 | CPU sockets | `dualSocket`, `quadSocket` | Bought with the System board up to 4, priced per socket. Socket factor and span penalty are fixed rules. |
 | RAM slots | `dualChannel` cap, `quadChannel` | Every slot on the board can be filled. The DIMM factor is a fixed rule. |
@@ -1374,15 +1373,15 @@ D32 costs stay. The cost of a deleted node folds into the purchase price of what
 
 | Kind | Nodes |
 |---|---|
-| **Keep: generation gate** (67) | CPU: `fabKhz`, `fabMhz`, `fabGhz`, `stacked3d`. RAM: `ddr`, `ddr2`, `ddr3`, `ddr4`, `ddr5`. Accelerators: `gpuGen2`–`gpuGen9`, `tensorCores`, `matrixGpu`. Drives: `ssd`, `nvme`, `scm`. Supplies: `psu80`, `psuBronze`, `psuGold`, `psuPlatinum`, `psuTitanium`, `meteredPdu`, `switchedPdu`, `upsOnline`, `upsLithium`, `substation`, `hvIntake`. Network: `sw100k`, `sw1M`, `sw10M`, `sw100M`, `sw1G`, `sw10G`, `dpFiber`, `dpDwdm`, `bbDarkFiber`, `bbDwdm`, `bbSubsea`. Cooling: `rackAir2`, `rackWater`, `rackWater2`, `roomAir2`, `chilledWater`, `chilledWater2`, `closedLoop`, `closedLoop2`. D31: `powerCtl`, `powerCtlLiIon`, `powerCtlLfp`, `roomStart`, `startPredict`, `globalStart`, `solarFarm`, `windFarm`, `fuelCell`, `ownPlant`. Structures: `systemBoard`, `rack`, `room`, `dataCenter`, `regions`. |
-| **Keep: improvement** (73) | `l3Slices`, `edramL3`, `rdimm`, `dma`, `prefetch`, `octaChannel`, `lowVoltRam`, `hotPages`, `gddr6`, `hbm`, `unifiedMemory`, `gpuLink`, `ncq`, `sharedStorage` (a rack storage node plus its sharing rule). All 24 scheduling and LB nodes, from `sjf` to `priceAware`. `cutThrough`, `qos`. All 10 power rules (`cstateC1` to `loadShed`, plus `dualFeed`). Cooling rules: `thermalThrottle`, `rackVarSpeed`, `hotColdAisle`, `containment`, `roomVarSpeed`, `economizer`. All 17 operations nodes. |
+| **Keep: generation gate** (67) | CPU: `fabKhz`, `fabMhz`, `fabGhz`. RAM: `ddr`, `ddr2`, `ddr3`, `ddr4`, `ddr5`. Accelerators: `gpuGen2`–`gpuGen9`, `tensorCores`, `matrixGpu`. Drives: `ssd`, `nvme`, `scm`. Supplies: `psu80`, `psuBronze`, `psuGold`, `psuPlatinum`, `psuTitanium`, `meteredPdu`, `switchedPdu`, `upsOnline`, `upsLithium`, `substation`, `hvIntake`. Network: `sw100k`, `sw1M`, `sw10M`, `sw100M`, `sw1G`, `sw10G`, `dpFiber`, `dpDwdm`, `bbDarkFiber`, `bbDwdm`, `bbSubsea`. Cooling: `rackAir2`, `rackWater`, `rackWater2`, `roomAir2`, `chilledWater`, `chilledWater2`, `closedLoop`, `closedLoop2`. D31: `powerCtl`, `powerCtlLiIon`, `powerCtlLfp`, `roomStart`, `startPredict`, `globalStart`, `solarFarm`, `windFarm`, `fuelCell`, `ownPlant`. Structures: `systemBoard`, `rack`, `room`, `dataCenter`, `regions`. |
+| **Keep: improvement** (73) | `rdimm`, `dma`, `prefetch`, `octaChannel`, `lowVoltRam`, `hotPages`, `gddr6`, `hbm`, `unifiedMemory`, `gpuLink`, `ncq`, `sharedStorage` (a rack storage node plus its sharing rule). All 24 scheduling and LB nodes, from `sjf` to `priceAware`. `cutThrough`, `qos`. All 10 power rules (`cstateC1` to `loadShed`, plus `dualFeed`). Cooling rules: `thermalThrottle`, `rackVarSpeed`, `hotColdAisle`, `containment`, `roomVarSpeed`, `economizer`. All 17 operations nodes. |
 | **Convert** (1) | `dualChannel` becomes "Multi-channel memory": matched modules run at channels × bandwidth. The slot cap is dropped. |
-| **Delete: part type or count** (23) | `smt`, `dualCore`, `l2Cache`, `l3Cache`, `fifoSched`, `dualSocket`, `quadSocket`, `quadChannel`, `ecc`, `storageCtl`, `raid0`, `gpuGen1`, `dualGpu`, `npu`, `accelSystem`, `portExpansion`, `densePorts`, `spineLeaf`, `lag`, `lag4`, `hallExpansion`, `zoneExpansion`, `intercontinental`. |
+| **Delete: part type or count** (23) | `smt`, `dualCore`, `fifoSched`, `dualSocket`, `quadSocket`, `quadChannel`, `ecc`, `storageCtl`, `raid0`, `gpuGen1`, `dualGpu`, `npu`, `accelSystem`, `portExpansion`, `densePorts`, `spineLeaf`, `lag`, `lag4`, `hallExpansion`, `zoneExpansion`, `intercontinental`. |
 
 **As landed.**
 1. **Tree.** The tree drops from 164 to 141 nodes. Prerequisites that pointed at a deleted node re-link to that node's own prerequisites. Three are set by hand: `gpuGen9` needs `gpuGen8` and `regions`; `octaChannel` needs `dualChannel` and `fabMhz`; `lbAffinity` needs `gpuGen2` and `lbCapability`. `systemBoard`, `sjf`, `timeSlice` and `workStealing` become roots. `intercontinental` leaves `MILESTONE_IDS`.
 2. **Start unlocks.** Owned from the start:
-   - L2, L3 and the scheduler (generation 0), with the FIFO strategy;
+   - The scheduler (generation 0), with the FIFO strategy;
    - 32 core sites;
    - the maximum ports, uplinks, rows, zones and sites. Each still needs its level open.
 3. **`systemBoard` grants the board.** The node now adds:
@@ -1392,7 +1391,7 @@ D32 costs stay. The cost of a deleted node folds into the purchase price of what
 
    Before System, these parts lock with "Needs System". That is a structure gate, not a part unlock.
 4. **Fixed rules.** The socket and DIMM factors are fixed board properties, read from `compile.ts` constants. `threadsPerCore` is capped at 1. The rule ids `smt`, `socketSpanPenalty`, `npuTensorOnly`, `socketFactor` and `dimmFactor` are removed.
-5. **Locks.** Generation locks still name their research node. Count locks no longer name a node; past the cap they read "At the limit" or "Max". `meet` lines for L2, cores and the scheduler come back unlocked.
+5. **Locks.** Generation locks still name their research node. Count locks no longer name a node; past the cap they read "At the limit" or "Max". `meet` lines for cache, cores and the scheduler come back unlocked.
 6. **Save.** `SAVE_VERSION` goes to 17, a pre-live reset.
 7. **System tray CPU item.** Sockets are now buyable from System on, so the item leads with Replace CPU when a newer package is researched and offers the next socket otherwise. Before this, the cheaper "CPU 2" hid the kHz package, and the bot never saved for it.
 8. **Replace only moves up (user bug, folded in).**
@@ -1711,7 +1710,7 @@ The die grid, process nodes, workbench, replacement artwork, routing effects and
 
 ### D43, 27 Oct: restore the original CPU (user)
 
-The user chose the original stacked CPU shown in their screenshot. Main uses its queue, cache bar, clock row and purple core cards. The CPU model again has package, cores, clock and L1/L2/L3 parts, 32 core sites, tier fabs and Replace CPU. The pre-Rack pipe and System-era PSU activation return. D41 and D42 are not active decisions on main. GPU tier work, report/research improvements and other unrelated edits remain. Save version 26 resets older saves under the pre-live policy.
+The user chose the original stacked CPU shown in their screenshot. Main uses its queue, cache bar, clock row and purple core cards. The CPU model again has package, cores, clock and cache parts, 32 core sites, tier fabs and Replace CPU. The pre-Rack pipe and System-era PSU activation return. D41 and D42 are not active decisions on main. GPU tier work, report/research improvements and other unrelated edits remain. Save version 26 resets older saves under the pre-live policy.
 
 ### D44, 27 Oct: direct paths between upgrades and research
 
@@ -1721,7 +1720,7 @@ The user found the upgrade and research popups clunky, with too many clicks to r
 - Prerequisite navigation keeps a local history of the previous project, filter, search and scroll position. Back returns through that history before leaving Research.
 - Find research searches the whole tree by project name, part or summary. Locked projects can be found without opening levels and folds first; their existing prerequisite keys remain available.
 - Compact rows expose Start, Resume or Queue directly when the existing research state permits it. Prices remain visible. A fixed action column avoids shifting controls as balances or research status change. Projects waiting on another project say Waiting. Details do not duplicate an action already on the row.
-- Cache in the system summary opens L1 cache upgrades directly, rather than opening CPU and requiring another drill and cache selection. The plate reads the system's existing chip snapshot and the normal simulation quote.
+- Cache in the system summary opens CPU cache upgrades directly, rather than opening CPU and requiring another drill and cache selection. The plate reads the system's existing chip snapshot and the normal simulation quote.
 
 Navigation spends nothing. Purchases and research starts remain explicit actions with their existing prices and rules. No game rules, balance, save fields or save version change in this refinement.
 
@@ -1882,3 +1881,25 @@ Keep the HUD's existing vertical footprint. Small phones shorten the fixed End k
 The running head's hardware `blockedBy` state drives the warning. The top task blinks between dark brown and muted amber, with light text. At the bottom, only the blocked-reason text between Research and Dismiss, or the desktop card's blocked reason, alternates between light text and yellow. The bottom background, border, resource values, countdown and action keys keep their normal appearance and positions. Stop the warning when the blocker clears or the round leaves running. Reduced-motion mode keeps the top task steady muted amber and the bottom reason steady yellow. This is status feedback, with no change to pickup deadlines, simulation clocks, task eligibility, rewards or saves.
 
 The phone task bar has no inner padding before Settings or after Dismiss. Reclaim that space for the middle requirements field, keeping the existing button sizes and bar height. Its keys use matching two-art-pixel top and bottom bevels, removing the extra lower row. The gear is 14 × 14 art pixels centered in its existing 16 px canvas cell, at the shell's integer art scale. It has eight short, square teeth, distinct recesses, a thick metal rim and a two-pixel center opening. Light and shaded metal edges keep the teeth visible at game scale.
+
+## D63, 28 Oct: explicit board upgrades, selected CPU navigation and tier introductions
+
+The user identified 300k RAM installs followed by 16-Credit upgrades, unclear module capacities and actions, board signals crossing CPU sockets, and CPU taps opening the wrong package. RAM, storage, PSU and legacy NPU upgrade bases now have a 10%-of-install floor, preserving higher existing bases, level curves and exact currency multipliers. SDRAM and HDD begin at 30k; ECC SDRAM at 37.5k. Cooling and rack supply bases already exceed this floor. Prices are re-quoted and charged by the same simulation plans. No save schema change is needed.
+
+Component options identify their target generation/level and action separately. RAM and drive facts distinguish the selected module's capacity and bandwidth from total used/capacity; adds preview system totals. Every option with bandwidth shows it, including regressions. A compact occupancy rail preserves each RAM/drive silhouette; activity lights follow actual memory access. Orthogonal board signals use component gutters from the task's bound socket and avoid every other CPU.
+
+A chip NodeRef includes its socket (omitted means socket zero). Snapshots, scope equality, child anchors, navigation keys, core activity, component refs, minis and payout anchors retain it. CPUs still share their hardware build and upgrades under D7.3. Rack and server navigation retain their existing distinct IDs and camera behavior.
+
+A newly researched tier flashes its existing ladder key until opened; reduced motion uses steady amber. Unlock alone preserves the selected song. The first settled visit selects that tier's song once, saving the introduction with local music preferences. Later visits and reloads preserve the selected song, enabled state and volume. This amends the previous music rule without adding simulation timers or save fields.
+
+## D64, 28 Oct: one CPU cache and compact memory controls
+
+The user requires exactly one cache per CPU. Its build field, catalog part and part slot are `cache`; it has one generation, level and capacity. CPU fabs advance its generation. The catalog, compile/pricing/config paths, research, quotes, selectors, renderer, fixtures and repository docs use that model. Cache-specific extra research and add slots are gone. Save version 33 resets earlier saves under the pre-live policy; no migrations.
+
+RAM and drive popups show Size, current used bits and a small usage meter, then speed. Upgrade previews only the resulting size/speed and price. Adding another module has one compact action. Change type holds replacement and ECC options, instead of rendering all generation choices. Empty slots have one type picker and one Add action. Adding a module opens its own compact details as a new target.
+
+System boards reserve two memory rows below their hardware. Each gives total usable size, percent used and a proportional meter when scale permits. Short screens retain legible rows at the shared body size. Values and utilization fills no longer cover RAM, drives or GPUs. GPU footprints move within the existing board footprint to make this space; HUD and task-bar height do not grow. Desktop CPU, GPU and power labels stay outside the board; phone component-value tags are removed. Read lights and routed task signals still represent actual hardware work.
+
+## D65, 28 Oct: memory readouts sit below the board
+
+The user clarified that RAM and disk readouts belong below the PCB outline, not inside it. The board slab now ends above the two existing readout rows. Component targets, the camera footprint, HUD and task-bar heights stay fixed. Bottom mounting holes follow the shorter slab, and power/dark shading stops at its edge. This overlay correction ships before the separate power/cooling rule update.

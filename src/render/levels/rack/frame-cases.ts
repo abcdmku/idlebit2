@@ -1,7 +1,7 @@
-// DEV-only: the rack, room and global level CASES (each level's fixtures.ts) in the L2 D17 frame,
+// DEV-only: the rack, room and global level CASES (each level's fixtures.ts) in the Control deck D17 frame,
 // so renderer-only states the sim fixtures don't carry yet (D25 flows, LB queues) can be captured.
-// /src/render/levels/rack/l2cases.html?form=desktop|phone&level=rack|room|global&case=<name>&t=<ms>
-// Same chrome and framing as core/l2.html; exposes the capture bridge (window.__br).
+// /src/render/levels/rack/frame-cases.html?form=desktop|phone&level=rack|room|global&case=<name>&t=<ms>
+// Same chrome and framing as core/frame.html; exposes the capture bridge (window.__br).
 import { DESKTOP_FRAMING, PHONE_FRAMING } from '../../core/camera';
 import type { RestFraming } from '../../core/camera';
 import { createCanvasRenderer, rect } from '../../core';

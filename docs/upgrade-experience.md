@@ -57,7 +57,6 @@ The dev report now shows a required-capacity range against the fleet, a strip of
 
 Version 20 adds `hot.skipLog` and `report.skipped.tasks`. Versions 17–19 migrate with an empty log on older reports, preserving the existing GPU and retired-research migrations. The report does not reconstruct historical skipped tasks it did not log.
 
-This improves purchase information but still fails to provide a satisfying affordable gain at the measured early limits. At 24 minutes, the 40,040-Credit L2/L3 route fits one of 45 logged skips and barely changes net. At two hours, the 58,394-Credit RAM step fits one of 51 and changes net by about 0.5%. The 29M DDR route fits 27, lifts net per round from 1.73M to 2.92M and reach from I17.9 to I19.1, while net/s stays flat; the fleet needs about eleven rounds to fund it. L36 remains loss-making. These results call for an incentive decision, not a claim that a truthful graph fixes gratification.
 
 Opus reports 198 files/1,859 tests, typecheck and build passing. Root independently checks two native buys at 390×780, 320×568, 1280×800 and 844×390: each action's wallet and full build match the pure public action, the second starts locked and opens after the first, both charges match, and the report frame holds. One task lights after the route. Small phone and landscape each need one native wheel scroll to reach the route; no extra click. The first snapshot is not fully visible there. Evidence is `root-report3/`. RAM/cache plates and the broader incentive fix are not included in this handoff.
 

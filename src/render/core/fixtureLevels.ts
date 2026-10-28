@@ -27,7 +27,7 @@ export function fixtureSystem(online: SystemSnapshot['online'] = 'onMarket'): Sy
   const part = { slot: 0, kind: 'cpu' as const, generation: 0, level: 1, active: false, resourceBusy: 0 };
   return {
     level: 'system', parent: null, systemId: systemId(0), kind: 'server', board: 'general', cpuCount: 1, ramSlots: 1, etaCfg: 1,
-    chip: fixtureChip(online), inbound: null, cpuBusy: [0], online, timerS: null, timerTotalS: null, cpu: part, ram: [], gpu: [], storage: [],
+    chip: fixtureChip(online), chips: [fixtureChip(online)], inbound: null, cpuBusy: [0], online, timerS: null, timerTotalS: null, cpu: part, ram: [], gpu: [], storage: [],
     psu: SUPPLY,
     running: [], memory: { tiers: [] }, queue: { cap: 0, count: 0, sample: [] }, reserved: 0, rates: { ops: 0, ramBits: 0, gpuOps: 0, ioBits: 0 },
     capacities: { cache: 0, ram: 0, vram: 0, storage: 0 }, used: { memory: 0, vram: 0, storage: 0 }, drawW: 0, saveable: true, slots: [],

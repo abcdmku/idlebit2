@@ -30,7 +30,7 @@ import { useLayout } from './shell/geometry';
 import { useShell } from './storeHooks';
 import type { ViewState } from './viewState';
 
-/** L2 rest framing (D17): art at N, the free world below the band and strip, the pipe from the head slot. */
+/** Control deck rest framing (D17): art at N, the free world below the band and strip, the pipe from the head slot. */
 export function framingOf(L: ShellLayout): RestFraming {
   return { form: L.kind, scale: L.N, lattice: L.lat, top: L.view.y - L.world.y, pipe: { x: L.pipeSrc.x, y: L.pipeSrc.y, runY: L.pipeRunY } };
 }

@@ -14,6 +14,7 @@ import { LEVEL_NAMES } from './viewState';
 import { returnToMarket } from './input/commands';
 import { CoinIcon } from './plates/icons';
 import { Sla } from './hud/Sla';
+import { useNewLevels } from './hud/useNewLevels';
 
 /** The ladder lists the deepest level first: CPU, System, Rack, Room, Global. */
 const LADDER: readonly LevelId[] = [...ORDER];
@@ -26,20 +27,21 @@ export function CurrencyIcon({ kind, n }: { kind: 'credits' | 'data'; n: number 
 function Ladder() {
   const L = useLayout(), { view, registry } = useShell(), state = useViewState();
   const unlocked = useGameSelector(s => s.unlocked, shallowEqual);
+  const newLevels = useNewLevels();
   const target = state.goal ?? state.focus.level;
   return <div className="ladder" role="group" aria-label="Zoom level">
     {LADDER.map((level, i) => {
       const open = unlocked[level] || level === state.focus.level;
-      return <button key={level} type="button" className={`rung${open ? '' : ' locked'}`} data-level={level} style={box(L.rungs[i]!)}
+      return <button key={level} type="button" className={`rung${open ? '' : ' locked'}${newLevels.has(level) ? ' newly-unlocked' : ''}`} data-level={level} style={box(L.rungs[i]!)}
         aria-pressed={level === target} title={open ? LEVEL_NAMES[level] : `${LEVEL_NAMES[level]}: opens with research`}
-        aria-label={open ? LEVEL_NAMES[level] : `${LEVEL_NAMES[level]}, locked. Opens research.`} data-qa-target={L.kind === 'phone' ? '' : undefined}
+        aria-label={open ? `${LEVEL_NAMES[level]}${newLevels.has(level) ? ', newly unlocked' : ''}` : `${LEVEL_NAMES[level]}, locked. Opens research.`} data-qa-target={L.kind === 'phone' ? '' : undefined}
         onClick={() => view.dispatch(open ? { type: 'zoomTo', level } : { type: 'openResearch' })}>
         <ArtCanvas w={16} h={16} n={L.N} style={{ margin: (L.rungs[i]!.w - 16 * L.N) / 2 }} artKey={`${level}:${registry.has(level)}`}
           draw={g => { g.clearRect(0, 0, 16, 16); if (registry.has(level)) registry.level(level).icon(g); }} />
       </button>;
     })}
     {L.kind === 'desktop' && <span className="rung-label" style={{ ...box(L.rungLabel), lineHeight: `${L.lh}px` }} data-testid="place">
-      <b>{LEVEL_NAMES[state.focus.level]}</b></span>}
+      <b>{state.focus.level === 'chip' ? `CPU ${(state.focus.socket ?? 0) + 1}` : LEVEL_NAMES[state.focus.level]}</b></span>}
   </div>;
 }
 

@@ -55,12 +55,12 @@ function drawReadout(g: G, s: RackSnapshot, quiet: boolean): void {
   if (dark || quiet) return;
   const deg = label('', Math.round(s.tempF), '°F');
   lcdText(g, r.x + Math.max(2, (r.w - lcdWidth(deg)) >> 1), r.y + 2, deg, tempCol(s.tempF));
-  let l2: string, c2: string;
-  if (s.crashed) { l2 = 'HALT'; c2 = P.fault; }
-  else if (s.crashS > 0) { l2 = label('HOT ', Math.ceil(s.crashS)); c2 = P.fault; }
+  let line2: string, c2: string;
+  if (s.crashed) { line2 = 'HALT'; c2 = P.fault; }
+  else if (s.crashS > 0) { line2 = label('HOT ', Math.ceil(s.crashS)); c2 = P.fault; }
   // Show an efficiency penalty only; the plate names the quantity.
-  else { const e = Math.round(s.eff * 100); l2 = e < 100 ? label('', e, '%') : ''; c2 = P.amber; }
-  lcdText(g, r.x + Math.max(2, (r.w - lcdWidth(l2)) >> 1), r.y + 8, l2, c2);
+  else { const e = Math.round(s.eff * 100); line2 = e < 100 ? label('', e, '%') : ''; c2 = P.amber; }
+  lcdText(g, r.x + Math.max(2, (r.w - lcdWidth(line2)) >> 1), r.y + 8, line2, c2);
 }
 
 // ---------- switch ----------

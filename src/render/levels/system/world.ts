@@ -2,16 +2,19 @@
 // callout, tray and plates; the world shows parts and state. While the round is not running there
 // is no activity: only the steady PSU meter and the online lamp remain.
 import type { QuoteResult, SystemSnapshot, TaskView } from '../../../game';
-import { BG, P, R, darkFx, drawGhost, drawSaveIcon, drawUnitLamp, glowBit, lampState, pathAt, upArrow, upArrowFill } from '../../core';
+import { BG, P, R, darkFx, drawGhost, drawSaveIcon, drawUnitLamp, lampState, pathAt, upArrow, upArrowFill } from '../../core';
 import type { GhostState, LevelRegistry, Point, Rect, ViewPresentation, WorldFrame } from '../../core';
 import { boardStatic } from './board';
+import { drawChipMini } from '../chip/mini';
 import { drawLeaders, firstRow } from './labels';
-import { CONNECTOR, LAMP, POWERED, PSU, PSU_TILE, SAVE, packageRect, siteCentre, siteRect, worldRect } from './layout';
+import { CONNECTOR, LAMP, POWERED, PSU, SAVE, packageRect, siteRect, worldRect } from './layout';
 import type { SiteType } from './layout';
 import { boardModel, pickedType, slotOf } from './model';
-import { drawGpuSpill, drawReadLights, drawTiers } from './memory';
+import { drawReadLights } from './memory';
+import { drawMemoryRows } from './memoryRows';
 import type { BoardModel, Site } from './model';
 import { drawGpuPiece, drawInbound, inboundOf } from './shards';
+import { boardRoute } from './routes';
 import { drawCpuSocket, drawDrivePart, drawEmptySite, drawGpuPart, drawPackageBody, drawPackageFront, drawConnector, drawPsu,
   drawRamPart, drawSiteLocked } from './sprites';
 
@@ -24,8 +27,7 @@ export function powered(s: SystemSnapshot): boolean {
   return s.online === 'onMarket' || s.online === 'draining' || s.online === 'goingOffline' || s.online === 'asleep';
 }
 const world: Rect = { x: 0, y: 0, w: 0, h: 0 }, pkg: Rect = { x: 0, y: 0, w: 0, h: 0 }, hit: Rect = { x: 0, y: 0, w: 0, h: 0 };
-const at: Point = { x: 0, y: 0 }, c0 = { x: 0, y: 0 }, c1 = { x: 0, y: 0 };
-const stage: [number, number][] = [[0, 0], [0, 0], [0, 0]];
+const at: Point = { x: 0, y: 0 };
 
 function quoteState(quotes: QuoteResult | null, type: SiteType): GhostState {
   if (!quotes) return 'open';
@@ -70,7 +72,7 @@ export function drawBoard(g: G, s: SystemSnapshot, view: ViewPresentation, frame
   // D25: the inbound shard rides in on the pipe at its real progress, in its task type's colour.
   if (transfer) drawInbound(g, transfer, b, frame);
   // D26: each tier fills its parts (spill hatched), and the tier a shard reads from now shows its light.
-  drawTiers(g, s, m, live); drawGpuSpill(g, m, live); drawReadLights(g, s, m, frame.timeMs, live);
+  drawReadLights(g, s, m, frame.timeMs, live);
   if (live) for (const t of s.running) { drawStageBit(g, m, t); drawGpuPiece(g, m, t); }
   if (live) {
     const credits = Number(frame.snapshot.hud?.credits ?? 0);
@@ -92,6 +94,7 @@ export function drawBoard(g: G, s: SystemSnapshot, view: ViewPresentation, frame
   const usage = s.psu.capacityW > 0 ? s.psu.deliveredW / s.psu.capacityW : 0;
   drawPsu(g, PSU, usage, s.psu.failed || s.psu.overloadS > 0 || s.psu.capped);
   drawTiles(g, s, m, view);
+  drawMemoryRows(g, s, frame);
   // Leaders belong to the labels: desktop only, and like the labels never during a zoom.
   if (frame.form !== 'phone' && !frame.zoom) drawLeaders(g, s, firstRow(frame));
 }
@@ -108,10 +111,10 @@ function drawTiles(g: G, s: SystemSnapshot, m: BoardModel, view: ViewPresentatio
   for (const site of m.sites) {
     if (site.state !== 'part' && !slotOf(s, site)) continue;
     if (site.type === 'cpu' && site.state === 'part') packageRect(b, site.index, hit); else siteRect(b, site.type, site.index, hit);
-    outline(g, hit, TILE_EDGE);
+    if (site.state === 'open') outline(g, hit, TILE_EDGE);
     if (site.state === 'open') plus(g, hit, quoteState(view.quotes, site.type) === 'picked');
   }
-  outline(g, PSU_TILE, TILE_EDGE);
+
 }
 function outline(g: G, r: Rect, c: string): void {
   R(g, r.x, r.y, r.w, 1, c); R(g, r.x, r.y + r.h - 1, r.w, 1, c); R(g, r.x, r.y + 1, 1, r.h - 2, c); R(g, r.x + r.w - 1, r.y + 1, 1, r.h - 2, c);
@@ -134,7 +137,7 @@ function drawCpu(g: G, s: SystemSnapshot, site: Site, live: boolean, frame: Worl
   packageRect(b, site.index, pkg);
   drawPackageBody(g, pkg, live && (s.cpuBusy[site.index] ?? 0) > 0);
   // Draw the same CPU parts as the CPU level.
-  if (registry.has('chip')) registry.level('chip').drawMini(g, s, pkg, frame);
+  if (registry.has('chip')) drawChipMini(g, s, pkg, frame, site.index);
   drawPackageFront(g, pkg);
 }
 
@@ -155,11 +158,12 @@ export function drawStageBit(g: G, m: BoardModel, t: TaskView): void {
   const list = m.installed[type];
   let site: Site | null = null;
   for (const p of list) if (!site || p.part?.active) site = p;
-  if (site) drawStagePath(g, m, site, t.progress, COLOUR[type]);
+  if (site) drawStagePath(g, m, site, t.progress, COLOUR[type], t.socket ?? 0);
 }
-function drawStagePath(g: G, m: BoardModel, site: Site, progress: number, colour: string): void {
-  siteCentre(m.b, 'cpu', 0, c0); siteCentre(m.b, site.type, site.index, c1);
-  stage[0][0] = c0.x; stage[0][1] = c0.y; stage[1][0] = c1.x; stage[1][1] = c0.y; stage[2][0] = c1.x; stage[2][1] = c1.y;
+function drawStagePath(g: G, m: BoardModel, site: Site, progress: number, colour: string, socket: number): void {
+  const stage = boardRoute(m.b, site.type, site.index, socket);
+  if (!stage.length) return;
   pathAt(stage, progress, at);
-  glowBit(g, at.x, at.y, 16, colour, undefined);
+  // A one-pixel signal fits the narrow socket gutters without painting over the neighbouring CPU.
+  R(g, Math.round(at.x), Math.round(at.y), 1, 1, colour);
 }

@@ -45,7 +45,7 @@ export function createRackRenderer(registry: LevelRegistry): LevelRenderer<'rack
     tagClear(s, out) { copyRect(FOCUS, out); out.x += colX(rackCol(s)) + rackRowScroll.offset; return out; },
     /** The row snaps, and a tapped neighbour settles, in 0.15 s (A06). */
     restEaseS: () => 0.15,
-    /** The pipe enters at the active rack's ceiling uplink (L2 D17: x 120, y 0). */
+    /** The pipe enters at the active rack's ceiling uplink (Control deck D17: x 120, y 0). */
     entry(s, out) { out.x = colX(rackCol(s)) + UP_X; out.y = 0; return out; },
     /** The camera tracks a drag or wheel along the row live. */
     followFocus: () => rackRowScroll.dragging,

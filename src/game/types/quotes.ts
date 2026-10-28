@@ -43,7 +43,7 @@ export type QuoteRequest =
    */
   | { readonly kind: 'meet'; readonly system: SystemId; readonly need: MeetNeed };
 
-/** A task's gates on one system (spec §6.1, D26.1): cache = L1 + L2 + L3 bits; ram; disk; GPU VRAM and cores; core count; ECC. */
+/** A task's gates on one system (spec §6.1, D26.1): cache = CPU cache bits; ram; disk; GPU VRAM and cores; core count; ECC. */
 export interface MeetNeed {
   readonly cacheBits?: number;
   readonly ramBits?: number;

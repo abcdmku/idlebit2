@@ -10,14 +10,14 @@ import { chipFloor, isLive, siteCount } from './world';
 
 const m = contain();
 /** The live chip for a system: the focus or partner when it is on screen, else the system's copy. */
-export function liveChip(frame: WorldFrame, system: SystemSnapshot): ChipSnapshot {
+export function liveChip(frame: WorldFrame, system: SystemSnapshot, socket = 0): ChipSnapshot {
   const s = frame.snapshot;
-  if (s.focus.level === 'chip' && s.focus.systemId === system.systemId) return s.focus;
-  if (s.partner?.level === 'chip' && s.partner.systemId === system.systemId) return s.partner;
-  return system.chip;
+  if (s.focus.level === 'chip' && s.focus.systemId === system.systemId && s.focus.socket === socket) return s.focus;
+  if (s.partner?.level === 'chip' && s.partner.systemId === system.systemId && s.partner.socket === socket) return s.partner;
+  return system.chips[socket] ?? system.chip;
 }
-export function drawChipMini(g: CanvasRenderingContext2D, system: SystemSnapshot, rect: Rect, frame: WorldFrame): void {
-  const chip = liveChip(frame, system), live = isLive(chip, frame), f = chipFloor(chip, frame.form);
+export function drawChipMini(g: CanvasRenderingContext2D, system: SystemSnapshot, rect: Rect, frame: WorldFrame, socket = 0): void {
+  const chip = liveChip(frame, system, socket), live = isLive(chip, frame), f = chipFloor(chip, frame.form);
   containMap(rect, f.pkg, m);
   const box = (r: Rect, c: string): Rect => {
     const x = Math.round(m.ox + r.x * m.k), y = Math.round(m.oy + r.y * m.k);

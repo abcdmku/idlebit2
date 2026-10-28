@@ -20,10 +20,8 @@ function inventory(state: GameState) {
     if (!system) continue;
     const s = system.spec;
     if (s.cpu) {
-      add('cpu', s.cpu.cpu.gen); add('clock', s.cpu.clock.gen); add('l1', s.cpu.l1.gen);
+      add('cpu', s.cpu.cpu.gen); add('clock', s.cpu.clock.gen); add('cache', s.cpu.cache.gen);
       for (const core of s.cpu.cores) add('core', core.gen);
-      if (s.cpu.l2) add('l2', s.cpu.l2.gen);
-      if (s.cpu.l3) add('l3', s.cpu.l3.gen);
       cores = Math.max(cores, s.cpu.cores.length * s.cpuCount);
       sockets = Math.max(sockets, s.cpuCount);
     }

@@ -15,7 +15,7 @@ export const TONE: Readonly<Record<LabelTone, string>> = {
   preload: '#a8c6ff',
 };
 export const TAG_FILL = 'rgba(14, 11, 28, 0.85)';
-/** CSS px. One body size and one line height per layout (L2: 16/24 desktop, 13/16 phone). */
+/** CSS px. One body size and one line height per layout (Control deck: 16/24 desktop, 13/16 phone). */
 export interface Typography { readonly body: number; readonly line: number; readonly grid: number }
 export const DESKTOP_TYPE: Typography = { body: 16, line: 24, grid: 8 };
 export const PHONE_TYPE: Typography = { body: 13, line: 16, grid: 8 };

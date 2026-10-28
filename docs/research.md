@@ -9,8 +9,8 @@ The current machine-readable appendix generates 140 nodes in ten categories. The
 Implementation status during the GPU wave: §5 and §9 are the accepted reference design, including all 36 CPU/RAM levels and `registeredCapacity { factor: 2 }`. Generated `tree.data.ts` and `tree.text.ts` match that source exactly. Runtime `RESEARCH` in `tree.ts` applies the two explicit overrides in `build/research/runtimeCompatibility.ts`: DDR describes deployed bandwidth-based watts, and RDIMM still grants `ramLevelBonus = 4` to ECC modules. Runtime definitions and research views use that actual effect copy. The 36-level curves, energy ratios and registered capacity multiplier remain pending CPU/RAM integration. Remove each override only after its stated runtime consumers and validation land; see `hardware-progression.md` §7. GPU definitions, fees, prerequisites and effects use the reference unchanged.
 
 1. **Research gates parts, generations, ceilings, strategies and rules.** Levels inside a generation are never gated. The only gated quantities are named ceilings: cores per chip, lanes per core, RAM, GPU and drive slots, CPU sockets, switch ports, uplinks, rows, zones and regions.
-2. **A generation needs two nodes.** A part's generation `g` needs the part's base node (for example `l2Cache`) and the node that opens that generation (for example `fabKhz`). This is v2's rule, kept.
-3. **Fab nodes move the whole CPU package.** `fabKhz`, `fabMhz` and `fabGhz` open the next generation of every chip part (core, clock, L1, L2, L3, scheduler) and the matching Barebones tier on the configuration plate. RAM, GPU, VRAM, storage, PSU, switch, cooling and supply generations have their own nodes, so the player picks which bottleneck to modernize first. The later CPU/RAM progression ruling gives every clock/RAM generation 36 levels, with overlapping speeds and worsening energy ratios in `hardware-progression.md`. Research opens purchases; it never modernizes installed parts for free or forces replacement at a tier's native rate.
+2. **CPU fabs advance the cache.** The cache exists from the start. `fabKhz`, `fabMhz` and `fabGhz` open its later generations along with the other CPU parts. RAM and drive generations keep their own research.
+3. **Fab nodes move the whole CPU package.** `fabKhz`, `fabMhz` and `fabGhz` open the next generation of every chip part (core, clock, cache, scheduler) and the matching Barebones tier on the configuration plate. RAM, GPU, VRAM, storage, PSU, switch, cooling and supply generations have their own nodes, so the player picks which bottleneck to modernize first. The later CPU/RAM progression ruling gives every clock/RAM generation 36 levels, with overlapping speeds and worsening energy ratios in `hardware-progression.md`. Research opens purchases; it never modernizes installed parts for free or forces replacement at a tier's native rate.
 4. **Strategies are chosen per unit and switching is hot.** Changing a strategy, filter or setpoint on a unit is instant and loses no work, in or between rounds.
 5. **Network nodes split into three kinds.**
    - Strategies: pick one per load balancer. First-fit is the free default; round robin, least connections, weighted, least work and bin packing are researched.
@@ -179,7 +179,6 @@ Names are proposals; the spec owner may rename them.
 | Part | Gen 0 (opened by) | Gen 1 | Gen 2 | Gen 3 | Gen 4 | Gen 5 |
 |---|---|---|---|---|---|---|
 | Core, Clock, L1, Scheduler, CPU package | Hz (start) | kHz `fabKhz` | MHz `fabMhz` | GHz `fabGhz` | | |
-| L2 / L3 | `l2Cache` / `l3Cache` | kHz `fabKhz` | MHz `fabMhz` | GHz `fabGhz` | | |
 | RAM | SDRAM `memController` | DDR `ddr` | DDR2 `ddr2` | DDR3 `ddr3` | DDR4 `ddr4` | DDR5 `ddr5` |
 | GPU adapter index | displayed gen 1 `gpuGen1` | displayed gen 2 `gpuGen2` | displayed gen 3 `gpuGen3` | displayed gen 4 `gpuGen4` | displayed gen 5 `gpuGen5` | displayed gen 6 `gpuGen6`; indices 6/7/8 are displayed gens 7/8/9, `gpuGen7`/`gpuGen8`/`gpuGen9` |
 | NPU | `npu` | `npu` + `gpuGen2` | `npu` + `tensorCores` | `npu` + `matrixGpu` | | |
@@ -244,7 +243,7 @@ Columns: id, short name, prerequisites, the zoom level where it first matters, e
 
 | id | Name | Requires | Level | Era / tier | Effect | Short | Answers |
 |---|---|---|---|---|---|---|---|
-| `fabKhz` | kHz fab | systemBoard | System | kHz W4 | Gen 1 of core (2 base lanes), clock (1 kHz base), L1, L2, L3, scheduler and CPU package. Opens Barebones kHz. | Opens kHz chips and Barebones kHz | all bands, `energy` |
+| `fabKhz` | kHz fab | systemBoard | System | kHz W4 | Gen 1 of core (2 base lanes), clock (1 kHz base), cache, scheduler and CPU package. Opens Barebones kHz. | Opens kHz chips and Barebones kHz | all bands, `energy` |
 | `fabMhz` | MHz fab | fabKhz, rack | Rack | MHz W9 | Gen 2 of every chip part. Opens Barebones MHz. | Opens MHz chips and Barebones MHz | all bands, `energy` |
 | `fabGhz` | GHz fab | fabMhz, room | Room | GHz W11 | Gen 3 of every chip part. Opens Barebones GHz. | Opens GHz chips and Barebones GHz | all bands, `energy` |
 | `dma` | DMA engine | systemBoard | System | Hz W5 | While a shard is in the RAM or disk part of a memory stage (D26), its core is free for another shard. The shard keeps its scheduler K slot. | Cores free up during RAM and disk. | `ram`, `storage` |
@@ -464,14 +463,14 @@ The path below is the real campaign bot's (`src/game/probes/bot.ts`, seed 42, D1
 |---|---|---|---|
 | 0:10 | `pipelining` (W1, 1 Data) | First whole Data arrives at about 0:10 | `fifoSched` |
 | ~4:45 | Round 1 ends on "Timed out" at the 1 kHz pipe wall (`I` ≈ 14). Between rounds research runs at full speed. | | |
-| 4:45–6:30 | `fifoSched`, `dualCore`, `l2Cache` (W1–W2), the path to `systemBoard` | Scheduler K needs a second core; `threads` families need 512–768 bits of cache | `sjf` or `timeSlice` |
+| 4:45–6:30 | `fifoSched`, `dualCore`, `cache` (W1–W2), the path to `systemBoard` | Scheduler K needs a second core; `threads` families need 512–768 bits of cache | `sjf` or `timeSlice` |
 | rounds 2 to Rack | no network node | The dual-core Hz chip outruns its fixed 1 kHz pipe in round 2. Until Rack, income is capped at 1,000 ops/s and tasks over 10,000 ops time out (D15) | |
 | 5:00–10:00 | `sjf`, `timeSlice`, `superscalar`, `quadCore`, `priorityQ`, `mlfq`, `workStealing` (W2–W3) | The off-path budget allows them while `systemBoard` is saved for | `cstate1` |
 | 0:46–0:53 | `systemBoard` (W4, 36,000 Data) | "Can't run · RAM" from JSON Parse and Merge Sort. The first real save-up: about 40 min of capped Data | C-state becomes available after this unlock |
-| 0:58–1:10 | `memController`, `psu80` (W4, 12,000 each) | `ram` band; the power supply limits a fast Hz chip | `l3Cache` |
+| 0:58–1:10 | `memController`, `psu80` (W4, 12,000 each) | `ram` band; the power supply limits a fast Hz chip | `cache` |
 | 1:10–3:30 | save for `fabKhz` (W6 milestone, 150,000 Data) | Hz parts are at their ceilings; Credits pile up for kHz parts | W5 nodes within the off-path budget |
 | 3:33 | `fabKhz` | kHz era: the upgrade-or-replace moment for the CPU. kHz parts speed research, not income: the pipe still caps it | |
-| 3:50–4:00 | `gpuGen1`, `storageCtl` (W5, 15,000 each) | Their bands open above the pipe wall, so the first card and drive pay only after Rack | `hotPages`, `l3Cache` |
+| 3:50–4:00 | `gpuGen1`, `storageCtl` (W5, 15,000 each) | Their bands open above the pipe wall, so the first card and drive pay only after Rack | `hotPages`, `cache` |
 | 4:00–6:20 | save for `rack` (W6 milestone, 150,000 Data) | | `offline12` (W6) for an overnight gap |
 | 6:20–6:50 | `rack` | **Rack** opens at 6:40–6:48. Ports step at once, servers are copied in, and the W5–W6 extras follow | |
 
@@ -484,7 +483,7 @@ Sources: `content/research.ts` (legacy research), `content/dispatcherJobs.ts` (d
 | IdleBit tech or upgrade | Verdict | v3 node(s) and reason |
 |---|---|---|
 | Decode Logic, Byte Operations, Bit Mutation, Shift Operations | Dropped | They unlocked task families. In v3 the market curve brings families in; research does not. |
-| Cache Mapping | Adapted | Cache exists from the start; the next cache step is `l2Cache`, then `l3Cache`. |
+| Cache Mapping | Adapted | Cache exists from the start; the next cache step is `cache`, then `cache`. |
 | Cache / Cache Speed upgrades | Adapted | Cache levels stay ungated. Cache speed dropped: v3 cache is a capacity gate. |
 | Benchmark Harness, benchmark compute tasks | Dropped | Payback inspection is UI work, and benchmark tasks don't exist in v3. |
 | Multi-Core Control, Add Core | Adopted | `dualCore` ("Multi-core"): one node opens all 32 core sites (D34); the add-core price curve paces core count. |
@@ -495,7 +494,7 @@ Sources: `content/research.ts` (legacy research), `content/dispatcherJobs.ts` (d
 | PSU Capacity upgrade, PSU SKUs (Barebones, Compact, Balanced, Headroom) | Adapted | Power supply levels plus the 80 Plus ladder (`psu80` to `psuTitanium`). |
 | Bootloader (36 levels, boot 10 s to 0.1 s) | Adopted (D45) | Boot loader levels 1-36; shared boot latency from the CPU CSV (section 3.4). |
 | RAM Control, dispatcher Memory controllers L1 | Adopted | `memController`. |
-| Memory controllers L2–L4 (kHz, MHz, GHz eras) | Adapted | Split into `fabKhz`/`fabMhz`/`fabGhz` and the DDR ladder. |
+| Memory controllers Control deck–L4 (kHz, MHz, GHz eras) | Adapted | Split into `fabKhz`/`fabMhz`/`fabGhz` and the DDR ladder. |
 | RAM Stick, RAM Capacity, RAM Frequency | Adapted | RAM levels, DDR generations, `rdimm` for capacity. |
 | Dual Channel RAM | Adopted | `dualChannel`. |
 | Quad Channel RAM | Adopted | `quadChannel`. |
@@ -543,7 +542,7 @@ Sources: `content/research.ts` (legacy research), `content/dispatcherJobs.ts` (d
 |---|---|---|
 | Family tag `tensor` on inference and training families | Tasks | `tensorCores`, `matrixGpu`, `npu` |
 | Task gate `ecc` on some `storage`, `rackDist` and later families | Tasks | `ecc`, `rdimm` |
-| Families whose `workingSet` beats L1 in the first 10 minutes | Tasks | `l2Cache` must answer a real `gate` failure |
+| Families whose `workingSet` beats L1 in the first 10 minutes | Tasks | `cache` must answer a real `gate` failure |
 | Per-member GPU core and VRAM gates from the accepted progression table | Tasks | `accelSystem`, `gpuLink`; CPU/RAM gates remain separate |
 | Region names and which regions open at `regions` vs `intercontinental` | Tasks, spec | `regions`, `intercontinental`, `bbSubsea` |
 | Model VRAM and hot-upgrade capacity with total memory technology multipliers 4 and 16 | Spec | `gddr6`, `hbm`, `gpuLink` |
@@ -592,7 +591,7 @@ export const CREDITS_ONLY = [
 ];
 
 export type PartId =
-  | "core" | "clock" | "l1" | "l2" | "l3" | "scheduler" | "cpu" | "psu"
+  | "core" | "clock" | "cache" | "scheduler" | "cpu" | "psu"
   | "ram" | "gpu" | "npu" | "storage" | "storageNode"
   | "rackCooler" | "pdu" | "lb" | "switch" | "roomCooler" | "ups" | "row"
   | "dataPlane" | "grid" | "zone" | "site" | "backbone"
@@ -662,7 +661,7 @@ const filt = (scope: Scope, id: FilterId): ResearchEffect => ({ kind: "filter", 
 const view = (level: ZoomLevel): ResearchEffect => ({ kind: "view", level });
 const rule = (id: RuleId, params?: Record<string, number>): ResearchEffect => ({ kind: "rule", id, params });
 const chipGen = (g: number) =>
-  (["core", "clock", "l1", "l2", "l3", "scheduler", "cpu"] as const).map((p) => gen(p, g));
+  (["core", "clock", "cache", "scheduler", "cpu"] as const).map((p) => gen(p, g));
 
 const n = (
   id: string, name: string, category: ResearchCategory, requires: string[],
@@ -671,9 +670,6 @@ const n = (
 
 export const RESEARCH_V3: readonly ResearchNode[] = [
   // Compute
-  n("stacked3d", "Stacked cache", "compute", ["fabGhz", "dataCenter"], "cpu", "ghz", 13, 4e8, [gen("l3", 4)], ["region", "density"]),
-  n("l3Slices", "L3 slices", "compute", ["fabMhz"], "cpu", "mhz", 10, 4e7, [cap("l3LevelBonus", 1)], ["ram", "rackDist"]),
-  n("edramL3", "eDRAM L3", "compute", ["l3Slices", "fabGhz"], "cpu", "ghz", 12, 2e8, [cap("l3LevelBonus", 2)], ["ram", "roomDist"]),
   n("fabKhz", "kHz fab", "compute", ["systemBoard"], "system", "khz", 4, 27_000, chipGen(1), ["bits", "ints", "threads", "energy"]),
   n("fabMhz", "MHz fab", "compute", ["fabKhz", "rack"], "rack", "mhz", 9, 4.5e7, chipGen(2), ["ram", "rackDist", "energy"]),
   n("fabGhz", "GHz fab", "compute", ["fabMhz", "room"], "room", "ghz", 11, 1.8e8, chipGen(3), ["roomDist", "energy"]),
@@ -866,7 +862,7 @@ Tiers and Data costs are unchanged. The `PlacementId` type and the `placement` e
 | `virtualMem` → `hotPages` (Hot pages) | Working sets may exceed RAM into storage, with an IO stage of 2× the excess. | Spill to disk is base (D26.1). The rule cuts a spilled shard's disk traffic to `f_d²` of its memory traffic. |
 | `unifiedMemory` (new, GHz W14, requires `hbm`, `gpuGen8`) | — | VRAM pools with RAM and disk; overflow costs RAM and disk time (D26.4). |
 | `memController`, `storageCtl`, `ssd`, `nvme`, `scm`, `raid0`, `ncq`, `sharedStorage` | RAM and drives are gates; IO stages need a drive. | RAM and drives are tiers of one hierarchy. Drive generations set spill speed (IO re-based to 1/16, 1/16, 1/4, 1/2 of their era's RAM bandwidth). |
-| `dma`, `prefetch`, `l2Cache`, `l3Cache` | RAM stream and IO stages. | RAM and disk parts of memory stages; cache traffic is free. |
+| `dma`, `prefetch`, `cache`, `cache` | RAM stream and IO stages. | RAM and disk parts of memory stages; cache traffic is free. |
 
 The tree has 162 nodes. Tiers and Data costs are unchanged; `unifiedMemory` costs W14 Data and work.
 
@@ -874,13 +870,12 @@ The tree has 162 nodes. Tiers and Data costs are unchanged; `unifiedMemory` cost
 
 > in later parts of the game there will still be lower level upgrades
 
-The research screen tabs nodes by the part they grow from (`src/game/view/researchParts.ts`), and the CPU tab ran thin after Hz. Eight nodes keep the CPU's own parts growing through kHz, MHz and GHz. Each uses an effect the runtime already consumes: the `lanesPerCore` and `coreSites` ceilings, and the `l3LevelBonus` ceiling, which `build/locks.ts` already applies to L3 but no node granted. Data and work follow §3's tiers.
+The research screen groups CPU research by the hardware it changes. Cache generation advances with the CPU fab.
 
 | Part | kHz | MHz | GHz |
 |---|---|---|---|
 | Clock (lanes) | `branchPredict` 12 | `fma` 24 | `dualVector` 64, `matrixTiles` 112 |
 | Cores | — (D34: Multi-core opens all 32) | — | — (32 is the D7.2 cap) |
-| Cache | — | `l3Slices` +1 L3 level | `edramL3` +2 L3 levels |
 | Queue | — | — | — (see below) |
 
 The lane ceiling used to stop at 32. That left MHz core levels 9–12 and GHz core levels 5–14 unreachable, although the core curve allows `8 + 2g` levels (spec §12.1). `dualVector` and `matrixTiles` open them. `CEILINGS_MAX.lanesPerCore` (`core/constants.ts`, used by the max-research test fixture) should follow to 112. Lanes past native still lower the core's energy ratio, so the higher ceilings are a choice, not free speed.
@@ -900,7 +895,6 @@ CPU-tab nodes per era (fabs excluded):
 4. **C-state levels.** The highest purchased level supplies the idle-power factor. One On/Off setting controls whether it is used; no fixed named-state factor table is involved.
 5. **Prefetcher generations.** `prefetch` has no params, and it maps to RAM.
 
-**Runtime gap found:** `stacked3d` grants L3 generation 4, but the L3 catalog row has only four generations (`build/catalog/chip.ts`), so the node currently unlocks nothing. Spec A.1 lists generation 4 (2^39 bits, gen-3 watts); the catalog needs that fifth entry.
 
 ### D31 nodes (power at scale), now in §5.7, §9 and the tree data
 
@@ -929,7 +923,7 @@ New `PartId`s: `powerCtl`, `roomStart`, `globalStart`, `generation`. New ceiling
 
 | Question | Decision | Effect on the tree |
 |---|---|---|
-| Do concurrent tasks share cache and RAM? | Yes (D1.1) | L2, L3, SMT, time slicing and `prefetch` keep their capacity tension. |
+| Do concurrent tasks share cache and RAM? | Yes (D1.1) | SMT, time slicing and `prefetch` keep their capacity tension. |
 | One IO stage per drive? | Yes (D1.2) | `ncq` stands. |
 | Separate VRAM track? | No (D1.3) | `gddr6` and `hbm` raise VRAM per level. No VRAM generations. |
 | `tensor` and `ecc` on families? | Yes (D1.4) | `tensorCores`, `matrixGpu`, `npu`, `ecc`, `rdimm` stand. |
@@ -943,7 +937,7 @@ New `PartId`s: `powerCtl`, `roomStart`, `globalStart`, `generation`. New ceiling
 | 4-port starter switch | Intended (D1.12) | `portExpansion`, `densePorts` stay cheap and early. |
 | Research currency | Data plus compute work (D3) | `data` per node by tier, milestones 3× (§3). |
 | Tiers from the market model | D5.6 | §3 re-derived from `scripts/market-model.ts`. 47 nodes changed tier so each tier belongs to one era. Band examples follow `docs/tasks.md`. |
-| CPUs and systems | D7 | The CPU level replaces Chip. Cores capped at 32 (`stacked3d` is now stacked L3 cache); Q ≤ 32; `quadSocket` added for 3–4 CPUs; RAM slots 1→4 on general servers; `accelSystem` (2 CPUs, 8 RAM, 8 GPU) replaces `quadGpu` and `gpuBaseboard`; `octaChannel` moves onto it; `lbAffinity` added. |
+| CPUs and systems | D7 | The CPU level replaces Chip. |
 | Fleet caps | Architecture §1.9 | §4.2 cites them. `spineLeaf` gives 24 room ports, `hallExpansion` the third row, `zoneExpansion` the third zone, `regions` 4 sites, `intercontinental` 8. |
 
 ### Open questions

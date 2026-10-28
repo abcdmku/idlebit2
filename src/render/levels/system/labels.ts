@@ -1,4 +1,4 @@
-// System value labels (L2 main.js systemLabels): every installed part carries its size and speed.
+// System value labels (Control deck main.js systemLabels): every installed part carries its size and speed.
 // Desktop: two-line labels in the board's side margins, with silkscreen leaders that end on the
 // part. Phone: one-line tags on the board beside each part. Values are snapshot fields, formatted.
 import { formatHertz, formatSize } from '../../../game';
@@ -9,6 +9,7 @@ import { BOARD, PSU, siteRect } from './layout';
 import { boardModel } from './model';
 import { tierOf } from './memory';
 import type { Site } from './model';
+import { writeMemoryRows } from './memoryRows';
 
 export type LabelKey = 'cpu' | 'psu' | 'ram' | 'drive' | 'gpu';
 export interface PartLabel {
@@ -49,7 +50,7 @@ export function sizes(bits: readonly number[]): string {
 /** A tier's use and spill for its label (D26), from `SystemSnapshot.memory`. */
 function tierNote(s: SystemSnapshot, tier: 'ram' | 'disk'): { used?: string; spilled?: string } {
   const t = tierOf(s, tier);
-  if (!t || t.usedBits <= 0) return {};
+  if (!t) return {};
   // RAM shows its use. On disk every used bit is spilled, so the drive shows only "spilled" (warning).
   if (tier === 'disk') return t.spilledBits > 0 ? { spilled: formatSize(t.spilledBits) } : {};
   return { used: formatSize(t.usedBits) };
@@ -65,15 +66,14 @@ function values(s: SystemSnapshot): Omit<PartLabel, 'top' | 'mid' | 'lx' | 'end'
   const ram = m.installed.ram, drive = m.installed.drive, gpu = m.installed.gpu;
   // R40: per-stick capacity and the slowest channel ("16.4 + 16.4 kb · 1 kHz"); per-drive size and IO.
   if (ram.length) {
-    let rate = Infinity;
-    for (const q of ram) rate = Math.min(rate, q.part!.rateBits ?? 0);
+    const rate = s.rates.ramBits;
     const capacities = ram.map(q => q.part!.capacityBits ?? 0);
-    out.push({ key: 'ram', name: 'RAM', value: `${sizes(capacities)} · ${formatSize(rate)}/s`,
-      phoneValue: formatSize(capacities.reduce((sum, n) => sum + n, 0)), side: 'R', r: union(ram, b), ...tierNote(s, 'ram') });
+    const total = capacities.reduce((sum, n) => sum + n, 0), used = tierOf(s, 'ram')?.usedBits ?? 0;
+    out.push({ key: 'ram', name: 'RAM', value: `${formatSize(total)} total · ${formatSize(rate)}/s`,
+      phoneValue: `${formatSize(used)} used / ${formatSize(total)}`, side: 'R', r: union(ram, b), ...tierNote(s, 'ram') });
   }
   if (drive.length) {
-    const capacity = sizes(drive.map(q => q.part!.capacityBits ?? 0));
-    const rate = Math.min(...drive.map(q => q.part!.rateBits ?? 0));
+    const capacity = `${formatSize(s.capacities.storage)} total`, rate = s.rates.ioBits;
     out.push({ key: 'drive', name: 'Drive', value: `${capacity} · ${formatSize(rate)}/s`,
       phoneValue: capacity, side: 'R', r: union(drive, b), ...tierNote(s, 'disk') });
   }
@@ -145,20 +145,19 @@ export function partLabels(s: SystemSnapshot, form: WorldForm | undefined, first
 /** Desktop leaders: a silk line from the label's inner edge to the part, with a dot on the part. Art. */
 export function drawLeaders(g: CanvasRenderingContext2D, s: SystemSnapshot, first = FIRST): void {
   for (const it of partLabels(s, 'desktop', first)) {
+    if (it.key === 'ram' || it.key === 'drive') continue;
     const a = Math.min(it.lx, it.end), b = Math.max(it.lx, it.end);
     R(g, a, it.mid, b - a, 1, P.silk); R(g, it.end - 1, it.mid - 1, 3, 3, P.silk);
   }
 }
 
-/** Write the labels: two lines in the margins (desktop) or one-line tags on the board (phone). */
+/** Desktop hardware labels stay outside the board. Memory has its own reserved rows. */
 export function writeLabels(s: SystemSnapshot, frame: WorldFrame, out: LabelWriter): void {
+  writeMemoryRows(s, frame, out);
   const form = frame.form;
+  if (form === 'phone') return;
   for (const it of partLabels(s, form, firstRow(frame))) {
-    if (form === 'phone') {
-      out.label(it.key, it.tagX, it.tagY, it.right ? 'right' : 'left', true).text(it.name, 'silk', true).text(it.phoneValue ?? it.value, 'value');
-      if (it.spilled) out.text(`· ${it.spilled} spilled`, 'warn');
-      continue;
-    }
+    if (it.key === 'ram' || it.key === 'drive') continue;
     const left = it.side === 'L';
     out.label(it.key, left ? it.lx - 3 : it.lx + 3, it.top, left ? 'right' : 'left').text(it.name, 'silk', true);
     if (it.used) out.text(`· ${it.used} used`, 'mute');

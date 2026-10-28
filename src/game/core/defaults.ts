@@ -10,7 +10,7 @@ import { MAX_ZONES_PER_SITE, RACK_SLOTS_PER_ROW, SERVERS_PER_RACK, SETPOINT_DEFA
  * Barebones units (spec §13.2) as plain build objects: the boot machine, the hidden containers and
  * the testkit fleets use them. Prices and PSU sizing are S5's (build/configs); these carry only shape.
  */
-export const L1 = (gen: number): PartLevel => ({ gen, level: 1 });
+export const levelOne = (gen: number): PartLevel => ({ gen, level: 1 });
 const supply = (gen: number): SupplyBuild => ({ gen, level: 1, capped: false });
 const cooler = (gen: number): CoolerBuild => ({ gen, level: 1, setpointF: SETPOINT_DEFAULT_F });
 export const baseRouter = (gen = 0): RouterBuild => ({ gen, level: 1, strategy: 'firstFit', filters: [], queueLevel: 1 });
@@ -32,7 +32,7 @@ export function barebonesSpec(tier = 0, board: BoardKind = 'general'): SystemSpe
   let spec = BAREBONES_SPECS.get(key);
   if (!spec) {
     spec = {
-      kind: 'server', board, cpu: { cpu: L1(tier), cores: [L1(tier)], clock: L1(tier), l1: L1(tier), l2: null, l3: null }, cpuCount: 1,
+      kind: 'server', board, cpu: { cpu: levelOne(tier), cores: [levelOne(tier)], clock: levelOne(tier), cache: levelOne(tier), }, cpuCount: 1,
       scheduler: null, ram: [], accels: [], drives: [], psu: supply(0), settings: { dvfs: false, turbo: false, cStateLimit: 1 },
     };
     BAREBONES_SPECS.set(key, spec);
@@ -47,16 +47,14 @@ export function barebonesRack(id: RackId, room: RoomId, slot: number, opened = t
   return {
     id, room, slot, online: true, opened,
     servers: Array<SystemId | null>(SERVERS_PER_RACK).fill(null),
-    cooler: cooler(0), pdu: supply(0), lb: baseRouter(), switch: rackSwitch(), powerCtl: null,
-  };
+    cooler: cooler(0), pdu: supply(0), lb: baseRouter(), switch: rackSwitch(), powerCtl: null, };
 }
 
 export function barebonesRoom(id: RoomId, site: SiteId, zone: number, opened = true, rows = 2): RoomBuild {
   return {
     id, site, zone, online: true, opened, rows,
     racks: Array<RackId | null>(rows * RACK_SLOTS_PER_ROW).fill(null),
-    switch: roomSwitch(), lb: baseRouter(), cooler: cooler(0), ups: [supply(0)], start: null,
-  };
+    switch: roomSwitch(), lb: baseRouter(), cooler: cooler(0), ups: [supply(0)], start: null, };
 }
 
 /** Data plane and backbone gen 0 start at their default rungs (spec A.3). */
@@ -65,6 +63,5 @@ export function barebonesSite(id: SiteId, region: RegionId, opened = true): Site
     id, region, online: true, opened,
     zones: Array<RoomId | null>(MAX_ZONES_PER_SITE).fill(null),
     dataPlane: { gen: 0, k: DATA_PLANE.baseK[0]!, router: baseRouter() }, grid: supply(0),
-    backbone: id === 0 ? null : { gen: 0, k: BACKBONE.baseK[0]! }, generation: null,
-  };
+    backbone: id === 0 ? null : { gen: 0, k: BACKBONE.baseK[0]! }, generation: null, };
 }

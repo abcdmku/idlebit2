@@ -26,7 +26,7 @@ export const STEP_LEVEL_MAX = 36;
 export const levelFactor = (curve: Curve, level: number): number =>
   curve === 'flow' ? 2 ** (level - 1) : curve === 'step' ? STEP_RATE ** (level - 1) : curve === 'fixed' ? 1 : level;
 
-/** Highest level of generation g (spec §12.1, A.5), plus a research bonus (rdimm, stacked3d). */
+/** Highest level of generation g (spec §12.1, A.5), plus a research bonus (rdimm, cache generations). */
 export const levelMax = (row: CatalogRow, g: number, bonus = 0): number =>
   (row.levelMax ?? (row.curve === 'step' ? STEP_LEVEL_MAX : row.curve === 'flow' ? 11 + g : row.curve === 'core' ? 8 + 2 * g : row.curve === 'linear' ? 8 + g : 1)) + bonus;
 

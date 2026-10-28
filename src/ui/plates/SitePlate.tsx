@@ -9,6 +9,7 @@ import { calloutModel } from '../callout/model';
 import { useShellOffers } from '../deck/useOffers';
 import { useSavingUp } from '../deck/SavingUp';
 import { leadAdd, useBoardPart, type BoardSlot } from './BoardPartPlate';
+import { MemoryAdd } from './MemoryPart';
 import { partFacts } from './partFacts';
 import { improves, OptionList, OptionRow, routine, type Option } from './OptionRow';
 import { PlateFrame } from './PlateFrame';
@@ -70,11 +71,11 @@ export function SitePlate({ target, focus, quotes, onAction, onResearch, researc
   const m = calloutModel(target, focus, quotes, useShellOffers(), store.getState());
   const holds = siteHolds(target, focus);
   const part = useBoardPart({ active: !!holds, slot: holds?.slot ?? 'ram', focus: focus as SystemSnapshot, facts: holds ? partFacts(focus, holds.part.slot) : null,
-    onOpenCpu: holds?.slot === 'cpu' ? onOpenCpu : undefined, quotes, onAction, onResearch, researchName, wide: !!frame.bounds });
+    part: holds?.part, onOpenCpu: holds?.slot === 'cpu' ? onOpenCpu : undefined, quotes, onAction, onResearch, researchName, wide: !!frame.bounds });
   const proxy = holds ? null : siteProxy(target, focus);
   const proxyQuotes = useQuote(proxy ? { kind: 'part', part: proxy.part } : null);
   const later = useBoardPart({ active: !!proxy, slot: proxy?.slot ?? 'ram', focus: focus as SystemSnapshot, facts: proxy ? partFacts(focus, proxy.part.slot) : null,
-    onOpenCpu: proxy?.slot === 'cpu' ? onOpenCpu : undefined, quotes: proxyQuotes, onAction, onResearch, researchName, wide: !!frame.bounds });
+    part: proxy?.part, onOpenCpu: proxy?.slot === 'cpu' ? onOpenCpu : undefined, quotes: proxyQuotes, onAction, onResearch, researchName, wide: !!frame.bounds });
   // Rendered only while the frame measures itself (CSS .plate-reserve), never shown, never hit.
   const reserve = (now: ReactNode, then: ReactNode) => later
     ? <div className="reserve-stack">{now}<div className="plate-reserve" aria-hidden="true">{then}</div></div> : now;
@@ -96,7 +97,10 @@ export function SitePlate({ target, focus, quotes, onAction, onResearch, researc
   const buy = (x: Quote) => onAction(x.action);
   const row = { onAction: buy, onResearch, researchName };
   // The same frame throughout (a purchase never re-places it): the part this site now holds, else its add.
-  if (part) return <PlateFrame {...frame} title={part.title} sub={part.sub} head={part.head} className="part site" footer={part.footer}>{part.body}</PlateFrame>;
+  if (part) return <PlateFrame key={part.title} {...frame} title={part.title} sub={part.sub} head={part.head} className="part site" footer={part.footer}>{part.body}</PlateFrame>;
+  if (focus.level === 'system' && kind && adds.length) return <PlateFrame key={`add-${kind}`} {...frame} title={`Add ${kind === 'ram' ? 'RAM' : 'drive'}`} className="part memory-site">
+    <MemoryAdd quotes={adds} preferred={lead?.quote} onAction={onAction} onResearch={onResearch} researchName={researchName} />
+  </PlateFrame>;
   if (main || rest.length) return <PlateFrame {...frame} title={m.name} className="part site"
     sub={later && <span className="plate-reserve">{later.sub}</span>} head={later?.head && <span className="plate-reserve">{later.head}</span>}
     footer={reserve(main && <OptionRow option={main} primary {...row} />, later?.footer)}>

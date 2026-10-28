@@ -1,4 +1,4 @@
-// The v3 shell: layout L2, Control deck (D15–D17). A stage on the 8 px grid holds the world canvas,
+// The v3 shell: layout Control deck, Control deck (D15–D17). A stage on the 8 px grid holds the world canvas,
 // the band (HUD and ladder) and the queue strip over the world's top edge, the deck below, the
 // upgrade callout, the research drawer, plates and the round plate. Geometry comes from layout.ts
 // and depends only on the viewport, so controls never move.

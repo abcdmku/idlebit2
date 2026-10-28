@@ -79,8 +79,6 @@ const node = (id: string, name: string, state: ResearchNodeView['state'], extra:
   level: 'system', era: 'khz', tier: 6, needsData: false, effect: '', summary: '', answers: [], part: 'cores', tab: 'cpu', ...extra });
 const tree = (phase: 'running' | 'between') => ({
   nodes: [node('fabKhz', 'kHz fab', 'active', { part: 'fab', progress: 0.4, effect: 'kHz CPU parts and scheduler' }),
-    node('l3Slices', 'L3 slices', 'available', { part: 'fab', effect: 'Higher L3 cache level', dataCost: '150000' as Amount, workOps: 3e6 }),
-    node('edramL3', 'eDRAM L3', 'locked', { part: 'fab', lockedBy: researchId('l3Slices'), effect: 'Higher L3 cache level' }),
     node('ddr', 'DDR', 'available', { part: 'ram', tab: 'system', category: 'memory', needsData: true, effect: 'RAM gen 1: 2× bandwidth', dataCost: '2000000' as Amount }),
     node('rackWater', 'Rack water', 'locked', { part: 'rackCooling', tab: 'rack', category: 'cooling', lockedBy: researchId('rack'), effect: 'Rack cooler technology 2: water' }),
     node('pipelining', 'Pipelining', 'done', { part: 'clock' })],
@@ -122,7 +120,7 @@ const scenes: Record<string, { level: LevelId; plate: ReactNode }> = {
   'config-system': { level: 'rack', plate: <ConfigPlate {...common} kind="system" sub="Rack A · slot 8" credits={'1500' as Amount} landscape={land} quotes={addQuotes('system')} /> },
   'config-rack': { level: 'room', plate: <ConfigPlate {...common} kind="rack" sub="AZ a · slot 7" landscape={land} quotes={addQuotes('rack')} /> },
   save: { level: 'rack', plate: <SavePrompt bounds={bounds} unit={rack} defaultName="Rack A 1" onAction={act} onClose={noop} /> },
-  research: { level: 'system', plate: <ResearchKit phase="running" focus={researchId('l3Slices')} /> },
+  research: { level: 'system', plate: <ResearchKit phase="running" focus={researchId('fabKhz')} /> },
   'research-between': { level: 'system', plate: <ResearchKit phase="between" focus={null} /> },
 };
 

@@ -7,14 +7,14 @@ import type { Line } from './widgets';
 export interface PartFacts { title: string; sub: string; level: number; status: string; lines: Line[] }
 
 const PART_ID: Partial<Record<PartSlot['kind'], PartId>> = {
-  cpu: 'cpu', clock: 'clock', l1: 'l1', l2: 'l2', l3: 'l3', core: 'core', scheduler: 'scheduler', ram: 'ram', gpu: 'gpu', drive: 'storage',
+  cpu: 'cpu', clock: 'clock', cache: 'cache', core: 'core', scheduler: 'scheduler', ram: 'ram', gpu: 'gpu', drive: 'storage',
   dataPlane: 'dataPlane', backbone: 'backbone', grid: 'grid', globalScheduler: 'globalScheduler',
 };
 const busy = (p: PartView) => (p.active ? `${percent(p.resourceBusy)} busy` : 'Idle');
 
 export function partFacts(focus: LevelSnapshot, slot: PartSlot, siteId?: number): PartFacts | null {
   // A system summary can open a CPU component directly without drilling into the CPU view first.
-  if (focus.level === 'system' && ['clock', 'l1', 'l2', 'l3', 'scheduler', 'core'].includes(slot.kind))
+  if (focus.level === 'system' && ['clock', 'cache', 'scheduler', 'core'].includes(slot.kind))
     return partFacts(focus.chip, slot);
   const id = PART_ID[slot.kind];
   const gen = (g: number) => (id ? genName(id, g) : `Gen ${g}`);
@@ -31,13 +31,12 @@ export function partFacts(focus: LevelSnapshot, slot: PartSlot, siteId?: number)
     }
     if (slot.kind === 'clock') {
       const k = focus.clock;
-      return { title: 'Clock', sub: hertz(k.hz), level: k.level, status: 'Sets the speed of every core',
+      return { title: 'Clock', sub: hertz(k.hz), level: k.level, status: focus.cpuCount > 1 ? `Shared by all ${focus.cpuCount} CPUs` : 'Sets the speed of every core',
         lines: k.effectiveHz !== k.hz ? [{ text: `Running at ${hertz(k.effectiveHz)}`, tone: 'warn' }] : [] };
     }
-    if (slot.kind === 'l1' || slot.kind === 'l2' || slot.kind === 'l3') {
-      const kind = slot.kind, c = focus.cache.levels.find((x) => x.kind === kind);
-      if (!c) return null;
-      return { title: SLOT_TITLE[kind], sub: bits(c.bits), level: c.level, status: 'Holds the working set of each running task',
+    if (slot.kind === 'cache') {
+      const kind = slot.kind, c = focus.cache;
+      return { title: SLOT_TITLE[kind], sub: bits(c.capacityBits), level: c.level, status: 'Holds the working set of each running task',
         lines: [{ text: `${bits(focus.cache.usedBits)} of ${bits(focus.cache.capacityBits)} in use`, tone: 'muted' }] };
     }
     if (slot.kind === 'scheduler') {
@@ -61,8 +60,11 @@ export function partFacts(focus: LevelSnapshot, slot: PartSlot, siteId?: number)
         : slot.kind === 'gpu' ? `${bits(p.vramUsedBits ?? 0)} VRAM held`
         : `${tier ? (tier.usedBits > 0 ? `${bits(tier.usedBits)} spilled` : `${bits(tier.capacityBits)} free`) : ''}${tier?.rateBits ? ` · spill speed ${bitRate(tier.rateBits)}` : ''}`;
       return { title: `${p.kind === 'npu' ? 'NPU' : SLOT_TITLE[slot.kind]} ${slot.index + 1}`, sub: `${p.kind === 'npu' ? `Gen ${p.generation + 1}` : gen(p.generation)}${p.ecc ? ' · ECC' : ''}`, level: p.level,
-        status: busy(p), lines: [{ text: cap, tone: 'muted' },
-          ...(slot.kind === 'ram' && p.rateBits !== undefined ? [{ text: `Bandwidth ${bitRate(p.rateBits)}`, tone: 'muted' as const }] : [])] };
+        status: busy(p), lines: slot.kind === 'gpu' ? [{ text: cap, tone: 'muted' }] : [
+          { text: `${slot.kind === 'ram' ? 'Module' : 'Drive'} capacity ${bits(p.capacityBits ?? 0)}`, tone: 'muted' },
+          { text: `Total ${slot.kind === 'ram' ? 'RAM' : 'storage'}: ${bits(tier?.usedBits ?? 0)} used / ${bits(tier?.capacityBits ?? 0)}`, tone: 'muted' },
+          { text: `${slot.kind === 'ram' ? 'Bandwidth' : 'IO'} ${bitRate(p.rateBits ?? 0)}`, tone: 'muted' },
+        ] };
     }
     return null;
   }

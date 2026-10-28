@@ -20,7 +20,7 @@ const CEILING_LABEL: Partial<Record<CeilingId, string>> = {
   uplinks: 'Uplinks', researchQueue: 'Research queue', roomRows: 'Room rows', siteZones: 'Zones per site', sites: 'Sites', regions: 'Regions',
 };
 const GEN_LABEL: Partial<Record<PartId, string>> = {
-  core: 'Cores', clock: 'Clock', l1: 'L1 cache', l2: 'L2 cache', l3: 'L3 cache', ram: 'RAM', gpu: 'GPU', npu: 'NPU',
+  core: 'Cores', clock: 'Clock', cache: 'Cache', ram: 'RAM', gpu: 'GPU', npu: 'NPU',
   storage: 'Drive', storageNode: 'Storage node', psu: 'Power supply', switch: 'Switch', lb: 'Load balancer', pdu: 'PDU', ups: 'UPS',
   rackCooler: 'Rack cooling', roomCooler: 'Room cooling', dataPlane: 'Data plane', backbone: 'Backbone', grid: 'Grid',
 };
@@ -30,7 +30,7 @@ const change = (label: string, before: string, after: string): ResearchChangeVie
 
 /** The scheduler's queue at level 1 of generation g, as the board prints it. */
 const queueText = (g: number): string => (g < 0 ? 'No queue' : `${capacity2(PARTS.scheduler, g, 1)} slots`);
-/** Before for a part with no generation researched yet: a dash, never "none → Hz L2". */
+/** Before for a part with no generation researched yet: a dash, never "none → Hz Control deck". */
 const NOT_YET = '—';
 
 function genChange(state: GameState, e: Extract<ResearchEffect, { kind: 'gen' }>): ResearchChangeView | null {
@@ -47,7 +47,7 @@ function genChange(state: GameState, e: Extract<ResearchEffect, { kind: 'gen' }>
 /**
  * A power supply generation: its loss at typical load (×1 up to 90% usage). Before: the installed
  * supply of the player's first system (its level adds loss), else the best researched generation
- * at L1. After: the new generation at L1, as a replace installs it.
+ * at L1. After: the new generation at levelOne, as a replace installs it.
  */
 function psuChange(state: GameState, have: number, gen: number): ResearchChangeView {
   const psu = state.build.systems.find((s) => s !== null)?.spec.psu ?? null;

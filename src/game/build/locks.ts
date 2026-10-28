@@ -35,7 +35,7 @@ export function optionLock(u: Unlocks, id: StrategyId | FilterId, kind: 'queue' 
 export function maxLevel(u: Unlocks, part: LeveledPartId, g: number, ecc = false): number {
   if (part === 'gpu') return 6;
   const row = PARTS[part];
-  const bonus = part === 'ram' && ecc ? u.ceilings.ramLevelBonus : part === 'l3' ? u.ceilings.l3LevelBonus : 0;
+  const bonus = part === 'ram' && ecc ? u.ceilings.ramLevelBonus : 0;
   let top = levelMax(row, g, bonus);
   if (part === 'scheduler') top = Math.min(top, Math.floor(MAX_SCHED_K / row.base[g]!), Math.ceil(MAX_SCHED_Q / (row.base2?.[g] ?? 1)));
   return top;
@@ -49,6 +49,5 @@ export function levelLock(u: Unlocks, part: PartId, g: number, level: number, ec
   if (level <= maxLevel(u, id, g, ecc)) return null;
   const row = PARTS[id];
   if (id === 'ram' && ecc && level <= levelMax(row, g, 4)) return ceilingLock(u, 'ramLevelBonus', level - levelMax(row, g));
-  if (id === 'l3' && level <= levelMax(row, g, 2)) return ceilingLock(u, 'l3LevelBonus', level - levelMax(row, g));
   return { code: 'ceiling', node: null, text: 'Max' };
 }

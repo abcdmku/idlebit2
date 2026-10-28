@@ -9,7 +9,7 @@ import type { SystemSnapshot } from '../types/snapshot';
 import type { GameState } from '../types/state';
 import type { BuildSlotView, PartView, PartViewKind } from '../types/views';
 import { chipSnapshot, chipStatic, cpuCountOf, type ChipStatic } from './chip';
-import { modeName, psuView, systemCoreActivity, systemTimerS, ticksToS } from './common';
+import { modeName, psuView, systemTimerS, ticksToS } from './common';
 import { inboundTransfer } from './flows';
 import { queuedTasks, runningTasks } from './tasks';
 import { acceleratorView } from './accelerators';
@@ -67,29 +67,31 @@ export function systemSnapshot(state: GameState, id: SystemId, parent: NodeRef |
   const threads = c.threads[id] ?? 0;
   const cpuBusy = (c.cores[id] ?? 0) > 0 ? Math.min(1, (h.busy[id] ?? 0) / c.cores[id]!) : 0;
   const cpuCount = cpuCountOf(spec);
-  const { cores, busyCores } = systemCoreActivity(state, id);
-  const coresPerCpu = cpuCount > 0 ? cores / cpuCount : 0;
+  const chips = Array.from({ length: Math.max(1, cpuCount) }, (_, socket) => chipSnapshot(state, id, { level: 'system', id }, st.chip, socket));
   const cpu0 = spec?.cpu?.cpu ?? { gen: 0, level: 1 };
   const ramBusy = resBusy(state, id, RES.ram), ioBusy = resBusy(state, id, RES.io);
   const timerS = systemTimerS(state.hot, id);
+  let ramLeft = h.usedRam[id] ?? 0, diskLeft = h.usedDisk[id] ?? 0;
+  const occupied = (cap: number, tier: 'ram' | 'disk'): number => {
+    const used = Math.max(0, Math.min(cap, tier === 'ram' ? ramLeft : diskLeft));
+    if (tier === 'ram') ramLeft -= used; else diskLeft -= used;
+    return used;
+  };
   return {
     level: 'system', parent, systemId: id, kind: spec?.kind ?? 'server', board: spec?.board ?? 'general',
     cpuCount, ramSlots: boardSlots(state, spec).ram, etaCfg: c.etaCfg[id] ?? 1,
-    chip: chipSnapshot(state, id, { level: 'system', id }, st.chip),
-    // Pooled scheduler display: fill CPU 1 first; exec does not yet write sockBusy.
-    cpuBusy: Array.from({ length: cpuCount }, (_, socket) =>
-      coresPerCpu > 0 ? Math.max(0, Math.min(1, busyCores / coresPerCpu - socket)) : 0),
+    chip: chips[0]!, chips,
+    cpuBusy: chips.slice(0, cpuCount).map(chip => chip.cores.length > 0
+      ? chip.cores.reduce((sum, core) => sum + core.busy + core.research, 0) / chip.cores.length : 0),
     online: modeName(h.mode[id]), timerS, timerTotalS: timerS === null ? null : ticksToS(state.research.unlocks.bootTicks),
     cpu: part(0, 'cpu', cpu0.gen, cpu0.level, cpuBusy),
     ram: (spec?.ram ?? []).map((m, i) => ({
       ...part(i, 'ram', m.gen, m.level, ramBusy, m.ecc),
-      capacityBits: capacity(PARTS.ram, m.gen, m.level), rateBits: capacity2(PARTS.ram, m.gen, m.level),
-    })),
+      capacityBits: capacity(PARTS.ram, m.gen, m.level), usedBits: occupied(capacity(PARTS.ram, m.gen, m.level), 'ram'), rateBits: capacity2(PARTS.ram, m.gen, m.level), })),
     gpu: (spec?.accels ?? []).map((a, i) => acceleratorView(state, id, i, a)),
     storage: (spec?.drives ?? []).map((d, i) => ({
       ...part(i, 'drive', d.gen, d.level, ioBusy),
-      capacityBits: capacity(PARTS.storage, d.gen, d.level), rateBits: capacity2(PARTS.storage, d.gen, d.level),
-    })),
+      capacityBits: capacity(PARTS.storage, d.gen, d.level), usedBits: occupied(capacity(PARTS.storage, d.gen, d.level), 'disk'), rateBits: capacity2(PARTS.storage, d.gen, d.level), })),
     psu: psuView(state, id, spec?.psu ?? { gen: 0, level: 1, capped: false }),
     running: runningTasks(state, id, Math.max(c.K[id] ?? 0, 1)),
     queue: { cap: c.Q[id] ?? 0, count: h.queueLen[id] ?? 0, sample: queuedTasks(state, id, 0, QUEUE_SAMPLE) },

@@ -24,7 +24,7 @@ const lvl = (gen: number, level: number): PartLevel => ({ gen, level });
  */
 const MID_SPEC: SystemSpec = {
   kind: 'server', board: 'general',
-  cpu: { cpu: lvl(1, 1), cores: Array.from({ length: 8 }, () => lvl(1, 1)), clock: lvl(1, 1), l1: lvl(1, 8), l2: lvl(1, 4), l3: null },
+  cpu: { cpu: lvl(1, 1), cores: Array.from({ length: 8 }, () => lvl(1, 1)), clock: lvl(1, 1), cache: lvl(1, 8), },
   cpuCount: 1,
   scheduler: { gen: 1, level: 4, strategy: 'fifo' },
   ram: [{ gen: 1, level: 8, ecc: false }, { gen: 1, level: 8, ecc: false }],
@@ -79,13 +79,13 @@ export function splitFleet(o: SplitShape): GameState {
 }
 
 export const SPLIT_FLEETS = {
-  /** One rack of 6 GPU servers: 100 kHz ports, one 200 kHz uplink (shards cross it in turn), LB queue L3. Splits 6 ways. */
+  /** One rack of 6 GPU servers: 100 kHz ports, one 200 kHz uplink (shards cross it in turn), LB queue level 3. Splits 6 ways. */
   rackSplit: (): GameState => splitFleet({
     zones: 1, racks: 1, servers: 6, gpuEvery: 1, port: D29_PORT, uplink: 7, roomPort: 7, roomUplink: 7, rackQueue: 3, roomQueue: 3, intensity: 17.5,
   }),
   /**
    * One room of 3 racks × 2 GPU servers: 100 kHz ports and rack links, and a 200 kHz
-   * room uplink that carries every shard in turn (they wait at its mouth). LB queues L3, room L4.
+   * room uplink that carries every shard in turn (they wait at its mouth). LB queues level 3, room L4.
    */
   roomSplit: (): GameState => splitFleet({
     zones: 1, racks: 3, servers: 2, gpuEvery: 1, port: D29_PORT, uplink: D29_PORT, roomPort: D29_PORT, roomUplink: 7, rackQueue: 3, roomQueue: 4, intensity: 18.5,
@@ -93,6 +93,5 @@ export const SPLIT_FLEETS = {
   /** One site of 2 zones, each 2 racks × 2 servers: the roomSplit links, split across zones over the data plane. */
   globalSplit: (): GameState => splitFleet({
     zones: 2, racks: 2, servers: 2, gpuEvery: 1, port: D29_PORT, uplink: D29_PORT, roomPort: D29_PORT, roomUplink: 7, rackQueue: 3, roomQueue: 4, intensity: 18,
-  }),
-} as const;
+  }), } as const;
 export type SplitFleetName = keyof typeof SPLIT_FLEETS;
