@@ -43,6 +43,15 @@ html, body, #root { margin: 0; width: 100%; height: 100%; overflow: hidden; back
 .source-part[data-narrow="true"] .source-name { white-space: normal; }
 .source-part[data-narrow="true"] .source-price { padding-top: 0; }
 .source-buy:focus-visible { pointer-events: auto; background: var(--well); }
+.source-compute .source-buy { display: flex; flex-direction: column; align-items: center; justify-content: center;
+  padding: 0 2px !important; background: transparent; min-height: 44px; gap: 0; }
+.source-compute .source-name { display: block; font-weight: 500; }
+.source-compute .source-price { padding: 0 !important; }
+.source-compute .source-buy:disabled .source-name { color: var(--muted); }
+.source-compute[data-tight="true"] .source-price .px-ic { display: none; }
+.source-short { display: none; }
+.source-compute[data-tight="true"] .source-full { display: none; }
+.source-compute[data-tight="true"] .source-short { display: inline; }
 
 /* text runs and art */
 .t { position: absolute; white-space: nowrap; line-height: var(--lh); }

@@ -1197,6 +1197,8 @@ The market is paused, but research still runs. If a project is active and not st
 
 At the ledger step, if the wallet is negative after the energy debit, research **stops**: the project is kept but marked `stoppedInsolvent`, and from the next tick no system runs research. The wallet can go negative by at most one tick's bill this way. A stopped project resumes by itself at the first ledger step with Credits at 0 or above (QA-04), or when the player resumes it.
 
+The Credits history panel offers **Declare bankruptcy**, followed by confirmation. It sets Credits to exactly 0 and charges `ceil(current Data / 10)` whole Data. With 0 Data the fee is 0. It is available whenever Credits are nonzero, including positive balances, and the panel states that Credits will become 0 before confirmation. Hardware, unlocks, research progress, fractional wallet meters and the current round remain intact. Research stopped for insolvency is released immediately. The Data fee counts toward lifetime Data spent; it changes no round earnings or energy totals. The simulation calculates the fee from the wallet when the action applies.
+
 ## 12. Parts and prices
 
 ### 12.1 Generations, levels and curves
@@ -1454,6 +1456,8 @@ The mockups decide the look. This section lists only the data each surface needs
 The read-only `?rescue` entry bypasses the game runtime and downloads the original stored save envelope without parsing or simulating it. It never writes, clears or resets the player's saved progress (D60).
 
 ### 16.1 HUD
+
+Clicking either currency's icon, figure or label opens one balance-over-time graph showing Credits and Data together. Credits use a solid gold line and the left y axis; Data uses a dashed green line and the right y axis. Both axes use five evenly spaced ticks rounded to whole 1, 2 or 5 multiples of powers of ten, including zero and negative Credits where applicable. Tick labels compact from 1,000, such as 1k and 10k. The dialog supports Close, Escape and phone Back and includes bankruptcy under §11.4. Graphs show recent measured balances against simulation time, including offline advances, energy, purchases, research and bankruptcy. They retain up to 600 observations in the save. Balance changes within each simulation second share a sample; player actions preserve immediate before/after checkpoints. Idle gaps extend the last observed balance to the current simulation tick. Negative Credits and balances beyond JavaScript's numeric range remain valid. Pointer inspection and arrow keys expose both historical balances at one timestamp. No forecasts are shown.
 
 Core and component progress bars fill from 0% at the start to 100% at completion, using measured stage progress. CPU miniatures follow the same direction. Research uses the same close-button appearance and 44 px target as the other popups.
 
@@ -1883,6 +1887,8 @@ Where the spec differs from the model's assumptions (`scripts/market-model.ts`),
 
 ### Compact operating menus and hardware maintenance (D73)
 
-No dropdowns or accordion sections. Short menus fit their contents at phone and desktop sizes; only long lists scroll locally. Visible button groups, toggles and sliders expose operating choices. Save sits beside Close. Generation text actions show resulting specs only. CPU queue modes include every researched scheduling strategy, separately from loading policy and loader count. Real queue-to-core assignments produce a presentation-time handoff along the die gutters, with reduced-motion support.
+No dropdowns or accordion sections. Short menus fit their contents at phone and desktop sizes; only long lists scroll locally. Visible button groups, toggles and sliders expose operating choices. Save sits beside Close. Generation text actions show resulting specs only. CPU queue modes include every researched scheduling strategy, separately from loading policy and loader count. Queue handoffs identify the departing task and shard in its visible well, shrink the icon into bits, then carry only bits through the die gutters to the assigned cores. Preloading alone is not a pickup. Do not invent a source well for tasks that arrive and start between snapshots. Reduced motion marks the destination without travel. Every prepared queue entry shows its own measured cache progress. Completed preload work is reused at dispatch; later cache reads are labeled separately from loads.
+
+CPU and System inbound pipes show only their speed, with no Pipe purchase box or popup. Empty core sites and CPU sockets show a centered add label directly above the quoted price, including when unaffordable. They have no plus glyph or extra status row. Narrow CPU sockets shorten the label to CPU 2, CPU 3 or CPU 4 and omit the coin to keep the full price readable. Other board slots that cannot fit a source control retain their native add icon and direct action rather than clipping a text overlay over them.
 
 Installed hardware can be downgraded or removed without a refund. Inventory reductions discard affected work. Core removal reduces count; the final CPU may be removed and subsequently installed. RAM and drive space/speed remain independent. Removed built-ins have level zero (ladder rung ?1); removed switches have no ports or uplinks. They provide zero capacity and component power draw until installed again. Supply downgrades and removals obey the same hard power-reservation limit as other purchases. Start controls expose initial awake count, task-wait wake threshold, researched busy wake threshold, and wake order.

@@ -384,6 +384,7 @@ export interface TaskRequirementsView {
 /** One occupied well in the chip's scheduler queue. */
 export interface ChipQueueEntryView {
   readonly taskId: number;
+  readonly shard?: number;
   readonly family: FamilyId;
   readonly preloading?: boolean;
   readonly preloadProgress?: number;

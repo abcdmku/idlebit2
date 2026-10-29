@@ -157,9 +157,12 @@ export function chipSnapshot(state: GameState, id: SystemId, parent: NodeRef | n
       generation: cpu?.cache.gen ?? 0, level: cpu?.cache.level ?? 1, usedBits: Math.min(capacityBits, (h.usedCache[id] ?? 0) / Math.max(1, cpus)), capacityBits,
       loadedBits: Math.min(capacityBits, loadedBits / Math.max(1, cpus)),
       spilledOutBits: spilledOutOfCache(state, id), },
-    scheduler, queue: queued.slice(0, scheduler?.q ?? 0).map((r) => ({ taskId: rec.taskId[r]!, family: familyId(rec.family[r]!),
-      preloading: preparation?.taskId === rec.taskId[r]!,
-      preloadProgress: preparation?.taskId === rec.taskId[r]! && preparation.targetBits > 0 ? preparation.loadedBits / preparation.targetBits : 0 })),
+    scheduler, queue: queued.slice(0, scheduler?.q ?? 0).map((r) => {
+      const prepared = preloadForRecord(state, id, r);
+      return { taskId: rec.taskId[r]!, shard: shardOf(state.hot, r).shard, family: familyId(rec.family[r]!),
+        preloading: !!prepared,
+        preloadProgress: prepared && prepared.targetBits > 0 ? prepared.loadedBits / prepared.targetBits : 0 };
+    }),
     researchShare: share, slots: st.slots,
     pipe: {
       speed: c.pipeSpeed[id] ?? 0, transfer: inboundTransfer(state, id),

@@ -118,22 +118,23 @@ export function drawPipe(g: CanvasRenderingContext2D, s: RenderSnapshot, timeMs:
   // speed, then the packet tag on the next line, so neither moves with the text. They never touch
   // the focus art (`art`, CSS px): where one line would, each value takes its own line in the gutter.
   tags.clear();
-  const speed = formatHertz(link.speed);
-  const moving = !!t && live && seconds >= MIN_VISIBLE_TRANSFER_S;
+  const speed = formatHertz(link.speed), plain = s.focus.level === 'chip' || s.focus.level === 'system';
+  const name = plain ? '' : link.name, title = name ? `${name} ${speed}` : speed;
+  const moving = !plain && !!t && live && seconds >= MIN_VISIBLE_TRANSFER_S;
   const secs = moving && t ? secondsText((1 - transferProgress(t, s.simTimeMs, timeMs)) * seconds) : '';
-  const spot = pipeTagSpot(p, vp, f, art, type, link.name, speed, secs, tagAt);
+  const spot = pipeTagSpot(p, vp, f, art, type, name, speed, secs, tagAt);
   const x = spot.x, y = spot.y;
   // A short phone can have no gutter at all. Keep the physical pipe, but omit its
   // redundant tag instead of printing it over the queue. The pipe plate retains its speed.
-  const tagW = spot.stacked ? Math.max(tagWidth(link.name, type), tagWidth(speed, type), moving && spot.packet ? tagWidth(secs, type) : 0)
-    : Math.max(tagWidth(`${link.name} ${speed}`, type), moving ? tagWidth(secs, type) : 0);
+  const tagW = spot.stacked ? Math.max(tagWidth(name, type), tagWidth(speed, type), moving && spot.packet ? tagWidth(secs, type) : 0)
+    : Math.max(tagWidth(title, type), moving ? tagWidth(secs, type) : 0);
   const lines = spot.stacked ? 2 + (moving && spot.packet ? 1 : 0) : moving ? 2 : 1;
   if (art && overlaps(x, y, tagW, type.line * lines, art)) return;
   if (!spot.stacked) {
-    tags.label('pipe', x, y, 'left', true).text(`${link.name} ${speed}`, 'net');
+    tags.label('pipe', x, y, 'left', true).text(title, 'net');
     if (moving) tags.label('packet', x, y + type.line, 'left', true).text(secs, 'net');
   } else {
-    tags.label('pipe', x, y, 'left', true).text(link.name, 'net');
+    tags.label('pipe', x, y, 'left', true).text(name, 'net');
     tags.label('pipe2', x, y + type.line, 'left', true).text(speed, 'net');
     if (moving && spot.packet) {
       tags.label('packet', x, y + 2 * type.line, 'left', true).text(secs, 'net');
@@ -157,8 +158,13 @@ export function pipeTagSpot(p: { readonly x: number; readonly runY: number }, vp
   const phone = f.form === 'phone';
   out.x = p.x + (phone ? 16 : 24); out.y = p.runY + (phone ? 8 : 24); out.stacked = false; out.packet = !!secs;
   if (!art) return out;
-  const lines = secs ? 2 : 1, oneW = Math.max(tagWidth(`${name} ${speed}`, type), secs ? tagWidth(secs, type) : 0);
+  const lines = secs ? 2 : 1, oneW = Math.max(tagWidth(name ? `${name} ${speed}` : speed, type), secs ? tagWidth(secs, type) : 0);
   if (!overlaps(out.x, out.y, oneW, lines * type.line, art)) return out;
+  if (!name) {
+    const x = vp.x + f.lattice;
+    if (!overlaps(x, out.y, oneW, type.line, art)) out.x = x;
+    return out;
+  }
   const linkW = Math.max(tagWidth(name, type), tagWidth(speed, type)), packetW = secs ? tagWidth(secs, type) : 0;
   for (const withPacket of secs ? [true, false] : [false]) {
     const w = withPacket ? Math.max(linkW, packetW) : linkW, h = (withPacket ? 3 : 2) * type.line;

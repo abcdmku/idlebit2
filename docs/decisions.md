@@ -1904,6 +1904,14 @@ System boards reserve two memory rows below their hardware. Each gives total usa
 
 The user clarified that RAM and disk readouts belong below the PCB outline, not inside it. The board slab now ends above the two existing readout rows. Component targets, the camera footprint, HUD and task-bar heights stay fixed. Bottom mounting holes follow the shorter slab, and power/dark shading stops at its edge. This overlay correction ships before the separate power/cooling rule update.
 
+## D66, 28 Oct: currency history and bankruptcy
+
+The user requested balance graphs on currency clicks and a bankruptcy option that sets Credits to 0 for 10% of Data. Both HUD currency rows open one dialog with Credits and Data tabs, measured balance graphs, pointer/keyboard inspection and the existing Close, Escape and phone Back behavior. The existing HUD geometry, font and currency colors are retained.
+
+The simulation saves at most 600 recent wallet observations. End-of-tick changes coalesce within a simulation second; player actions keep before/after checkpoints. Offline simulation records the same history, independent of advance partitioning. Charts scale exact integer balances before converting coordinates to floats. Save version 36 resets earlier pre-live saves without migrations.
+
+Bankruptcy requires a nonzero Credits balance and confirmation. It sets Credits to 0 and deducts `ceil(Data / 10)` whole Data, including a zero fee when Data is zero. Positive Credits are erased as the confirmation states. The fee is re-quoted by the simulation and recorded as lifetime Data spent. Hardware, unlocks, research progress, round state and fractional meters are retained, and insolvency-stopped research is released immediately.
+
 ## D67, 28 Oct: rack power is a build limit; cooling limits performance
 
 The user moved power capacity out of the board. Board supply hardware, purchase paths, prices, losses and its research entries are retired. The serializable supply field and old hot columns remain inert internal metadata. The board shows measured power; its inspection and Rack PDU distinguish actual use from full-load allocation. CPU power settings remain in the system inspection.
@@ -1957,3 +1965,17 @@ Start controls say Initially on, Wake after task waits, Wake when busy, and Wake
 Task details show a complete recipe breakdown, including aggregated counts for shared operations, without drill-down clicks. The library is a searchable list: selecting a task shows its complete recipe in one tap. Repeated flavor, capability and work text is omitted.
 
 CPU queue controls expose FIFO, Shortest, Slice, Priority and Aging, with the same research locks and actions as the simulation. Loading policy and loader count remain separate controls. A new core assignment animates the task from its queue well through the die gutters to that core. Handoffs occur only for observed assignments, use presentation simulation time, and honor reduced motion. They never add simulation timers or synthetic work.
+
+## D74, 29 Oct: plain pipe speeds and identifiable queue pickups
+
+The user rejected the CPU/System Pipe purchase box and the opaque Add core patch. Pipes at these levels show only their actual speed and have no hit target. The empty core site keeps its native plus between its name and price, dimmed when unaffordable. Tiny board slots retain their native icon and direct action instead of clipped source text.
+
+A queued task shrinks in its actual visible well for 140 ms, then only bits travel through the die gutter and row gaps to its assigned cores over 280 ms. Match task and shard identity, independent of queue strategy. A preload becoming running work still counts as pickup; speculative preloading alone does not. Briefly hold the other visible wells while the selected icon shrinks. Unobserved arrivals do not borrow well zero. Reduced motion marks the destination. Every prepared queue record shows its own loading progress.
+
+The preload audit found completed cache work already reused correctly. A fully prepared task skips cache loading; partial preparation pays only for missing bits. Compact core labels now distinguish Read from Load to avoid presenting later cache reads as duplicate loading.
+
+## D75, 29 Oct: paired currency lines and quiet CPU add actions
+
+The user rejected the plus and spacing on the CPU add controls. Core sites and empty CPU sockets show a centered add label directly above the price, with no plus or extra status row. Empty sockets leave a clear center for these labels. Unaffordable controls retain the same geometry with dim text; narrow CPU prices omit their coin instead of truncating the value. This supersedes the plus treatment in D74.
+
+Both currency clicks open one graph showing Credits and Data together, replacing D66's separate currency tabs. Credits are solid gold against the left y axis; Data is dashed green against the right y axis so overlapping lines remain visible. Each scale includes zero, extends to negative Credits when needed, and uses five evenly spaced ticks with whole 1, 2 or 5 multiples of powers of ten. Compact labels start at 1k. Pointer and keyboard inspection report both values for the same time. Cancel and Confirm text are centered in their buttons.

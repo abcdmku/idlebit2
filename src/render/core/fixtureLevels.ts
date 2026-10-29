@@ -41,6 +41,7 @@ export function fixtureSnapshot(focus: LevelSnapshot, partner: LevelSnapshot | n
   const round = o.round ?? 'running';
   return {
     completions: o.completions ?? [], failures: [], shardsDone: [],
+    walletHistory: [{ tick: 0, credits: ZERO_AMOUNT, data: ZERO_AMOUNT, checkpoint: true }],
     epoch: o.epoch ?? 1, tick: Math.floor((o.simTimeMs ?? 0) / 100), simTimeMs: o.simTimeMs ?? 0, bootMs: 10_000,
     hud: { credits: ZERO_AMOUNT, data: ZERO_AMOUNT, netPerMinute: ZERO_AMOUNT, sla: { met: 0, failed: 0, percent: 100, checking: false, window: 50, roundMet: 0, roundFailed: 0, deliveredWork: 0, failedWork: 0, grace: 10 },
       roundState: round, roundIndex: 1, roundElapsedMs: o.simTimeMs ?? 0, autoReturnInMs: null },

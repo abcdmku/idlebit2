@@ -57,7 +57,7 @@ The renderer does not emit commands. `renderer.hit(x, y)` returns a borrowed `Hi
 | `save` | `unit` | Opens the save-name prompt. |
 | `unit` | `unit` | Opens the online switch row (the lamp). |
 | `port` | `sw`, `port` (`-1` = uplink) | Opens the switch plate on that port. |
-| `link` | level-specific `id`; `pipe` (CPU, System) has `unit` | Opens the link callout. The pipe stays at its default until its upstream device exists (D15.5). |
+| `link` | level-specific `id` | Links with an upgrade show it at the source. CPU and System pipes are speed readouts with no hit target or popup. |
 
 - Give every target a stable `id`; it is the selection key, and the core brackets `view.selectedId`.
 - Rects are in focus-world art px. Do not pad them; the core pads every target to 44 CSS px. Overlaps: exact hits win, then the nearest, then the frontmost.

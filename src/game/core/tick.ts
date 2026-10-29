@@ -8,6 +8,7 @@ import { linkPhase, routePhase } from '../net';
 import { powerPhase, thermalPhase } from '../phys';
 import { eventPhase } from './events';
 import { ledgerPhase } from './ledger';
+import { walletHistoryPhase } from './walletHistory';
 import { autoReturnDue, timerPhase } from './timers';
 import type { World } from './world';
 
@@ -80,5 +81,6 @@ export function runTick(w: World): void {
   roundPhase(w);
   researchPhase(w);
   eventPhase(w);
+  walletHistoryPhase(w);
   w.tick += 1;
 }

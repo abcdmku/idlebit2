@@ -2,7 +2,7 @@
 // die's IN pad on top (the core draws the pipe); work falls through queue and cache to the cores,
 // and each payout pops on the core that ran it.
 import type { ChipSnapshot } from '../../../game';
-import { P, R, copyRect, partVersionOf, resetHitTarget, setRect, sumVersions } from '../../core';
+import { P, R, copyRect, partVersionOf, resetHitTarget, sumVersions } from '../../core';
 import type { HitTarget, LevelRegistry, LevelRenderer, Rect, WorldForm, WorldFrame } from '../../core';
 import { chipLabels } from './labels';
 import { coreSites } from './layout';
@@ -51,7 +51,8 @@ export function createChipRenderer(_registry: LevelRegistry): LevelRenderer<'chi
     },
     draw(g, s, view, frame) {
       lastFrame = frame; const form = frame.form ?? 'desktop';
-      drawWorld(g, s, frame, form, view);
+      const queue = pickups.update(s, frame);
+      drawWorld(g, s, frame, form, view, queue);
       pickups.draw(g, s, frame, chipFloor(s, form), siteCount(s), form);
     },
     labels: (s, view, frame, out) => chipLabels(s, frame, out, frame.form ?? 'desktop', view),
@@ -70,15 +71,10 @@ export function createChipRenderer(_registry: LevelRegistry): LevelRenderer<'chi
         t.part = partRef(s.systemId, 'core0', s.socket); t.unit = { kind: 'system', id: s.systemId };
         t.slot = sites.length > s.cores.length ? s.cores.length : null; coresBlock(sites, t.rect);
       }
-      // The "+" add site: tapping it buys the next core (addPart core on this system, at that index).
+      // The empty core site buys the next core on this system, at that index.
       if (i < out.length && sites.length > s.cores.length) {
         const t = resetHitTarget(out[i++]!, 'add:core', 'add', owner(s));
         t.unit = { kind: 'system', id: s.systemId }; t.slot = s.cores.length; copyRect(sites[s.cores.length]!, t.rect);
-      }
-      // The pipe's drop onto the IN pad: its callout says where the link is upgraded (D15.5).
-      if (i < out.length) {
-        const t = resetHitTarget(out[i++]!, 'pipe', 'link', owner(s));
-        t.unit = { kind: 'system', id: s.systemId }; setRect(t.rect, f.inp.x - 4, f.pkg.y - 16, 8, f.inp.y - f.pkg.y + 18);
       }
       return i;
     },

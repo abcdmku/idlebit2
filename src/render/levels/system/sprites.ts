@@ -32,7 +32,8 @@ export function drawSocketEmpty(g: G, f: Rect): void {
   prism(g, f.x, f.y + 3, f.w, f.h - 3, 3, { top: '#2e2a45', front: '#1d1a30' });
   const x = f.x + 5, y = f.y + 3, w = 36, h = 35;
   R(g, x, y, w, h, '#1b1830');
-  for (let j = y + 2; j < y + h - 1; j += 3) for (let i = x + 2; i < x + w - 1; i += 3) px(g, i, j, P.padLo);
+  for (let j = y + 2; j < y + h - 1; j += 3) for (let i = x + 2; i < x + w - 1; i += 3)
+    if (i < x + 6 || i > x + w - 7 || j < y + 6 || j > y + h - 7) px(g, i, j, P.padLo);
   R(g, x, y, 3, 1, P.goldLo); R(g, x, y, 1, 3, P.goldLo);
   R(g, f.x + f.w - 4, f.y + 6, 2, f.h - 14, P.steelLo);
   R(g, f.x + f.w - 4, f.y + 1, 2, 5, P.steel); px(g, f.x + f.w - 4, f.y + 1, P.steelHi);

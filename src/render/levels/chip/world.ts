@@ -4,7 +4,7 @@
 // ticks with real cycles, the IN pad lights while a transfer lands. Payouts pop on the core that ran
 // the task's last shard (core/pops.ts).
 import { familyId } from '../../../game';
-import type { ChipSnapshot, CoreView, QuoteResult, SystemId } from '../../../game';
+import type { ChipQueueEntryView, ChipSnapshot, CoreView, QuoteResult, SystemId } from '../../../game';
 import { P, brackets, createRateAnimation, drawFamilyIcon, rateAnimation, transferProgress } from '../../core';
 import type { Rect, ViewPresentation, WorldFrame, WorldForm } from '../../core';
 import { MAX_CORES, arrangementOf, coreSites, coreText, floorOf, queueWells } from './layout';
@@ -90,7 +90,8 @@ const afford = createChipAfford();
 const goldBracket = (g: G, r: Rect): void => brackets(g, r.x - 2, r.y - 2, r.w + 4, r.h + 4, P.gold);
 
 /** `view` carries the tray quotes for the affordable brackets; without it none are drawn. */
-export function drawWorld(g: G, chip: ChipSnapshot, frame: WorldFrame, form: WorldForm, view?: ViewPresentation | null): void {
+export function drawWorld(g: G, chip: ChipSnapshot, frame: WorldFrame, form: WorldForm, view?: ViewPresentation | null,
+  queue?: readonly (ChipQueueEntryView | null)[]): void {
   const f = chipFloor(chip, form), live = isLive(chip, frame), arr = arrangementOf(frame.scale, form);
   g.drawImage(staticCpu(f, form), 0, 0);
   const sites = coreSites(f, siteCount(chip)), used = Math.max(1, Math.min(sites.length, chip.cores.length));
@@ -105,7 +106,7 @@ export function drawWorld(g: G, chip: ChipSnapshot, frame: WorldFrame, form: Wor
     const t = live ? chip.pipe.transfer : null, s = frame.snapshot;
     incoming.count = live ? sc.reserved : 0; incoming.family = t ? t.family : null;
     incoming.progress = t ? transferProgress(t, s.simTimeMs, frame.timeMs) : 0;
-    queueBlock(g, f.queue, queueWells(f, sc.q, form), live ? chip.queue : NONE, incoming);
+    queueBlock(g, f.queue, queueWells(f, sc.q, form), live ? queue ?? chip.queue : NONE, incoming);
   }
   else if (qOpen) queueGhost(g, f.queue); else lockedSite(g, f.queue);
   cacheBlock(g, f.cache, chip.cache.capacityBits, live ? chip.cache.loadedBits : 0, live ? spilledOut(chip) : 0);

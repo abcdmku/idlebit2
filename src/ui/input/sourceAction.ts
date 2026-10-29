@@ -19,6 +19,7 @@ export interface SourceAction {
 /** Only parts without operating settings or a build choice can buy on the part itself. */
 export function sourceRequest(target: HitTarget, focus: LevelSnapshot): QuoteRequest | null {
   if (target.drill || target.kind === 'save' || target.kind === 'port') return null;
+  if (isInbound(target) && (focus.level === 'chip' || focus.level === 'system')) return null;
   if (target.part?.slot.kind === 'gpu' || /^(?:add:|slot-)gpu/.test(target.id)) return null;
   if (target.id === 'add:core') return { kind: 'tray', at: target.owner };
   if (target.kind === 'add') return plateRequest(addDetail(target), focus);

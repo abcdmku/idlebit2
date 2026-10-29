@@ -9,7 +9,6 @@ import type { ChipSnapshot } from '../../../game';
 import { familyName, whole } from '../../core';
 import type { LabelWriter, ViewPresentation, WorldFrame, WorldForm } from '../../core';
 import { PHONE_TYPE, typeForScale } from '../../core';
-import { addMarkY } from './sprites';
 import { arrangementOf, coreSites, coreText } from './layout';
 import { coreActivityText, coreActivityTone, coreSleep, labelFits, readySpeedText, tileLabelFits } from './speed';
 import { chipFloor, isLive, lentCore, queueOpen, siteCount, spilledOut } from './world';
@@ -48,12 +47,14 @@ export function chipLabels(chip: ChipSnapshot, frame: WorldFrame, out: LabelWrit
 
   const n = siteCount(chip), sites = coreSites(f, n), price = view?.sourceActions?.includes('add:core') ? null : addCorePrice(view, chip);
   if (sites.length > 2) {
-    // The add site's price, dim, under its "+" when a line fits there (unaffordable: dim, never blank).
+    // The add action stays centered in the empty site, with the price directly below its name.
     const add = sites[chip.cores.length];
     if (add && price) {
-      const scale = frame.scale ?? (form === 'phone' ? 2 : 3), t = form === 'phone' ? PHONE_TYPE : typeForScale(scale), py = addMarkY(add) + 5;
-      if (labelFits(price.text, { x: add.x, y: py, w: add.w, h: add.y + add.h - py }, scale, t.body, t.line))
-        out.label('addPrice', add.x + add.w / 2, py, 'center').text(price.text, price.affordable ? 'gold' : 'dim');
+      const scale = frame.scale ?? (form === 'phone' ? 2 : 3), t = form === 'phone' ? PHONE_TYPE : typeForScale(scale);
+      const py = add.y + (add.h - 2 * t.line / scale) / 2;
+      if (labelFits('Add core', add, scale, t.body, 2 * t.line))
+        out.label('addPrice', add.x + add.w / 2, py, 'center').text('Add core', price.affordable ? 'name' : 'dim')
+          .br().text(price.text, price.affordable ? 'gold' : 'dim');
     }
     // Every tile shows its own speed (user): the die grows so a tile always fits its label (layout.ts).
     // A sleeping core shows its C-state, dimmed. No busy tag: each tile shows its own state.
@@ -70,8 +71,10 @@ export function chipLabels(chip: ChipSnapshot, frame: WorldFrame, out: LabelWrit
   for (let i = 0; i < sites.length; i++) {
     const r = sites[i]!, core = chip.cores[i], c = coreText(r, wide ? 'wide' : 'stacked'), x = r.x + c.pad;
     if (!core) {
+      if (view?.sourceActions?.includes('add:core')) continue;
       // the add site: what it sells and its price (dim when unaffordable)
-      out.label(LABEL_IDS[i]!, x, r.y + c.pad, 'left').text(`Add ${CORE_NAMES[i]!}`, price?.affordable ? 'name' : 'dim', !!price?.affordable);
+      const scale = frame.scale ?? (form === 'phone' ? 2 : 3), t = form === 'phone' ? PHONE_TYPE : typeForScale(scale);
+      out.label(LABEL_IDS[i]!, r.x + r.w / 2, r.y + (r.h - 2 * t.line / scale) / 2, 'center').text('Add core', price?.affordable ? 'name' : 'dim');
       if (price) out.br().text(price.text, price.affordable ? 'gold' : 'dim');
       continue;
     }

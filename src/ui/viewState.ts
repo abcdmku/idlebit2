@@ -11,7 +11,7 @@ import type { LevelId, LevelSnapshot, NodeRef, RenderSnapshot, ResearchId, Snaps
 export { LEVEL_NAMES } from '../game';
 
 /** A page over the world. */
-export type Sheet = 'research' | 'settings' | 'roundRewards';
+export type Sheet = 'research' | 'settings' | 'roundRewards' | 'creditsHistory' | 'dataHistory';
 
 export interface ViewState {
   readonly focus: NodeRef;

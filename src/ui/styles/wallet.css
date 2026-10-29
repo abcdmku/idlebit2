@@ -1,0 +1,47 @@
+.band .wallet-key { pointer-events: auto; min-width: 64px; }
+.wallet-key:hover .fig { text-decoration: underline; text-underline-offset: 3px; }
+.wallet-veil { position: absolute; inset: 0; z-index: 30; background: #0e0b1cc9; }
+.wallet-page { display: flex; flex-direction: column; --rim: #5d5296; }
+.wallet-head { flex: none; position: relative; min-height: 64px; display: flex; align-items: center; padding: 0 72px 0 12px; }
+.wallet-head h1 { font-size: var(--head); margin: 0; }
+.wallet-body { flex: none; min-height: 0; padding: 0 12px 12px; }
+.balance-chart { margin: 0; }
+.balance-chart .credits { --line: var(--gold); color: var(--gold); }
+.balance-chart .data { --line: var(--data); color: var(--data); }
+.balance-chart-labels { display: flex; justify-content: space-between; gap: 8px; margin-bottom: 8px; }
+.balance-chart-labels span { display: inline-flex; align-items: center; gap: 4px; white-space: nowrap; }
+.balance-chart-labels i { display: inline-block; width: 12px; height: 2px; background: var(--line); }
+.balance-chart-labels .data i { background: repeating-linear-gradient(to right, var(--line) 0 4px, transparent 4px 6px); }
+.balance-chart-body { display: grid; grid-template-columns: 40px minmax(0, 1fr) 40px; gap: 4px; height: 144px; }
+.balance-chart-y { display: flex; flex-direction: column; justify-content: space-between; text-align: right; line-height: 1; }
+.balance-chart-y.data { text-align: left; }
+.balance-chart svg { display: block; width: 100%; height: 100%; min-height: 0; overflow: visible; background: var(--well); touch-action: pan-y; }
+.balance-chart svg:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+.balance-grid { stroke: var(--panel-hi); stroke-width: 1; vector-effect: non-scaling-stroke; }
+.balance-zero { stroke: var(--gold); stroke-opacity: .5; stroke-dasharray: 4 4; stroke-width: 1; vector-effect: non-scaling-stroke; }
+.balance-line { fill: none; stroke: var(--line); stroke-width: 2; vector-effect: non-scaling-stroke; }
+.balance-line.data { stroke-dasharray: 6 3; }
+.balance-point { fill: var(--line); }
+.balance-cursor { stroke: var(--muted); stroke-width: 1; vector-effect: non-scaling-stroke; }
+.balance-chart-times { display: flex; justify-content: space-between; margin: 4px 44px 0; color: var(--muted); }
+.balance-chart figcaption { color: var(--dim); margin: 0 0 8px; }
+.bankruptcy { border-top: 1px solid var(--panel-hi); padding-top: 8px; }
+.bankruptcy h2 { margin: 0; font-size: var(--head); }
+.bankruptcy p { margin: 4px 0; }
+.bankruptcy-head { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
+.bankruptcy-actions { display: flex; gap: 8px; }
+.wallet-page .bankruptcy-actions .skey { position: relative; display: flex; align-items: center; justify-content: center;
+  flex: 1; min-height: 44px; padding: 4px 8px; text-align: center; }
+.wallet-status { min-height: var(--lh); color: var(--muted); }
+.l-desktop .wallet-head { min-height: 80px; padding-left: 16px; padding-right: 96px; }
+.l-desktop .wallet-body { padding: 0 16px 16px; }
+@media (max-height: 480px) and (min-width: 640px) {
+  .wallet-body { display: grid; grid-template-columns: minmax(0, 3fr) minmax(0, 2fr); gap: 0 16px; }
+  .balance-chart { grid-column: 1; }
+  .balance-chart-labels { flex-wrap: wrap; gap: 0 8px; }
+  .balance-chart-body { height: 128px; }
+  .balance-chart figcaption { margin-bottom: 0; }
+  .bankruptcy { grid-column: 2; grid-row: 1; border-top: 0; border-left: 1px solid var(--panel-hi); padding: 0 0 0 16px; }
+  .bankruptcy-actions { flex-direction: column-reverse; }
+  .bankruptcy p { margin: 4px 0 8px; }
+}

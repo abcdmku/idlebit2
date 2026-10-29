@@ -3,7 +3,7 @@ import type { BuildState, SavedConfigs } from '../types/build';
 import { FAIL_CAUSES, type GameEvent } from '../types/events';
 import type { ResearchId } from '../types/ids';
 import type { RoundReport } from '../types/report';
-import type { GameState, LedgerSample, MarketState, QueuedTask, ResearchState, RoundState } from '../types/state';
+import type { GameState, LedgerSample, MarketState, QueuedTask, ResearchState, RoundState, WalletSample } from '../types/state';
 import { cloneHot, type CompiledBuffers, type HotBuffers } from './buffers';
 import type { TouchLog } from './touch';
 import { completionLog, type CompletionLog } from './completions';
@@ -32,6 +32,9 @@ export interface LedgerWork {
   roundEnergy: bigint;
   roundData: bigint;
   netRing: LedgerSample[];
+  walletHistory: WalletSample[];
+  historyCredits: bigint;
+  historyData: bigint;
   /** This advance call. */
   callGross: bigint;
   callEnergy: bigint;
@@ -108,6 +111,8 @@ export function openWorld(state: GameState, owned = false): World {
       creditsSpent: big(state.ledger.creditsSpent),
       roundGross: big(state.round.gross), roundEnergy: big(state.round.energy), roundData: big(state.round.data),
       netRing: [...state.ledger.netRing],
+      walletHistory: [...state.ledger.walletHistory],
+      historyCredits: big(state.wallet.credits), historyData: big(state.wallet.data),
       callGross: 0n, callEnergy: 0n, callData: 0n,
     },
     events: { nextSeq: state.events.nextSeq, entries: [...state.events.entries] },
@@ -129,6 +134,7 @@ export function commitWorld(state: GameState, w: World, carryMs: number): GameSt
       gross: toAmount(l.gross), energy: toAmount(l.energy), dataEarned: toAmount(l.dataEarned), dataSpent: toAmount(l.dataSpent),
       creditsSpent: toAmount(l.creditsSpent),
       netRing: l.netRing,
+      walletHistory: l.walletHistory,
     },
     round: { ...w.round, gross: toAmount(l.roundGross), energy: toAmount(l.roundEnergy), data: toAmount(l.roundData) },
     market: { ...w.market, window: [...w.market.window] },

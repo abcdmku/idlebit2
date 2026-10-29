@@ -7,6 +7,7 @@ export type * from './types';
 export { createInitialState } from './core/state';
 export { advanceGame, advanceGameOwned, copyGameState, copyOfflineState } from './core/advance';
 export { applyAction } from './core/actions';
+export { selectBankruptcy } from './core/bankruptcy';
 export { deriveRenderSnapshot } from './view/snapshot';
 export { quote } from './build/quotes';
 export { SETPOINT_MIN_F, SETPOINT_MAX_F } from './build/settings';

@@ -6,7 +6,7 @@ import type { FailCause, FailCounts, FailDetail, GameEvent } from './events';
 import type { FamilyId, LevelId, NodeRef, RackId, ResearchId, RoomId, SiteId, SystemId } from './ids';
 import type { RoundReport } from './report';
 import type { FrontierView } from './frontier';
-import type { RoundPhase } from './state';
+import type { RoundPhase, WalletSample } from './state';
 import type {
   PowerCtlView, StartCtlView,
   BuildSlotView, ChipQueueEntryView, ResearchQueueEntryView, CompletionView, CoolerView, FailureView, LbView, LinkView, MemTierView, OutcomeView, PartView, QueueEntryView, RackSlotView,
@@ -30,6 +30,7 @@ export interface RenderSnapshot {
   /** The current one boot time, unlocks.bootTicks × TICK_MS; pips drain timerS / bootMs. */
   readonly bootMs: number;
   readonly hud: HudSnapshot;
+  readonly walletHistory: readonly WalletSample[];
   readonly feed: FeedSnapshot;
   readonly round: RoundSnapshot;
   readonly research: ResearchBadge;

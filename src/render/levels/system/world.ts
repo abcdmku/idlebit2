@@ -93,8 +93,8 @@ export function drawBoard(g: G, s: SystemSnapshot, view: ViewPresentation, frame
 
 /**
  * Every tappable part reads as its own component (user): a 1 art px outline on exactly its hit rect
- * (the CPU package, each slot's part, each open slot, the power supply), and a "+" on each open slot,
- * bright when its add is affordable, dim otherwise. A locked slot is a tile too (its callout says what
+ * (the CPU package, each slot's part, each open slot, the power supply). Empty CPU sockets carry
+ * centered add text and a price; other open slots keep their "+". A locked slot is a tile too (its callout says what
  * unlocks it), with no "+". The tiles are the same set and rects as the level's hit targets (index.ts).
  */
 const TILE_EDGE = 'rgba(191, 178, 255, 0.55)';
@@ -104,7 +104,7 @@ function drawTiles(g: G, s: SystemSnapshot, m: BoardModel, view: ViewPresentatio
     if (site.state !== 'part' && !slotOf(s, site)) continue;
     if (site.type === 'cpu' && site.state === 'part') packageRect(b, site.index, hit); else siteRect(b, site.type, site.index, hit);
     if (site.state === 'open') outline(g, hit, TILE_EDGE);
-    if (site.state === 'open') plus(g, hit, quoteState(view.quotes, site.type) === 'picked');
+    if (site.state === 'open' && site.type !== 'cpu') plus(g, hit, quoteState(view.quotes, site.type) === 'picked');
   }
 
 }

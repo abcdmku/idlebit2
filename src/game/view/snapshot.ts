@@ -139,6 +139,7 @@ export function deriveRenderSnapshot(state: GameState, scope: SnapshotScope, pre
     epoch: state.epoch, tick: state.clock.tick, simTimeMs: state.clock.tick * TICK_MS + state.clock.carryMs,
     bootMs: state.research.unlocks.bootTicks * TICK_MS,
     hud: hudSnapshot(state, prev?.hud ?? null),
+    walletHistory: state.ledger.walletHistory,
     feed: feedSnapshot(state, prev?.feed ?? null, sameEvents),
     round: roundSnapshot(state, prev?.round ?? null),
     research: researchBadge(state),

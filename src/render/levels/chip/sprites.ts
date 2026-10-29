@@ -64,17 +64,13 @@ export function coreBlock(g: G, r: Rect, busy: boolean, lent: boolean): Rect {
   const front = lent ? mix(P.logicLo, P.rndLo, 0.7) : busy ? P.logic : P.logicLo;
   return prism(g, r.x, r.y + 3, r.w, r.h - 3, 3, { top, front, sx: 2, sy: 2 });
 }
-/** The add site's "+" centre row: mid-site (labels.ts puts the price under it). */
-export const addMarkY = (r: Rect): number => r.y + (r.h >> 1);
 /**
- * The add site (D34): the next core goes here. Always addable-looking: a dim well, a dotted rim and
- * a "+" in the middle, bright when the core is affordable, dim (never blank) when it isn't.
+ * The next core's empty well. Its centered name and price are supplied by the UI or labels.
  */
 export function addSite(g: G, r: Rect, affordable: boolean): void {
-  R(g, r.x, r.y, r.w, r.h, mix(P.wafer, P.ink, 0.25));
-  if (r.w >= 8) dotted(g, r.x, r.y, r.w, r.h, affordable ? P.silk : P.silkLo, 0, 1, 2);
-  const cx = r.x + (r.w >> 1), cy = addMarkY(r), c = affordable ? P.paper : P.silkLo;
-  R(g, cx - 3, cy - 1, 7, 3, P.ink); R(g, cx - 1, cy - 3, 3, 7, P.ink); R(g, cx - 2, cy, 5, 1, c); R(g, cx, cy - 2, 1, 5, c);
+  R(g, r.x, r.y, r.w, r.h, P.ink);
+  R(g, r.x + 1, r.y + 1, r.w - 2, r.h - 2, mix(P.wafer, P.ink, 0.25));
+  if (r.w >= 8) dotted(g, r.x + 1, r.y + 1, r.w - 2, r.h - 2, affordable ? P.silk : P.silkLo, 0, 1, 2);
 }
 /** A locked site (A25): bare die, one dim outline and the lock glyph, no text; the callout names it. */
 export function lockedSite(g: G, r: Rect): void {
@@ -153,7 +149,7 @@ export interface Incoming { count: number; family: FamilyId | null; progress: nu
  * with a thin bar at the transfer's real progress in its type colour; the rest wait as dim outlines.
  * Empty wells stay empty.
  */
-export function queueBlock(g: G, r: Rect, wells: readonly Rect[], queue: readonly ChipQueueEntryView[], incoming: Incoming | null = null): void {
+export function queueBlock(g: G, r: Rect, wells: readonly Rect[], queue: readonly (ChipQueueEntryView | null)[], incoming: Incoming | null = null): void {
   prism(g, r.x, r.y + 3, r.w, r.h - 3, 3, { top: P.logicLo, front: mix(P.logicLo, P.ink, 0.4) });
   const reserved = incoming ? Math.min(incoming.count, Math.max(0, wells.length - queue.length)) : 0;
   for (let i = 0; i < wells.length; i++) {
@@ -165,7 +161,7 @@ export function queueBlock(g: G, r: Rect, wells: readonly Rect[], queue: readonl
       continue;
     }
     const k = i - queue.length;
-    if (k >= reserved) continue;
+    if (k < 0 || k >= reserved) continue;
     // Incoming: the first reserved well is the task on the pipe now (its icon, dimmed, and its progress).
     const landing = k === 0 && incoming!.family !== null;
     brackets(g, w.x, w.y, w.w, w.h, mix(P.silk, P.ink, 0.35), 2);

@@ -9,6 +9,7 @@ import { FAMILIES } from '../market/families';
 import { validateAccelBuilds, validateAccelRuntime } from './accelerators';
 import { validatePreload } from './preload';
 import { validateRoundRewards } from './roundRewards';
+import { WALLET_HISTORY_LIMIT } from '../core/walletHistory';
 import { validateMemoryBuilds } from './memory';
 
 type Obj = Record<string, unknown>;
@@ -54,6 +55,18 @@ function check(raw: unknown): GameState {
   const ledger = obj(s.ledger, 'ledger');
   for (const k of ['gross', 'energy', 'dataEarned', 'creditsSpent', 'dataSpent']) whole(ledger[k], `ledger.${k}`);
   arr(ledger.netRing, 'ledger.netRing');
+  const history = arr(ledger.walletHistory, 'ledger.walletHistory');
+  if (history.length === 0 || history.length > WALLET_HISTORY_LIMIT) fail('ledger.walletHistory', 'invalid history length');
+  let previousTick = 0;
+  history.forEach((raw, i) => {
+    const path = `ledger.walletHistory[${i}]`, sample = obj(raw, path);
+    const tick = int(sample.tick, `${path}.tick`);
+    if (tick < previousTick || tick > (clock.tick as number)) fail(path, 'history ticks must be ordered and no later than the clock');
+    previousTick = tick;
+    whole(sample.credits, `${path}.credits`, true);
+    whole(sample.data, `${path}.data`);
+    if (typeof sample.checkpoint !== 'boolean') fail(path, 'expected a checkpoint flag');
+  });
   const round = obj(s.round, 'round');
   oneOf(round.phase, 'round.phase', ['running', 'ended', 'between']);
   int(round.index, 'round.index', 1);

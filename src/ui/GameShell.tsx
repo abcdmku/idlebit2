@@ -29,6 +29,7 @@ import { PlatformLine } from './shell/PlatformLine';
 import { createViewStore, initialView, type ViewStore } from './viewState';
 import { openingLevel, writeLastLevel } from './prefs';
 import { SettingsScreen } from './settings/SettingsScreen';
+import { CurrencyScreen } from './wallet/CurrencyScreen';
 import './styles/tokens.css';
 import './styles/shell.css';
 import './styles/plates.css';
@@ -160,6 +161,7 @@ export function GameShell({ store, registry, level, view, size, saveNow, childre
             <TaskDetail />
           </OffersScope>
           <SettingsScreen />
+          <CurrencyScreen />
           <RoundRewardsScreen />
           <LeaveDialog guard={guard} />
           {children}

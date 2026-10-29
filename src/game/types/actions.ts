@@ -20,6 +20,7 @@ export type ConfigSource =
 export type GameAction =
   | { readonly type: 'returnToMarket' }
   | { readonly type: 'endRound' }
+  | { readonly type: 'declareBankruptcy' }
   | { readonly type: 'dismissReport' }
   | { readonly type: 'claimRoundReward'; readonly milestone: number }
   | { readonly type: 'setQueueLoaderLimit'; readonly system: SystemId; readonly limit: 1 | 2 | 4 }

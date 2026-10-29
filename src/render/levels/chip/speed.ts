@@ -18,7 +18,7 @@ export const coreSpeedText = (c: CoreView): string => coreSleep(c) ?? formatHert
 export function coreActivityText(c: CoreView, compact = false): string {
   if (c.activity === 'preload') return 'Preload';
   if (c.activity === 'cacheLoad') return compact ? 'Load' : 'Cache load';
-  if (c.activity === 'cacheAccess') return compact ? 'Cache' : 'Cache read';
+  if (c.activity === 'cacheAccess') return compact ? 'Read' : 'Cache read';
   if (c.activity === 'compute') return 'Compute';
   return c.research > 0 ? 'Research' : c.busy > 0 ? 'Waiting' : 'Idle';
 }

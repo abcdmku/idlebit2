@@ -76,18 +76,21 @@ function useSpent(): number | null {
 /** Data over Credits at the band's right (user, 25 Oct), the same size; right-aligned, so nothing shifts. */
 function Wallet() {
   const L = useLayout(), spent = useSpent(), d = L.kind === 'desktop';
+  const { view } = useShell();
   const w = useGameSelector(s => ({ credits: s.hud.credits, data: s.hud.data }), shallowEqual, 100);
   const box0 = L.wallet, rowH = box0.h / 2;
   const credits = amountText(w.credits), data = amountText(w.data);
-  const row = (i: number) => ({ right: L.w - (box0.x + box0.w), top: box0.y + i * rowH, height: rowH });
+  const row = (i: number) => ({ right: L.w - (box0.x + box0.w), top: box0.y + i * rowH, width: box0.w, height: rowH });
   return <div className="wallet" role="group" aria-label="Wallet">
-    <span className="figrow r" style={row(0)} aria-label={`${data} Data`}>
+    <button type="button" className="figrow r wallet-key" style={row(0)} aria-label={`${data} Data. View history`} aria-haspopup="dialog"
+      onClick={() => view.dispatch({ type: 'toggleSheet', sheet: 'dataHistory' })}>
       <CurrencyIcon kind="data" n={L.N} /><b className="fig mid data" data-testid="data">{data}</b>{d && <span className="mute">Data</span>}
-    </span>
-    <span className="figrow r" style={row(1)} aria-label={`${credits} Credits`}>
+    </button>
+    <button type="button" className="figrow r wallet-key" style={row(1)} aria-label={`${credits} Credits. View history`} aria-haspopup="dialog"
+      onClick={() => view.dispatch({ type: 'toggleSheet', sheet: 'creditsHistory' })}>
       <span className="dim" data-testid="spent">{spent ? <>−<CoinIcon />{wholeText(spent)}</> : ''}</span>
       <CurrencyIcon kind="credits" n={L.N} /><b className="fig mid gold" data-testid="credits">{credits}</b>{d && <span className="mute">Credits</span>}
-    </span>
+    </button>
   </div>;
 }
 

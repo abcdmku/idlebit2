@@ -95,6 +95,7 @@ export function createInitialState(seed: number = DEFAULT_SEED): GameState {
     ledger: {
       gross: ZERO_AMOUNT, energy: ZERO_AMOUNT, dataEarned: ZERO_AMOUNT, creditsSpent: ZERO_AMOUNT, dataSpent: ZERO_AMOUNT,
       netRing: [{ tick: 0, gross: ZERO_AMOUNT, energy: ZERO_AMOUNT }],
+      walletHistory: [{ tick: 0, credits: ZERO_AMOUNT, data: ZERO_AMOUNT, checkpoint: true }],
     },
     round,
     market,

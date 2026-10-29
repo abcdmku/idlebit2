@@ -48,6 +48,13 @@ export interface Wallet {
 
 /** One sample per second at which lifetime gross or energy changed (change points only). */
 export interface LedgerSample { readonly tick: number; readonly gross: Amount; readonly energy: Amount }
+/** Recent wallet observations. Checkpoints retain both sides of a player action. */
+export interface WalletSample {
+  readonly tick: number;
+  readonly credits: Amount;
+  readonly data: Amount;
+  readonly checkpoint: boolean;
+}
 export interface LedgerState {
   /** Lifetime totals, whole units. */
   readonly gross: Amount;
@@ -57,6 +64,8 @@ export interface LedgerState {
   readonly dataSpent: Amount;
   /** Change points over at least the last 60 s, oldest first (spec §16.1 net/min). */
   readonly netRing: readonly LedgerSample[];
+  /** At most 600 observations, oldest first; tick changes coalesce within each simulation second. */
+  readonly walletHistory: readonly WalletSample[];
 }
 
 export type RoundPhase = 'running' | 'ended' | 'between';

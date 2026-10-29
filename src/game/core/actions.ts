@@ -5,6 +5,7 @@ import type { ActionOf, ActionOutcome, GameAction, GameActionType, RejectionCode
 import type { GameState } from '../types/state';
 import { coreHandlers } from './coreActions';
 import { roundRewardHandlers } from '../rewards/actions';
+import { recordWalletAction } from './walletHistory';
 
 export type ActionHandler<A extends GameAction> = (state: GameState, action: A) => ActionOutcome;
 export type HandlerMap = { readonly [T in GameActionType]?: ActionHandler<ActionOf<T>> };
@@ -24,7 +25,8 @@ const HANDLERS: HandlerMap = { ...marketHandlers, ...buildHandlers, ...coreHandl
 export function applyAction(state: GameState, action: GameAction): ActionOutcome {
   const handler = HANDLERS[action.type] as ActionHandler<GameAction> | undefined;
   if (!handler) return reject(state, 'invalid', `Not implemented: ${action.type}`);
-  return handler(state, action);
+  const outcome = handler(state, action);
+  return outcome.ok ? accept(recordWalletAction(state, outcome.state)) : outcome;
 }
 
 /** Debits whole Credits. Purchases need wallet >= price (spec §9.8). */
