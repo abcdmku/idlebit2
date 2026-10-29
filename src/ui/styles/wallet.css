@@ -11,7 +11,6 @@
 .balance-chart-labels { display: flex; justify-content: space-between; gap: 8px; margin-bottom: 8px; }
 .balance-chart-labels span { display: inline-flex; align-items: center; gap: 4px; white-space: nowrap; }
 .balance-chart-labels i { display: inline-block; width: 12px; height: 2px; background: var(--line); }
-.balance-chart-labels .data i { background: repeating-linear-gradient(to right, var(--line) 0 4px, transparent 4px 6px); }
 .balance-chart-body { display: grid; grid-template-columns: 40px minmax(0, 1fr) 40px; gap: 4px; height: 144px; }
 .balance-chart-y { display: flex; flex-direction: column; justify-content: space-between; text-align: right; line-height: 1; }
 .balance-chart-y.data { text-align: left; }
@@ -20,7 +19,6 @@
 .balance-grid { stroke: var(--panel-hi); stroke-width: 1; vector-effect: non-scaling-stroke; }
 .balance-zero { stroke: var(--gold); stroke-opacity: .5; stroke-dasharray: 4 4; stroke-width: 1; vector-effect: non-scaling-stroke; }
 .balance-line { fill: none; stroke: var(--line); stroke-width: 2; vector-effect: non-scaling-stroke; }
-.balance-line.data { stroke-dasharray: 6 3; }
 .balance-point { fill: var(--line); }
 .balance-cursor { stroke: var(--muted); stroke-width: 1; vector-effect: non-scaling-stroke; }
 .balance-chart-times { display: flex; justify-content: space-between; margin: 4px 44px 0; color: var(--muted); }
