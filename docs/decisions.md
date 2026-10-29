@@ -1979,3 +1979,9 @@ The preload audit found completed cache work already reused correctly. A fully p
 The user rejected the plus and spacing on the CPU add controls. Core sites and empty CPU sockets show a centered add label directly above the price, with no plus or extra status row. Empty sockets leave a clear center for these labels. Unaffordable controls retain the same geometry with dim text; narrow CPU prices omit their coin instead of truncating the value. This supersedes the plus treatment in D74.
 
 Both currency clicks open one graph showing Credits and Data together, replacing D66's separate currency tabs. Credits are solid gold against the left y axis; Data is solid green against the right y axis. Both legend keys are solid. Each scale includes zero, extends to negative Credits when needed, and uses five evenly spaced ticks with whole 1, 2 or 5 multiples of powers of ten. Compact labels start at 1k. Pointer and keyboard inspection report both values for the same time. Cancel and Confirm text are centered in their buttons.
+
+## D76, 29 Oct: compact round report
+
+The user marked the completed-task heading, previous-best row, next-era row and end-reason text for removal. The title is Round over, without round number or elapsed duration. Keep the goal ruler, NEW BEST badge, earnings and failure details. The milestone labels and bar use one inset; center intermediate labels over their markers and right-align the final label to the bar end. Milestone hit areas remain at least 44 px tall while their text and ticks stay directly above the bar. This supersedes the corresponding D40 report layout.
+
+The completed-task total sits 2px from the gold fill's edge, just after the fill, or inside near the end or when it would not fit outside. The text has no extra horizontal padding. Compact large counts without rounding up, retain the exact count in the accessible label and tooltip, and keep the ruler and report height unchanged.

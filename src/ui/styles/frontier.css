@@ -1,29 +1,28 @@
 /* D40: progress at round end (the report's reach bar) and the runway at the top of Research.
    Built on the plate and research tokens: pixel edges (lit top, shaded bottom), gold for money and the fill. */
 
-/* the report: the reach, one bar over the bands, then what is next */
-.round-plate .rp-badge { margin-left: auto; align-self: center; padding: 0 8px; line-height: 20px; font-weight: 700;
+/* the report: one goal ruler followed by the round's earnings and failures */
+.round-plate .rp-badge { margin-left: 0; align-self: center; padding: 0 8px; line-height: 20px; font-weight: 700;
   background: var(--gold); color: var(--ink); box-shadow: inset 0 -2px #c4861c; }
-.round-plate .rp-reach { display: flex; align-items: baseline; gap: 8px; margin: 8px 0 0; }
-.v3-plate.round-plate .rp-big { font-size: var(--mid); line-height: 1; font-weight: 700; }
 .round-plate .mute { color: var(--muted); }
 
 /* The goal ruler: counts above their marks, an unbroken bevelled gold fill, thin seams where goals fall. */
-.rb { margin-top: 8px; }
-.rb-marks { position: relative; height: calc(var(--lh) + 8px); }
-.rb-mark { position: absolute; bottom: 8px; transform: translateX(-50%); white-space: nowrap; line-height: var(--lh); color: var(--muted); }
+.rb { --bar-height: calc(var(--lh) / 2 + 8px); margin-top: 8px; padding: 0 4px calc(24px - var(--bar-height)); }
+.rb-marks { position: relative; height: calc(var(--lh) + 4px); }
+.rb-mark { position: absolute; top: 0; transform: translateX(-50%); white-space: nowrap; line-height: var(--lh); color: var(--muted); }
+.rb-value { position: absolute; top: 0; left: 0; right: 0; line-height: var(--lh); pointer-events: none; }
 .rb-mark.end { transform: translateX(-100%); }
 .rb-mark.on { color: var(--ok); font-weight: 600; }
-.rb-mark::after { content: ''; position: absolute; left: 50%; bottom: -8px; width: 2px; height: 4px; margin-left: -1px; background: currentColor; }
+.rb-mark::after { content: ''; position: absolute; left: 50%; top: var(--lh); width: 2px; height: 4px; margin-left: -1px; background: currentColor; }
 .rb-mark.end::after { left: auto; right: 0; margin: 0; }
-.rb-bar { position: relative; height: 12px; margin: 0 4px 8px; background: #120d26; box-shadow: 0 0 0 2px #3a2f6e, 0 0 0 4px var(--ink); }
+.rb-bar { position: relative; height: var(--bar-height); background: #120d26; box-shadow: 0 0 0 2px #3a2f6e, 0 0 0 4px var(--ink); }
 .rb-fill { position: absolute; left: 0; top: 0; bottom: 0; background: var(--gold); box-shadow: inset 0 -3px #c4861c, inset 0 2px #fff1a6; }
 .rb-seam { position: absolute; top: 0; bottom: 0; width: 2px; margin-left: -1px; background: #2a2350; }
 .rb-seam.on { background: #c4861c; }
+.rb-total { position: absolute; top: 0; height: 100%; display: flex; align-items: center; padding: 0;
+  line-height: var(--lh); font-weight: 700; white-space: nowrap; color: var(--paper); background: #120d26; pointer-events: none; }
+.rb-total[data-placement="inside"] { color: var(--ink); background: var(--gold); box-shadow: inset 0 -3px #c4861c, inset 0 2px #fff1a6; }
 
-.round-plate .rp-next { margin-top: 8px; }
-.v3-plate.round-plate .rp-next .v { color: var(--paper); text-align: right; }
-.round-plate .rp-next .gold { color: var(--gold); }
 .v3-plate.round-plate .rp-vs .v { color: var(--paper); display: inline-flex; align-items: center; gap: 4px; }
 .round-plate .rp-chg { margin-left: 8px; min-width: 56px; text-align: right; }
 .round-plate .rp-chg.ok { color: var(--ok); } .round-plate .rp-chg.bad { color: var(--fault-text); } .round-plate .rp-chg.mute { color: var(--muted); }

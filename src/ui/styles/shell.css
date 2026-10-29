@@ -167,6 +167,7 @@ b, .b { font-weight: 700; }
 /* the round plate sits over the paused world */
 .round-plate { z-index: 12; display: flex; flex-direction: column; overflow: hidden; }
 .round-plate .p-head { flex: none; align-items: center; }
+.round-plate .p-head .p-title { margin-right: auto; }
 .round-content { min-height: 0; overflow-y: auto; overscroll-behavior: contain; scrollbar-width: thin; }
 .v3-plate.round-plate[data-more="true"]::after { display: none; }
 .round-plate .report-more { display: none; flex: none; height: 24px; align-items: center; justify-content: center; color: var(--paper); visibility: hidden; }
@@ -212,11 +213,7 @@ b, .b { font-weight: 700; }
 /* the new-version banner: the reserved line, taller for its 48 px Reload key */
 .platform-line.version { background: var(--panel); pointer-events: auto; display: flex; align-items: center; gap: 16px; padding: 0 0 0 8px; color: var(--cyan); overflow: visible; }
 
-.round-details { margin-top: 8px; }
-.round-details > summary { min-height: 44px; display: flex; align-items: center; justify-content: space-between; color: var(--cyan); cursor: pointer; }
-.round-details > summary::after { content: '+'; }
-.round-details[open] > summary::after { content: '−'; }
-.round-details > summary:focus-visible { outline: 2px solid var(--focus); outline-offset: -2px; }
+.round-details { margin-top: 0; }
 
 /* Sandbox (never the real game): an amber frame round the band, and its line in the head card */
 .sandbox .band-bg { box-shadow: inset 0 0 0 2px #ffb03b; }
@@ -227,6 +224,7 @@ b, .b { font-weight: 700; }
 
 /* Shared spacing for the report and task detail. */
 .round-plate .round-details > :not(summary) { margin: 8px 0 0; }
+.round-plate .round-details > :first-child { margin-top: 0; }
 .round-plate .p-list { display: grid; list-style: none; margin: 8px 0 0; padding: 0; row-gap: 4px; }
 .round-plate .p-list li { display: flex; align-items: center; gap: 8px; min-height: 18px; }
 .round-plate .p-list .v { margin-left: auto; }

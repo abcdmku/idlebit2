@@ -10,4 +10,6 @@
 .reward-amounts { display: flex; gap: 6px; }
 .reward-amounts .px-ic { width: 10px; height: 10px; }
 .round-rewards-plate .component-link { min-height: 44px; }
-.rb-marks button.rb-mark { border: 0; background: none; font: inherit; min-width: 44px; min-height: 44px; margin-top: -14px; padding: 14px 0 0; cursor: pointer; }
+.rb-marks button.rb-mark { display: block; border: 0; background: none; font: inherit; min-width: 44px; height: 44px; min-height: 44px;
+  margin: 0; padding: 0; text-align: center; cursor: pointer; z-index: 1; }
+.rb-marks button.rb-mark.end { text-align: right; }

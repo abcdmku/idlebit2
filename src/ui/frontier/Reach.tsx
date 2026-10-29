@@ -1,11 +1,9 @@
-// The report's lead (D40): progress shows only here, at round end (user, 26 Oct). One number, the tasks
-// completed this round, and one bar: a ruler from 0 marked with the goals around this round on the endless
-// ladder (10, 15, 20, 30, 50, 75, 100 … six per ×10), the counts themselves as labels. Under it
-// the best round to beat and the next era. Totals against the last round wait in the report's details.
-import type { ReactNode } from 'react';
-import { tierOf, tierValue, type Amount, type ResearchId, type RoundReport, type RunwayMark, type RunwayView } from '../../game';
+// The report's progress ruler and earnings comparison. The ruler's labels share the bar's span.
+import { useLayoutEffect, useRef, type ReactNode } from 'react';
+import { tierOf, tierValue, type Amount, type ResearchId, type RoundReport, type RunwayView } from '../../game';
 import { CoinIcon, GemIcon } from '../plates/icons';
 import { amountText, wholeText } from '../hooks/format';
+import { shortCount } from '../plates/format';
 import { familyName } from '../hooks/feedModel';
 import { useShell } from '../storeHooks';
 
@@ -33,35 +31,34 @@ export function goalBar(met: number) {
 /** This round's one bar: the counts above, an unbroken gold fill to this round's count, seams where the marks fall. */
 export function GoalBar({ report }: { report: RoundReport }) {
   const shell = useShell();
+  const trackRef = useRef<HTMLDivElement>(null), totalRef = useRef<HTMLSpanElement>(null);
   const met = report.met, bar = goalBar(met), pct = (v: number) => `${(Math.min(1, v / bar.hi) * 100).toFixed(2)}%`;
-  return <div className="rb" data-testid="rp-goal-bar" role="group" aria-label={`${wholeText(met)} tasks this round; next goal ${wholeText(bar.next)}`}>
-    <div className="rb-marks">{bar.marks.map((m, i) => <button type="button" key={m.at} className={`rb-mark${m.reached ? ' on' : ''}${i === bar.marks.length - 1 ? ' end' : ''}`}
+  useLayoutEffect(() => {
+    const track = trackRef.current, total = totalRef.current;
+    if (!track || !total) return;
+    const position = () => {
+      const width = track.clientWidth, text = total.getBoundingClientRect().width;
+      const end = track.querySelector<HTMLElement>('.rb-fill')?.getBoundingClientRect().width ?? 0;
+      const inside = met / bar.hi >= 0.7 || end + text + 4 > width;
+      const left = inside ? end - text - 2 : end + 2;
+      total.style.left = `${Math.max(2, Math.min(left, width - text - 2))}px`;
+      total.dataset.placement = inside ? 'inside' : 'after';
+    };
+    position();
+    const observer = new ResizeObserver(position);
+    observer.observe(track); observer.observe(total);
+    return () => observer.disconnect();
+  }, [met, bar.hi]);
+  return <div className="rb" data-testid="rp-goal-bar" role="group" aria-label={`${met.toLocaleString('en-US')} tasks this round; next goal ${wholeText(bar.next)}`}>
+    <div className="rb-marks">{bar.marks.map((m, i) => <button type="button" key={m.at} data-qa-target className={`rb-mark${m.reached ? ' on' : ''}${i === bar.marks.length - 1 ? ' end' : ''}`}
       aria-label={`${wholeText(m.at)} tasks: view reward`} onClick={() => shell.view.dispatch({ type: 'openRoundRewards', milestone: m.at })}
-      style={{ left: pct(m.at) }}>{wholeText(m.at)}</button>)}</div>
-    <div className="rb-bar" data-free="art">
+      style={{ left: pct(m.at) }}><span className="rb-value">{wholeText(m.at)}</span></button>)}</div>
+    <div ref={trackRef} className="rb-bar" data-free="art" title={`${met.toLocaleString('en-US')} tasks completed`}>
       <b className="rb-fill" style={{ width: pct(met) }} />
       {bar.marks.slice(0, -1).map(m => <i key={m.at} className={`rb-seam${m.reached ? ' on' : ''}`} style={{ left: pct(m.at) }} />)}
+      <span ref={totalRef} className="rb-total" data-testid="rp-total" style={{ left: pct(met) }}>{shortCount(met)}</span>
     </div>
   </div>;
-}
-
-/** The best round to beat (or the one just beaten), under the bar. */
-export function GoalRows({ report }: { report: RoundReport }) {
-  const best = report.frontier.priorBestMet;
-  return best > 0 ? <li data-testid="rp-best"><span className="mute">{report.met > best ? 'Previous best' : 'Best'}</span>
-    <span className="v">{wholeText(best)} tasks</span></li> : null;
-}
-
-/** "Rack 59% → 71%" (the end figure gold), "Rack research 10% → 34%", or the milestone that finished in the round. */
-export function RunwayValue({ start, end, eras }: { start: RunwayMark | null; end: RunwayMark | null; eras: RunwayView['eras'] }) {
-  const name = (m: RunwayMark) => <>{eraName(m.node, eras)}{m.phase === 'research' ? ' research' : ''}</>;
-  if (!end) return start ? <>{eraName(start.node, eras)} done</> : null;
-  if (start && start.node !== end.node) return <>{eraName(start.node, eras)} done · {name(end)} <b className="gold">{pctText(end.progress)}</b></>;
-  // An unchanged figure reads once ("Rack 0%"), not as a move.
-  if (start && start.phase === end.phase && pctText(start.progress) !== pctText(end.progress)) {
-    return <>{name(end)} {pctText(start.progress)} → <b className="gold">{pctText(end.progress)}</b></>;
-  }
-  return <>{name(end)} <b className="gold">{pctText(end.progress)}</b></>;
 }
 
 /** A change from the last round: "▲ 69%" against a positive last value, else the signed difference; empty without one. */

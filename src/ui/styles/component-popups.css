@@ -24,7 +24,6 @@
 .v3-plate details > summary::before { content: '›'; }
 .v3-plate details[open] > summary::before { content: '⌄'; }
 .v3-plate details > summary::-webkit-details-marker { display: none; }
-.v3-plate .round-details > summary::after { content: none; }
 .component-options .plate-section { margin-top: 4px; }
 .component-facts p { margin: 4px 0 0; }
 .component-picker { display: flex; align-items: center; gap: 8px; margin: 4px 0; }

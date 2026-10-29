@@ -1,22 +1,20 @@
-// Round over: an in-world plate over the paused, veiled world (program §12). It leads with the reach
-// against the frontier (D40: tasks done, the goal ruler, the best and the next era), then the details:
-// end reason, Net and Data against the last round, earned, energy, counts, causes (all seven, zeros
+// Round over: a compact in-world report over the paused world. It leads with the goal ruler,
+// then Net and Data against the last round, earned, energy, counts, causes (all seven, zeros
 // dimmed so the grid never moves), failures by type. One Return to market key. Closing it dismisses the report.
 import { useEffect, useLayoutEffect, useRef, type CSSProperties } from 'react';
 import { FAIL_CAUSES, formatOps } from '../game';
-import type { EnergyBreakdown, FailCause, RoundEndedBy, RoundReport, RoundTypeTally } from '../game';
+import type { EnergyBreakdown, FailCause, RoundReport, RoundTypeTally } from '../game';
 import { P, drawCause, typeColor, typeName } from '../render/core';
 import { CoinIcon } from './plates/icons';
 import { AutoReturnControl } from './AutoReturnControl';
 import { useDialogFocus } from './hooks/useDialogFocus';
 import { CAUSE_NAME } from './hooks/feedModel';
-import { amountText, clockText, wholeText } from './hooks/format';
+import { amountText, wholeText } from './hooks/format';
 import { returnToMarket } from './input/commands';
 import type { ShellLayout } from './layout';
 import { useLayout } from './shell/geometry';
 import { useGameSelector, useShell, useViewState } from './storeHooks';
-import { GoalBar, GoalRows, ReachDetails, reportBadge, RunwayValue } from './frontier/Reach';
-import { useRunway } from './frontier/Runway';
+import { GoalBar, ReachDetails, reportBadge } from './frontier/Reach';
 
 function CauseIcon({ cause, lit }: { cause: FailCause; lit: boolean }) {
   const ref = useRef<HTMLCanvasElement>(null);
@@ -83,27 +81,18 @@ export function RoundReportPlate({ report, onReturn, onClose }: {
   const chips = failedByType(report.byType ?? []);
   const energy = report.energy ?? null;
   const prev = shell.store.getState().round.reports.find(r => r.index === report.index - 1) ?? null;
-  const eras = useRunway().eras, badge = reportBadge(report);
+  const badge = reportBadge(report);
   return <section ref={ref} className="v3-plate round-plate has-x" role="dialog" aria-modal="true" aria-label="Round over" tabIndex={-1}
     data-testid="round-plate" style={plateStyle(L)} onPointerDown={e => e.stopPropagation()} onWheel={e => e.stopPropagation()}>
     <header className="p-head">
-      <b className="p-title">Round {report.index} over</b>
-      <span className="p-sub">{clockText(report.durationMs)}</span>
+      <b className="p-title">Round over</b>
       {badge && <span className="rp-badge" data-testid="rp-badge">{badge}</span>}
       <button type="button" className="p-x" aria-label="Close report" onClick={onClose}>
         <i className="x-glyph" aria-hidden="true" style={{ width: 12, height: 12, '--x-w': '1px' } as CSSProperties} /></button>
     </header>
     <div className="round-content" ref={contentRef} onScroll={updateMore}>
-    {/* D40: progress shows here only: the reach, its bar over the bands with the best before, and what is next. */}
-    <p className="rp-reach" data-testid="rp-reach"><b className="rp-big">{wholeText(report.met)}</b> <span className="mute">tasks done this round</span></p>
     <GoalBar report={report} />
-    <ul className="p-list rp-next">
-      <GoalRows report={report} />
-      {(report.frontier.runwayStart || report.frontier.runwayEnd) && <li data-testid="rp-runway"><span className="mute">Next era</span>
-        <span className="v"><RunwayValue start={report.frontier.runwayStart} end={report.frontier.runwayEnd} eras={eras} /></span></li>}
-    </ul>
     <section className="round-details">
-    <p className="mute">{ENDED_BY[report.endedBy]}</p>
     <ReachDetails report={report} prev={prev} />
     <ul className="p-list rp-bottom">
       <li><span>Earned</span><span className="v gold"><CoinIcon />{amountText(report.gross)}</span></li>
@@ -140,11 +129,6 @@ export function RoundReportPlate({ report, onReturn, onClose }: {
     </div>
   </section>;
 }
-
-/** Why the round ended, in the report's subtitle (spec §4.1, D33). */
-export const ENDED_BY: Readonly<Record<RoundEndedBy, string>> = {
-  sla: 'SLA under 80%', player: 'Ended by you', stall: 'Stalled · nothing completed for 2 min',
-};
 
 /** D31 energy lines: billed and paid (−), unbilled (saved by batteries and generation). */
 const ENERGY_LINES: readonly { key: keyof EnergyBreakdown; label: string; paid: boolean }[] = [
