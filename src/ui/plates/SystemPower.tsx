@@ -13,14 +13,13 @@ export function SystemPower({ system }: { system: SystemId }) {
   if (!p) return null;
   const percent = (n: number) => `${Math.round(n * 100)}%`;
   const selected = p.sleepStates.find(c => c.depth === p.cStateLimit)!;
-  return <details className="system-power"><summary>CPU power settings</summary>
+  return <section className="system-power">
     <div role="group" aria-label="System power settings">
-    {!p.live && <p className="p-line muted">CPU power is fixed until System.</p>}
-    <Toggle label="C-state" note={p.maxCState ? `Level ${p.cStateResearchLevel} · idle core power ${percent(selected.idleFactor)}` : 'Requires C-state'}
-      disabled={!p.maxCState} on={p.cStateLimit > 0} onToggle={() => shell.dispatch({ type: 'setCStateLimit', system, limit: p.cStateLimit ? 0 : 1 })} />
-    <Toggle label="Dynamic clock (DVFS)" note={p.dvfsAvailable ? `Idle only · ${percent(p.dvfsClock)} clock` : 'Needs research'}
+    <Toggle label="Idle sleep" note={p.maxCState ? `${percent(selected.idleFactor)} idle power` : 'Research C-state'}
+      disabled={!p.maxCState} on={p.maxCState > 0 && p.cStateLimit > 0} onToggle={() => shell.dispatch({ type: 'setCStateLimit', system, limit: p.cStateLimit ? 0 : 1 })} />
+    <Toggle label="Idle clock" note={p.dvfsAvailable ? `${percent(p.dvfsClock)} speed` : 'Research DVFS'}
       disabled={!p.dvfsAvailable} on={p.dvfs} onToggle={() => { shell.dispatch({ type: 'setSystemSetting', system, setting: 'dvfs', on: !p.dvfs }); }} />
-    <Toggle label="Turbo boost" note={p.turboAvailable ? `${percent(p.turboClock)} clock · ${percent(p.turboWatts)} power` : 'Needs research'}
+    <Toggle label="Turbo" note={p.turboAvailable ? `${percent(p.turboClock)} speed · ${percent(p.turboWatts)} power` : 'Research Turbo'}
       disabled={!p.turboAvailable} on={p.turbo} onToggle={() => { shell.dispatch({ type: 'setSystemSetting', system, setting: 'turbo', on: !p.turbo }); }} />
-  </div></details>;
+  </div></section>;
 }

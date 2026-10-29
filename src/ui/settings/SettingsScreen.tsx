@@ -1,8 +1,8 @@
-import { useRef } from 'react';
+import { useLayoutEffect, useRef } from 'react';
 import { selectMusicTracks, type MusicTrackView } from '../../game';
 import { useDialogFocus } from '../hooks/useDialogFocus';
 import { CloseKey } from '../shell/CloseKey';
-import { box, useLayout } from '../shell/geometry';
+import { useLayout } from '../shell/geometry';
 import { shallowEqual, useGameSelector, useShell, useViewState } from '../storeHooks';
 import { useMusic } from './useMusic';
 import '../styles/settings.css';
@@ -21,10 +21,22 @@ function OpenSettings({ music, tracks }: { music: MusicControls; tracks: readonl
   useDialogFocus(ref, close);
   const inset = L.kind === 'desktop' ? L.lat : 8;
   const w = Math.min(560, L.w - 2 * inset), h = Math.min(640, L.h - 2 * inset);
+  useLayoutEffect(() => {
+    const panel = ref.current;
+    if (!panel) return;
+    const align = () => {
+      const x = (L.w - w) / 2, y = (L.h - panel.offsetHeight) / 2;
+      panel.style.transform = `translate(${Math.floor(x / 8) * 8 - x}px, ${Math.floor(y / 8) * 8 - y}px)`;
+    };
+    align();
+    const observer = new ResizeObserver(align);
+    observer.observe(panel);
+    return () => observer.disconnect();
+  }, [L.w, L.h, w]);
   const { preferences, status } = music;
   const playing = status === 'playing';
   return <div className="settings-veil" onPointerDown={e => e.stopPropagation()}>
-    <section ref={ref} className="panel settings-page" style={box({ x: Math.floor((L.w - w) / 16) * 8, y: Math.floor((L.h - h) / 16) * 8, w, h })}
+    <section ref={ref} className="panel settings-page" style={{ width: w, maxHeight: h }}
       role="dialog" aria-modal="true" aria-labelledby="settings-title" tabIndex={-1} data-testid="settings-page" data-k="sheet">
       <header className="settings-head">
         <h1 id="settings-title">Settings</h1>

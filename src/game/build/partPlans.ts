@@ -8,7 +8,7 @@ import { researchId, type PartRef, type SystemId } from '../types/ids';
 import type { GameState, Unlocks } from '../types/state';
 import {
   capacity, ECC_PRICE_FACTOR, EXTRA_CORE_GROWTH, installPrice, isLadder, LADDERS, partName, PARTS, networkStepPrice,
-  scalePrice, upgradePrice, upgradesBetween, gpuModel, ladderSpeed, type LeveledPartId,
+  scalePrice, upgradePrice, upgradesBetween, gpuModel, ladderSpeed, ladderInstall, type LeveledPartId,
 } from './catalog';
 import { ceilingLock, genLock, levelLock, maxLevel, ruleLock } from './locks';
 import { coldScope, cpuCount, readPart, withSpec, writePart, POWER_SLOTS } from './partAccess';
@@ -16,6 +16,7 @@ import { coldScopes, fail, locked, planned, type Plan } from './plan';
 import { cpuCores, cpuPrice, extraFactor } from './pricing';
 import { newestGen } from './research/unlocks';
 import { planGpuUpgrade } from './gpuPlans';
+import { switchAt, withSwitch } from './ports';
 
 export function planReplaceCpu(state: GameState, system: SystemId): Plan {
   const spec = specOf(state, system);
@@ -69,6 +70,18 @@ export function planUpgrade(state: GameState, ref: PartRef, axis: MemoryUpgrade 
   if (ref.slot.kind === 'pdu' && !state.research.unlocks.levels.rack) return locked({ code: 'research', node: researchId('rack'), text: 'Needs Rack' });
   const part = readPart(state.build, ref);
   if (!part) return fail('invalid', 'No such part');
+  if ((part.id === 'switch' || part.id === 'roomSwitch') && (ref.unit.kind === 'rack' || ref.unit.kind === 'room')) {
+    const at = switchAt(state.build, ref.unit);
+    if (at && !at.sw.ports.length) {
+      const k = at.row.baseK[at.sw.gen]!;
+      return planned({ build: withSwitch(state.build, ref.unit, { ...at.sw, ports: Array(at.row.minPorts).fill(k), uplinks: [k] }), price: ladderInstall(at.row, at.sw.gen) }, 'Install switch');
+    }
+  }
+  if (isLadder(part.id) ? part.level < 0 : part.level === 0) {
+    const level = isLadder(part.id) ? LADDERS[part.id].baseK[part.gen]! : 1;
+    const price = isLadder(part.id) ? ladderInstall(LADDERS[part.id], part.gen) : installPrice(PARTS[part.id as LeveledPartId], part.gen);
+    return planned({ build: writePart(state.build, ref, part.gen, level)!, price }, `Install ${partName(part.id, part.gen)}`);
+  }
   if (part.id === 'gpu') return planGpuUpgrade(state, ref);
   const u = state.research.unlocks;
   if (isLadder(part.id)) {
@@ -171,7 +184,11 @@ export function planAdd(state: GameState, system: SystemId, kind: BoardPartKind,
   };
   const levelOne: PartLevel = { gen: g, level: 1 };
   if (kind === 'socket') {
-    if (!cpu) return fail('invalid', 'No CPU');
+    if (!cpu && spec.kind === 'server') {
+      const gen = Math.max(0, g), first: CpuBuild = { cpu: { gen, level: 1 }, clock: { gen, level: 1 }, cache: { gen, level: 1 }, cores: [{ gen, level: 1 }] };
+      return commit({ ...spec, cpu: first, cpuCount: 1 }, cpuPrice(first), 'Install CPU', { have: 0, limit: boardLimit(spec, u, 'socket') }, 'cpu');
+    }
+    if (!cpu) return fail('invalid', 'No CPU socket');
     return commit({ ...spec, cpuCount: n + 1 }, cpuPrice(cpu), `CPU ${n + 1}`, { have: n, limit: boardLimit(spec, u, 'socket'), key: 'cpuSockets' }, null);
   }
   if (kind === 'core') {
@@ -197,26 +214,7 @@ export function planAdd(state: GameState, system: SystemId, kind: BoardPartKind,
   return commit({ ...spec, drives: [...spec.drives, { ...levelOne, speedLevel: 1 }] }, price, partName('storage', g), { have: spec.drives.length, limit: boardLimit(spec, u, 'drive'), key: 'driveSlots' }, 'storage');
 }
 
-/** Cold remove, scrapped (spec §4.5). A CPU's package, clock, levelOne, last core and the PSU stay. */
-export function planRemove(state: GameState, ref: PartRef): Plan {
-  if (ref.unit.kind !== 'system') return fail('invalid', 'Only board parts can be removed');
-  const id = ref.unit.id;
-  const spec = specOf(state, id);
-  if (!spec || !readPart(state.build, ref)) return fail('invalid', 'No such part');
-  const slot = ref.slot;
-  const cpu = spec.cpu;
-  const drop = <T>(list: readonly T[], i: number) => list.filter((_, j) => j !== i);
-  let next: SystemSpec | null = null;
-  if (slot.kind === 'cpu' && spec.cpuCount > 1) next = { ...spec, cpuCount: spec.cpuCount - 1 };
-  else if (slot.kind === 'core' && cpu && cpu.cores.length > 1) next = { ...spec, cpu: { ...cpu, cores: drop(cpu.cores, slot.index) } };
-  else if (slot.kind === 'scheduler') next = { ...spec, scheduler: null };
-  else if (slot.kind === 'ram') next = { ...spec, ram: drop(spec.ram, slot.index) };
-  else if (slot.kind === 'gpu') next = { ...spec, accels: drop(spec.accels, slot.index) };
-  else if (slot.kind === 'drive') next = { ...spec, drives: drop(spec.drives, slot.index) };
-  if (!next) return fail('invalid', 'This part cannot be removed');
-  return planned({ build: withSpec(state.build, id, next), price: 0n, cold: coldScopes(state, ref.unit, ref),
-    ...(slot.kind === 'gpu' ? { kill: [ref.unit] } : {}) }, 'Remove');
-}
+export { planRemove } from './maintenance';
 
 /** Hot: every RAM module, GPU/NPU or drive of generation g one level up; price is the sum (spec §12.3). */
 export function planUpgradeAll(state: GameState, system: SystemId, kind: 'ram' | 'gpu' | 'drive', g: number, axis: MemoryUpgrade = 'capacity'): Plan {

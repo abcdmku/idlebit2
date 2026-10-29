@@ -32,9 +32,10 @@ export const levelMax = (row: CatalogRow, g: number, bonus = 0): number =>
 
 /** Primary capacity at (g, L): base[g] × x. */
 export const capacity = (row: CatalogRow, g: number, level: number): number =>
-  row.base[g]! * (row.capacityTable ? row.capacityTable[Math.min(row.capacityTable.length, Math.max(1, level)) - 1]! : levelFactor(row.curve, level));
+  level <= 0 ? 0 : row.base[g]! * (row.capacityTable ? row.capacityTable[Math.min(row.capacityTable.length, Math.max(1, level)) - 1]! : levelFactor(row.curve, level));
 /** Secondary capacity (RAM bandwidth, VRAM, IO rate, scheduler Q) scales by the same x. */
 export const capacity2 = (row: CatalogRow, g: number, level: number): number => {
+  if (level <= 0) return 0;
   const value = (row.base2?.[g] ?? 0) * levelFactor(row.curve, level);
   return row.id === 'scheduler' ? Math.min(MAX_SCHED_Q, value) : value;
 };
@@ -76,6 +77,7 @@ export function ratioWatts(era: number, native: number, rate: number, decay: rea
 
 /** Idle and full-use load watts of one part at (g, L). Cores pass their own rate (the clock) and native. */
 export function partWatts(row: CatalogRow, g: number, level: number, rate?: { rate: number; native: number }): Watts {
+  if (level <= 0) return NONE;
   const w = row.watts;
   const x = levelFactor(row.curve, level);
   switch (w.kind) {
@@ -98,7 +100,7 @@ export function partWatts(row: CatalogRow, g: number, level: number, rate?: { ra
 
 /** Supply loss fraction: loss[g] + lossPerLevel × (L − 1) (spec §9.2). 0 for non-supplies. */
 export const lossFraction = (row: CatalogRow, g: number, level: number): number =>
-  row.watts.kind === 'supply' ? (row.watts.loss[g] ?? 0) + row.watts.lossPerLevel * (level - 1) : 0;
+  level > 0 && row.watts.kind === 'supply' ? (row.watts.loss[g] ?? 0) + row.watts.lossPerLevel * (level - 1) : 0;
 
 /** Rounds a positive price up to a whole Credit. 15 significant digits strip float noise first. */
 export const ceilCredits = (value: number): bigint => {
@@ -134,11 +136,11 @@ export const scalePrice = (price: bigint, factor: number): bigint => (factor ===
 
 /* ---------- Ladders (spec §7.3, §12.5) ---------- */
 
-export const ladderSpeed = (k: number): number => [1, 2, 5][k % 3]! * 10 ** (3 + Math.floor(k / 3));
+export const ladderSpeed = (k: number): number => k < 0 ? 0 : [1, 2, 5][k % 3]! * 10 ** (3 + Math.floor(k / 3));
 /** xp = speed(k) / speed(baseK[g]). */
 export const portX = (row: LadderDef, g: number, k: number): number => ladderSpeed(k) / ladderSpeed(row.baseK[g]!);
 /** Watts of one port or uplink at rung k (D18.5); the generation sets only the rung range. */
-export const portWatts = (row: LadderDef, _g: number, k: number): Watts => linkWatts(row.wPerUnit, ladderSpeed(k));
+export const portWatts = (row: LadderDef, _g: number, k: number): Watts => k < 0 ? NONE : linkWatts(row.wPerUnit, ladderSpeed(k));
 export const ladderInstall = (row: LadderDef, g: number): bigint => ceilCredits(row.price[g] ?? 0);
 /*
  * Port-step prices are pure in (row, k, uplink, zones) but cost two 80-digit Decimal powers each,

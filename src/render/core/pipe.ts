@@ -86,7 +86,7 @@ const lattice = (v: number, lat: number) => Math.round(v / lat) * lat;
  * moving entry without tags. Reads only the snapshot and the presentation time.
  */
 export function drawPipe(g: CanvasRenderingContext2D, s: RenderSnapshot, timeMs: number, paused: boolean, f: RestFraming,
-  vp: Rect, ratio: PixelRatio, entry: Point | null, type: Typography, rest = true, art: Rect | null = null, tagAlpha = 1): void {
+  vp: Rect, ratio: PixelRatio, entry: Point | null, type: Typography, rest = true, art: Rect | null = null, tagAlpha = 1, sourceAction = false): void {
   if((s.focus.level==='chip'&&!s.focus.pipe)||(s.focus.level==='system'&&!s.focus.chip.pipe))return;
   const p = f.pipe;
   if (!p) return;
@@ -113,7 +113,7 @@ export function drawPipe(g: CanvasRenderingContext2D, s: RenderSnapshot, timeMs:
     } else { const e = pts[count - 1]; R(g, e[0] - 2, e[1] - 6, 4, 6, '#c6f7cf'); }
   }
   g.restore();
-  if (!entry || !rest) return;
+  if (!entry || !rest || sourceAction) return;
   // Labels in the left gutter under the run, beside the first drop (Control deck D17, A05): the link and its
   // speed, then the packet tag on the next line, so neither moves with the text. They never touch
   // the focus art (`art`, CSS px): where one line would, each value takes its own line in the gutter.

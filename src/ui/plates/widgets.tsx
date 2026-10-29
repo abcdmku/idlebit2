@@ -87,7 +87,7 @@ export function QuoteKey({ quote, label, detail, tone = '', researchName, onActi
   const why = purchaseReason(quote, researchName);
   const gain = detail ?? purchaseGain(quote);
   const noPower = !!quote.overSupply || quote.locked?.code === 'power';
-  const shownLabel = noPower ? "Can't upgrade" : quote.gpu && typeof label === 'string' ? `${label} · ${quote.gpu.after.cores} cores` : label;
+  const shownLabel = noPower ? "Can't upgrade" : quote.gpu && typeof label === 'string' ? `${label} · ${quote.gpu.after.cores} ${quote.gpu.after.cores === 1 ? 'core' : 'cores'}` : label;
   const cold = quote.cold && quote.downtimeMs > 0 ? Math.ceil(quote.downtimeMs / 1000) + 's offline' : '';
   const shown = (quote.locked || quote.overSupply) ? why : [gain, cold].filter(Boolean).join(' · ') || why;
   return <Key tone={tone} label={shownLabel} price={quote.locked && quote.cost === '0' ? null : { cost: quote.cost, currency: quote.currency }} detail={shown || undefined}

@@ -25,7 +25,7 @@ type CoolerCols = Pick<CompiledBuffers['rack'], 'coolerQc' | 'coolerTau' | 'cool
 type RouterCols = Pick<CompiledBuffers['rack'], 'lbStrategy' | 'lbFilters' | 'lbQueueSlots' | 'lbIdleW' | 'lbLoadW'>;
 
 /** A router's queue level as a compiled byte (D25.7). */
-export const queueSlots = (lb: RouterBuild): number => Math.max(1, Math.min(ROUTER_QUEUE_MAX, Math.floor(lb.queueLevel || 1)));
+export const queueSlots = (lb: RouterBuild): number => lb.level <= 0 ? 0 : Math.max(1, Math.min(ROUTER_QUEUE_MAX, Math.floor(lb.queueLevel || 1)));
 
 const mask = <T extends string>(ids: readonly T[], on: readonly T[]) => on.reduce((m, id) => m | (1 << ids.indexOf(id)), 0);
 

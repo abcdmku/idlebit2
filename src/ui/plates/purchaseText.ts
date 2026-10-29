@@ -19,6 +19,14 @@ export function purchaseGain(q: Quote): string {
   return gain;
 }
 
+/** A generation's resulting specs. The old stats are already visible in the component. */
+export function resultingSpecs(q: Quote): string {
+  if (q.gpu) return `${ops(q.gpu.after.opsPerS)}/s · ${bits(q.gpu.after.vramBits)} VRAM`;
+  const e = q.effect;
+  if (!e) return purchaseGain(q);
+  return [measureUnit(e.capacityAfter, e.unit), e.throughputAfter !== undefined ? bitRate(e.throughputAfter) : ''].filter(Boolean).join(' · ');
+}
+
 export function purchaseReason(q: Quote, researchName?: (id: ResearchId) => string): string | null {
   if (q.overSupply || q.locked?.code === 'power') return 'No available power';
   const lock = q.locked;

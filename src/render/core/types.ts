@@ -70,6 +70,7 @@ export interface ViewPresentation {
   readonly picked: string | null;
   /** Tray quotes the UI already holds for the visible level; null leaves ghosts unpriced. */
   readonly quotes: QuoteResult | null;
+  readonly sourceActions?: readonly string[];
   readonly reducedMotion: boolean;
   /** The level a multi-level zoom is heading for (ViewState.goal), so its steps play as one move. */
   readonly zoomGoal?: LevelId | null;

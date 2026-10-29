@@ -2,7 +2,7 @@
 // pays and needs, and whether it can run. A plate right under the tapped card, with a pointer to it (user, 26 Oct); over the
 // bottom of the world. Back and Escape close it (viewState 'back'). No task numbers (D22).
 import { useMemo } from 'react';
-import { FAMILIES, formatHertz, formatOps, type QueueEntryView } from '../../game';
+import { formatHertz, formatOps, type QueueEntryView } from '../../game';
 import { typeColor, typeName, typeOf, type Rect } from '../../render/core';
 import { CoinIcon, GemIcon } from '../plates/icons';
 import { useShellOffers } from '../deck/useOffers';
@@ -19,6 +19,7 @@ import { HeadClock, InQueue, TaskIcon } from './taskText';
 import { useMeet } from './meet';
 import { MeetKey } from './MeetKey';
 import { TaskWork } from './TaskWork';
+import { plateArea, plateSpill } from '../plates/PlateLayer';
 
 /** Keeps every number with its unit on one line ("100 kHz", "1 ms", "2 b", "4 systems"): a no-break space between them. */
 export const keepUnits = (s: string): string => s.replace(/([0-9][kMGTPEZY]?) (?=[A-Za-z%µ])/g, '$1\u00a0');
@@ -111,8 +112,9 @@ function OpenTask({ taskKey: key }: { taskKey: string }) {
   const status = statusLine(t, f.running), fixes = t.blockedBy && !meet.length && !point ? fixLines(t, offers) : [];
   const needs = needLines(t).filter((_, i) => !(i === 0 && t.workingSetBits > 0 && ['cache', 'ram', 'disk'].includes(t.blockedBy ?? '')));
   const close = () => shell.view.dispatch({ type: 'back' });
+  const area = plateArea(L, L.view);
   return <PlateFrame title={familyName(t.family)} sub={<span style={{ color }}>{typeName(typeOf(t.family))}</span>}
-    className="task-detail" bounds={L.view} readAnchor={readAnchor} tip onClose={close}
+    className="task-detail" bounds={area} spill={plateSpill(L, area)} readAnchor={readAnchor} tip onClose={close}
     head={<span className="td-ic"><TaskIcon task={t} n={L.N} /></span>}>
     <p className={`p-line td-status ${status.tone}`} data-testid="td-status">{status.text}</p>
     <dl className="td-facts">
@@ -122,7 +124,6 @@ function OpenTask({ taskKey: key }: { taskKey: string }) {
       {head && f.running && !t.committed && <><dt>Pickup</dt><dd><HeadClock blocked={t.blockedBy !== null} risk={false} /></dd></>}
       {head && f.running && t.committed && <><dt>Taken</dt><dd><InQueue task={t} /></dd></>}
     </dl>
-    <TaskWork key={key} task={t} />
     {(t.blockedBy || t.dismissible) && <div className="keys">
       {/* One line per missing component or research; each buys every level it needs in one tap. */}
       {primaryMeet && <MeetKey quote={primaryMeet} n={L.N} onAction={a => shell.dispatch(a)}
@@ -137,11 +138,7 @@ function OpenTask({ taskKey: key }: { taskKey: string }) {
       {t.dismissible && <button type="button" className="key quiet" data-qa-target data-testid="td-dismiss"
         onClick={() => { shell.dispatch({ type: 'dismissTask', task: t.task }); close(); }}>Dismiss</button>}
     </div>}
-    <div className="task-notes" data-testid="td-details">
-      <p className="p-line muted td-note">{FAMILIES[t.family]?.note ?? ''}</p>
-      <p data-testid="td-work">{workLine(t)}</p>
-      <p className="mute" data-testid="td-capable">{capableText(t.capableSystems)}</p>
-    </div>
+    <TaskWork key={key} task={t} />
   </PlateFrame>;
 }
 

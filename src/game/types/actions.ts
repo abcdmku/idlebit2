@@ -27,6 +27,7 @@ export type GameAction =
   | { readonly type: 'setAutoReturn'; readonly on: boolean }
   | { readonly type: 'setOnline'; readonly unit: UnitRef; readonly online: boolean }
   | { readonly type: 'upgradePart'; readonly part: PartRef; readonly axis?: MemoryUpgrade }
+  | { readonly type: 'downgradePart'; readonly part: PartRef; readonly axis?: MemoryUpgrade }
   /** Every level from the part's current one up to `level`, atomically, for the summed price (hot like upgradePart). */
   | { readonly type: 'upgradePartTo'; readonly part: PartRef; readonly level: number; readonly axis?: MemoryUpgrade }
   | { readonly type: 'installGpu'; readonly system: SystemId; readonly model: GpuModelId; readonly index: number | null }

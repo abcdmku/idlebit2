@@ -2,6 +2,7 @@
 // opening that part's own plate. Tapping the CPU in the world goes inside.
 import type { LevelSnapshot, PartRef, SystemId } from '../../game';
 import { bits, hertz, watts } from './format';
+import { ComponentRow } from './ComponentRow';
 
 type Sys = Extract<LevelSnapshot, { level: 'system' }>;
 
@@ -27,8 +28,7 @@ export function SystemSummary({ focus, onOpenPart }: { focus: Sys; onOpenPart: (
   return <>
     <ul className="sys-summary" aria-label="In this system">
       {summaryRows(focus).map(r => <li key={r.key}>
-        <button type="button" className="sum-row" disabled={!r.part} data-qa-target onClick={() => r.part && onOpenPart(r.part, r.key)}>
-          <b>{r.label}</b><span>{r.value}</span></button>
+        <ComponentRow label={r.label} value={r.value} part={r.part} onOpen={() => r.part && onOpenPart(r.part, r.key)} />
       </li>)}
     </ul>
   </>;

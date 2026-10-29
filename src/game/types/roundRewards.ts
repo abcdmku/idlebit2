@@ -37,6 +37,7 @@ export interface RoundRewardBonuses {
 export interface RoundRewardDefinition {
   readonly milestone: number;
   readonly name: string;
+  readonly summary: string;
   readonly icon: string;
   readonly effect: string;
   readonly limit: string;

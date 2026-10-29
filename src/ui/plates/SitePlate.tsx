@@ -98,8 +98,8 @@ export function SitePlate({ target, focus, quotes, onAction, onResearch, researc
   </PlateFrame>;
   if (main || rest.length) return <PlateFrame {...frame} title={m.name} className="part site"
     footer={main && <OptionRow option={main} primary {...row} />}>
-    {rest.some(o => o.quote.locked?.code !== 'research') && <details className="component-options"><summary>Type</summary>
-      <OptionList options={rest.filter(o => o.quote.locked?.code !== 'research')} {...row} /></details>}
+    {rest.some(o => o.quote.locked?.code !== 'research') && <section className="component-options">
+      <OptionList options={rest.filter(o => o.quote.locked?.code !== 'research')} {...row} /></section>}
   </PlateFrame>;
   // A board site with nothing to add says why; it never offers the deck row's buy (that would act on another part).
   if (focus.level === 'system') return <PlateFrame {...frame} title={m.name} className="part site">

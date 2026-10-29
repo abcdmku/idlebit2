@@ -39,13 +39,13 @@ export function SwitchBody({ sw, view, lead, selected = null, quotes, onAction, 
   return <>
     <div className="keys">
       {lead}
-      {all ? <QuoteKey quote={all} label={`All ports${after(all) != null ? ` → ${hertz(after(all)!)}` : ''}`}
+      {all ? <QuoteKey quote={all} label="Port speed"
         onAction={fire} onResearch={onResearch} researchName={researchName} />
         : <p className="p-hint">Ports at this switch's top speed</p>}
     </div>
-    <details className="component-options" open={selected !== null}><summary>Ports and uplinks</summary><Toggle label="Match ports" on={view.sameSpeed}
+    <section className="switch-controls"><Toggle label="Match port speeds" on={view.sameSpeed}
       onToggle={() => onAction({ type: 'setSameSpeed', sw, on: !view.sameSpeed })} />
-    {!view.sameSpeed && <ol ref={list} className="port-list" aria-label="Ports">
+    {!view.sameSpeed && <ol ref={list} className="port-list scroll-list" aria-label="Ports">
       {view.ports.map((p, i) => {
         const q = portQuote(i), to = after(q);
         return <li key={i} data-port={i} className={i === selected ? 'sel' : ''}>
@@ -56,11 +56,12 @@ export function SwitchBody({ sw, view, lead, selected = null, quotes, onAction, 
       })}
     </ol>}
     <div className="keys">
-      {addPorts && addPorts.locked?.code !== 'ceiling' && addPorts.locked?.code !== 'cap' && <QuoteKey quote={addPorts} label={`Ports · ${view.ports.length} → ${Math.min(view.portCeiling, view.ports.length + 1)}`}
+      {addPorts && addPorts.locked?.code !== 'ceiling' && addPorts.locked?.code !== 'cap' && <QuoteKey quote={addPorts} label="Ports"
         onAction={fire} onResearch={onResearch} researchName={researchName} />}
-      {routine(uplinks.filter(q => q.locked?.code !== 'ceiling' && q.locked?.code !== 'cap').map(quote => ({ quote }))).map(({ quote: q }, i) => <QuoteKey key={i} quote={q} label={q.action.type === 'addUplink' ? 'Add uplink' : `Uplink ${q.action.type === 'upgradeUplink' ? q.action.uplink + 1 : ''}${after(q) != null ? ` · ${hertz(after(q)!)}` : ''}`}
+      {routine(uplinks.filter(q => q.locked?.code !== 'ceiling' && q.locked?.code !== 'cap').map(quote => ({ quote }))).map(({ quote: q }, i) => <QuoteKey key={i} quote={q} label={q.action.type === 'addUplink' ? 'Add uplink' : `Uplink ${q.action.type === 'upgradeUplink' ? q.action.uplink + 1 : ''}`}
+        detail={q.action.type === 'addUplink' && q.effect ? `${q.effect.capacityBefore} → ${q.effect.capacityAfter} uplinks` : undefined}
         onAction={fire} onResearch={onResearch} researchName={researchName} />)}
-    </div></details>
+    </div></section>
     <GenerationAction quote={replace} onAction={fire} onResearch={onResearch} researchName={researchName} />
   </>;
 }

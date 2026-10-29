@@ -19,9 +19,10 @@ export function partQuotes(quotes: readonly Quote[]) {
 
 /** The selected component keeps its own upgrade button, including a disabled limit state. */
 export function partMain(quotes: readonly Quote[], _level: number, _eccPriority = false): Option | null {
-  const { upgrade, replace } = partQuotes(quotes);
-  const q = upgrade ?? replace;
-  return q ? { name: q.label, verb: q === upgrade ? 'Upgrade' : 'Replace', quote: q } : null;
+  const { upgrade, replace, replaces } = partQuotes(quotes);
+  const ended = upgrade?.locked?.code === 'ceiling' || upgrade?.locked?.code === 'cap';
+  const q = ended ? nextGeneration(replaces) : upgrade ?? replace;
+  return q ? { name: q.label, verb: q.label.startsWith('Install ') ? 'Install' : q === upgrade ? 'Upgrade' : 'Replace', quote: q } : null;
 }
 export function PartKeys({ quotes, level, onAction, onResearch, researchName, part = 'all' }:
   Pick<PlateCommon, 'quotes' | 'onAction' | 'onResearch' | 'researchName'> & { level: number; unblocks?: number; eccPriority?: boolean; part?: 'all' | 'primary' | 'rest' }) {
@@ -29,6 +30,6 @@ export function PartKeys({ quotes, level, onAction, onResearch, researchName, pa
   const fire = (q: Quote) => onAction(q.action);
   const rows = { onAction: fire, onResearch, researchName };
   const primary = main && (isReplace(main.quote) ? <GenerationAction quote={main.quote} {...rows} /> : <OptionRow option={main} primary {...rows} />);
-  const rest = <GenerationAction quote={nextGeneration(partQuotes(all).replaces.filter(q => q !== main?.quote))} {...rows} />;
+  const rest = main && isReplace(main.quote) ? null : <GenerationAction quote={nextGeneration(partQuotes(all).replaces)} {...rows} />;
   return part === 'primary' ? primary : part === 'rest' ? rest : <>{rest}{primary}</>;
 }

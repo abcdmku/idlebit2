@@ -1,8 +1,9 @@
 # Component popups
 
-Component popups show current facts and buy only that component. Shared purchase text is in purchaseText.ts; QuoteKey renders the action, price and gain in one 48px button. A power limit disables that same button and displays Can't upgrade / No available power. RAM and drives have separate Space and Speed buttons side by side in that same footer height. Generation changes start both tracks at level 1. GenerationAction renders a transparent 44px text button for the next generation. While locked, Research opens the required research entry without purchasing or starting it. Once unlocked, Upgrade to shows the target name, quoted specs and price and buys that component.
+One-action hardware buys on its source control with price and stat gain (D72). Links, one-choice empty slots and parts without another generation or operating setting do not open a confirmation popup. Power and wallet limits disable that control in place. A choice between builds, generations or operating settings keeps its menu. Navigating to a simple part reveals the source control without purchasing it.
 
-No popup inserts a supply-preparation purchase, another component's upgrade, or a separate stat-increase/cold-swap paragraph. Empty fact rows are omitted. The next generation is directly visible; operating settings use disclosures. Opening a disclosure can resize the popup; runtime status, wallet and quote updates retain its geometry. Empty-slot popups close after a successful installation.
+Component popups show current facts and buy only that component. Shared purchase text is in purchaseText.ts; QuoteKey renders the action, price and gain in one 44px button. A power limit disables that same button and displays Can't upgrade / No available power. RAM and drives have separate Space and Speed buttons side by side in that same footer height. Generation changes start both tracks at level 1. GenerationAction uses a transparent text button, 28px for a research link or 36px with specs and price. While locked, Research opens the required research entry without purchasing or starting it. Once unlocked, Upgrade to shows the target name, quoted specs and price and buys that component.
+
 
 ## Ownership audit
 
@@ -25,11 +26,13 @@ No popup inserts a supply-preparation purchase, another component's upgrade, or 
 | Room / global start controller | That controller |
 | Site generation | That generator |
 | Data plane | Its data plane and integrated router |
-| Unit overview | Component navigation; room rows remain a room structural action |
+| Unit overview | Component navigation or a quoted one-action component row; room rows remain a room structural action |
 | New system / rack / room / site | One selected whole build |
 
-Supplies do not sell start controllers. The site overview does not sell generation or data-plane queues. Those parts have their own popups through component navigation. Room switch and load-balancer views are separate.
+Supply menus do not sell start controllers. Overviews show a quoted component action when it is the only choice, or open that component's menu when it has choices or settings. Each purchase still belongs to the selected component. Room switch and load-balancer views are separate.
 
 ## Verification
 
-The task QA manifest covers every family above, installed and empty states, and the power-limit case at 1280x800, 844x390, 390x780 and 320x568. Browser checks inspect each purchase action for component ownership, confirm the 48px key height, and reject standalone upgrade prose. Explicit settings/type disclosures and real purchases are checked separately. Use the repository's scripts/qa/capture.mjs workflow with the development server for screenshots and the layout audit. Generated captures and temporary probes belong under artifacts/qa and are not committed.
+Run npm run verify and the documented QA captures at all four standard viewport sizes. Check component ownership, direct controls, and local list scrolling. Temporary probes and captures stay under artifacts/qa and are not committed.
+
+D73: no dropdowns or accordions. Use ChoiceStrip for visible choices and local scroll-list regions only for long lists. ComponentActions renders simulation-owned downgrade/removal quotes. Save belongs beside Close. Next-generation actions show resulting specs only.

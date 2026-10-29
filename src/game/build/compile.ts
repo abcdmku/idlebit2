@@ -105,7 +105,7 @@ export function compileSystem(c: CompiledBuffers, build: SystemBuild, u: Unlocks
   s.coreIdleW[i] = coreIdle; s.coreLoadW[i] = coreLoad; s.clockIdleW[i] = clockIdle; s.clockLoadW[i] = 0;
 
   const sched = sys.scheduler;
-  const server = sys.kind === 'server';
+  const server = sys.kind === 'server' && n > 0 && cores > 0 && s.clockHz[i]! > 0;
   const K = !server ? 0 : sched ? Math.min(MAX_SCHED_K, capacity(PARTS.scheduler, sched.gen, sched.level)) : 1;
   const Q = sched ? Math.min(MAX_SCHED_Q, capacity2(PARTS.scheduler, sched.gen, sched.level)) : 0;
   const strategy = sched?.strategy ?? 'fifo';

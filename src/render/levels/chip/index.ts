@@ -9,6 +9,7 @@ import { coreSites } from './layout';
 import { partRef } from './model';
 import type { TargetId } from './model';
 import { drawChipMini } from './mini';
+import { QueuePickups } from './pickups';
 import { chipFloor, coresBlock, drawWorld, siteCount } from './world';
 
 const owner = (s: ChipSnapshot) => ({ level: 'chip', id: s.systemId, socket: s.socket }) as const;
@@ -26,6 +27,7 @@ function slot(s: ChipSnapshot, out: HitTarget[], i: number, id: TargetId, r: Rec
 }
 
 export function createChipRenderer(_registry: LevelRegistry): LevelRenderer<'chip'> {
+  const pickups = new QueuePickups();
   let lastFrame: WorldFrame | null = null;
   let restForm: WorldForm = 'desktop', restHeight = Infinity;
   return {
@@ -47,7 +49,11 @@ export function createChipRenderer(_registry: LevelRegistry): LevelRenderer<'chi
       out.y = restForm === 'phone' && first && restHeight < first.y + first.h - f.focus.y
         ? (f.clock.y + first.y + first.h) / 2 : f.focus.y;
     },
-    draw(g, s, view, frame) { lastFrame = frame; drawWorld(g, s, frame, frame.form ?? 'desktop', view); },
+    draw(g, s, view, frame) {
+      lastFrame = frame; const form = frame.form ?? 'desktop';
+      drawWorld(g, s, frame, form, view);
+      pickups.draw(g, s, frame, chipFloor(s, form), siteCount(s), form);
+    },
     labels: (s, view, frame, out) => chipLabels(s, frame, out, frame.form ?? 'desktop', view),
     drawMini: drawChipMini,
     children: () => 0,

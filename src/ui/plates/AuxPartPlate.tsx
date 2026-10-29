@@ -17,7 +17,7 @@ export function AuxPartPlate({ unit, kind, start, generation, ...common }: Plate
     {kind === 'generation' && <GenerationRow generation={generation ?? null} />}
     {kind === 'start' && start && <>
       <p className="p-status">{startStatus(start, scope)}</p>
-      <details className="component-options"><summary>Settings</summary><StartRow unit={unit} scope={scope} view={start} onAction={onAction} /></details>
+      <section className="component-options"><StartRow unit={unit} scope={scope} view={start} onAction={onAction} /></section>
     </>}
     <PowerKeys quotes={quotes} installed={!!installed} level={installed?.level ?? 0} noun={title} wake={kind === 'start'}
       onAction={onAction} onResearch={onResearch} researchName={researchName} />

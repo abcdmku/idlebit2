@@ -31,7 +31,7 @@ function channelLink(kind: number, owner: number, row: LadderDef, sw: SwitchBuil
   const ks = sw.uplinks.map((k) => (capK === null ? k : Math.min(k, capK)));
   const rung = ks.length ? Math.min(...ks) : 0;
   const w = portW(row, sw.gen, sw.uplinks);
-  return { kind, owner, channels: sw.uplinks.length, rung, speed: ladderSpeed(rung), latency, idle: w.idle + extra.idle, load: w.load + extra.load };
+  return { kind, owner, channels: sw.uplinks.length, rung, speed: sw.uplinks.length ? ladderSpeed(rung) : 0, latency, idle: w.idle + extra.idle, load: w.load + extra.load };
 }
 
 export function compileLinks(c: CompiledBuffers, build: BuildState, u: Unlocks): void {

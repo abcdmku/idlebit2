@@ -34,8 +34,8 @@ export function PowerCtlPlate({ rack, view, research: _research, ...common }: Po
   }
   const b = view.battery;
   return <PlateFrame {...frame} title="Power control" sub={`${genName('powerCtl', view.generation)} · L${view.level}`} className="part power-ctl">
-    <Status text={quantity(b.chargeJ, 'J') + ' / ' + quantity(b.capacityJ, 'J') + (b.discharging ? ' on battery' : ' on grid')} tone={b.discharging ? '' : 'warn'} progress={b.capacityJ > 0 ? b.chargeJ / b.capacityJ : 0} />
-    <details className="component-options"><summary>Start settings</summary><StartRow unit={{ kind: 'rack', id: rack }} scope="rack" view={view.start} onAction={(a: GameAction) => onAction(a)} /></details>
+    <Status text={quantity(b.chargeJ, 'J') + ' / ' + quantity(b.capacityJ, 'J') + (b.discharging ? ' · Battery' : ' · Grid')} progress={b.capacityJ > 0 ? b.chargeJ / b.capacityJ : 0} />
+    <section className="component-options"><StartRow unit={{ kind: 'rack', id: rack }} scope="rack" view={view.start} onAction={(a: GameAction) => onAction(a)} /></section>
     <PowerKeys quotes={quotes} installed level={view.level} noun="Power control" onAction={onAction} onResearch={onResearch} researchName={researchName} />
   </PlateFrame>;
 }

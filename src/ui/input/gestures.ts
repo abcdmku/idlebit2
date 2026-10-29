@@ -1,6 +1,8 @@
 import type { CanvasRendererDebug, HitTarget } from '../../render/core';
 export interface GestureHandlers {
   renderer(): CanvasRendererDebug | null;
+  /** DOM facts on a world part can extend its tap area. The canvas still owns pan and pinch. */
+  hit?(xCss: number, yCss: number): HitTarget | null;
   tap(hit: HitTarget | null): void;
   zoom(direction: 'in' | 'out', hit: HitTarget | null): void;
   /** A pan of the resting view (the rack row, D17.2; a level larger than the view, A05/A09/A20), when it has one. */
@@ -34,7 +36,7 @@ export function bindGestures(canvas: HTMLCanvasElement, handlers: GestureHandler
     return [(last.x - first.x) / dt, (last.y - first.y) / dt];
   };
   const local = (x: number, y: number) => { const r = canvas.getBoundingClientRect(); return { x: x - r.left, y: y - r.top }; };
-  const hit = (x: number, y: number) => { const p = local(x, y); return handlers.renderer()?.hit(p.x, p.y) ?? null; };
+  const hit = (x: number, y: number) => { const p = local(x, y); return handlers.hit?.(p.x, p.y) ?? handlers.renderer()?.hit(p.x, p.y) ?? null; };
   const down = (event: PointerEvent) => {
     if (event.pointerType === 'mouse' && event.button !== 0) return;
     canvas.focus({ preventScroll: true });

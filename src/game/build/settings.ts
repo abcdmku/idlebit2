@@ -84,7 +84,7 @@ export function planFilter(state: GameState, unit: ScopeRef, filter: FilterId, o
 /** The router's queue one slot larger, L → L + 1 (at most 8). Hot; never research-gated. */
 export function planRouterQueue(state: GameState, unit: ScopeRef): Plan {
   const lb = routerOf(state.build, unit);
-  if (!lb || unit.kind === 'system') return fail('invalid', 'No router here');
+  if (!lb || lb.level <= 0 || unit.kind === 'system') return fail('invalid', 'Install router first');
   const level = lb.queueLevel;
   const label = `Queue ${level} → ${level + 1}`;
   if (level >= ROUTER_QUEUE_MAX) return fail('cap', 'Max', `Queue ${level}`);

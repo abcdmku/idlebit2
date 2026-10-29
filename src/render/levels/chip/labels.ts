@@ -32,17 +32,21 @@ export function chipLabels(chip: ChipSnapshot, frame: WorldFrame, out: LabelWrit
   if (sc) {
     out.label('queue', f.queue.x + pad, f.queue.y + 3).text('Queue', 'name', true).text(`${whole(live ? sc.queued : 0)} / ${whole(sc.q)}`, 'value');
   }
-  else if (queueOpen(chip)) out.label('queue', f.queue.x + pad, f.queue.y + 3).text('Queue', 'dim', true).text('none', 'dim');
+  else if (queueOpen(chip) && !view?.sourceActions?.includes('queue')) out.label('queue', f.queue.x + pad, f.queue.y + 3).text('Queue', 'dim', true).text('none', 'dim');
+  if (!view?.sourceActions?.includes('cache')) {
   out.label('cache', f.cache.x + pad, f.cache.y + 3).text('Cache', 'name', true).text(formatSize(chip.cache.capacityBits), 'cyan');
-  if (form !== 'phone') out.text(`? ${formatSize(live ? chip.cache.usedBits : 0)} used`, 'mute');
+  if (form !== 'phone') out.text(`${formatSize(live ? chip.cache.usedBits : 0)} used`, 'mute');
   // D26: what overflowed out of cache to RAM, as a warning, beside the cache's own numbers.
   if (live && spilledOut(chip) > 0) out.text(`· ${formatSize(spilledOut(chip))} spilled`, 'warn');
+  }
   // (One level: the in-use run fits the desktop cache row at either scale; the phone row has no room for it.)
   const clockName = form === 'phone' && chip.cpuCount > 1 ? `CPU ${chip.socket + 1} · Clock` : 'Clock';
-  const clock = out.label('clock', f.clock.x + pad, f.clock.y + (f.clockAbove ? 8 : pad)).text(clockName, 'name', true);
-  (f.clockAbove ? clock : clock.br()).text(formatHertz(chip.clock.hz), 'value');
+  if (!view?.sourceActions?.includes('clock')) {
+    const clock = out.label('clock', f.clock.x + pad, f.clock.y + (f.clockAbove ? 8 : pad)).text(clockName, 'name', true);
+    (f.clockAbove ? clock : clock.br()).text(formatHertz(chip.clock.hz), 'value');
+  }
 
-  const n = siteCount(chip), sites = coreSites(f, n), price = addCorePrice(view, chip);
+  const n = siteCount(chip), sites = coreSites(f, n), price = view?.sourceActions?.includes('add:core') ? null : addCorePrice(view, chip);
   if (sites.length > 2) {
     // The add site's price, dim, under its "+" when a line fits there (unaffordable: dim, never blank).
     const add = sites[chip.cores.length];

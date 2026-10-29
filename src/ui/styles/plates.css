@@ -340,14 +340,7 @@
 .v3-plate[data-measure="true"] { height: auto !important; }
 .v3-plate[data-measure="true"] > .plate-content { overflow: visible; }
 .v3-plate[data-measure="true"] > .plate-more { height: 0; }
-/* Cramped (the head and the main option alone fill the room): the whole plate scrolls, the main option right under the
-   head and the other options after it; the cue sits in the head. */
-.v3-plate[data-cramped="true"]:has(> .plate-content) { display: flex; flex-direction: column; overflow-y: auto; }
-.v3-plate[data-cramped="true"] > .p-head { order: 0; flex: none; top: calc(-1 * var(--s3)); }
-.v3-plate[data-cramped="true"] > .plate-footer { order: 1; flex: none; padding-top: var(--s1); }
-.v3-plate[data-cramped="true"] > .plate-content { order: 2; flex: none; overflow: visible; }
-.v3-plate[data-cramped="true"] > .plate-more { display: none; }
-.v3-plate[data-cramped="true"][data-more="true"] > .p-head::after { content: 'More ↓'; margin-left: auto; color: #a99be6; }
+/* Short popups retain the same header/body/footer order; only the body scrolls. */
 .v3-plate .opts-fix { margin-top: var(--s2); }
 
 /* Open CPU in the plate head: beside the subtitle, clear of the close key. */

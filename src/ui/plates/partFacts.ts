@@ -37,7 +37,7 @@ export function partFacts(focus: LevelSnapshot, slot: PartSlot, siteId?: number)
     if (slot.kind === 'cache') {
       const kind = slot.kind, c = focus.cache;
       return { title: SLOT_TITLE[kind], sub: bits(c.capacityBits), level: c.level, status: '',
-        lines: [{ text: `${bits(focus.cache.usedBits)} of ${bits(focus.cache.capacityBits)} in use`, tone: 'muted' }] };
+        lines: [] };
     }
     if (slot.kind === 'scheduler') {
       const s = focus.scheduler;

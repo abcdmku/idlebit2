@@ -13,6 +13,7 @@ import { planAddRow, planAddUnit, planRemoveUnit } from './units';
 import { planInstallGpu } from './gpuPlans';
 import { planStartConfig } from './startCtl';
 import { planRamEcc } from './eccPlans';
+import { planDowngrade } from './maintenance';
 
 /** Part, unit, configuration, port, setting and research actions (architecture §4). Every handler re-plans and re-prices. */
 export const buildHandlers: HandlerMap = {
@@ -20,6 +21,7 @@ export const buildHandlers: HandlerMap = {
   convertRamToEcc: (s, a) => commitPlan(s, planRamEcc(s, a.system)),
   installGpu: (s, a) => commitPlan(s, planInstallGpu(s, a.system, a.model, a.index)),
   upgradePart: (s, a) => commitPlan(s, planUpgrade(s, a.part, a.axis)),
+  downgradePart: (s, a) => commitPlan(s, planDowngrade(s, a.part, a.axis)),
   upgradePartTo: (s, a) => commitPlan(s, planUpgradeTo(s, a.part, a.level, a.axis)),
   upgradeAll: (s, a) => commitPlan(s, planUpgradeAll(s, a.system, a.kind, a.gen, a.axis)),
   replacePart: (s, a) => {

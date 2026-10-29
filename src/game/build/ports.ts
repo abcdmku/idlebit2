@@ -26,7 +26,7 @@ export function switchAt(build: BuildState, ref: SwitchRef): SwitchAt | null {
   return z ? { sw: z.switch, row: LADDERS.roomSwitch, opened: z.opened, ceiling: 'roomPorts', max: MAX_ROOM_PORTS } : null;
 }
 
-function withSwitch(build: BuildState, ref: SwitchRef, sw: SwitchBuild): BuildState {
+export function withSwitch(build: BuildState, ref: SwitchRef, sw: SwitchBuild): BuildState {
   if (ref.kind === 'rack') return { ...build, racks: build.racks.map((r, i) => (i === ref.id && r ? { ...r, switch: sw } : r)) };
   return { ...build, rooms: build.rooms.map((z, i) => (i === ref.id && z ? { ...z, switch: sw } : z)) };
 }
@@ -67,6 +67,7 @@ function uplinkLock(build: BuildState, ref: SwitchRef): LockReason | null {
 export function planUpgradePort(state: GameState, ref: SwitchRef, port: number | 'all'): Plan {
   const at = switchAt(state.build, ref);
   if (!at) return fail('invalid', 'No such switch');
+  if (!at.sw.ports.length) return fail('invalid', 'Install switch first');
   if (!at.opened && (ref.kind !== 'rack' || port === 'all')) return closed(ref);
   const { sw, row } = at;
   if (!at.opened && port !== 'all') {
@@ -109,6 +110,7 @@ export function planUpgradeUplink(state: GameState, ref: SwitchRef, uplink: numb
 export function planAddPort(state: GameState, ref: SwitchRef): Plan {
   const at = switchAt(state.build, ref);
   if (!at) return fail('invalid', 'No such switch');
+  if (!at.sw.ports.length) return fail('invalid', 'Install switch first');
   if (!at.opened) return closed(ref);
   const { sw, row } = at;
   const n = sw.ports.length + 1;
@@ -134,6 +136,7 @@ function upstreamDefaultK(build: BuildState, ref: SwitchRef): number {
 export function planAddUplink(state: GameState, ref: SwitchRef): Plan {
   const at = switchAt(state.build, ref);
   if (!at) return fail('invalid', 'No such switch');
+  if (!at.sw.ports.length) return fail('invalid', 'Install switch first');
   if (!at.opened) return closed(ref);
   const { sw, row } = at;
   const n = sw.uplinks.length + 1;

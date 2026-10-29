@@ -9,7 +9,7 @@ import type { InfraSlot } from '../types/catalog';
 import { amount, amountCompare } from '../amount';
 import { MAX_ACCELS, TICK_MS } from '../core/constants';
 import type { GameAction } from '../types/actions';
-import { FILTER_IDS, ROUTE_STRATEGY_IDS } from '../types/catalog';
+import { FILTER_IDS, ROUTE_STRATEGY_IDS, QUEUE_STRATEGY_IDS } from '../types/catalog';
 import type { NodeRef, PartRef, PartSlot, ResearchId, ScopeRef, SwitchRef, SystemId } from '../types/ids';
 import type { GpuGeneration, GpuModelId } from '../types/gpu';
 import type { Currency, EffectPreview, Quote, QuoteRequest, QuoteResult } from '../types/quotes';
@@ -32,6 +32,7 @@ import { planFilter, planRouterQueue, planSetpoint, planStrategy } from './setti
 import { gpuAsType, gpuAtGeneration, gpuModel } from './catalog/gpuModels';
 import { installedGpuStats } from './gpu';
 import { planInstallGpu } from './gpuPlans';
+import { planDowngrade } from './maintenance';
 import { gpuPowerPreview } from './gpuPower';
 import { overSupply, powerLock } from './overSupply';
 import { planRamEcc } from './eccPlans';
@@ -203,13 +204,23 @@ function gpuMetadata(state: GameState, action: GameAction, plan: Plan): Pick<Quo
 const effectOf = (state: GameState, ref: PartRef, plan: Plan): EffectPreview | null =>
   plan.ok ? partEffect(state, ref, plan.change.build, plan.change.price) : null;
 
+function maintenanceQuotes(state: GameState, part: PartRef): Quote[] {
+  const axes = part.slot.kind === 'ram' || part.slot.kind === 'drive' ? ['capacity', 'speed'] as const : ['capacity'] as const;
+  const down = part.slot.kind === 'core' ? [] : axes.map(axis => {
+    const plan = planDowngrade(state, part, axis);
+    return toQuote(state, { type: 'downgradePart', part, axis }, plan, effectOf(state, part, plan));
+  });
+  const remove = planRemove(state, part);
+  return [...down, toQuote(state, { type: 'removePart', part }, remove)];
+}
+
 /** Part plate: upgrade, then replace (L1 and capacity-preserving) per other generation, then remove. */
 export function partQuotes(state: GameState, ref: PartRef): Quote[] {
   if (ref.unit.kind === 'system' && ref.slot.kind === 'cpu') {
-    const spec = state.build.systems[ref.unit.id]?.spec, current = spec?.cpu?.cpu.gen;
-    if (!spec || current === undefined) return [];
+    const spec = state.build.systems[ref.unit.id]?.spec, current = spec?.cpu?.cpu.gen ?? 0;
+    if (!spec) return [];
     // An empty socket offers only its own add (a copy of CPU 1, D7.3), never a replace of the installed ones.
-    if (ref.slot.socket >= spec.cpuCount) {
+    if (!spec.cpu || ref.slot.socket >= spec.cpuCount) {
       const action = { type: 'addPart' as const, system: ref.unit.id, kind: 'socket' as const, generation: current };
       const plan = planAdd(state, ref.unit.id, 'socket', current);
       // What another CPU adds to the system: its work rate, power and research, as a clock or core step reads.
@@ -219,9 +230,9 @@ export function partQuotes(state: GameState, ref: PartRef): Quote[] {
     const plan = planReplaceCpu(state, ref.unit.id);
     const nextLock = !plan.ok && current + 1 < genCount('cpu') ? genLock(state.research.unlocks, 'cpu', current + 1) : null;
     if (nextLock) return [{ ...toQuote(state, { type: 'replaceCpu', system: ref.unit.id }, plan),
-      label: partName('cpu', current + 1), locked: nextLock }];
+      label: partName('cpu', current + 1), locked: nextLock }, ...maintenanceQuotes(state, ref)];
     return [toQuote(state, { type: 'replaceCpu', system: ref.unit.id }, plan,
-      plan.ok ? partEffect(state, ref, plan.change.build, plan.change.price) : null)];
+      plan.ok ? partEffect(state, ref, plan.change.build, plan.change.price) : null), ...maintenanceQuotes(state, ref)];
   }
   const part = readPart(state.build, ref);
   if (!part) {
@@ -253,6 +264,9 @@ export function partQuotes(state: GameState, ref: PartRef): Quote[] {
     return [];
   }
   const out: Quote[] = [];
+  if (ref.unit.kind === 'system' && ref.slot.kind === 'scheduler')
+    for (const strategy of QUEUE_STRATEGY_IDS) out.push(toQuote(state,
+      { type: 'setStrategy', unit: ref.unit, strategy }, planStrategy(state, ref.unit, strategy)));
   const ladder = isLadder(part.id);
   // D34: a core has no upgrade of its own.
   if (!(part.id === 'switch' || part.id === 'roomSwitch' || part.id === 'core')) {
@@ -273,10 +287,9 @@ export function partQuotes(state: GameState, ref: PartRef): Quote[] {
       out.push(toQuote(state, { type: 'replacePart', part: ref, generation: g, preserveCapacity }, plan, effectOf(state, ref, plan)));
     }
   }
-  const remove = planRemove(state, ref);
   if (ref.unit.kind === 'system' && ref.slot.kind === 'ram' && state.build.systems[ref.unit.id]?.spec.ram.some(m => !m.ecc))
     out.push(toQuote(state, { type: 'convertRamToEcc', system: ref.unit.id }, planRamEcc(state, ref.unit.id)));
-  if (remove.ok) out.push(toQuote(state, { type: 'removePart', part: ref }, remove));
+  if (isLadder(part.id) ? part.level >= 0 : part.level > 0) out.push(...maintenanceQuotes(state, ref));
   if (ref.slot.kind === 'globalScheduler' || ref.slot.kind === 'dataPlane') out.push(...routingQuotes(state, ref.unit));
   return out;
 }
@@ -310,10 +323,13 @@ export function switchQuotes(state: GameState, sw: SwitchRef): Quote[] {
   out.push(withEffect(state, { type: 'addUplink', sw }, planAddUplink(state, sw)));
   const slot: PartSlot = { kind: sw.kind === 'rack' ? 'switch' : 'roomSwitch' };
   const ref: PartRef = { unit: sw, slot };
+  if (!at.sw.ports.length) return [withEffect(state, { type: 'upgradePart', part: ref }, planUpgrade(state, ref))];
   for (let g = at.sw.gen + 1; g < at.row.baseK.length; g += 1) {
     out.push(withEffect(state, { type: 'replacePart', part: ref, generation: g, preserveCapacity: false }, planReplaceLadder(state, ref, g)));
   }
   out.push(toQuote(state, { type: 'setSameSpeed', sw, on: !at.sw.sameSpeed }, planSameSpeed(state, sw, !at.sw.sameSpeed)));
+  out.push(...maintenanceQuotes(state, ref));
+  if (!at.sw.ports.length) out.unshift(withEffect(state, { type: 'upgradePart', part: ref }, planUpgrade(state, ref)));
   return out;
 }
 
@@ -331,7 +347,7 @@ export function infraQuotes(state: GameState, unit: { kind: 'rack' | 'room'; id:
   const kind = INFRA_SLOT[unit.kind][slot];
   const ref: PartRef = { unit: scope, slot: kind === 'ups' ? { kind, index: 0 } : { kind } as PartSlot };
   if (slot !== 'lb') {
-    const out = partQuotes(state, ref).filter((q) => q.action.type !== 'removePart');
+    const out = partQuotes(state, ref);
     if (slot === 'cooling') {
       const setpointF = unit.kind === 'rack' ? state.build.racks[unit.id]?.cooler.setpointF ?? 70 : state.build.rooms[unit.id]?.cooler.setpointF ?? 70;
       out.push(toQuote(state, { type: 'setSetpoint', unit: scope as never, setpointF }, planSetpoint(state, scope as never, setpointF)));
@@ -339,6 +355,7 @@ export function infraQuotes(state: GameState, unit: { kind: 'rack' | 'room'; id:
     return out;
   }
   const out = [toQuote(state, { type: 'upgradePart', part: ref }, planUpgrade(state, ref))];
+  out.push(...maintenanceQuotes(state, ref));
   out.push(...routingQuotes(state, scope));
   return out;
 }

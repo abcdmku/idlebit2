@@ -3,6 +3,7 @@ import type { Rect } from '../../render/core/geom';
 import { placePlate } from './place';
 import { useDialogFocus } from '../hooks/useDialogFocus';
 import { Pips } from './widgets';
+import { useComponentActions } from './ComponentActions';
 import '../styles/plates.css';
 import '../styles/component-popups.css';
 
@@ -34,6 +35,7 @@ export interface PlateFrameProps extends PlatePosition {
   pips?: readonly [number, number];
   /** Extra header content after the subtitle (a total price). */
   head?: ReactNode;
+  actions?: ReactNode;
   /** Primary actions that remain visible while a long body scrolls. */
   footer?: ReactNode;
   className?: string;
@@ -46,14 +48,12 @@ export interface PlateFrameProps extends PlatePosition {
   children: ReactNode;
 }
 
-/** The least scrolling body height that shows a row of choices and a line of what the picked one does. */
-const CRAMPED_BODY = 120;
-
-/** The plate body: a fixed-width dark slab with a paper rim. It never resizes while open. */
-export function PlateFrame({ title, sub, pips, head, footer, className = '', closeKey = true, as = 'section', onSubmit, initialFocus,
+/** Runtime values retain geometry. Explicit menus can resize without rearranging the controls. */
+export function PlateFrame({ title, sub, pips, head, actions, footer, className = '', closeKey = true, as = 'section', onSubmit, initialFocus,
   onClose, children, readAnchor, bounds, subscribeFrame, pinTop, beside, tip, spill }: PlateFrameProps) {
   const ref = useRef<HTMLElement>(null);
   const contentRef = useRef<HTMLDivElement>(null);
+  const maintenance = useComponentActions();
   useDialogFocus(ref, onClose, initialFocus);
   useLayoutEffect(() => {
     const root = ref.current, content = contentRef.current;
@@ -62,7 +62,6 @@ export function PlateFrame({ title, sub, pips, head, footer, className = '', clo
     let natural = root.offsetWidth;
     // One layout (R16): the plate is a grid of explicit height, head, body, a real "More ↓" row and the footer. The
     // body is the only thing that scrolls and its own row clips it, so nothing paints under the cue or the footer.
-    // Cramped (the head and the main option alone fill the room), the whole plate scrolls, main option first.
     const more = () => {
       const cramped = root.dataset.cramped === 'true';
       const box = cramped ? root : content;
@@ -76,21 +75,14 @@ export function PlateFrame({ title, sub, pips, head, footer, className = '', clo
     };
     content.addEventListener('scroll', more, { passive: true });
     root.addEventListener('scroll', more, { passive: true });
-    // Held (user, 26 Oct: buttons never shift a popup): once its part stands still the frame keeps its place and size
-    // for its life; a choice, a purchase, a quote, Details or a wallet change updates inside it (the body scrolls).
-    // Only a new target (a new plate) or a window resize places it again.
+    // Hold placement for runtime changes. Menu toggles change height within the current area.
     let held = false, stable = 0, lastAnchor = '';
-    /**
-     * The plate's own height with nothing limiting it: what it would take with room to spare. Its head, body and footer
-     * are read in the same pass, so content the plate only reserves (R17: an empty site holds the room of the part its
-     * Add installs, rendered only while measuring) counts the same way everywhere below.
-     */
-    let measured = { head: 40, footer: 0, content: 0 };
+    let placedArea: Rect | null = null;
     const naturalHeight = () => {
       root.dataset.measure = 'true';
-      const h = root.offsetHeight;
-      measured = { head: root.querySelector<HTMLElement>('.p-head')?.offsetHeight ?? 40,
-        footer: root.querySelector<HTMLElement>(':scope > .plate-footer')?.offsetHeight ?? 0, content: content.scrollHeight };
+      // Inline glyphs can extend a few pixels beyond their grid row. Include that real overflow
+      // before placing the panel; otherwise a 2px difference creates an unnecessary scroll cue.
+      const h = root.offsetHeight + Math.max(0, content.scrollHeight - content.clientHeight);
       delete root.dataset.measure;
       return h;
     };
@@ -102,7 +94,7 @@ export function PlateFrame({ title, sub, pips, head, footer, className = '', clo
       const a = !pinTop && readAnchor?.(target) ? target : null;
       // A plate beside its part may be narrower than its own width (place.ts); its natural width is read unset.
       if (!root.style.width) natural = root.offsetWidth;
-      let best: { safe: Rect; full: number; at: ReturnType<typeof placePlate>; head: number; footer: number; content: number; width: string; covers: boolean } | null = null;
+      let best: { safe: Rect; full: number; at: ReturnType<typeof placePlate>; width: string; covers: boolean } | null = null;
       // Keep the part visible when possible. If that would force scrolling, try the same areas centered over it.
       const placements = a && !pinTop ? [false, true] : [false];
       search: for (const covers of placements) for (const area of areas) {
@@ -110,21 +102,21 @@ export function PlateFrame({ title, sub, pips, head, footer, className = '', clo
         root.style.width = '';
         let full = naturalHeight();
         let at = placePlate(covers ? null : a, natural, full, area, { beside, pinTop });
+        // Wide control grids need their measured width. Try centering before squeezing their columns.
+        if (!covers && natural >= 560 && at.w < natural * 0.9) continue;
         if (at.w < natural) { root.style.width = `${at.w}px`; full = naturalHeight(); at = placePlate(covers ? null : a, natural, full, area, { beside, pinTop }); }
-        const candidate = { safe: area, full, at, ...measured, width: root.style.width, covers };
+        const candidate = { safe: area, full, at, width: root.style.width, covers };
         if (!best || Math.min(full, at.room) > Math.min(best.full, best.at.room)) best = candidate;
         if (at.room >= full) { best = candidate; break search; }
       }
-      const { safe, full, at, head: headH, footer: footerH, content: contentH, width, covers } = best!;
+      const { safe, full, at, width, covers } = best!;
+      placedArea = safe;
       root.style.setProperty('--plate-safe-width', `${Math.max(0, safe.w)}px`);
       root.style.width = width;
       const height = Math.max(0, Math.min(full, at.room));
       root.style.height = `${height}px`;
       root.style.setProperty('--plate-safe-height', `${Math.max(0, at.room)}px`);
-      const pad = full - headH - footerH - contentH;
-      // Cramped: the head, the main option and the plate's padding leave too little body for what it holds.
-      const body = height - headH - footerH - Math.max(0, pad) - (full > height ? 24 : 0);
-      root.dataset.cramped = String(footerH > 0 && body < Math.min(CRAMPED_BODY, contentH));
+      root.dataset.cramped = 'false';
       root.style.left = `${Math.round(at.x)}px`;
       // Above its part, the plate's foot sits 8 px over the part.
       const top = !covers && a && at.y + at.h <= a.y ? a.y - 8 - height : at.y;
@@ -153,11 +145,30 @@ export function PlateFrame({ title, sub, pips, head, footer, className = '', clo
       position();
     };
     window.addEventListener('resize', resize);
-    // Explicitly opening settings can use more room. Runtime values keep the held geometry.
-    content.addEventListener('toggle', resize, true);
+    let toggleFrame = 0;
+    const toggle = (event: Event) => {
+      const section = event.target;
+      if (!(section instanceof HTMLElement)) return;
+      cancelAnimationFrame(toggleFrame);
+      toggleFrame = requestAnimationFrame(() => {
+        if (!placedArea) return;
+        const full = naturalHeight(), height = Math.min(full, Math.max(0, placedArea.h - 8));
+        if (full > placedArea.h - 8) { resize(); return; }
+        const previousTop = parseFloat(root.style.top) || placedArea.y;
+        // Grow down from the same top; move up only by the amount needed to stay in the current area.
+        const top = Math.max(placedArea.y, Math.min(previousTop, placedArea.y + placedArea.h - height - 4));
+        root.style.height = `${height}px`;
+        root.style.top = `${Math.round(top)}px`;
+        root.dataset.tip = 'none';
+        held = true; root.dataset.held = 'true';
+        more();
+      });
+    };
+    content.addEventListener('plate-layout', toggle, true);
+    root.addEventListener('click', toggle);
     const stop = subscribeFrame?.(position);
     observer?.observe(content);
-    return () => { stop?.(); observer?.disconnect(); changes.disconnect(); window.removeEventListener('resize', resize); content.removeEventListener('toggle', resize, true); content.removeEventListener('scroll', more); root.removeEventListener('scroll', more); };
+    return () => { cancelAnimationFrame(toggleFrame); stop?.(); observer?.disconnect(); changes.disconnect(); window.removeEventListener('resize', resize); content.removeEventListener('plate-layout', toggle, true); root.removeEventListener('click', toggle); content.removeEventListener('scroll', more); root.removeEventListener('scroll', more); };
   }, [bounds, readAnchor, subscribeFrame, pinTop, beside, tip, spill]);
 
   const body = <>
@@ -166,12 +177,12 @@ export function PlateFrame({ title, sub, pips, head, footer, className = '', clo
       {sub != null && <span className="p-sub">{sub}</span>}
       {head}
       {pips && <Pips filled={pips[0]} max={pips[1]} />}
-      {closeKey && <button type="button" className="p-x" aria-label="Close" onClick={onClose}>
-        <i className="x-glyph" aria-hidden="true" style={{ width: 12, height: 12, '--x-w': '1px' } as CSSProperties} /></button>}
+      <span className="p-head-actions">{actions}{closeKey && <button type="button" className="p-x" aria-label="Close" onClick={onClose}>
+        <i className="x-glyph" aria-hidden="true" style={{ width: 12, height: 12, '--x-w': '1px' } as CSSProperties} /></button>}</span>
     </header>
     <div ref={contentRef} className="plate-content">{children}</div>
     <div className="plate-more" aria-hidden="true">More ↓</div>
-    {footer && <footer className="plate-footer">{footer}</footer>}
+    {(footer || maintenance) && <footer className="plate-footer">{footer}{maintenance}</footer>}
   </>;
   const common = {
     className: `v3-plate ${closeKey ? 'has-x ' : ''}${className}`, 'aria-label': title, tabIndex: -1,

@@ -30,9 +30,9 @@
 .lab .px-ic { flex: none; width: 12px; height: 12px; }
 .pt-d { color: var(--data); } .pt-c { color: var(--gold); }
 .pt .dim { color: var(--muted); }
-.ld-body { display: flex; flex-direction: column; gap: 12px; padding: 12px; background: #241e48; box-shadow: inset 3px 0 #efeaff, inset 0 -2px var(--rail); }
+.ld-body { display: flex; flex-direction: column; gap: 6px; padding: 8px; background: #241e48; box-shadow: inset 3px 0 #efeaff, inset 0 -2px var(--rail); }
 .ld-body p, .ld-body dl, .ld-body dd { margin: 0; }
-.ld-facts { display: grid; grid-template-columns: 64px minmax(0, 1fr); gap: 8px 12px; align-items: baseline; }
+.ld-facts { display: grid; grid-template-columns: 64px minmax(0, 1fr); gap: 4px 8px; align-items: baseline; }
 .ld-facts dt { color: var(--muted); }
 .ld-facts dd { min-width: 0; overflow-wrap: anywhere; }
 .ld-cost, .ld-needs { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 12px; }
@@ -43,4 +43,4 @@
 .tx { display: grid; grid-template-rows: 0fr; }
 .tx.open { grid-template-rows: 1fr; }
 .tx-in { min-height: 0; overflow: hidden; }
-.lab.phone .ld-body { padding: 8px 12px; gap: 8px; }
+.lab.phone .ld-body { padding: 6px 8px; gap: 6px; }

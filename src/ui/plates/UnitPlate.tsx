@@ -26,12 +26,12 @@ export interface UnitPlateProps extends Omit<PlateCommon, 'quotes'> {
 /** A unit's plate: what it is doing, its market row, and its keys. */
 export function UnitPlate({ unit, title, sub, status, statusTone = '', mode, timerS, market, onSave, saveLabel = 'Save configuration',
   className = '', children, onAction, bootS, onResearch: _r, researchName: _n, ...frame }: UnitPlateProps) {
-  return <PlateFrame {...frame} title={title} sub={sub} className={`unit ${className}`}>
+  return <PlateFrame {...frame} title={title} sub={sub} className={`unit ${className}`}
+    actions={onSave && <button type="button" className="p-save" aria-label={saveLabel} onClick={onSave}>Save</button>}>
     <Status text={status} tone={statusTone} />
     {market && <OnlineRow mode={mode} timerS={timerS} bootS={bootS} market={market} onToggle={(online) => onAction({ type: 'setOnline', unit, online })} />}
     <div className="keys">
       {children}
-      {onSave && <Key tone="go" label={saveLabel} onPress={onSave} />}
     </div>
   </PlateFrame>;
 }

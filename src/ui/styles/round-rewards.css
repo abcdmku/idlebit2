@@ -1,4 +1,13 @@
-.round-rewards-plate{width:368px}.reward-heading{display:flex;align-items:center;gap:8px;margin:4px 0 12px}.round-rewards-plate .reward-ready{color:var(--gold)}.round-rewards-plate .reward-done{color:var(--ok)}.reward-grant{display:flex;gap:24px;flex-wrap:wrap;margin:8px 0 12px}.reward-grant .pz{font-size:var(--mid)}.reward-grant .px-ic{width:16px;height:16px}.round-rewards-plate .reward-list .row{flex-wrap:nowrap;gap:8px;min-height:52px}.reward-list-name{flex:1;display:grid;gap:4px;min-width:0}.reward-list-name>span{font-weight:400;color:var(--muted)}.reward-project{margin:12px 0;padding-top:8px;border-top:1px solid var(--panel-hi)}.reward-calculation summary{display:flex;align-items:center;min-height:44px;color:var(--muted);cursor:pointer}.round-rewards-plate .reward-later{margin-top:12px}.rb-marks button.rb-mark{border:0;background:none;font:inherit;min-width:44px;min-height:44px;margin-top:-14px;padding:14px 0 0;cursor:pointer}
-
-/* Keep cramped claim keys below the sticky close header. */
-.round-rewards-plate[data-cramped="true"] > .plate-footer{padding-top:48px}
+.round-rewards-plate { width: 368px; }
+.reward-list { display: grid; gap: 4px; }
+.reward-item { display: flex; align-items: center; gap: 8px; min-height: 56px; padding: 4px !important; }
+.reward-list-name { flex: 1; display: grid; min-width: 0; }
+.reward-list-name > span { font-weight: 400; color: var(--muted); }
+.reward-result { display: grid; justify-items: end; color: var(--muted); }
+.reward-item.ready { background: var(--well); }
+.reward-item.ready .reward-result { color: var(--gold); }
+.reward-item.claimed .reward-result { color: var(--ok); }
+.reward-amounts { display: flex; gap: 6px; }
+.reward-amounts .px-ic { width: 10px; height: 10px; }
+.round-rewards-plate .component-link { min-height: 44px; }
+.rb-marks button.rb-mark { border: 0; background: none; font: inherit; min-width: 44px; min-height: 44px; margin-top: -14px; padding: 14px 0 0; cursor: pointer; }

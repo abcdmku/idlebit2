@@ -8,6 +8,7 @@ import { GPU_GENERATIONS, gpuResearch, SERIES_NAMES } from './gpuModel';
 import { Key, QuoteKey } from './widgets';
 import { PartKeys } from './PartKeys';
 import { GenerationAction } from './GenerationAction';
+import { ChoiceStrip } from './ChoiceStrip';
 
 interface GpuPlateProps extends Omit<PlateCommon, 'quotes'> { system: SystemId; index: number | null; installed?: PartView; tasks?: readonly TaskView[] }
 function researched(nodes: readonly ResearchNodeView[], g: GpuGeneration): boolean {
@@ -36,7 +37,6 @@ export function GpuPlate({ system, index, installed, onAction, onResearch, tasks
   const options = card ? types : [...entry, ...(npus?.quotes.filter(q => q.action.type === 'addPart' && q.locked?.code !== 'research') ?? [])];
   const selected = options[choice] ?? options[0];
   const tier = part?.quotes.find(q => q.action.type === 'upgradePart');
-  const remove = part?.quotes.find(q => q.action.type === 'removePart');
   const primary = card ? tier : selected;
   const fire = (q: Quote) => {
     const before = shell.store.getState().build.revision;
@@ -44,20 +44,17 @@ export function GpuPlate({ system, index, installed, onAction, onResearch, tasks
     if (index === null && shell.store.getState().build.revision !== before) frame.onClose();
   };
   const keys = { onAction: fire, onResearch, researchName: frame.researchName };
-  const picker = <><label className="component-picker">Type<select aria-label="Card type" value={Math.min(choice, Math.max(0, options.length - 1))} onChange={e => setChoice(Number(e.target.value))}>
-    {options.map((q, i) => <option key={i} value={i}>{q.gpu?.after.model ?? q.label}</option>)}
-  </select></label>{card && selected && <QuoteKey quote={selected} label="Replace" tone="replace" {...keys} />}</>;
+  const picker = <><ChoiceStrip label="Card type" value={String(choice)} onPick={value => setChoice(Number(value))}
+    choices={options.map((q, i) => ({ id: String(i), label: q.gpu ? `${q.gpu.after.model} · ${SERIES_NAMES[q.gpu.after.series]}` : q.label }))} />
+    {card && selected && <QuoteKey quote={selected} label={selected.gpu ? `Switch to ${selected.gpu.after.model}` : 'Replace'} tone="replace" {...keys} />}</>;
   const npu = installed?.kind === 'npu';
-  const removeKey = remove && <Key label="Remove card" tone="replace" purchase={remove} disabled={!!remove.locked}
-    onPress={() => fire(remove)} />;
   return <PlateFrame {...frame} title={card ? 'GPU ' + card.model : npu ? 'NPU ' + (index! + 1) : 'GPU bay'}
     sub={card ? SERIES_NAMES[card.series] + ' · Gen ' + card.generation + ' · Tier ' + card.tier : npu ? 'Gen ' + (installed.generation + 1) : 'Empty'} className="part gpu-picker"
     footer={npu ? <PartKeys quotes={part} level={installed.level} onAction={onAction} onResearch={onResearch} researchName={frame.researchName} part="primary" />
       : primary ? <QuoteKey quote={primary} label={card ? 'Upgrade' : 'Buy'} {...keys} /> : <Key label="Buy" detail="No card available" disabled onPress={() => undefined} />}>
     {card && <div className="component-facts"><p>{card.cores} cores · {ops(card.opsPerS)}/s</p><p>VRAM {bits(installed?.vramUsedBits ?? 0)} / {bits(card.vramBits)} · {Math.round((installed?.resourceBusy ?? 0) * 100)}% busy</p></div>}
-    {npu ? <><PartKeys quotes={part} level={installed.level} onAction={onAction} onResearch={onResearch} researchName={frame.researchName} part="rest" />
-      {removeKey && <details className="component-options"><summary>Card options</summary>{removeKey}</details>}</>
+    {npu ? <PartKeys quotes={part} level={installed.level} onAction={onAction} onResearch={onResearch} researchName={frame.researchName} part="rest" />
       : card ? <><GenerationAction quote={generation} {...keys} />
-        {(options.length > 0 || remove) && <details className="component-options"><summary>Card options</summary>{options.length > 0 && picker}{removeKey}</details>}</> : picker}
+        {options.length > 0 && picker}</> : picker}
   </PlateFrame>;
 }

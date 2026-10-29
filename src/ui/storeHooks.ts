@@ -4,7 +4,7 @@ import { createContext, useCallback, useContext, useMemo, useRef, useSyncExterna
 import { quote } from '../game';
 import type { ActionOutcome, GameAction, QuoteRequest, QuoteResult, RenderSnapshot } from '../game';
 import type { GameStore } from '../platform';
-import type { CanvasRenderer, LevelRegistry, Rect } from '../render/core';
+import type { CanvasRenderer, HitTarget, LevelRegistry, Rect } from '../render/core';
 import type { ShellLayout } from './layout';
 import type { ViewState, ViewStore } from './viewState';
 
@@ -20,6 +20,8 @@ export interface ShellSurface {
   frameListeners: Set<FrameListener>;
   /** The visible level's build quotes the deck holds; the world prices ghosts with them. */
   buildQuotes: QuoteResult | null;
+  /** Controls whose sole action and facts are drawn directly on the hardware by React. */
+  sourceActions?: Map<string, { target: HitTarget; rect: Rect }>;
   /** Real canvas draws so far (QA). */
   drawCount: number;
 }

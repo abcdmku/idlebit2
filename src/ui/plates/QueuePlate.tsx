@@ -1,4 +1,4 @@
-import { selectSystemQueue, QUEUE_NAMES, type SchedulerView, type SystemId, type SystemQueueTaskView } from '../../game';
+import { selectSystemQueue, type SchedulerView, type SystemId, type SystemQueueTaskView } from '../../game';
 import { useShell } from '../storeHooks';
 import { useLayout } from '../shell/geometry';
 import { ArtCanvas } from '../art/ArtCanvas';
@@ -47,15 +47,13 @@ export function QueuePlate({ system, view, quotes, onAction, onResearch, researc
   const main = partMain(quotes?.quotes ?? [], view.level);
   return <PlateFrame {...frame} title="Queue" sub={`${tasks.length} / ${view.q}`} className="hardware-queue"
     footer={main && <PartKeys {...keys} part="primary" />}>
-    <details className="component-options"><summary>Waiting tasks</summary>
-      <p className="hardware-queue-summary">{view.running} running · {view.reserved} incoming · {QUEUE_NAMES[view.strategy]}</p>
-      <ol className="hardware-task-list" aria-label="Tasks waiting on this system">
+    <QueueControls system={system} view={view} onAction={onAction} />
+    <section className="component-section queue-tasks">
+      <ol className="hardware-task-list scroll-list" aria-label="Waiting tasks">
         {tasks.map((task, i) => <QueuedRow key={task.key} task={task} position={i + 1} n={layout.N} />)}
       </ol>
-    </details>
-    <details className="component-options"><summary>Settings</summary>
-      <QueueControls system={system} view={view} onAction={onAction} />
-    </details>
+      {!tasks.length && <p className="p-line muted">No waiting tasks</p>}
+    </section>
     <PartKeys {...keys} part="rest" />
   </PlateFrame>;
 }

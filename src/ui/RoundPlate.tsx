@@ -102,7 +102,7 @@ export function RoundReportPlate({ report, onReturn, onClose }: {
       {(report.frontier.runwayStart || report.frontier.runwayEnd) && <li data-testid="rp-runway"><span className="mute">Next era</span>
         <span className="v"><RunwayValue start={report.frontier.runwayStart} end={report.frontier.runwayEnd} eras={eras} /></span></li>}
     </ul>
-    <details className="round-details"><summary>Round details</summary>
+    <section className="round-details">
     <p className="mute">{ENDED_BY[report.endedBy]}</p>
     <ReachDetails report={report} prev={prev} />
     <ul className="p-list rp-bottom">
@@ -131,7 +131,7 @@ export function RoundReportPlate({ report, onReturn, onClose }: {
       {energyLines(report.energyBreakdown).map(l => <li key={l.key} data-line={l.key}><span>{l.label}</span>
         <span className={`v ${l.paid ? 'mute' : 'ben'}`}>{l.paid ? '−' : ''}<CoinIcon />{amountText(report.energyBreakdown[l.key])}{l.paid ? '' : ' saved'}</span></li>)}
     </ul>}
-    </details>
+    </section>
     </div>
     <div className="report-more" aria-hidden="true">More ↓</div>
     <div className="keys">

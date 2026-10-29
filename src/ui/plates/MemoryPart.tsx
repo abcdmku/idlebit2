@@ -7,6 +7,7 @@ import { bits, bitRate } from './format';
 import { partQuotes } from './PartKeys';
 import { GenerationAction, nextGeneration } from './GenerationAction';
 import { QuoteKey } from './widgets';
+import { ChoiceStrip } from './ChoiceStrip';
 
 type Actions = Pick<PlateCommon, 'onAction' | 'onResearch' | 'researchName'>;
 
@@ -37,11 +38,11 @@ export function memoryPartView({ module: part, slot, facts, own, ...actions }: A
       {speedUpgrade && <QuoteKey quote={speedUpgrade} label="Speed" onAction={buy} onResearch={actions.onResearch} researchName={actions.researchName} />}
     </div>,
     body: <div className="memory-part">
-      <div className="memory-current"><b>Size {bits(capacity)} · L{part.level}</b><span>{bits(used)} used</span></div>
+      <div className="memory-current"><b>{bits(used)} / {bits(capacity)} used</b></div>
       <div className="memory-meter" role="meter" aria-label={`${name} used`} aria-valuemin={0} aria-valuemax={capacity} aria-valuenow={used}>
         <i style={{ width: `${Math.min(100, used / Math.max(1, capacity) * 100)}%` }} />
       </div>
-      <p className="memory-speed">{slot === 'ram' ? 'Bandwidth' : 'IO'} {bitRate(part.rateBits ?? 0)} · L{part.speedLevel ?? 1}</p>
+      <p className="memory-speed">Speed {bitRate(part.rateBits ?? 0)}</p>
       <GenerationAction quote={nextGeneration(replaces)} onAction={q => actions.onAction(q.action)} onResearch={actions.onResearch} researchName={actions.researchName} />
     </div>,
   };
@@ -54,9 +55,8 @@ export function MemoryAdd({ quotes, preferred, ...actions }: Actions & { quotes:
   const q = ordered[choice] ?? ordered[0];
   if (!q) return null;
   return <div className="memory-add">
-    <label>Type<select aria-label="Memory type" value={choice} onChange={e => setChoice(Number(e.target.value))}>
-      {ordered.map((q, i) => <option key={i} value={i}>{q.label}</option>)}
-    </select></label>
+    <ChoiceStrip label="Memory type" value={String(choice)} onPick={value => setChoice(Number(value))}
+      choices={ordered.map((q, i) => ({ id: String(i), label: q.label }))} />
     <MemoryAction quote={q} label="Add" add primary {...actions} />
   </div>;
 }

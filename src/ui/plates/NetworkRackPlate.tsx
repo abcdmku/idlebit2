@@ -1,10 +1,10 @@
 import type { LbView, Quote, QuoteResult, RoomId, SwitchView } from '../../game';
 import { zoneLetter } from './copy';
 import { PlateFrame } from './PlateFrame';
-import { LbBody, lbLines, lbStatus } from './LbPlate';
+import { LbBody, lbStatus } from './LbPlate';
 import { SwitchBody, speedOf } from './SwitchPlate';
 import { hertz } from './format';
-import { Lines, Status } from './widgets';
+import { Status } from './widgets';
 import type { PlateCommon } from './types';
 
 export interface NetworkRackPlateProps extends PlateCommon {
@@ -29,8 +29,7 @@ export function NetworkRackPlate({ room, zone, network, racks, lbQuotes, queueQu
   if (view === 'lb') {
     const st = lbStatus(network.lb);
     return <PlateFrame {...frame} title="Room load balancer" sub={az} className="lb netrack">
-      <Status text={st.text} progress={st.progress} />
-      <Lines lines={lbLines(network.lb, 'rack')} slots={1} />
+      <Status text={st.text} tone={st.tone} progress={st.progress} />
       <LbBody unit={{ kind: 'room', id: room }} view={network.lb} child="rack" quotes={lbQuotes} queueQuote={queueQuote}
         onAction={onAction} onResearch={onResearch} researchName={researchName} />
     </PlateFrame>;

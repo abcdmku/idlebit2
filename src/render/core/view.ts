@@ -204,7 +204,8 @@ export function createCanvasRenderer(canvas: HTMLCanvasElement, registry: LevelR
     toScreen(cam, viewport, ratio, art.x, art.y, artTl); toScreen(cam, viewport, ratio, art.x + art.w, art.y + art.h, artBr);
     artRect.x = artTl.x; artRect.y = artTl.y; artRect.w = artBr.x - artTl.x; artRect.h = artBr.y - artTl.y;
     toScreen(cam, viewport, ratio, at.x, at.y, corner);
-    drawPipe(g, snapshot!, frame!.timeMs, frame!.paused, framing, viewport, ratio, corner, type, true, artRect, labelAlpha(nowS));
+    drawPipe(g, snapshot!, frame!.timeMs, frame!.paused, framing, viewport, ratio, corner, type, true, artRect, labelAlpha(nowS),
+      view?.sourceActions?.some(id => id === 'pipe' || id === 'entry'));
   }
   function drawZoom(s: RenderSnapshot): boolean {
     const partner = s.partner;

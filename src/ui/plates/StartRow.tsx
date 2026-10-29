@@ -2,15 +2,14 @@
 // scheduler). Three fixed controls: "Start with n", "Wake when the head waits X s" (plus "or busy ≥ Y %"
 // at generation 1, reserved and greyed before), and the order. Geometry never changes with state.
 import type { GameAction, ScopeRef, StartCtlView, StartOrder } from '../../game';
-import { wakeS } from './PowerKeys';
+import { ChoiceStrip } from './ChoiceStrip';
 
 /** Spec D31.2 ranges. */
 export const HEAD_WAIT_S = [1, 9] as const;
 export const BUSY_PCT = [50, 95] as const;
-const BUSY_STEP = 5;
 
 export const ORDER_NAMES: Readonly<Record<StartOrder, string>> = {
-  slot: 'Slot', fastest: 'Fastest', coolest: 'Coolest', cheapest: 'Cheapest', nearest: 'Nearest',
+  slot: 'In order', fastest: 'Fastest', coolest: 'Coolest', cheapest: 'Cheapest', nearest: 'Nearest',
 };
 export const SCOPE_ORDERS: Readonly<Record<'rack' | 'room' | 'global', readonly StartOrder[]>> = {
   rack: ['slot', 'fastest'], room: ['slot', 'coolest'], global: ['slot', 'cheapest', 'nearest'],
@@ -61,23 +60,18 @@ export function StartRow({ unit, scope, view: v, onAction }: StartRowProps) {
   const [one, many] = WORDS[scope], gen1 = v.generation >= 1;
   const busy = v.busyPct;
   return <div className="start-row" data-testid="start-row">
-    <p className="start-head"><b>Start · L{v.level} · wake in {wakeS(v.level)} s</b><span>{startStatus(v, scope)}</span></p>
-    <Stepper label={`Start with, of ${v.total} ${v.total === 1 ? one : many}`} name="Start with" value={`${v.startWith} of ${v.total}`}
+    <Stepper label={`Initially on, of ${v.total} ${v.total === 1 ? one : many}`} name="Initially on" value={`${v.startWith} / ${v.total}`}
       lower="Start with fewer" raise="Start with more"
       onLower={v.startWith > 1 ? () => set({ startWith: v.startWith - 1 }) : null}
       onRaise={v.startWith < v.total ? () => set({ startWith: v.startWith + 1 }) : null} />
-    <Stepper label="Wake when the head waits" name="Head waits" value={`${v.headWaitS} s`} lower="Wake sooner" raise="Wake later"
-      onLower={v.headWaitS > HEAD_WAIT_S[0] ? () => set({ headWaitS: v.headWaitS - 1 }) : null}
-      onRaise={v.headWaitS < HEAD_WAIT_S[1] ? () => set({ headWaitS: v.headWaitS + 1 }) : null} />
-    {/* Generation 1 (predictive): or when the awake units are this busy. Reserved, greyed before. */}
-    <Stepper label={gen1 ? 'or when busy over' : 'or when busy over, generation 1'} name={gen1 ? 'Or busy' : 'Or busy · gen 1'} value={!gen1 ? '—' : busy === null ? 'off' : `${busy}%`} disabled={!gen1}
-      lower="Busy trigger lower" raise="Busy trigger higher"
-      onLower={busy === null ? null : () => set({ busyPct: busy - BUSY_STEP < BUSY_PCT[0] ? null : busy - BUSY_STEP })}
-      onRaise={busy === null ? () => set({ busyPct: BUSY_PCT[0] }) : busy < BUSY_PCT[1] ? () => set({ busyPct: busy + BUSY_STEP }) : null} />
-    <div className="start-order" role="radiogroup" aria-label="Wake order">
-      <span>Order</span>
-      {SCOPE_ORDERS[scope].map(o => <button key={o} type="button" role="radio" aria-checked={v.order === o} className={`opt${v.order === o ? ' on' : ''}`}
-        onClick={() => v.order !== o && set({ order: o })}>{ORDER_NAMES[o]}</button>)}
-    </div>
+    <label className="range-setting"><span>Wake after task waits</span><input type="range" aria-label="Wake after task waits"
+      min={1} max={9} value={v.headWaitS} onChange={event => set({ headWaitS: Number(event.target.value) })} /><output>{v.headWaitS}s</output></label>
+    {gen1 && <div className="range-setting"><label><input type="checkbox" checked={busy !== null}
+      onChange={event => set({ busyPct: event.target.checked ? 75 : null })} />Wake when busy</label>
+      <input type="range" aria-label="Wake when busy" min={50} max={95} step={5} disabled={busy === null}
+        value={busy ?? 75} onChange={event => set({ busyPct: Number(event.target.value) })} /><output>{busy === null ? 'Off' : `${busy}%`}</output></div>}
+    <div className="inline-setting"><span>Wake order</span><ChoiceStrip label="Wake order" value={v.order}
+      choices={SCOPE_ORDERS[scope].map(order => ({ id: order, label: ORDER_NAMES[order] }))}
+      onPick={value => set({ order: value as StartOrder })} /></div>
   </div>;
 }

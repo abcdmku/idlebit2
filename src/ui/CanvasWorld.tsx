@@ -62,10 +62,13 @@ export function CanvasWorld() {
     let presentedFor: ViewState | null = null, presentedQuotes = surface.buildQuotes, presentation: ViewPresentation | null = null;
     // Desktop hover: the target under the mouse gets a faint bracket (user, 26 Oct).
     let hoverId: string | null = null, presentedHover: string | null = null;
+    let presentedSources = '';
     const present = (v: ViewState): ViewPresentation => {
-      if (v !== presentedFor || surface.buildQuotes !== presentedQuotes || hoverId !== presentedHover || !presentation) {
+      const sources = [...surface.sourceActions?.keys() ?? []], key = sources.join('|');
+      if (v !== presentedFor || surface.buildQuotes !== presentedQuotes || hoverId !== presentedHover || key !== presentedSources || !presentation) {
         presentedFor = v; presentedQuotes = surface.buildQuotes; presentedHover = hoverId;
-        presentation = { selectedId: v.selectedId, hoverId, picked: null, quotes: surface.buildQuotes, reducedMotion: v.reducedMotion, zoomGoal: v.goal };
+        presentedSources = key;
+        presentation = { selectedId: v.selectedId, hoverId, picked: null, quotes: surface.buildQuotes, sourceActions: sources, reducedMotion: v.reducedMotion, zoomGoal: v.goal };
       }
       return presentation;
     };
@@ -112,6 +115,13 @@ export function CanvasWorld() {
     };
     const stopInput = bindGestures(canvas, {
       renderer: () => renderer,
+      hit: (x, y) => {
+        for (const source of surface.sourceActions?.values() ?? []) {
+          const r = source.rect;
+          if (x >= r.x && x <= r.x + r.w && y >= r.y && y <= r.y + r.h) return source.target;
+        }
+        return null;
+      },
       pan,
       hover: hit => { hoverId = hit?.id ?? null; },
       tap: hit => {

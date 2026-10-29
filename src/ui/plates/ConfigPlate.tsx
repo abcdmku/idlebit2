@@ -5,6 +5,7 @@ import type { ConfigKind } from './configArt';
 import { wholeText } from './format';
 import { PlateFrame } from './PlateFrame';
 import { QuoteKey } from './widgets';
+import { ChoiceStrip } from './ChoiceStrip';
 import type { PlateCommon } from './types';
 
 type AddQuote = Quote & { action: { type: 'addUnit'; source: ConfigSource } };
@@ -39,9 +40,8 @@ export function ConfigPlate({ kind, title, sub, credits: _credits, landscape: _l
   const gain = q ? '+1 ' + noun.toLowerCase() + (q.action.source.kind === 'barebones' ? ' \u00b7 ' + barebonesText(kind, q) : '') : '';
   return <PlateFrame {...frame} onClose={onClose} title={title ?? 'New ' + noun} sub={sub} className="part config-picker"
     footer={q && <QuoteKey quote={q} label={'Buy ' + noun} detail={gain} onAction={value => { onAction(value.action); onClose(); }} onResearch={onResearch} researchName={researchName} />}>
-    <label className="component-picker">Build<select aria-label="Build" value={Math.min(choice, Math.max(0, options.length - 1))} onChange={e => setChoice(Number(e.target.value))}>
-      {options.map((q, i) => <option key={i} value={i}>{name(q)}</option>)}
-    </select></label>
+    <div className="build-options scroll-list"><ChoiceStrip label="Build" value={String(choice)} onPick={value => setChoice(Number(value))}
+      choices={options.map((q, i) => ({ id: String(i), label: name(q) }))} /></div>
     {!options.length && <p className="p-line muted">No build available</p>}
   </PlateFrame>;
 }

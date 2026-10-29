@@ -2,8 +2,8 @@
 .hardware-queue-tabs { display: grid; grid-template-columns: 1fr 1fr; margin-top: 8px; border-bottom: 1px solid var(--panel-hi); }
 .hardware-queue-tabs button { min-height: 44px; text-align: center; color: var(--muted); border-bottom: 2px solid transparent; }
 .hardware-queue-tabs button[aria-selected="true"] { color: var(--paper); border-bottom-color: var(--cyan); }
-.hardware-queue .hardware-queue-summary { margin: 8px 0; color: var(--muted); }
-.hardware-task-list { display: grid; gap: 0; }
+.hardware-queue .hardware-queue-summary { margin: 2px 0 4px; color: var(--muted); }
+.hardware-task-list { display: grid; gap: 0; margin: 0; padding: 0; list-style: none; }
 .hardware-task { position: relative; display: flex; align-items: center; gap: 8px; min-height: calc(2 * var(--lh) + 8px);
   box-sizing: border-box; padding: 4px 0; border-top: 1px solid #342a58; }
 .hardware-position { width: 12px; flex: none; color: var(--muted); text-align: center; }

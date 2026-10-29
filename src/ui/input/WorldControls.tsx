@@ -7,6 +7,8 @@ import { useLayout } from '../shell/geometry';
 import { useShell } from '../storeHooks';
 import { LEVEL_NAMES } from '../viewState';
 import { activateTarget } from './commands';
+import { SourceControl } from './SourceControl';
+import { sourceRequest } from './sourceAction';
 
 /** Names the same targets used by pointer input, without exposing internal IDs. */
 export function targetLabel(t: HitTarget): string {
@@ -46,6 +48,8 @@ export function WorldControls() {
       for (const t of list) {
         const button = buttons.current.get(t.id);
         if (!button || !renderer.anchor(t.id, bounds)) continue;
+        button.tabIndex = shell.surface.sourceActions?.has(t.id) ? -1 : 0;
+        button.setAttribute('aria-hidden', shell.surface.sourceActions?.has(t.id) ? 'true' : 'false');
         const w = Math.min(L.view.w, Math.max(44, bounds.w)), h = Math.min(L.view.h, Math.max(44, bounds.h));
         Object.assign(button.style, {
           left: `${Math.max(L.view.x, Math.min(L.view.x + L.view.w - w, bounds.x))}px`,
@@ -73,5 +77,6 @@ export function WorldControls() {
       ref={el => { if (el) buttons.current.set(t.id, el); else buttons.current.delete(t.id); }}
       onFocus={() => focus(t.id)} onBlur={() => shell.surface.renderer?.press(null)}
       onClick={() => { const live = current.current.get(t.id); if (live) activateTarget(shell, live); }}>{targetLabel(t)}</button>)}
+    {targets.filter(t => sourceRequest(t, shell.store.getSnapshot().focus)).map(t => <SourceControl key={`source-${t.id}`} target={t} />)}
   </div>;
 }

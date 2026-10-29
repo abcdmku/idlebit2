@@ -1,5 +1,4 @@
-// Tapping a "+" opens that slot's choices and never spends (user, 26 Oct, superseding one-tap buy): the price,
-// what each option does, and one key that buys the picked one.
+// A "+" with several available builds opens the picker. Single choices buy at their source (D72).
 import type { HitTarget } from '../../render/core';
 import { hasPlate } from '../plates/PlateLayer';
 import type { ShellContextValue } from '../storeHooks';

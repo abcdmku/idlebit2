@@ -6,8 +6,9 @@ import { useWindowLeft } from '../hooks/headClock';
 import { clockText } from '../hooks/format';
 import { FILTER_NAMES, ROUTE_NAMES } from './copy';
 import { PlateFrame } from './PlateFrame';
-import { Choices, Lines, QuoteKey, Status, type Choice, type Line } from './widgets';
+import { Choices, QuoteKey, Status, type Choice, type Line } from './widgets';
 import type { PlateCommon } from './types';
+import { ChoiceStrip } from './ChoiceStrip';
 
 export type LbChild = 'server' | 'rack' | 'zone' | 'site';
 export interface LbBodyProps extends Pick<PlateCommon, 'quotes' | 'onAction' | 'onResearch' | 'researchName'> {
@@ -69,7 +70,7 @@ export function LbBody({ unit, view, quotes, queueQuote, onAction, onResearch, r
   const rows: Choice[] = [
     ...strategyIds.map((id) => ({ id: 's:' + id, label: ROUTE_NAMES[id].name, on: id === view.strategy,
       lock: id === view.strategy ? null : lockText(strategies.find((q) => q.action.strategy === id)) })),
-    ...filters.map((q) => ({ id: 'f:' + q.action.filter, label: FILTER_NAMES[q.action.filter].name,
+    ...filters.map((q) => ({ id: 'f:' + q.action.filter, label: FILTER_NAMES[q.action.filter].name.replace(/-aware$/, '').replace(' checks', ''),
       on: view.filters.includes(q.action.filter), lock: lockText(q) })),
   ];
   const pick = (key: string) => {
@@ -84,14 +85,17 @@ export function LbBody({ unit, view, quotes, queueQuote, onAction, onResearch, r
         onAction={(q) => onAction(q.action)} onResearch={onResearch} researchName={researchName} />}
       {capacity && capacity.locked?.code !== 'ceiling' && <QuoteKey quote={capacity} label={`Capacity${capacity.effect ? ` · ${Math.round(capacity.effect.capacityAfter)}/s` : ''}`} onAction={(q) => onAction(q.action)} onResearch={onResearch} researchName={researchName} />}
     </div>
-    <details className="component-options"><summary>Routing settings</summary><LbQueue view={view} /><section className="plate-section"><p className="cfg-lab">Strategy</p><Choices rows={rows.filter(r => r.id.startsWith('s:'))} label="Strategy" onPick={pick} /></section>
-    <section className="plate-section"><p className="cfg-lab">Filters</p><Choices rows={rows.filter(r => r.id.startsWith('f:'))} label="Filters" onPick={pick} /></section>{children}</details>
+    <section className="routing-controls"><LbQueue view={view} />
+      <ChoiceStrip label="Routing strategy" value={'s:' + view.strategy} onPick={pick}
+        choices={rows.filter(r => r.id.startsWith('s:')).map(row => ({ id: row.id, label: row.label, disabled: !!row.lock, title: row.lock ?? undefined }))} />
+      <div className="filter-options"><Choices rows={rows.filter(r => r.id.startsWith('f:'))} label="Filters" onPick={pick} /></div>{children}</section>
   </>;
 }
 
 /** Load balancers have no routing capacity (D12.5); the plate reports routes taken. */
 export function lbStatus(view: LbView) {
-  return { text: `${Math.round(view.routedPerSec)} routed/s · Queue ${view.queue.entries.length}/${view.queue.slots}`, progress: null };
+  const warning = lbLines(view, 'server')[0]?.text;
+  return { text: `${Math.round(view.routedPerSec)} routed/s${warning ? ' · ' + warning : ''}`, tone: warning ? 'warn' as const : '' as const, progress: null };
 }
 
 export interface LbPlateProps extends PlateCommon { unit: ScopeRef; view: LbView; child?: LbChild; title?: string; queueQuote?: Quote | null; children?: ReactNode }
@@ -100,8 +104,7 @@ export interface LbPlateProps extends PlateCommon { unit: ScopeRef; view: LbView
 export function LbPlate({ unit, view, child = 'server', title = 'Load balancer', queueQuote, quotes, onAction, onResearch, researchName, children, ...frame }: LbPlateProps) {
   const st = lbStatus(view);
   return <PlateFrame {...frame} title={title} sub={ROUTE_NAMES[view.strategy].name} className="lb">
-    <Status text={st.text} progress={st.progress} />
-    <Lines lines={lbLines(view, child)} slots={1} />
+    <Status text={st.text} tone={st.tone} progress={st.progress} />
     <LbBody unit={unit} view={view} child={child} quotes={quotes} queueQuote={queueQuote}
       onAction={onAction} onResearch={onResearch} researchName={researchName}>{children}</LbBody>
   </PlateFrame>;

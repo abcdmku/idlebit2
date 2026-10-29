@@ -1,9 +1,9 @@
-.queue-controls { display: grid; gap: 8px; min-width: 0; margin-block: 12px; }
-.queue-controls > label { display: grid; gap: 4px; }
-.queue-controls select { min-width: 0; width: 100%; min-height: 44px; padding: 8px; font: inherit;
+.queue-controls { display: grid; gap: 4px; min-width: 0; margin-block: 2px 4px; }
+.queue-controls > label { display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: center; gap: 8px; }
+.queue-controls select { min-width: 0; width: 100%; height: 32px; min-height: 32px; padding: 4px 6px; font: inherit;
   color: var(--paper); background: var(--well); border: 1px solid var(--panel-hi); }
-.queue-controls > .queue-batching { display: flex; align-items: center; min-height: 44px; gap: 8px; }
-.queue-batching input { width: 20px; height: 20px; accent-color: #77a7ff; }
-.queue-controls > .p-line { min-height: 2lh; margin: 0; }
-.queue-preparation { min-height: 3lh; border-left: 3px solid #77a7ff; padding-left: 8px; color: #a8c6ff; }
+.queue-controls > .queue-batching { display: flex; align-items: center; min-height: 28px; gap: 6px; }
+.queue-batching input { width: 16px; height: 16px; margin: 0; accent-color: #77a7ff; }
+.queue-controls > .p-line { min-height: 0; margin: 0; }
+.queue-preparation { color: #a8c6ff; }
 .queue-preparation .p-line { margin: 0; }

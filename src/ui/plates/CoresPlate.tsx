@@ -20,9 +20,9 @@ export function CoresPlate({ focus, quotes: _q, onAction, onResearch, researchNa
   return <PlateFrame {...frame} title="Cores" sub={`${n} ${n === 1 ? 'core' : 'cores'} · up to ${focus.coreSites}`} className="part cores">
     <Status text={`${hertz(focus.clock.effectiveHz)} each · ${busy} of ${n} busy`} />
     <CoreKey onAction={onAction} onResearch={onResearch} researchName={researchName} />
-    <details className="component-options"><summary>Core activity</summary><ol className="core-list" aria-label="Each core">
+    <ol className="core-list scroll-list" aria-label="Each core">
       {/* Fixed core order, never sorted by progress (user, 26 Oct). */}
       {focus.cores.map((c, i) => <li key={i} className={c.family !== null ? 'busy' : ''}><b>{i + 1}</b><span>{coreState(c)}</span></li>)}
-    </ol></details>
+    </ol>
   </PlateFrame>;
 }

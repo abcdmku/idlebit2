@@ -118,7 +118,7 @@ export function quoteEffect(state: GameState, action: GameAction, plan: Plan): E
       if (!effect || effect.capacityAfter > effect.capacityBefore) return effect;
       return { ...effect, capacityLabel: 'Limit', capacityBefore: ladderSpeed(row.topK[a.gen]!), capacityAfter: ladderSpeed(row.topK[next.gen]!) };
     }
-    case 'upgradePartTo': case 'upgradePart': {
+    case 'downgradePart': case 'upgradePartTo': case 'upgradePart': {
       const part = readPart(b, action.part);
       if (part?.id === 'dataPlane' || part?.id === 'backbone') return ladderEffect(state, action.part, after, cost);
       const effect = partEffect(state, action.part, after, cost);

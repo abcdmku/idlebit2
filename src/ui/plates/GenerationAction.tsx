@@ -1,5 +1,5 @@
 import type { Quote, ResearchId } from '../../game';
-import { purchaseGain, purchaseReason } from './purchaseText';
+import { resultingSpecs, purchaseReason } from './purchaseText';
 import { Price } from './widgets';
 
 /** Catalog order is generation order. Prefer the capacity-preserving quote for the next one. */
@@ -25,7 +25,7 @@ export function GenerationAction({ quote, onAction, onResearch, researchName }: 
   const reason = purchaseReason(quote, researchName);
   const disabled = node ? !onResearch : !!reason;
   const cold = quote.cold && quote.downtimeMs > 0 ? `${Math.ceil(quote.downtimeMs / 1000)}s offline` : '';
-  const spec = [purchaseGain(quote), cold].filter(Boolean).join(' · ');
+  const spec = [resultingSpecs(quote), cold].filter(Boolean).join(' · ');
   const detail = !node && (quote.locked || quote.overSupply ? reason : spec);
   return <button type="button" className="generation-action" disabled={disabled}
     data-research-target={node ?? undefined} data-purchase-action={!node ? JSON.stringify(quote.action) : undefined}

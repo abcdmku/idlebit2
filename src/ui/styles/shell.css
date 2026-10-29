@@ -18,6 +18,31 @@ html, body, #root { margin: 0; width: 100%; height: 100%; overflow: hidden; back
 .world-controls { position: absolute; inset: 0; pointer-events: none; z-index: 2; }
 .world-key { position: absolute; pointer-events: none; opacity: 0; }
 .world-key:focus-visible { opacity: 1; background: #120d28e8; color: var(--focus); text-align: center !important; padding: 8px; }
+.source-control { position: absolute; pointer-events: none; }
+.source-buy { position: absolute; inset: 0; display: grid; grid-template-columns: minmax(0, 1fr) auto; grid-template-rows: 16px 16px;
+  align-content: start; gap: 0 6px; padding: 4px 8px !important; min-height: 44px; line-height: 16px; }
+.source-name { grid-column: 1; font-weight: 700; white-space: nowrap; }
+.source-gain { grid-column: 1 / -1; grid-row: 2; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: var(--muted); }
+.source-price { grid-column: 2; grid-row: 1; color: var(--gold); }
+.source-price .pz { gap: 3px; }
+.source-control .px-ic { width: 10px; height: 10px; }
+.source-buy:disabled .source-price, .source-buy:disabled .pz { color: var(--muted); }
+.source-link .source-buy { background: var(--well); border: 1px solid var(--panel-hi); }
+.source-add .source-buy { align-content: end; padding-bottom: 5px !important; background: #15122ae8; }
+.source-add .source-name { display: none; }
+.source-add .source-price { grid-column: 1 / -1; justify-self: center; }
+.source-add .source-gain { text-align: center; }
+.source-control[data-narrow="true"] .source-buy { grid-template-columns: 1fr; }
+.source-control[data-narrow="true"] .source-name { grid-row: 1; }
+.source-control[data-narrow="true"] .source-gain { grid-row: 2; }
+.source-control[data-narrow="true"] .source-price { grid-row: 3; grid-column: 1; padding-top: 4px; }
+.source-add[data-narrow="true"] .source-price { grid-row: 1; padding-top: 0; }
+.source-add[data-narrow="true"] .source-buy { padding-inline: 2px !important; }
+.source-part[data-narrow="true"] .source-buy { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; }
+.source-part[data-narrow="true"] .source-gain { white-space: normal; }
+.source-part[data-narrow="true"] .source-name { white-space: normal; }
+.source-part[data-narrow="true"] .source-price { padding-top: 0; }
+.source-buy:focus-visible { pointer-events: auto; background: var(--well); }
 
 /* text runs and art */
 .t { position: absolute; white-space: nowrap; line-height: var(--lh); }
