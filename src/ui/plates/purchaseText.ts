@@ -21,9 +21,9 @@ export function purchaseGain(q: Quote): string {
 
 /** A generation's resulting specs. The old stats are already visible in the component. */
 export function resultingSpecs(q: Quote): string {
-  if (q.gpu) return `${ops(q.gpu.after.opsPerS)}/s · ${bits(q.gpu.after.vramBits)} VRAM`;
+  if (q.gpu) return `${ops(q.gpu.after.opsPerS)}/s · ${bits(q.gpu.after.vramBits)}`;
   const e = q.effect;
-  if (!e) return purchaseGain(q);
+  if (!e) return purchaseGain(q).replace('Head wait + busy triggers', 'Wait + busy').replace('Head wait trigger', 'Wait wake');
   return [measureUnit(e.capacityAfter, e.unit), e.throughputAfter !== undefined ? bitRate(e.throughputAfter) : ''].filter(Boolean).join(' · ');
 }
 

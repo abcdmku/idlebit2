@@ -109,12 +109,12 @@ function EndRound() {
     shell.dispatch({ type: 'endRound' });
   };
   // Out of a round the same key (same box) is Return to market, as the head card's key (user, 26 Oct).
-  if (phase === 'ended') return <button type="button" className="skey end-round" style={box(k)} disabled data-testid="end-round" aria-label="End round">{compact ? 'End' : 'End round'}</button>;
+  if (phase === 'ended') return <button type="button" className="skey end-round" style={box(k)} disabled data-testid="end-round" aria-label="End round"><span className="end-round-label">{compact ? 'End' : 'End round'}</span></button>;
   if (!running) return <button type="button" className="skey end-round" style={box(k)} disabled={!canReturn} data-testid="end-round"
-    data-qa-target={k.h >= 44 ? "" : undefined} aria-label="Return to market" onPointerDown={e => e.stopPropagation()} onClick={() => returnToMarket(shell)}>Return</button>;
-  return <button type="button" className={`skey end-round ${armed ? 'warn two' : ''}`} style={box(k)} data-testid="end-round"
+    data-qa-target={k.h >= 44 ? "" : undefined} aria-label="Return to market" onPointerDown={e => e.stopPropagation()} onClick={() => returnToMarket(shell)}><span className="end-round-label">Return</span></button>;
+  return <button type="button" className={`skey end-round ${armed ? 'warn' : ''}`} style={box(k)} data-testid="end-round"
     data-qa-target={k.h >= 44 ? "" : undefined} aria-label={armed ? "End round? Tap again" : "End round"} onPointerDown={e => e.stopPropagation()} onClick={press}>
-    {armed ? <><span>{compact ? 'End?' : 'End round?'}</span><span>{compact ? 'Again' : 'Tap again'}</span></> : compact ? 'End' : 'End round'}</button>;
+    <span className="end-round-label">{armed ? compact ? 'End?' : 'End round?' : compact ? 'End' : 'End round'}</span></button>;
 }
 
 export function Hud() {

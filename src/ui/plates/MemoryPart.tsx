@@ -3,13 +3,25 @@ import type { PartView, Quote } from '../../game';
 import type { BoardPartView } from './BoardPartPlate';
 import type { PartFacts } from './partFacts';
 import type { PlateCommon } from './types';
-import { bits, bitRate } from './format';
+import { bits, bitRate, measureUnit } from './format';
 import { partQuotes } from './PartKeys';
 import { GenerationAction, nextGeneration } from './GenerationAction';
 import { QuoteKey } from './widgets';
 import { ChoiceStrip } from './ChoiceStrip';
+import { MaintenanceAction } from './ComponentActions';
 
 type Actions = Pick<PlateCommon, 'onAction' | 'onResearch' | 'researchName'>;
+
+function MemoryTrack({ upgrade, downgrade, label, current, ...actions }: Actions & { upgrade?: Quote; downgrade?: Quote; label: string; current: string }) {
+  const buy = (q: Quote) => actions.onAction(q.action);
+  return <div className="memory-track" role="group" aria-label={label}>
+    <span className="memory-track-name"><span>{label}</span><b>{current}</b></span>
+    {downgrade && <MaintenanceAction quote={downgrade} label="−" icon="minus" actionLabel={`Decrease ${label.toLowerCase()}`} className="memory-down" onAction={buy} />}
+    {upgrade && <QuoteKey quote={upgrade} label={upgrade.effect ? `+ ${measureUnit(upgrade.effect.capacityAfter, upgrade.effect.unit)}` : 'Upgrade'}
+      ariaLabel={`Increase ${label.toLowerCase()}`} detail=""
+      onAction={buy} onResearch={actions.onResearch} researchName={actions.researchName} />}
+  </div>;
+}
 
 function MemoryAction({ quote: q, label, add: _add = false, primary = false, ...actions }: Actions & {
   quote: Quote; label: string; add?: boolean; primary?: boolean;
@@ -21,28 +33,28 @@ function MemoryAction({ quote: q, label, add: _add = false, primary = false, ...
   </div>;
 }
 
-/** One module's current facts, capacity upgrade and next generation. */
+/** One module's usage, independent Space and Speed controls, and next generation. */
 export function memoryPartView({ module: part, slot, facts, own, ...actions }: Actions & {
   module: PartView; slot: 'ram' | 'drive'; facts: PartFacts; own: readonly Quote[];
 }): BoardPartView {
   const { replaces } = partQuotes(own);
   const capacityUpgrade = own.find(q => q.action.type === 'upgradePart' && q.action.axis !== 'speed');
   const speedUpgrade = own.find(q => q.action.type === 'upgradePart' && q.action.axis === 'speed');
-  const buy = (q: Quote) => actions.onAction(q.action);
+  const capacityDown = own.find(q => q.action.type === 'downgradePart' && q.action.axis !== 'speed');
+  const speedDown = own.find(q => q.action.type === 'downgradePart' && q.action.axis === 'speed');
   const capacity = part.capacityBits ?? 0, used = part.usedBits ?? 0;
   const name = slot === 'ram' ? 'RAM' : 'Drive';
   return {
     title: facts.title, sub: facts.sub, head: null,
-    footer: <div className="memory-upgrades">
-      {capacityUpgrade && <QuoteKey quote={capacityUpgrade} label="Space" onAction={buy} onResearch={actions.onResearch} researchName={actions.researchName} />}
-      {speedUpgrade && <QuoteKey quote={speedUpgrade} label="Speed" onAction={buy} onResearch={actions.onResearch} researchName={actions.researchName} />}
+    footer: <div className="memory-upgrades memory-tracks">
+      <MemoryTrack label="Space" current={bits(capacity)} upgrade={capacityUpgrade} downgrade={capacityDown} {...actions} />
+      <MemoryTrack label="Speed" current={bitRate(part.rateBits ?? 0)} upgrade={speedUpgrade} downgrade={speedDown} {...actions} />
     </div>,
     body: <div className="memory-part">
-      <div className="memory-current"><b>{bits(used)} / {bits(capacity)} used</b></div>
+      <div className="memory-current"><b>{bits(used)} used</b></div>
       <div className="memory-meter" role="meter" aria-label={`${name} used`} aria-valuemin={0} aria-valuemax={capacity} aria-valuenow={used}>
         <i style={{ width: `${Math.min(100, used / Math.max(1, capacity) * 100)}%` }} />
       </div>
-      <p className="memory-speed">Speed {bitRate(part.rateBits ?? 0)}</p>
       <GenerationAction quote={nextGeneration(replaces)} onAction={q => actions.onAction(q.action)} onResearch={actions.onResearch} researchName={actions.researchName} />
     </div>,
   };

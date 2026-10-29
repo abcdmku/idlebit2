@@ -208,7 +208,7 @@ function maintenanceQuotes(state: GameState, part: PartRef): Quote[] {
   const axes = part.slot.kind === 'ram' || part.slot.kind === 'drive' ? ['capacity', 'speed'] as const : ['capacity'] as const;
   const down = part.slot.kind === 'core' ? [] : axes.map(axis => {
     const plan = planDowngrade(state, part, axis);
-    return toQuote(state, { type: 'downgradePart', part, axis }, plan, effectOf(state, part, plan));
+    return withEffect(state, { type: 'downgradePart', part, axis }, plan);
   });
   const remove = planRemove(state, part);
   return [...down, toQuote(state, { type: 'removePart', part }, remove)];
