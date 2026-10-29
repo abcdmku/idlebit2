@@ -26,6 +26,7 @@ export function fixtureChip(online: ChipSnapshot['online'] = 'onMarket'): ChipSn
 export function fixtureSystem(online: SystemSnapshot['online'] = 'onMarket'): SystemSnapshot {
   const part = { slot: 0, kind: 'cpu' as const, generation: 0, level: 1, active: false, resourceBusy: 0 };
   return {
+    power: { actualW: 0.2, reservedW: 0.4, rackReservedW: 0.4, capacityW: 1, rackOpen: false },
     level: 'system', parent: null, systemId: systemId(0), kind: 'server', board: 'general', cpuCount: 1, ramSlots: 1, etaCfg: 1,
     chip: fixtureChip(online), chips: [fixtureChip(online)], inbound: null, cpuBusy: [0], online, timerS: null, timerTotalS: null, cpu: part, ram: [], gpu: [], storage: [],
     psu: SUPPLY,

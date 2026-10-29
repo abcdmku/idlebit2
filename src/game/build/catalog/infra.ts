@@ -12,8 +12,8 @@ export const RACK_COOLER: CatalogRow = {
 };
 export const PDU: CatalogRow = {
   id: 'pdu', scope: 'rack', names: ['Basic PDU', 'Metered PDU', 'Switched PDU'], gates: [r('rack'), r('meteredPdu'), r('switchedPdu')],
-  // ×10 with the rack cooler, for the CSV energy ratio.
-  curve: 'flow', base: [1e7, 2e9, 5e15], watts: { kind: 'supply', loss: [0.04, 0.03, 0.02], lossPerLevel: 0.005 },
+  // Starter allocation is 1 view W. Rack exposes upgrades to this shared budget (D67).
+  curve: 'flow', base: [1e6, 2e9, 5e15], watts: { kind: 'supply', loss: [0.04, 0.03, 0.02], lossPerLevel: 0.005 },
   price: [2.4e6, 1.2e7, 1.4e11], upgrade: [1.5e6, 1.5e6, 1.8e10],
 };
 /**

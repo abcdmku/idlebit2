@@ -35,7 +35,11 @@ function levelLine(state: GameState, ref: PartRef, rest: number, need: number): 
       return { action: { type: 'upgradePartTo', part: ref, level }, plan: planUpgradeTo(state, ref, level) };
     }
   }
-  const g = part.gen + 1;
+  let g = part.gen + 1;
+  if (id === 'ram' || id === 'storage') {
+    while (g < row.base.length && rest + capacity(row, g, 1) < need) g += 1;
+    return g < row.base.length ? { action: { type: 'replacePart', part: ref, generation: g, preserveCapacity: false }, plan: planReplace(state, ref, g, false) } : null;
+  }
   if (g >= row.base.length) return null;
   return { action: { type: 'replacePart', part: ref, generation: g, preserveCapacity: true }, plan: planReplace(state, ref, g, true) };
 }

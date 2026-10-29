@@ -13,8 +13,8 @@ function request(state: GameState, q: Quote): QuoteRequest | null {
       : a.type === 'addUnit' ? a.parent : null;
   if (!unit) return null;
   const system = unit.kind === 'system' ? unit.id : null;
-  const rack = unit.kind === 'rack' ? unit.id : system !== null ? state.build.systems[system]?.rack : undefined;
-  const room = unit.kind === 'room' ? unit.id : rack !== undefined ? state.build.racks[rack]?.room : undefined;
+  const rack = os.rack ?? (unit.kind === 'rack' ? unit.id : system !== null ? state.build.systems[system]?.rack : undefined);
+  const room = os.room ?? (unit.kind === 'room' ? unit.id : rack !== undefined ? state.build.racks[rack]?.room : undefined);
   const part: PartRef | null = os.part === 'psu' && system !== null ? { unit: { kind: 'system', id: systemId(system) }, slot: { kind: 'psu' } }
     : os.part === 'pdu' && rack !== undefined ? { unit: { kind: 'rack', id: rackId(rack) }, slot: { kind: 'pdu' } }
     : os.part === 'ups' && room !== undefined ? { unit: { kind: 'room', id: roomId(room) }, slot: { kind: 'ups', index: 0 } } : null;

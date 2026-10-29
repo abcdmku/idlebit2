@@ -99,6 +99,8 @@ Replacement restores efficiency relative to pushed old hardware. A native part m
 
 ## 4. RAM capacity and bandwidth
 
+D70, 28 October: capacity and bandwidth now have independently purchased levels. Each track uses its existing curve and costs half the former combined step price, rounded up to whole Credits. A new RAM generation starts both at level 1. Drives follow the same separation for capacity and IO, using their existing generation curves and ceilings. Transfer speed determines rated power. The former single saved level described below is superseded by separate capacity and speed levels.
+
 Keep the six existing RAM technologies and their gates. They are independent of CPU fab purchases. Their capacity and bandwidth bases in game-spec A.1 remain starting values. The source's one-bit RAM does not add RAM to the one-bit-cache boot state.
 
 D46 makes bandwidth apply to initial loading as well as later memory traffic. SDRAM, DDR, DDR2, DDR3, DDR4 and DDR5 each have their own base rate and 36 levels of speed upgrades within the generation. Rates are the game's scaled bit/s, not real-world DIMM MHz ratings. A cache load consumes CPU operations. HDD, SSD, NVMe and SCM load at their own drive IO rates and retain their existing level upgrades.

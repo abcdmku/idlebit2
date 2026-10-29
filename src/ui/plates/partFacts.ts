@@ -31,12 +31,12 @@ export function partFacts(focus: LevelSnapshot, slot: PartSlot, siteId?: number)
     }
     if (slot.kind === 'clock') {
       const k = focus.clock;
-      return { title: 'Clock', sub: hertz(k.hz), level: k.level, status: focus.cpuCount > 1 ? `Shared by all ${focus.cpuCount} CPUs` : 'Sets the speed of every core',
+      return { title: 'Clock', sub: hertz(k.hz), level: k.level, status: '',
         lines: k.effectiveHz !== k.hz ? [{ text: `Running at ${hertz(k.effectiveHz)}`, tone: 'warn' }] : [] };
     }
     if (slot.kind === 'cache') {
       const kind = slot.kind, c = focus.cache;
-      return { title: SLOT_TITLE[kind], sub: bits(c.capacityBits), level: c.level, status: 'Holds the working set of each running task',
+      return { title: SLOT_TITLE[kind], sub: bits(c.capacityBits), level: c.level, status: '',
         lines: [{ text: `${bits(focus.cache.usedBits)} of ${bits(focus.cache.capacityBits)} in use`, tone: 'muted' }] };
     }
     if (slot.kind === 'scheduler') {

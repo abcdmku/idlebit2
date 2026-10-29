@@ -13,6 +13,7 @@ import { ruleLock, genLock } from './locks';
 import { findSaved } from './units';
 import { mergeAccels } from './configAccels';
 import { lbQueueStepsTo } from './catalog/network';
+import { memorySteps } from './memory';
 
 /* ---------- Save and delete (spec §13.5) ---------- */
 
@@ -57,6 +58,11 @@ interface Merge { price: bigint; cold: boolean }
 function mergePart<T extends PartLevel>(row: CatalogRow, have: T | null | undefined, want: T | null | undefined, m: Merge, factor = 1, driven = 1): T | null {
   if (!want) { if (have) m.cold = true; return null; }
   if (have && have.gen === want.gen) {
+    if ('speedLevel' in want && typeof want.speedLevel === 'number' && 'speedLevel' in have && typeof have.speedLevel === 'number') {
+      const level = Math.max(have.level, want.level), speedLevel = Math.max(have.speedLevel, want.speedLevel);
+      m.price += scalePrice(memorySteps(row, have.gen, have.level, level) + memorySteps(row, have.gen, have.speedLevel, speedLevel), factor);
+      return { ...want, level, speedLevel };
+    }
     if (have.level >= want.level) return have.level === want.level ? want : have;
     m.price += scalePrice(upgradesBetween(row, have.gen, have.level, want.level, driven), factor);
     return want;
@@ -103,8 +109,8 @@ export function mergeSpec(have: SystemSpec, want: SystemSpec): { spec: SystemSpe
   m.price += accelerators.price;
   m.cold ||= accelerators.cold;
   const drives = mergeList(() => PARTS.storage, have.drives, want.drives, m);
-  const psu = mergePart(PARTS.psu, have.psu, want.psu, m)!;
-  const merged: SystemSpec = { ...want, cpu, scheduler: scheduler && want.scheduler ? { ...scheduler, strategy: want.scheduler.strategy } : null, ram, accels, drives, psu: { ...psu, capped: want.psu.capped } };
+  const psu = have.psu;
+  const merged: SystemSpec = { ...want, cpu, scheduler: scheduler && want.scheduler ? { ...scheduler, strategy: want.scheduler.strategy } : null, ram, accels, drives, psu };
   const same = JSON.stringify(merged) === JSON.stringify(want);
   return { spec: same ? want : merged, price: m.price, cold: m.cold, accelCold: accelerators.cold };
 }

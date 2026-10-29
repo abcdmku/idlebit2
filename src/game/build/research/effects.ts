@@ -1,6 +1,3 @@
-import { capacity } from '../catalog/curves';
-import { PARTS } from '../catalog';
-import { fullLoadWatts } from '../configModel';
 import { secondsToTicks } from '../../core/constants';
 import { baseRouter } from '../../core/defaults';
 import { baseUnlocks } from '../../core/state';
@@ -86,26 +83,4 @@ export function openContainers(build: BuildState, unlocks: Unlocks): BuildState 
   open(build.sites, 'sites', unlocks.levels.global);
   if (!next.global.scheduler && (unlocks.gens.site & 1) !== 0) next = { ...next, global: { ...next.global, scheduler: baseRouter(0) } };
   return next === build ? build : { ...next, revision: build.revision + 1 };
-}
-
-/** QA-02: headroom a System-arrival PSU keeps over its system's full-load draw. */
-export const PSU_ARRIVAL_HEADROOM = 1.25;
-/**
- * Before System the board PSU has no limit (`psuLive`). When System arrives each system's PSU is raised,
- * free, to the first level of its generation that covers 1.25× the system's full-load watts, so a chip
- * built up before System keeps running. Levels only go up; a PSU that already covers it is left alone.
- */
-export function sizePsusForSystem(build: BuildState, unlocks: Unlocks): BuildState {
-  let changed = false;
-  const systems = build.systems.map((sys) => {
-    if (!sys) return sys;
-    const need = PSU_ARRIVAL_HEADROOM * fullLoadWatts(sys.spec, unlocks);
-    const { gen } = sys.spec.psu;
-    let level = sys.spec.psu.level;
-    while (level < 60 && capacity(PARTS.psu, gen, level) < need) level += 1;
-    if (level === sys.spec.psu.level) return sys;
-    changed = true;
-    return { ...sys, spec: { ...sys.spec, psu: { ...sys.spec.psu, level } } };
-  });
-  return changed ? { ...build, systems } : build;
 }

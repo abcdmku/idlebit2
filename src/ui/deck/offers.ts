@@ -59,7 +59,7 @@ export const ROWS: Readonly<Record<LevelId, readonly RowDef[]>> = {
  * tapping the load balancer offers. At most two per level.
  */
 export const EXTRA_ROWS: Readonly<Partial<Record<LevelId, readonly RowDef[]>>> = {
-  system: [row('psu', 'power', 'Power supply', 'psu')],
+  system: [],
   rack: [row('powerCtl', 'power', 'Power control'), row('lbQueue', 'lb', 'LB queue', 'lb')],
   room: [row('lbQueue', 'lb', 'LB queue', 'roomLb'), row('roomStart', 'power', 'Start control')],
   global: [row('lbQueue', 'lb', 'Scheduler queue', 'globalScheduler'), row('globalStart', 'power', 'Start control')],

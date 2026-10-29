@@ -19,9 +19,9 @@ export const buildHandlers: HandlerMap = {
   setQueueLoaderLimit: (s, a) => commitPlan(s, planQueueLoaderLimit(s, a.system, a.limit)),
   convertRamToEcc: (s, a) => commitPlan(s, planRamEcc(s, a.system)),
   installGpu: (s, a) => commitPlan(s, planInstallGpu(s, a.system, a.model, a.index)),
-  upgradePart: (s, a) => commitPlan(s, planUpgrade(s, a.part)),
-  upgradePartTo: (s, a) => commitPlan(s, planUpgradeTo(s, a.part, a.level)),
-  upgradeAll: (s, a) => commitPlan(s, planUpgradeAll(s, a.system, a.kind, a.gen)),
+  upgradePart: (s, a) => commitPlan(s, planUpgrade(s, a.part, a.axis)),
+  upgradePartTo: (s, a) => commitPlan(s, planUpgradeTo(s, a.part, a.level, a.axis)),
+  upgradeAll: (s, a) => commitPlan(s, planUpgradeAll(s, a.system, a.kind, a.gen, a.axis)),
   replacePart: (s, a) => {
     const part = readPart(s.build, a.part);
     return commitPlan(s, part && isLadder(part.id) ? planReplaceLadder(s, a.part, a.generation) : planReplace(s, a.part, a.generation, a.preserveCapacity, a.minimumCapacity));

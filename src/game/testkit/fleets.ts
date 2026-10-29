@@ -26,9 +26,9 @@ const TOP_SPEC: SystemSpec = {
   cpu: { cpu: lvl(3, 1), cores: Array.from({ length: 32 }, () => core), clock: flowTop(3), cache: flowTop(3), },
   cpuCount: 2,
   scheduler: { gen: 3, level: 11, strategy: 'mlfq' },
-  ram: Array.from({ length: 8 }, () => ({ gen: 5, level: 20, ecc: true })),
+  ram: Array.from({ length: 8 }, () => ({ gen: 5, level: 20, speedLevel: 20, ecc: true })),
   accels: Array.from({ length: 8 }, () => ({ kind: 'gpu' as const, model: '9990' as const })),
-  drives: Array.from({ length: 4 }, () => flowTop(3)),
+  drives: Array.from({ length: 4 }, () => ({ ...flowTop(3), speedLevel: 14 })),
   psu: { gen: 5, level: 16, capped: false },
     settings: { dvfs: true, turbo: true, cStateLimit: 1 },
 };

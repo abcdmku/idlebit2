@@ -1,11 +1,11 @@
 // System level: the original motherboard (mockup v3 levels/system.js, D15.2), whole and on its own.
 // Parts open their component plate; a CPU target drills into its own socket. The system summary
-// also opens CPU upgrade options. The PSU is a fixed board part; nothing on a board cools.
+// also opens CPU upgrade options. Power capacity and cooling upgrades belong to the Rack.
 import type { SystemSnapshot } from '../../../game';
 import { P, R, copyRect, partVersionOf, resetHitTarget, setRect } from '../../core';
 import type { HitTarget, LevelRegistry, LevelRenderer, Rect } from '../../core';
 import { writeLabels } from './labels';
-import { CABLE_X, CONNECTOR, FOCUS, PSU, PSU_TILE, SAVE, WORLD, packageRect, siteRect, worldRect } from './layout';
+import { CABLE_X, CONNECTOR, FOCUS, SAVE, WORLD, packageRect, siteRect, worldRect } from './layout';
 import { boardModel, boardPartRef, slotOf } from './model';
 import { drawSystemMini } from './mini';
 import { drawBoard } from './world';
@@ -75,10 +75,6 @@ export function createSystemRenderer(registry: LevelRegistry): LevelRenderer<'sy
         const t = resetHitTarget(out[i++]!, `${site.type}${p.slot}`, 'part', owner(s));
         t.part = boardPartRef(s.systemId, site.type, p.slot); siteRect(b, site.type, site.index, t.rect);
       }
-      if (i < out.length) {
-        const t = resetHitTarget(out[i++]!, 'psu', 'part', owner(s));
-        t.part = boardPartRef(s.systemId, 'psu'); copyRect(PSU_TILE, t.rect);
-      }
       if (s.saveable && i < out.length) {
         const t = resetHitTarget(out[i++]!, 'save', 'save', owner(s));
         t.unit = { kind: 'system', id: s.systemId }; setRect(t.rect, SAVE.x, SAVE.y, 7, 7);
@@ -100,7 +96,6 @@ export function createSystemRenderer(registry: LevelRegistry): LevelRenderer<'sy
     },
     /** Purchase flash (A10): the part on each site, by its generation and level. */
     partVersion(s, id) {
-      if (id === 'psu') return partVersionOf(s.psu);
       if (id.startsWith('cpu')) return Number(id.slice(3)) < s.cpuCount ? partVersionOf(s.cpu) : null;
       const list = id.startsWith('ram') ? s.ram : id.startsWith('gpu') ? s.gpu : id.startsWith('drive') ? s.storage : null;
       if (!list) return null;
@@ -111,7 +106,6 @@ export function createSystemRenderer(registry: LevelRegistry): LevelRenderer<'sy
     faults(s, out) {
       let n = 0;
       if (s.online === 'crashed' && n < out.length) packageRect(boardModel(s).b, 0, out[n++]!);
-      if (s.psu.failed && n < out.length) setRect(out[n++]!, PSU.x, PSU.y - 5, PSU.w, PSU.h);
       return n;
     },
     icon(g) {

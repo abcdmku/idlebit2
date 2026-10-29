@@ -173,7 +173,7 @@ export function partEffect(state: GameState, ref: PartRef, after: BuildState, co
       const effect = { ...preview(ownValue(state.build, ref), ownValue(after, ref), unit, inputA, inputB, price, cost, gain, energy), ...estimate };
       if (ref.slot.kind === 'ram' || ref.slot.kind === 'drive') {
         const pa = readPart(state.build, ref), pb = readPart(after, ref), row = PARTS[ref.slot.kind === 'ram' ? 'ram' : 'storage'];
-        if (pb) return { ...effect, throughputBefore: pa ? capacity2(row, pa.gen, pa.level) : 0, throughputAfter: capacity2(row, pb.gen, pb.level) };
+        if (pb) return { ...effect, throughputBefore: pa ? capacity2(row, pa.gen, pa.speedLevel!) : 0, throughputAfter: capacity2(row, pb.gen, pb.speedLevel!) };
       }
       return effect;
     }

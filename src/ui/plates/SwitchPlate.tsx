@@ -3,8 +3,8 @@ import type { Quote, SwitchRef, SwitchView } from '../../game';
 import { genName, rackLetter } from './copy';
 import { hertz } from './format';
 import { PlateFrame } from './PlateFrame';
-import { effectText } from './PartKeys';
 import { routine } from './OptionRow';
+import { GenerationAction, nextGeneration } from './GenerationAction';
 import { QuoteKey, Status, Toggle } from './widgets';
 import type { PlateCommon } from './types';
 
@@ -31,7 +31,7 @@ export function SwitchBody({ sw, view, lead, selected = null, quotes, onAction, 
   const all = portQuote('all') ?? (view.sameSpeed ? qs.find((q) => q.action.type === 'upgradePort') : undefined);
   const uplinks = qs.filter((q) => q.action.type === 'upgradeUplink' || q.action.type === 'addUplink');
   const addPorts = qs.find((q) => q.action.type === 'addPorts');
-  const replace = qs.find((q) => q.action.type === 'replacePart' && !q.locked) ?? qs.find((q) => q.action.type === 'replacePart');
+  const replace = nextGeneration(qs);
   const list = useRef<HTMLOListElement>(null);
   // A port tapped on the switch art opens the plate at its row.
   useEffect(() => { if (selected !== null) list.current?.querySelector(`[data-port="${selected}"]`)?.scrollIntoView?.({ block: 'nearest' }); }, [selected]);
@@ -43,13 +43,13 @@ export function SwitchBody({ sw, view, lead, selected = null, quotes, onAction, 
         onAction={fire} onResearch={onResearch} researchName={researchName} />
         : <p className="p-hint">Ports at this switch's top speed</p>}
     </div>
-    <Toggle label="Match ports" on={view.sameSpeed}
+    <details className="component-options" open={selected !== null}><summary>Ports and uplinks</summary><Toggle label="Match ports" on={view.sameSpeed}
       onToggle={() => onAction({ type: 'setSameSpeed', sw, on: !view.sameSpeed })} />
     {!view.sameSpeed && <ol ref={list} className="port-list" aria-label="Ports">
       {view.ports.map((p, i) => {
         const q = portQuote(i), to = after(q);
         return <li key={i} data-port={i} className={i === selected ? 'sel' : ''}>
-          {q ? <><p className="port-peer">{peer(p.peer)} · {hertz(p.speedHz)}</p><QuoteKey quote={q} tone="row" label={`Port ${i + 1}${to != null ? ` → ${hertz(to)}` : ''}`}
+          {q ? <><QuoteKey quote={q} tone="row" label={'Port ' + (i + 1) + ' / ' + peer(p.peer)}
             ariaLabel={`Port ${i + 1}, ${peer(p.peer)}, ${hertz(p.speedHz)}${to != null ? ` to ${hertz(to)}` : ''}`} onAction={fire} onResearch={onResearch} researchName={researchName} /></>
             : <p className="key-slot">Port {i + 1} · {peer(p.peer)} · {hertz(p.speedHz)} · top speed</p>}
         </li>;
@@ -60,9 +60,8 @@ export function SwitchBody({ sw, view, lead, selected = null, quotes, onAction, 
         onAction={fire} onResearch={onResearch} researchName={researchName} />}
       {routine(uplinks.filter(q => q.locked?.code !== 'ceiling' && q.locked?.code !== 'cap').map(quote => ({ quote }))).map(({ quote: q }, i) => <QuoteKey key={i} quote={q} label={q.action.type === 'addUplink' ? 'Add uplink' : `Uplink ${q.action.type === 'upgradeUplink' ? q.action.uplink + 1 : ''}${after(q) != null ? ` · ${hertz(after(q)!)}` : ''}`}
         onAction={fire} onResearch={onResearch} researchName={researchName} />)}
-      {replace && <QuoteKey quote={replace} tone="replace" label={`Replace · ${replace.label}`} detail={effectText(replace.effect)}
-        onAction={fire} onResearch={onResearch} researchName={researchName} />}
-    </div>
+    </div></details>
+    <GenerationAction quote={replace} onAction={fire} onResearch={onResearch} researchName={researchName} />
   </>;
 }
 

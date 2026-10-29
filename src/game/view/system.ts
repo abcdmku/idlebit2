@@ -1,3 +1,4 @@
+import { selectPowerBudget } from './powerBudget';
 import { viewW } from '../core/constants';
 import { ACCEL_GPU_SLOTS, ACCEL_MAX_CPUS, ACCEL_RAM_SLOTS, GENERAL_MAX_GPUS, QUEUE_SAMPLE, GENERAL_MAX_RAM, MAX_CPUS } from '../core/constants';
 import { capacity, capacity2, PARTS } from '../build/catalog';
@@ -78,6 +79,7 @@ export function systemSnapshot(state: GameState, id: SystemId, parent: NodeRef |
     return used;
   };
   return {
+    power: selectPowerBudget(state, id),
     level: 'system', parent, systemId: id, kind: spec?.kind ?? 'server', board: spec?.board ?? 'general',
     cpuCount, ramSlots: boardSlots(state, spec).ram, etaCfg: c.etaCfg[id] ?? 1,
     chip: chips[0]!, chips,
@@ -87,11 +89,11 @@ export function systemSnapshot(state: GameState, id: SystemId, parent: NodeRef |
     cpu: part(0, 'cpu', cpu0.gen, cpu0.level, cpuBusy),
     ram: (spec?.ram ?? []).map((m, i) => ({
       ...part(i, 'ram', m.gen, m.level, ramBusy, m.ecc),
-      capacityBits: capacity(PARTS.ram, m.gen, m.level), usedBits: occupied(capacity(PARTS.ram, m.gen, m.level), 'ram'), rateBits: capacity2(PARTS.ram, m.gen, m.level), })),
+      speedLevel: m.speedLevel, capacityBits: capacity(PARTS.ram, m.gen, m.level), usedBits: occupied(capacity(PARTS.ram, m.gen, m.level), 'ram'), rateBits: capacity2(PARTS.ram, m.gen, m.speedLevel), })),
     gpu: (spec?.accels ?? []).map((a, i) => acceleratorView(state, id, i, a)),
     storage: (spec?.drives ?? []).map((d, i) => ({
       ...part(i, 'drive', d.gen, d.level, ioBusy),
-      capacityBits: capacity(PARTS.storage, d.gen, d.level), usedBits: occupied(capacity(PARTS.storage, d.gen, d.level), 'disk'), rateBits: capacity2(PARTS.storage, d.gen, d.level), })),
+      speedLevel: d.speedLevel, capacityBits: capacity(PARTS.storage, d.gen, d.level), usedBits: occupied(capacity(PARTS.storage, d.gen, d.level), 'disk'), rateBits: capacity2(PARTS.storage, d.gen, d.speedLevel), })),
     psu: psuView(state, id, spec?.psu ?? { gen: 0, level: 1, capped: false }),
     running: runningTasks(state, id, Math.max(c.K[id] ?? 0, 1)),
     queue: { cap: c.Q[id] ?? 0, count: h.queueLen[id] ?? 0, sample: queuedTasks(state, id, 0, QUEUE_SAMPLE) },

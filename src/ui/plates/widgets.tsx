@@ -1,9 +1,8 @@
 import type { ReactNode } from 'react';
-import { supplyPreparation, supplyResearch, type Amount, type Currency, type Quote, type ResearchId } from '../../game';
+import { type Amount, type Currency, type Quote, type ResearchId } from '../../game';
 import { CoinIcon, GemIcon, LockIcon } from './icons';
-import { span, watts, wholeText } from './format';
-import { overSupplyText, supplyRequest } from './overSupply';
-import { useQuote, useShell } from '../storeHooks';
+import { span, wholeText } from './format';
+import { purchaseGain, purchaseReason } from './purchaseText';
 
 /* The plate language (mockup core/plate.js): head, status and bar, lines, list, keys, port grid, toggle, choices. */
 
@@ -33,9 +32,9 @@ export function Status({ text, tone = '', progress }: { text: string; tone?: Ton
   </>;
 }
 
-/** Fixed-count line slots: a plate reserves `slots` rows so it never resizes when a warning appears. */
-export function Lines({ lines, slots = lines.length }: { lines: readonly Line[]; slots?: number }) {
-  const rows = Array.from({ length: Math.max(slots, lines.length) }, (_, i) => lines[i] ?? null);
+/** Render actual facts without reserving empty paragraph rows. */
+export function Lines({ lines, slots: _slots = lines.length }: { lines: readonly Line[]; slots?: number }) {
+  const rows = lines.filter(line => line.text.trim());
   return <>{rows.map((l, i) => <p key={i} className={`p-line ${l?.tone ?? ''}`} aria-live={i === 0 ? 'polite' : undefined}>{l?.text ?? ''}</p>)}</>;
 }
 
@@ -50,14 +49,15 @@ export interface KeyProps {
   ariaLabel?: string;
   /** A choice key that is the current setting. */
   pressed?: boolean;
+  purchase?: Quote;
   onPress: () => void;
 }
-export function Key({ label, price, detail, tone = '', disabled, ariaLabel, pressed, onPress }: KeyProps) {
-  return <button type="button" className={`key ${tone}${pressed ? ' on' : ''}`} disabled={disabled} aria-label={ariaLabel} aria-pressed={pressed}
+export function Key({ label, price, detail, tone = '', disabled, ariaLabel, pressed, purchase, onPress }: KeyProps) {
+  return <button type="button" className={`key ${tone}${pressed ? ' on' : ''}`} disabled={disabled} aria-label={ariaLabel} aria-pressed={pressed} data-purchase-action={purchase ? JSON.stringify(purchase.action) : undefined}
     onClick={(e) => { e.stopPropagation(); if (!disabled) onPress(); }}>
     <span className="kl">{label}</span>
     {price && <Price cost={price.cost} currency={price.currency} />}
-    {detail != null && <span className="action-detail">{detail}</span>}
+    {detail != null && <span className="action-detail clip">{detail}</span>}
   </button>;
 }
 
@@ -76,74 +76,23 @@ export interface QuoteKeyProps {
   tone?: KeyTone;
   showSupplyNote?: boolean;
   ariaLabel?: string;
-  /** Shown under the key when it cannot be bought. */
+  /** Optional caller hint. Component locks are read from the quote itself. */
   reason?: string | null;
   researchName?: (id: ResearchId) => string;
   onAction: (q: Quote) => void;
   onResearch?: (id: ResearchId) => void;
 }
-/**
- * A purchase key for one quote. A research lock turns it into a key that opens that research, and it says so
- * ("Research Rack"): a key never names a purchase it does not make (user, 26 Oct).
- */
-export function QuoteKey({ quote, label, detail, tone = '', reason, researchName, onAction, onResearch, showSupplyNote = true, ariaLabel }: QuoteKeyProps) {
-  const lock = quote.locked;
-  if (lock?.code === 'research' && lock.node && onResearch) {
-    const node = lock.node, name = researchName?.(node) ?? lock.text.replace(/^Needs /, '').replace(/ research$/, '');
-    return <Key tone="locked-action" label={<><LockIcon />{`Research ${name}`}</>}
-      ariaLabel={`Research ${name}. ${typeof label === 'string' ? `${label} needs it.` : lock.text}`}
-      onPress={() => onResearch(node)} />;
-  }
-  const cantBuy = Boolean(lock) || !quote.affordable;
-  const why = lock ? lock.text : !quote.affordable ? (reason ?? null) : null;
-  return <>
-    <Key tone={tone} label={label} price={lock ? null : { cost: quote.cost, currency: quote.currency }} detail={detail} ariaLabel={ariaLabel}
-      disabled={cantBuy} onPress={() => onAction(quote)} />
-    {why && <p className="need">{why}</p>}
-    {showSupplyNote && <OverSupplyNote quote={quote} onAction={onAction} />}
-  </>;
-}
-
-/**
- * A buy that would push a supply past its cap (sim `overSupply`, view watts): "Over the power supply · 64 W → 80 W",
- * and a key that upgrades that supply. Nothing at all when the quote stays under every supply.
- * R17: the warning names the option it belongs to (`scope`), so it never reads as the machine as it is now, and its
- * preparation is a secondary key inside that option, never a competing main key. `prepAbove`: an earlier option
- * on the same plate already carries this very preparation, so this one points to it instead of repeating the key.
- */
-export function OverSupplyNote({ quote, onAction, scope, prepAbove = false }: { quote: Quote; onAction: (q: Quote) => void; scope?: string; prepAbove?: boolean }) {
-  return quote.overSupply ? <SupplyFix purchase={quote} onAction={onAction} scope={scope} prepAbove={prepAbove} /> : null;
-}
-/** "With DDR4 · L1: full load 13 kW over the 3.2 kW power supply" (the option's future, not the machine's present). */
-export const scopedOverSupplyText = (os: NonNullable<Quote['overSupply']>, scope?: string) => scope
-  ? `With ${scope}: ${watts(os.afterW)} at full load, over the ${watts(os.capW)} ${os.part === 'pdu' ? 'PDU' : os.part === 'ups' ? 'UPS' : 'power supply'}`
-  : overSupplyText(os);
-function SupplyFix({ purchase, onAction, scope, prepAbove }: { purchase: Quote; onAction: (q: Quote) => void; scope?: string; prepAbove: boolean }) {
-  const shell = useShell(), os = purchase.overSupply!;
-  // Refresh with the same wallet/unlock cadence as purchase quotes. Resolve dependencies from
-  // the quoted unit, including an upstream PDU, rather than guessing the focused supply.
-  useQuote(supplyRequest(os, shell.store.getSnapshot()));
-  const state = shell.store.getState(), supply = supplyPreparation(state, purchase, false);
-  const research = !supply ? supplyResearch(state, purchase) : null;
-  const slot = supply && (supply.action.type === 'upgradePart' || supply.action.type === 'upgradePartTo' || supply.action.type === 'replacePart')
-    ? supply.action.part.slot.kind : os.part;
-  const name = slot === 'pdu' ? 'PDU' : slot === 'ups' ? 'UPS' : 'power supply';
-  const verb = supply?.action.type === 'replacePart' ? 'Replace' : 'Upgrade';
-  return <>
-    <p className="need warn power-limit" data-testid="over-supply">{scopedOverSupplyText(os, scope)}</p>
-    {prepAbove ? <p className="option-values">Same {name} {verb.toLowerCase()} as above</p> : <>
-    {supply && <>
-      <p className="option-values">{slot !== os.part ? `First the ${name}: ` : `${name[0]!.toUpperCase()}${name.slice(1)} `}{watts(supply.effect!.capacityBefore)} → {watts(supply.effect!.capacityAfter)}</p>
-      {coldText(supply) && <p className="option-cold">{coldText(supply)}</p>}
-    </>}
-    {research ? <Key tone="locked-action" label="Research power supply"
-      onPress={() => shell.view.dispatch({ type: 'openResearch', project: research })} />
-      // The preparation is a step toward the option, so it is a secondary key, never the plate's gold one.
-      : supply && <Key tone="replace prep" label={`${verb} ${name}`} price={{ cost: supply.cost, currency: supply.currency }}
-        ariaLabel={`First ${verb.toLowerCase()} ${name} to ${watts(supply.effect!.capacityAfter)}, ${supply.cost} Credits`}
-        disabled={!supply.affordable} onPress={() => onAction(supply)} />}
-    </>}
-  </>;
+/** One purchase, its stat gain and price. Limits disable this same key. */
+export function QuoteKey({ quote, label, detail, tone = '', researchName, onAction, ariaLabel }: QuoteKeyProps) {
+  const why = purchaseReason(quote, researchName);
+  const gain = detail ?? purchaseGain(quote);
+  const noPower = !!quote.overSupply || quote.locked?.code === 'power';
+  const shownLabel = noPower ? "Can't upgrade" : quote.gpu && typeof label === 'string' ? `${label} · ${quote.gpu.after.cores} cores` : label;
+  const cold = quote.cold && quote.downtimeMs > 0 ? Math.ceil(quote.downtimeMs / 1000) + 's offline' : '';
+  const shown = (quote.locked || quote.overSupply) ? why : [gain, cold].filter(Boolean).join(' · ') || why;
+  return <Key tone={tone} label={shownLabel} price={quote.locked && quote.cost === '0' ? null : { cost: quote.cost, currency: quote.currency }} detail={shown || undefined}
+    ariaLabel={[ariaLabel ?? (typeof shownLabel === 'string' ? shownLabel : quote.label), purchaseGain(quote), why, cold].filter(Boolean).join('. ')}
+    disabled={!!why} purchase={quote} onPress={() => onAction(quote)} />;
 }
 
 /* ---------- widgets: port grid, toggle row, choice list ---------- */

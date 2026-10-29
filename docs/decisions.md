@@ -1903,3 +1903,33 @@ System boards reserve two memory rows below their hardware. Each gives total usa
 ## D65, 28 Oct: memory readouts sit below the board
 
 The user clarified that RAM and disk readouts belong below the PCB outline, not inside it. The board slab now ends above the two existing readout rows. Component targets, the camera footprint, HUD and task-bar heights stay fixed. Bottom mounting holes follow the shorter slab, and power/dark shading stops at its edge. This overlay correction ships before the separate power/cooling rule update.
+
+## D67, 28 Oct: rack power is a build limit; cooling limits performance
+
+The user moved power capacity out of the board. Board supply hardware, purchase paths, prices, losses and its research entries are retired. The serializable supply field and old hot columns remain inert internal metadata. The board shows measured power; its inspection and Rack PDU distinguish actual use from full-load allocation. CPU power settings remain in the system inspection.
+
+A shared rack budget reserves all installed hardware, including offline components, enabled turbo, peak pipe/network traffic and infrastructure. The starter allocation reserves the existing rack parts even before its view opens, so Rack unlock cannot overload an approved board build. Basic PDU capacity starts at 1 view W and doubles per level. Every hardware quote and authoritative build commit rejects an increase beyond PDU capacity before debit. Open rooms apply the same check to their UPS capacity. Turning off hardware and saved/copied configurations cannot bypass allocation. Reductions remain allowed, and cooler capacity itself never blocks a purchase. PDU upgrades require Rack.
+
+Rack research costs 270k Data plus 2.7M Credits and uses 18M CPU ops of work. In the active seed-42 campaign, the starter rack reserves 0.984/1 W at 3.5 h, with its next clock step requiring 1.444 W. Rack completes at 3:52:32, so the power ceiling leads into Rack rather than a separate board supply grind. Existing hardware keeps earning while research runs.
+
+Heat never kills tasks or shuts down a rack/room. The existing temperature efficiency curve is the soft limit: above 80 degrees F it reduces compute/GPU performance to a 25% floor; cooler upgrades restore throughput. Researched thermal throttling retains its hysteresis. Runtime PDU/UPS/grid electrical failure protection remains for actual overloads; installation checks prevent normal purchases from creating one. No save fields were added for this rule change.
+
+## D68, 28 Oct: compact popups buy only their own component
+
+The user rejected cross-component purchase buttons and verbose hardware popups. Every component popup now buys only that component. CPU packages do not sell clocks or sockets; Cores does not sell clocks; installed RAM and drives do not sell another module. Power-limit preparation purchases and research buttons are removed from component popups. A power limit disables the component's existing buy button and says `Power limit` inside it. Research requirements likewise disable the original purchase.
+
+Purchase keys stay 48 CSS pixels high. The action and whole Credit price share the first line; the stat change shares the second line with any cold-swap latency. GPU core count fits beside the action, with work rate and VRAM below. Bandwidth losses retain a down arrow. Unaffordable purchases still show their stat gain and price. Separate effect paragraphs, repeated descriptions, empty fact rows and future-state height reservations are removed.
+
+Advanced settings and type changes use collapsed disclosures. Switch and load-balancer popups are separate, including the room network hardware. Start controllers and site generation have their own popups; their parent supplies, scheduler and site no longer sell them. Unit overviews link to components. New-build popups use one build picker and one buy button. Empty component slots close after a successful installation so the same popup cannot sell another component.
+
+Frames retain their geometry for runtime status, quote and wallet updates. Explicitly opening or closing settings may resize the frame to fit. The frame no longer reserves a scroll cue when its complete contents already fit. CPU replacement quotes now include their existing simulation stat preview; purchase rules and prices are unchanged.
+
+## D69, 28 Oct: direct research and generation text actions
+
+The user replaced Change type disclosures with a text button for the next generation. A locked generation says Research followed by the required project's name and opens that research entry without spending or starting it. Once researched, the same location says Upgrade to followed by the component name, with its quoted specs and price. The transparent action keeps a 44px touch target and two lines; ordinary capacity upgrades retain their 48px purchase button. Power limits and insufficient funds still disable the component purchase. Generation choices use the next catalog generation and prefer capacity preservation. CPU package quotes expose the missing generation research when no newer CPU is unlocked. GPU generation research is directly accessible alongside its existing tier upgrade; alternate GPU types and removal remain under Card options.
+
+## D70, 28 Oct: independent RAM and storage size and speed
+
+The user separated space and speed upgrades for RAM and drives. Each module saves a capacity level and an independent speed level. Capacity follows the existing size curve; bandwidth or IO follows the existing rate curve. Each track costs half the former combined step price, rounded up to whole Credits, with the existing price growth and level ceilings. Installation prices remain unchanged. This is a quick balance adjustment, without a campaign-wide retune.
+
+Changing RAM or drive generation always starts both tracks at level 1. Capacity-preserving replacement is retired for these parts, including task-fix purchases. Quotes show the resulting native capacity and rate, including any decrease. Copies, saved configurations, ECC conversion and config pricing retain and price both tracks. RAM multichannel matching compares generation and speed, so a capacity-only upgrade does not change bandwidth. Power continues to follow rated bandwidth/IO; speed upgrades reserve the resulting full load. A power-blocked button is disabled and says Can't upgrade with No available power. Space and Speed share the existing 48px footer row. Save version 35 resets earlier pre-live saves without migration.

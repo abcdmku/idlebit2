@@ -3,7 +3,7 @@ import { MAX_SCHED_K, MAX_SCHED_Q } from '../core/constants';
 import type { BuildState, SystemBuild, SystemSpec } from '../types/build';
 import { QUEUE_STRATEGY_IDS, RULE_IDS, type RuleId } from '../types/catalog';
 import type { ResearchState, Unlocks } from '../types/state';
-import { capacity, capacity2, lossFraction, PARTS, partWatts } from './catalog';
+import { capacity, capacity2, PARTS, partWatts } from './catalog';
 import { compileAccels } from './compileAccels';
 import { compileInfra } from './compileInfra';
 import { compileLinks } from './compileLinks';
@@ -128,10 +128,10 @@ export function compileSystem(c: CompiledBuffers, build: SystemBuild, u: Unlocks
   let uniform = true;
   for (const m of sys.ram) {
     mem += capacity(PARTS.ram, m.gen, m.level);
-    minBw = Math.min(minBw, capacity2(PARTS.ram, m.gen, m.level));
-    if (m.gen !== first!.gen || m.level !== first!.level) uniform = false;
+    minBw = Math.min(minBw, capacity2(PARTS.ram, m.gen, m.speedLevel));
+    if (m.gen !== first!.gen || m.speedLevel !== first!.speedLevel) uniform = false;
     const f = ramFactor * (m.ecc ? eccWatts : 1);
-    const w = partWatts(PARTS.ram, m.gen, m.level);
+    const w = partWatts(PARTS.ram, m.gen, m.speedLevel);
     ramIdle += w.idle * f;
     ramLoad += w.load * f;
   }
@@ -147,8 +147,8 @@ export function compileSystem(c: CompiledBuffers, build: SystemBuild, u: Unlocks
   let store = 0, io = 0, ioIdle = 0, ioLoad = 0;
   for (const d of sys.drives) {
     store += capacity(PARTS.storage, d.gen, d.level);
-    io += capacity2(PARTS.storage, d.gen, d.level);
-    const w = partWatts(PARTS.storage, d.gen, d.level);
+    io += capacity2(PARTS.storage, d.gen, d.speedLevel);
+    const w = partWatts(PARTS.storage, d.gen, d.speedLevel);
     ioIdle += w.idle;
     ioLoad += w.load;
   }
@@ -161,9 +161,9 @@ export function compileSystem(c: CompiledBuffers, build: SystemBuild, u: Unlocks
   const watts = [[uncoreIdle, 0], [ramIdle, ramLoad], [gpuWatts.idle, gpuWatts.load], [ioIdle, ioLoad]] as const;
   for (let r = 0; r < R; r += 1) { s.idleW[i * R + r] = watts[r]![0]; s.loadW[i * R + r] = watts[r]![1]; }
 
-  s.psuCapW[i] = capacity(PARTS.psu, sys.psu.gen, sys.psu.level);
-  s.psuLoss[i] = lossFraction(PARTS.psu, sys.psu.gen, sys.psu.level);
-  s.psuCapSwitch[i] = sys.psu.capped && hasRule(u, 'powerCap') ? 1 : 0;
+  s.psuCapW[i] = 0;
+  s.psuLoss[i] = 0;
+  s.psuCapSwitch[i] = 0;
   s.rules[i] = ruleMask(sys, u);
 }
 

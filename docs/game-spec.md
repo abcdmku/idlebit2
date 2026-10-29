@@ -130,7 +130,7 @@ Rules for numbers:
 
 The saved tree is `World → Site → Zone → Rack → System → Socket`.
 
-- A **system** is one server: a board (`general` or `accelerator`) with 1–4 CPU sockets, RAM modules, GPUs, drives and a fixed power supply.
+- A **system** is one server: a board (`general` or `accelerator`) with 1–4 CPU sockets, RAM modules, GPUs and drives. Power capacity belongs to the rack.
 - A **socket** holds one CPU: a package, cores, a clock, one cache. Every CPU in a system is identical. A system's single scheduler serves all of them.
 - A **rack** has 5 infrastructure slots, top to bottom: cooler, **power control** (D31: battery and smart start, under the cooler), PDU, load balancer, switch. It also has 12 server slots. A server slot holds a system or a storage node (§6.10).
 - A **zone** is one room, one data hall and one availability zone. It has a network rack in the top-left slot (room switch and room load balancer), rows of rack slots, room cooling, one UPS (two with `dualFeed`).
@@ -145,7 +145,7 @@ Fleet caps are set in `docs/architecture.md` §1.9: 12 servers per rack, 2 then 
 
 | Zoom level | Opened by (research effect) | What the player gets for free |
 |---|---|---|
-| CPU (formerly Chip) | start | One system: socket 1 with package gen 0, one core gen 0 L1 (1 lane), clock gen 0 L1 (1 Hz), CPU cache gen 0 L1 (1 bit). Power supply gen 0 L1 (dormant until System, §9.2). No scheduler, RAM, GPU or storage. |
+| CPU (formerly Chip) | start | One system: socket 1 with package gen 0, one core gen 0 L1 (1 lane), clock gen 0 L1 (1 Hz), CPU cache gen 0 L1 (1 bit). Fixed starter power allocation of 1 view W, raised by the Rack PDU after Rack unlock (D67). No scheduler, RAM, GPU or storage. |
 | System | `view: system` | The same system, now shown as a board. |
 | Rack | `view: rack` | A barebones rack (§13.2) holding the existing system in server slot 1. |
 | Room | `view: room` | A barebones zone holding the existing rack in its first rack slot. |
@@ -951,7 +951,6 @@ GPU models use the coefficient and split idle rules in `gpu-progression.md`, not
 
 | Supply | Part | Feeds | Input from |
 |---|---|---|---|
-| power supply | `psu` | its system's parts | rack PDU (before Rack: utility) |
 | rack PDU | `pdu` | the rack's PSU inputs, storage node PSUs, cooler, switch, load balancer | zone UPS (before Room: utility) |
 | UPS | `ups` | the zone's PDU inputs, network rack, room cooling | site grid feed (before Global: utility) |
 | grid feed | `grid` | the site's UPS inputs and data plane | utility |
@@ -971,7 +970,11 @@ lossFraction = loss[g] + lossPerLevel × (L − 1)   // Appendix A; pushing an o
 
 Loss is real power: it is billed and becomes heat in the lump that holds the supply (§10.3).
 
-Before System the power supply is dormant: no capacity limit, no usage shown, no loss. It appears with the System view.
+D67: there is no board power-supply component, purchase or loss. The starter system has a fixed 1 view W allocation supplied by its hidden rack's basic PDU. Actual component power is shown on the board. Rack unlock exposes PDU upgrades, which raise that same allocation.
+
+Every hardware purchase or upgrade reserves the full installed load of its whole rack, including offline hardware, peak pipe/network traffic, enabled turbo and rack infrastructure. The starter allocation reserves the existing rack parts before the Rack view opens, so unlocking it cannot overload an approved board build. Cooling reserves its full draw at maximum supported lift. A purchase exceeding PDU capacity is rejected before charging Credits. Open rooms also enforce their shared UPS capacity. Quotes show the same limit. The component buy button stays disabled with Power limit; it never offers a PDU, UPS or research purchase from another component popup. Downgrades that reduce an existing excess remain possible. Cooling capacity never locks a build.
+
+Basic PDU capacity starts at 1 view W and doubles per level. Rack research costs 270k Data and 2.7M Credits, with 18M CPU ops of work. The active seed-42 campaign reaches the starter limit near 3.5 h and unlocks Rack at about 4 h. No timer grants this access.
 
 **`dualFeed`.** A zone may hold a second UPS. Each rack PDU input is split equally between the two. If one UPS is dark, the other carries every PDU input alone.
 
@@ -987,7 +990,7 @@ Each is a research rule (Appendix C). Factors multiply.
 | `dvfs` (system switch, default on once researched) | At allocation the system's queue is empty and nothing is reserved on it. | Its cores: clock × 0.5, core and clock `loadFactor` 0.3. |
 | `turbo` (system switch) | Not under `dvfs`; previous tick's PSU usage < 0.90; from Rack on, rack `T < 80 °F`. | Clock × 1.25, core and clock `loadFactor` 1.8. |
 | `thermalThrottle` | Rack `T >= 95 °F`; holds until `T < 90 °F`. | The rack's systems: clock × 0.5, core and clock `loadFactor` 0.5. |
-| `powerCap` (supply switch on PSU and PDU) | See §9.5. | Clock × `capFactor`. |
+| `powerCap` (rack PDU switch) | See §9.5. | Clock × `capFactor`. |
 | `ramWatts` (Memory voltage levels 1-36) | Installed RAM. | RAM idle and load x `(74 - 2 * level) / 100`; capacity and bandwidth are unchanged. |
 | `ecc` | ECC modules. | RAM idle and load × 1.1. |
 | `vramScale` (`hbm`) | GPUs. | VRAM idle share × 0.5 only. Core idle and load watts stay unchanged. |
@@ -1013,7 +1016,7 @@ A failure reaches exactly the subtree under the failed supply: a system, a rack,
 
 ### 9.5 Power capping
 
-With `powerCap`, a power supply or rack PDU can be set to cap (hot switch). It keeps `capFactor ∈ {0.1, 0.2, …, 1.0}`, saved in state, starting at 1.
+With `powerCap`, a rack PDU can be set to cap (hot switch). The switch does not bypass installation limits. It keeps `capFactor ∈ {0.1, 0.2, …, 1.0}`, saved in state, starting at 1.
 - During the tick, every core clock below it is multiplied by its `capFactor` (and by its ancestors' factors).
 - After the power step: `need` = its delivered watts recomputed with its cores' load at `capFactor = 1`. If `need > capacity`, step `capFactor` down by 0.1 for each 10% of excess, to at least 0.1; if `need <= 0.9 × capacity`, step it up by 0.1.
 - A capped supply's `tOver` only counts ticks where its idle draw plus child supply inputs alone exceed capacity. Compute load never makes it fail.
@@ -1089,7 +1092,7 @@ All lumps start at their surroundings' temperature and never go below the 50 °F
 
 ```text
 Hrack = Σ over its systems (Σ actualW of their parts) / (η_cfg × e(Track))
-      + Σ PSU losses (systems and storage nodes) + storage node part watts
+      + storage node part watts
       + PDU loss + switch W + load balancer W
 
 Hzone = Σ over its racks (moved out of the rack this tick, §10.5)
@@ -1154,16 +1157,9 @@ Fan sprites spin at `d`. The rack cooler shows `Track` in °F.
 
 `H` grows as `e` falls, so a rack whose heat outruns its cooler heats faster and faster. The cooler plate shows the margin: `H / Qc` and the current `Teq`. `thermalThrottle` (§9.3) is the researched safety net.
 
-### 10.7 Crash
+### 10.7 Cooling is a soft limit (D67)
 
-Each rack and zone has a crash timer `tHot`, in seconds:
-- If `T >= 100`: `tHot += dt`. Otherwise `tHot = max(0, tHot − dt)`.
-- If `tHot >= 10`: the lump **crashes**:
-  1. every system in it becomes `crashed` and draws 0 W (for a zone: every system in every rack of the zone);
-  2. every task queued or running there fails with `heat` (after live migration, §6.11); transfers heading there return to the queue front;
-  3. `tHot = 0`; a recovery timer starts;
-  4. infrastructure keeps running: coolers, switches, load balancers, supplies.
-- It recovers at the first tick where at least `bootSeconds` have passed and `T < 90`. Systems return to their §4.3 mode.
+Rack and zone heat never causes a crash, task failure, reboot or building lock. Above 80 degrees F, the existing e(T) curve reduces compute and GPU performance, reaching 25% at 110 degrees F. Better cooling restores performance. The researched thermal-throttle switch keeps its 95/90 degree F hysteresis. Obsolete heat-crash counters stay zero.
 
 ## 11. Research mechanics
 
@@ -1278,7 +1274,7 @@ Special prices:
 - A replacement that cannot hold what the part holds is not offered at that level; the plate names the shortfall.
 - Within a generation, capacity grows as `x` while load watts grow as `x^1.3` (§9.1), so energy per unit of work rises as you push old parts. A native generation starts back at `push = 1` and opens a higher level ceiling. Replace wins over a horizon; upgrade wins short.
 
-The part plate shows, for both options: price, capacity after, watts after at current utilization and energy cost change per minute. Saving-up and payback time forecasts are omitted (D48).
+D68/D69/D70: the component popup shows current facts and its own purchases. Each 48px capacity buy button contains the action, price and stat change. RAM and drives have independent Space and Speed upgrades, side by side in the same 48px footer row. Each track costs half its former combined step, rounded up to whole Credits, using the existing growth and ceiling. Changing generation resets both levels to 1 and charges the native install price. A transparent 44px text button shows the next generation directly. Research opens the missing research entry without starting or buying it; once unlocked, Upgrade to shows the target name, specs and quoted price and buys the selected component. Limits disable the purchase; a power limit says Can't upgrade / No available power. Operating settings start collapsed. Separate stat-increase paragraphs, cross-component purchases and saving-up/payback forecasts are omitted. Save version 35 resets earlier pre-live saves for the independent speed levels.
 
 ### 12.5 Switches, data plane and backbone
 
@@ -1350,8 +1346,8 @@ A configuration is a named, serializable description of a unit. It never stores 
 
 | Kind | Stores |
 |---|---|
-| system | board type; CPU count; for CPU 1 (copied to all): package g; cores (g, L each); clock (g, L); cache (g, L) or none. Scheduler (g, L, strategy) or none. RAM modules (g, L, ECC). GPUs (kind, model ID encoding tier); legacy NPUs (kind, gen, level). Drives (g, L). PSU (g, L, cap switch). DVFS, turbo and C-state settings. Online switch. |
-| storage node | drives (g, L); PSU (g, L) |
+| system | board type; CPU count; for CPU 1 (copied to all): package g; cores (g, L each); clock (g, L); cache (g, L) or none. Scheduler (g, L, strategy) or none. RAM modules (g, L, ECC). GPUs (kind, model ID encoding tier); legacy NPUs (kind, gen, level). Drives (g, L). Legacy inert supply metadata. DVFS, turbo and C-state settings. Online switch. |
+| storage node | drives (g, L) |
 | rack | cooler (g, L, setpoint); power control (g, L, start settings: start with, wake trigger, order; D31) or none; PDU (g, L, cap switch); load balancer (g, L, strategy, filters, queue level `L` 1–8); switch (g, ports with `k` each, uplinks with `k` each, toggle); a system or storage-node configuration per occupied server slot; online switch |
 | zone | rows; room switch (as rack switch); room load balancer (as rack); room cooling (g, L, setpoint); UPS(s) (g, L, room start controller and settings, D31); a rack configuration per occupied slot; online switch |
 | site | data plane (g, `k`, strategy, filters, queue level); grid feed (g, L); a zone configuration per zone; online switch |
@@ -1362,8 +1358,8 @@ Tapping an empty server slot, the next free rack slot, the Zone item or the Site
 
 1. **Barebones** (always available).
    - Accelerator system (with `systemBoard`, D39): as a general barebones system on the `accelerator` board, with one CPU.
-   - System, at any CPU tier `g` whose chip generation is researched: one socket with package g, one core g at L1, clock g L1, L1 g L1, and a PSU: the cheapest researched PSU and levels that cover full-load watts, or the largest researched capacity if none fits. No scheduler, RAM, GPU or storage.
-   - Storage node (with `sharedStorage`): chassis, one drive of the newest researched generation at L1, PSU as above.
+   - System, at any CPU tier `g` whose chip generation is researched: one socket with package g, one core g at L1, clock g L1, cache g L1. No scheduler, RAM, GPU or storage. Power is allocated from the rack.
+   - Storage node (with `sharedStorage`): chassis, one drive of the newest researched generation at L1, power allocated from the rack.
    - Rack: frame; cooler gen 0 L1; PDU gen 0 L1; load balancer gen 0 L1 on `firstFit` with a 1-slot queue; switch gen 0 with four 100 kHz ports and one uplink at the room network rack's 10 GHz native default. No servers.
    - Zone: shell; network rack with room switch gen 0 (4 ports, 1 uplink, base speed) and room load balancer gen 0 L1 on `firstFit` with a 1-slot queue; 2 rows; room cooling gen 0 L1; UPS gen 0 L1. No racks.
    - Site: shell; data plane gen 0 at base speed on `firstFit`; grid feed gen 0 L1; one barebones zone. Placed at a free map location in an open region.
@@ -1410,7 +1406,7 @@ Every tick runs these steps in this order. "Now" is the tick index `t`.
 | 6 | Execution (`run`) | §6.7 for every system in index order: before Rack, head pulls and pipe transfers; then stages, shard completions, chaining and research ops (§11.2, §11.3). Each pull promotes and draws as in step 4. A task whose last shard completes is met and adds its full `W` to `deliveredWork` (D25.5). |
 | 7 | Deadlines (`deadlines`) | The head only. If this is tick `headTick + 99` and it is still untaken, it fails once: `cantRun` if it can't run on the fleet (§6.3), `timeout` otherwise. The next task becomes the head with `headTick = t + 1`, and one replacement is drawn. Every checkpoint replacement past its deadline fails its task. Then every taken task whose completion window ends this tick (`takeTick + deadline − 1`) and that is not met fails once as `late` (D26.5); its shards and router-queue shares are aborted. |
 | 8 | Power (`power`) | §9.1–§9.5, bottom up: draws, usage, losses, overload timers, failures and their lost tasks, ride-through, load shedding, cap factors for the next tick. |
-| 9 | Heat (`thermal`) | §10.3–§10.7: heat inputs, duties, cooler watts for the next tick, every lump's new temperature from start-of-tick values, crash timers, crashes and their lost tasks, throttle state for the next tick. |
+| 9 | Heat (`thermal`) | §10.3–§10.7: heat inputs, duties, cooler watts for the next tick, every lump's new temperature from start-of-tick values, temperature efficiency and throttle state for the next tick. |
 | 10 | Ledger (`ledger`) | §9.8: Credits, Data, energy debit. Then insolvency (§11.4). |
 | 11 | SLA (`round`) | Recompute SLA. If `running` and `SLA < 0.80`, end the round (§4.1) and freeze the report. |
 | 12 | Research (`research`) | Add this tick's research ops to the project; complete it; start the next queued project if Data covers it (§11.1). |
@@ -1515,7 +1511,7 @@ The core tray offers physical `Add core`. The Cores popup also offers the CPU's 
 | Level | Data per element |
 |---|---|
 | CPU | Exactly four parts (program D7.1): clock, cache (one block, total bits; cache on its plate), scheduler, cores. Per core: busy fraction, current activity (Cache load, Cache read or Compute), the shard on each thread (task ID, shard index, family, progress fraction, and how many threads that shard holds, so cores running one shard draw as one group), research share, C-state. Effective clock. Cache reserved bits, loaded bits and capacity; its lights fill from actual loading progress, including fractional bits, and remain lit until release. CPU miniatures use the same loaded count. Cache bits used / capacity per level, and the running shards' bits that spilled past cache (D26.7). Scheduler: queue entries, reserved count, running count, `K`, `Q`, strategy. Empty core sites up to `coreSites`. The inbound pipe (D10.4) is the incoming connector, not a fifth part: its speed, the task in transfer with bits sent / total, and whether the core is waiting on it. Tapping it opens the port plate (§16.3): before Rack the fixed 1 kHz and "Upgrade at the Rack switch"; from Rack on, the next step as "x → x". |
-| System | Board type, CPU count, `η_cfg`. The memory tiers filling (D26.7): cache, RAM and disk capacity, used bits, spilled bits (bits that didn't fit a faster tier) and rate. The shard arriving on the system's port and each running shard (task ID, shard index of count, units, threads held, GPU domain), so a shard is drawn splitting between the CPU and the GPU card. PSU usage, `tOver`, loss W. RAM used / capacity and bandwidth use per module. Per-card GPU/NPU duty, VRAM holds and assigned tasks; GPU model ID, upgrades, cores, clock and effective rate. Drive IO use and holds. Mode. |
+| System | Board type, CPU count, `η_cfg`. The memory tiers filling (D26.7): cache, RAM and disk capacity, used bits, spilled bits (bits that didn't fit a faster tier) and rate. The shard arriving on the system's port and each running shard (task ID, shard index of count, units, threads held, GPU domain), so a shard is drawn splitting between the CPU and the GPU card. Actual system power and full-load rack allocation/capacity. RAM used / capacity and bandwidth use per module. Per-card GPU/NPU duty, VRAM holds and assigned tasks; GPU model ID, upgrades, cores, clock and effective rate. Drive IO use and holds. Mode. |
 | Rack | Power control (under the cooler): battery charge, battery time at current draw, awake count of total, next wake. Per server slot: mode, busy fraction, admitted and reserved shard counts. Every shard transfer on the uplinks and ports (task ID, shard index of count, target slot, bits sent of total), so a task is drawn arriving on the uplink and fanning out to the servers. LB queue entries.
  Per port and uplink: busy flag and speed. Load balancer routes per second. Cooler `T` and duty. PDU usage and `tOver`. `tHot`. |
 | Room | Per rack: `T`, mode, PDU usage. Shard transfers on the zone link and rack uplinks, as for Rack. Room LB queue entries. Network rack ports busy. Room cooling duty; zone `T`. UPS usage and `tOver`. `tHot`. |

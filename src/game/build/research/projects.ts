@@ -4,7 +4,7 @@ import { compileAll, syncHotSizes } from '../../core/topology';
 import type { World } from '../../core/world';
 import type { ResearchId } from '../../types/ids';
 import type { ResearchState } from '../../types/state';
-import { deriveUnlocks, openContainers, sizePsusForSystem } from './effects';
+import { deriveUnlocks, openContainers } from './effects';
 import { researchDef } from './tree';
 import { reconcileAccelerators } from '../../exec';
 import { researchCosts } from '../../rewards/research';
@@ -50,11 +50,8 @@ function complete(w: World, id: ResearchId): void {
   r.completed = [...r.completed, id];
   r.active = null;
   r.activeProgress = 0;
-  const hadSystem = r.unlocks.levels.system;
   r.unlocks = deriveUnlocks(r.completed);
-  let opened = openContainers(w.build, r.unlocks);
-  // System activates supplies; size the existing fleet for its full load.
-  if (!hadSystem && r.unlocks.levels.system) opened = sizePsusForSystem(opened, r.unlocks);
+  const opened = openContainers(w.build, r.unlocks);
   w.build = { ...opened, revision: w.build.revision + 1 };
   w.compiled = compileAll(w.build, r, w.roundRewards);
   syncHotSizes(w.hot, w.compiled);

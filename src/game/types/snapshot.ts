@@ -10,7 +10,7 @@ import type { RoundPhase } from './state';
 import type {
   PowerCtlView, StartCtlView,
   BuildSlotView, ChipQueueEntryView, ResearchQueueEntryView, CompletionView, CoolerView, FailureView, LbView, LinkView, MemTierView, OutcomeView, PartView, QueueEntryView, RackSlotView,
-  ServerSlotView, ShardDoneView, SiteView, SupplyView, SwitchView, TaskView, TransferView, UnitMode,
+  ServerSlotView, ShardDoneView, SiteView, SupplyView, PowerBudgetView, SwitchView, TaskView, TransferView, UnitMode,
 } from './views';
 
 
@@ -212,6 +212,7 @@ export interface ChipSnapshot {
 }
 
 export interface SystemSnapshot {
+  readonly power: PowerBudgetView;
   readonly level: 'system';
   readonly parent: NodeRef | null;
   readonly systemId: SystemId;

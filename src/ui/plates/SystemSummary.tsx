@@ -19,7 +19,7 @@ export function summaryRows(f: Sys): SummaryRow[] {
     { key: 'ram', label: 'RAM', value: mem('ram'), part: f.ram.length ? { unit, slot: { kind: 'ram', index: 0 } } : null },
     { key: 'drive', label: 'Storage', value: mem('disk'), part: f.storage.length ? { unit, slot: { kind: 'drive', index: 0 } } : null },
     { key: 'gpu', label: 'GPU', value: f.gpu.length ? `${f.gpu.length} ${f.gpu.length === 1 ? 'card' : 'cards'}` : 'none', part: f.gpu.length ? { unit, slot: { kind: 'gpu', index: f.gpu[0]!.slot } } : null },
-    { key: 'psu', label: 'Power supply', value: `${watts(f.psu.deliveredW)} of ${watts(f.psu.capacityW)}`, part: { unit, slot: { kind: 'psu' } } },
+    { key: 'power', label: 'Power', value: `${watts(f.power.actualW)} used · ${watts(f.power.rackReservedW)} / ${watts(f.power.capacityW)} allocated`, part: null },
   ] as SummaryRow[];
 }
 

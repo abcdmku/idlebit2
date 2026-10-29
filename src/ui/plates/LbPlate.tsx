@@ -17,6 +17,7 @@ export interface LbBodyProps extends Pick<PlateCommon, 'quotes' | 'onAction' | '
   child?: LbChild;
   /** `quote({ kind: 'routerQueue', unit })`: the next queue slot (D25.7), or null before it loads. */
   queueQuote?: Quote | null;
+  children?: ReactNode;
 }
 
 /** The router queue's ladder top (D25.7). */
@@ -24,10 +25,10 @@ export const QUEUE_MAX = ROUTER_QUEUE_MAX;
 
 const lockText = (q: Quote | undefined) => (q?.locked ? q.locked.text : null);
 
-export function lbLines(view: LbView, child: LbChild): Line[] {
+export function lbLines(view: LbView, _child: LbChild): Line[] {
   const s = ROUTE_NAMES[view.strategy];
   const lines: Line[] = [];
-  if (s.blind && !view.filters.includes('capability')) lines.push({ text: `Can send tasks to a ${child} that can't run them`, tone: 'warn' });
+  if (s.blind && !view.filters.includes('capability')) lines.push({ text: 'May misroute tasks', tone: 'warn' });
   else if (view.misroutesThisRound > 0) lines.push({ text: `${view.misroutesThisRound} misrouted this round`, tone: 'warn' });
   return lines;
 }
@@ -60,7 +61,7 @@ function DueIn({ endTick }: { endTick: number }) {
 }
 
 /** Strategy (pick one) and filters (toggles), each locked by research; the router queue and its next slot. */
-export function LbBody({ unit, view, quotes, queueQuote, onAction, onResearch, researchName }: LbBodyProps) {
+export function LbBody({ unit, view, quotes, queueQuote, onAction, onResearch, researchName, children }: LbBodyProps) {
   const qs = quotes?.quotes ?? [];
   const strategies = qs.filter((q): q is Quote & { action: { type: 'setStrategy'; strategy: RouteStrategyId } } => q.action.type === 'setStrategy');
   const filters = qs.filter((q): q is Quote & { action: { type: 'setFilter'; filter: FilterId } } => q.action.type === 'setFilter');
@@ -78,20 +79,19 @@ export function LbBody({ unit, view, quotes, queueQuote, onAction, onResearch, r
   };
   const level = view.queue.level, max = level >= QUEUE_MAX, capacity = qs.find((q) => q.action.type === 'upgradePart');
   return <>
-    <LbQueue view={view} />
     <div className="keys">
       {queueQuote && !max && <QuoteKey quote={queueQuote} label={max ? `Queue ${level} · max` : `Queue ${level} → ${level + 1}`}
         onAction={(q) => onAction(q.action)} onResearch={onResearch} researchName={researchName} />}
       {capacity && capacity.locked?.code !== 'ceiling' && <QuoteKey quote={capacity} label={`Capacity${capacity.effect ? ` · ${Math.round(capacity.effect.capacityAfter)}/s` : ''}`} onAction={(q) => onAction(q.action)} onResearch={onResearch} researchName={researchName} />}
     </div>
-    <section className="plate-section"><p className="cfg-lab">Strategy</p><Choices rows={rows.filter(r => r.id.startsWith('s:'))} label="Strategy" onPick={pick} /></section>
-    <section className="plate-section"><p className="cfg-lab">Filters</p><Choices rows={rows.filter(r => r.id.startsWith('f:'))} label="Filters" onPick={pick} /></section>
+    <details className="component-options"><summary>Routing settings</summary><LbQueue view={view} /><section className="plate-section"><p className="cfg-lab">Strategy</p><Choices rows={rows.filter(r => r.id.startsWith('s:'))} label="Strategy" onPick={pick} /></section>
+    <section className="plate-section"><p className="cfg-lab">Filters</p><Choices rows={rows.filter(r => r.id.startsWith('f:'))} label="Filters" onPick={pick} /></section>{children}</details>
   </>;
 }
 
 /** Load balancers have no routing capacity (D12.5); the plate reports routes taken. */
 export function lbStatus(view: LbView) {
-  return { text: `${Math.round(view.routedPerSec)} routed/s`, progress: null };
+  return { text: `${Math.round(view.routedPerSec)} routed/s · Queue ${view.queue.entries.length}/${view.queue.slots}`, progress: null };
 }
 
 export interface LbPlateProps extends PlateCommon { unit: ScopeRef; view: LbView; child?: LbChild; title?: string; queueQuote?: Quote | null; children?: ReactNode }
@@ -103,7 +103,6 @@ export function LbPlate({ unit, view, child = 'server', title = 'Load balancer',
     <Status text={st.text} progress={st.progress} />
     <Lines lines={lbLines(view, child)} slots={1} />
     <LbBody unit={unit} view={view} child={child} quotes={quotes} queueQuote={queueQuote}
-      onAction={onAction} onResearch={onResearch} researchName={researchName} />
-    {children}
+      onAction={onAction} onResearch={onResearch} researchName={researchName}>{children}</LbBody>
   </PlateFrame>;
 }

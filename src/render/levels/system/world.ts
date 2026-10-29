@@ -1,13 +1,11 @@
-// System world (mockup v3 levels/system.js draw + core/power.js board PSU). Prices live in the
-// callout, tray and plates; the world shows parts and state. While the round is not running there
-// is no activity: only the steady PSU meter and the online lamp remain.
+// Motherboard display. Hardware state and power rules come from the simulation.
 import type { QuoteResult, SystemSnapshot, TaskView } from '../../../game';
 import { BG, P, R, darkFx, drawGhost, drawSaveIcon, drawUnitLamp, lampState, pathAt, upArrow, upArrowFill } from '../../core';
 import type { GhostState, LevelRegistry, Point, Rect, ViewPresentation, WorldFrame } from '../../core';
 import { boardStatic } from './board';
 import { drawChipMini } from '../chip/mini';
 import { drawLeaders, firstRow } from './labels';
-import { CONNECTOR, LAMP, POWERED, PSU, SAVE, packageRect, siteRect, worldRect } from './layout';
+import { CONNECTOR, LAMP, POWERED, SAVE, packageRect, siteRect, worldRect } from './layout';
 import type { SiteType } from './layout';
 import { boardModel, pickedType, slotOf } from './model';
 import { drawReadLights } from './memory';
@@ -15,7 +13,7 @@ import { drawMemoryRows } from './memoryRows';
 import type { BoardModel, Site } from './model';
 import { drawGpuPiece, drawInbound, inboundOf } from './shards';
 import { boardRoute } from './routes';
-import { drawCpuSocket, drawDrivePart, drawEmptySite, drawGpuPart, drawPackageBody, drawPackageFront, drawConnector, drawPsu,
+import { drawCpuSocket, drawDrivePart, drawEmptySite, drawGpuPart, drawPackageBody, drawPackageFront, drawConnector,
   drawRamPart, drawSiteLocked } from './sprites';
 
 type G = CanvasRenderingContext2D;
@@ -87,12 +85,6 @@ export function drawBoard(g: G, s: SystemSnapshot, view: ViewPresentation, frame
   if (s.saveable) drawSaveIcon(g, SAVE.x, SAVE.y);
   drawUnitLamp(g, LAMP.x, LAMP.y, LAMP.w, lampState(s.online), (s.timerS ?? 0) * 1000, Math.max(BOOT_MS, (s.timerS ?? 0) * 1000), frame.paused);
   if (s.online === 'offline' || s.online === 'dark' || s.online === 'crashed') darkFx(g, POWERED.x, POWERED.y, POWERED.w, POWERED.h);
-  else if (s.psu.capFactor < 0.999) {
-    // Real brownout: the board works at capFactor of its rate, so it dims by the missing share.
-    const a = g.globalAlpha; g.globalAlpha = a * (1 - Math.max(0, s.psu.capFactor)); R(g, POWERED.x, POWERED.y, POWERED.w, POWERED.h, P.void); g.globalAlpha = a;
-  }
-  const usage = s.psu.capacityW > 0 ? s.psu.deliveredW / s.psu.capacityW : 0;
-  drawPsu(g, PSU, usage, s.psu.failed || s.psu.overloadS > 0 || s.psu.capped);
   drawTiles(g, s, m, view);
   drawMemoryRows(g, s, frame);
   // Leaders belong to the labels: desktop only, and like the labels never during a zoom.

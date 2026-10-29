@@ -1,11 +1,10 @@
-import { useState } from 'react';
 import type { LbView, Quote, QuoteResult, RoomId, SwitchView } from '../../game';
-import { ROUTE_NAMES, zoneLetter } from './copy';
+import { zoneLetter } from './copy';
 import { PlateFrame } from './PlateFrame';
 import { LbBody, lbLines, lbStatus } from './LbPlate';
 import { SwitchBody, speedOf } from './SwitchPlate';
 import { hertz } from './format';
-import { Key, Lines, Status } from './widgets';
+import { Lines, Status } from './widgets';
 import type { PlateCommon } from './types';
 
 export interface NetworkRackPlateProps extends PlateCommon {
@@ -25,7 +24,7 @@ export interface NetworkRackPlateProps extends PlateCommon {
 /** The room's network rack: rack uplinks and speeds, and the room load balancer behind one key. */
 export function NetworkRackPlate({ room, zone, network, racks, lbQuotes, queueQuote, initialView = 'ports', initialPort = null,
   quotes, onAction, onResearch, researchName, ...frame }: NetworkRackPlateProps) {
-  const [view, setView] = useState(initialView);
+  const view = initialView;
   const sw = { kind: 'room', id: room } as const, az = `Zone ${zoneLetter(zone)}`;
   if (view === 'lb') {
     const st = lbStatus(network.lb);
@@ -34,13 +33,11 @@ export function NetworkRackPlate({ room, zone, network, racks, lbQuotes, queueQu
       <Lines lines={lbLines(network.lb, 'rack')} slots={1} />
       <LbBody unit={{ kind: 'room', id: room }} view={network.lb} child="rack" quotes={lbQuotes} queueQuote={queueQuote}
         onAction={onAction} onResearch={onResearch} researchName={researchName} />
-      <div className="keys"><Key tone="ghost" label="Back to ports" onPress={() => setView('ports')} /></div>
     </PlateFrame>;
   }
-  return <PlateFrame {...frame} title="Network rack" sub={az} className="switch netrack">
+  return <PlateFrame {...frame} title="Room switch" sub={az} className="switch netrack">
     <Status text={`${hertz(speedOf(network.switch))} to every rack port · ${racks} ${racks === 1 ? 'rack' : 'racks'}`} />
     <SwitchBody sw={sw} view={network.switch} selected={initialPort}
-      lead={<Key tone="ghost" label={`Load balancer · ${ROUTE_NAMES[network.lb.strategy].name}`} onPress={() => setView('lb')} />}
       quotes={quotes} onAction={onAction} onResearch={onResearch} researchName={researchName} />
   </PlateFrame>;
 }

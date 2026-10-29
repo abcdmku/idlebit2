@@ -10,6 +10,7 @@ export { applyAction } from './core/actions';
 export { deriveRenderSnapshot } from './view/snapshot';
 export { quote } from './build/quotes';
 export { SETPOINT_MIN_F, SETPOINT_MAX_F } from './build/settings';
+export { selectPowerBudget } from './view/powerBudget';
 export { selectSystemPower } from './view/systemPower';
 export { selectRunway, tierOf, tierValue } from './view/frontier';
 export { ROUTE_NAMES, FILTER_NAMES, QUEUE_NAMES, rackLetter, zoneLetter, regionName } from './view/labels';

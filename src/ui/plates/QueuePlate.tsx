@@ -1,4 +1,3 @@
-import { useState } from 'react';
 import { selectSystemQueue, QUEUE_NAMES, type SchedulerView, type SystemId, type SystemQueueTaskView } from '../../game';
 import { useShell } from '../storeHooks';
 import { useLayout } from '../shell/geometry';
@@ -42,25 +41,21 @@ function QueuedRow({ task, position, n }: { task: SystemQueueTaskView | null; po
 
 export function QueuePlate({ system, view, quotes, onAction, onResearch, researchName, bootS: _boot, ...frame }:
   PlateCommon & { system: SystemId; view: SchedulerView }) {
-  const shell = useShell(), layout = useLayout(), [tab, setTab] = useState<'tasks' | 'settings'>('tasks');
+  const shell = useShell(), layout = useLayout();
   const tasks = selectSystemQueue(shell.store.getState(), system);
   const keys = { quotes, level: view.level, onAction, onResearch, researchName };
   const main = partMain(quotes?.quotes ?? [], view.level);
   return <PlateFrame {...frame} title="Queue" sub={`${tasks.length} / ${view.q}`} className="hardware-queue"
     footer={main && <PartKeys {...keys} part="primary" />}>
-    <div className="hardware-queue-tabs" role="tablist" aria-label="Queue view">
-      <button type="button" role="tab" aria-selected={tab === 'tasks'} onClick={() => setTab('tasks')}>Waiting tasks</button>
-      <button type="button" role="tab" aria-selected={tab === 'settings'} onClick={() => setTab('settings')}>Settings</button>
-    </div>
-    <div role="tabpanel" hidden={tab !== 'tasks'}>
+    <details className="component-options"><summary>Waiting tasks</summary>
       <p className="hardware-queue-summary">{view.running} running · {view.reserved} incoming · {QUEUE_NAMES[view.strategy]}</p>
       <ol className="hardware-task-list" aria-label="Tasks waiting on this system">
-        {Array.from({ length: view.q }, (_, i) => <QueuedRow key={tasks[i]?.key ?? `empty-${i}`} task={tasks[i] ?? null} position={i + 1} n={layout.N} />)}
+        {tasks.map((task, i) => <QueuedRow key={task.key} task={task} position={i + 1} n={layout.N} />)}
       </ol>
-    </div>
-    <div role="tabpanel" hidden={tab !== 'settings'}>
+    </details>
+    <details className="component-options"><summary>Settings</summary>
       <QueueControls system={system} view={view} onAction={onAction} />
-      <PartKeys {...keys} part="rest" />
-    </div>
+    </details>
+    <PartKeys {...keys} part="rest" />
   </PlateFrame>;
 }

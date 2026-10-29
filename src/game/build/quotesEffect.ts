@@ -4,7 +4,7 @@ import type { PartRef, PartSlot, SwitchRef } from '../types/ids';
 import type { CapacityUnit, EffectPreview } from '../types/quotes';
 import type { GameState } from '../types/state';
 import { amount } from '../amount';
-import { ladderSpeed, LADDERS, portWatts, type LadderDef } from './catalog';
+import { isLadder, ladderSpeed, LADDERS, portWatts, type LadderDef } from './catalog';
 import { energyPrice, partEffect, preview } from './effect';
 import { readPart } from './partAccess';
 import { planPrice, type Plan } from './plan';
@@ -59,8 +59,8 @@ function ladderEffect(state: GameState, ref: PartRef, after: BuildState, cost: b
   const row = LADDERS[pa.id];
   const site = ref.unit.kind === 'site' ? state.build.sites[ref.unit.id] : null;
   const ports = pa.id === 'dataPlane' ? Math.max(1, site?.zones.filter((z) => z !== null).length ?? 1) : 1;
-  return linkPreview(state, ref, ladderSpeed(pa.level), ladderSpeed(pb.level),
-    ports * idleW(row, pa.gen, [pa.level]), ports * idleW(row, pb.gen, [pb.level]), cost);
+  return { ...linkPreview(state, ref, ladderSpeed(pa.level), ladderSpeed(pb.level),
+    ports * idleW(row, pa.gen, [pa.level]), ports * idleW(row, pb.gen, [pb.level]), cost), unit: 'bit/s' };
 }
 
 /** Units under an addUnit parent. */
@@ -107,10 +107,24 @@ export function quoteEffect(state: GameState, action: GameAction, plan: Plan): E
   if (!plan.ok) return structureLocked ? lockedAddEffect(state.build, action) : null;
   const b = state.build, after = plan.change.build, cost = plan.change.price;
   switch (action.type) {
-    case 'upgradePart': {
+    case 'replacePart': {
+      const a = readPart(b, action.part), next = readPart(after, action.part);
+      if (!a || !next || !isLadder(a.id)) return partEffect(state, action.part, after, cost);
+      const row = LADDERS[a.id];
+      const sw = action.part.unit;
+      const effect = a.id === 'switch' || a.id === 'roomSwitch'
+        ? sw.kind === 'rack' || sw.kind === 'room' ? switchEffect(state, sw, 'ports', 'all', after, cost) : null
+        : ladderEffect(state, action.part, after, cost);
+      if (!effect || effect.capacityAfter > effect.capacityBefore) return effect;
+      return { ...effect, capacityLabel: 'Limit', capacityBefore: ladderSpeed(row.topK[a.gen]!), capacityAfter: ladderSpeed(row.topK[next.gen]!) };
+    }
+    case 'upgradePartTo': case 'upgradePart': {
       const part = readPart(b, action.part);
       if (part?.id === 'dataPlane' || part?.id === 'backbone') return ladderEffect(state, action.part, after, cost);
-      return partEffect(state, action.part, after, cost);
+      const effect = partEffect(state, action.part, after, cost);
+      if (!effect || (part?.id !== 'ram' && part?.id !== 'storage')) return effect;
+      const { throughputBefore, throughputAfter, ...capacity } = effect;
+      return action.axis === 'speed' ? { ...capacity, capacityBefore: throughputBefore ?? 0, capacityAfter: throughputAfter ?? 0, unit: 'bit/s' } : capacity;
     }
     case 'replaceCpu': return partEffect(state, { unit: { kind: 'system', id: action.system }, slot: { kind: 'cpu', socket: 0 } }, after, cost);
     case 'addPart':

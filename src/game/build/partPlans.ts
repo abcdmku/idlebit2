@@ -2,8 +2,9 @@ import { formatHertz } from '../format';
 import { planPowerPart } from './powerParts';
 import type { BoardPartKind } from '../types/actions';
 import { GENERAL_MAX_GPUS, MAX_ACCELS } from '../core/constants';
-import type { CpuBuild, PartLevel, SystemSpec } from '../types/build';
-import type { PartRef, SystemId } from '../types/ids';
+import type { CpuBuild, MemoryUpgrade, PartLevel, SystemSpec } from '../types/build';
+import { planMemoryUpgrade } from './memoryPlans';
+import { researchId, type PartRef, type SystemId } from '../types/ids';
 import type { GameState, Unlocks } from '../types/state';
 import {
   capacity, ECC_PRICE_FACTOR, EXTRA_CORE_GROWTH, installPrice, isLadder, LADDERS, partName, PARTS, networkStepPrice,
@@ -62,7 +63,10 @@ export function boardLimit(spec: SystemSpec, u: Unlocks, kind: 'socket' | 'ram' 
 }
 
 /** Hot level + 1 (spec §4.5). Chip parts apply to every CPU at price × CPU count (D7.3). */
-export function planUpgrade(state: GameState, ref: PartRef): Plan {
+export function planUpgrade(state: GameState, ref: PartRef, axis: MemoryUpgrade = 'capacity'): Plan {
+  if (ref.slot.kind === 'ram' || ref.slot.kind === 'drive') return planMemoryUpgrade(state, ref, axis);
+  if (ref.slot.kind === 'psu') return fail('locked', 'Power upgrades at Rack');
+  if (ref.slot.kind === 'pdu' && !state.research.unlocks.levels.rack) return locked({ code: 'research', node: researchId('rack'), text: 'Needs Rack' });
   const part = readPart(state.build, ref);
   if (!part) return fail('invalid', 'No such part');
   if (part.id === 'gpu') return planGpuUpgrade(state, ref);
@@ -91,7 +95,10 @@ export function planUpgrade(state: GameState, ref: PartRef): Plan {
  * Several levels at once (the blocked task's "Buy X" key): every level from the current one up to `level`,
  * atomically, for the summed price. Rejected at the first locked level; hot like a single upgrade.
  */
-export function planUpgradeTo(state: GameState, ref: PartRef, level: number): Plan {
+export function planUpgradeTo(state: GameState, ref: PartRef, level: number, axis: MemoryUpgrade = 'capacity'): Plan {
+  if (ref.slot.kind === 'ram' || ref.slot.kind === 'drive') return planMemoryUpgrade(state, ref, axis, level);
+  if (ref.slot.kind === 'psu') return fail('locked', 'Power upgrades at Rack');
+  if (ref.slot.kind === 'pdu' && !state.research.unlocks.levels.rack) return locked({ code: 'research', node: researchId('rack'), text: 'Needs Rack' });
   const part = readPart(state.build, ref);
   if (!part) return fail('invalid', 'No such part');
   if (part.id === 'gpu' || part.id === 'core' || isLadder(part.id)) return fail('invalid', 'Upgrade this part one step at a time');
@@ -117,6 +124,8 @@ export function planUpgradeTo(state: GameState, ref: PartRef, level: number): Pl
 export function planReplace(state: GameState, ref: PartRef, g: number, preserveCapacity: boolean, minimumCapacity = 0): Plan {
   if (!Number.isFinite(minimumCapacity) || minimumCapacity < 0) return fail('invalid', 'Invalid capacity');
   if (POWER_SLOTS.includes(ref.slot.kind)) return planPowerPart(state, ref, g);
+  if (ref.slot.kind === 'psu') return fail('locked', 'Power upgrades at Rack');
+  if (ref.slot.kind === 'pdu' && !state.research.unlocks.levels.rack) return locked({ code: 'research', node: researchId('rack'), text: 'Needs Rack' });
   const part = readPart(state.build, ref);
   if (!part) return fail('invalid', 'No such part');
   if (part.id === 'gpu') return fail('invalid', 'Choose a GPU model');
@@ -129,7 +138,8 @@ export function planReplace(state: GameState, ref: PartRef, g: number, preserveC
   if (g <= part.gen || g >= row.base.length) return fail('invalid', 'Only a newer generation', label);
   const ecc = eccOf(state, ref);
   let level = 1;
-  if ((preserveCapacity || minimumCapacity > 0) && row.curve !== 'fixed') {
+  const memory = id === 'ram' || id === 'storage';
+  if (!memory && (preserveCapacity || minimumCapacity > 0) && row.curve !== 'fixed') {
     const need = Math.max(minimumCapacity, preserveCapacity ? capacity(row, part.gen, part.level) : 0);
     const top = maxLevel(u, id, g, ecc);
     while (level <= top && capacity(row, g, level) < need) level += 1;
@@ -140,7 +150,7 @@ export function planReplace(state: GameState, ref: PartRef, g: number, preserveC
   const lock = genLock(u, id, g);
   if (lock) return locked(lock, label, price);
   const build = writePart(state.build, ref, g, level)!;
-  return planned({ build, price, cold: coldScopes(state, coldScope(ref), ref) }, preserveCapacity ? `${label} · L${level}` : label);
+  return planned({ build, price, cold: coldScopes(state, coldScope(ref), ref) }, preserveCapacity && !memory ? `${label} · L${level}` : label);
 }
 
 /** Add into an empty slot, always hot (spec §4.5, §6.1, §12.3). A new CPU copies CPU 1 (D7.3). Cores go into every CPU. */
@@ -176,7 +186,7 @@ export function planAdd(state: GameState, system: SystemId, kind: BoardPartKind,
   if (kind === 'ram') {
     const price = scalePrice(scalePrice(installPrice(PARTS.ram, g), extraFactor(spec.ram.length)), ecc ? ECC_PRICE_FACTOR : 1);
     if (ecc) { const lock = ruleLock(u, 'ecc'); if (lock) return locked(lock, 'ECC', price); }
-    return commit({ ...spec, ram: [...spec.ram, { ...levelOne, ecc }] }, price, partName('ram', g), { have: spec.ram.length, limit: boardLimit(spec, u, 'ram'), key: 'ramSlots' }, 'ram');
+    return commit({ ...spec, ram: [...spec.ram, { ...levelOne, speedLevel: 1, ecc }] }, price, partName('ram', g), { have: spec.ram.length, limit: boardLimit(spec, u, 'ram'), key: 'ramSlots' }, 'ram');
   }
   if (kind === 'npu') {
     const have = spec.accels.filter((a) => a.kind === kind).length;
@@ -184,7 +194,7 @@ export function planAdd(state: GameState, system: SystemId, kind: BoardPartKind,
     return commit({ ...spec, accels: [...spec.accels, { ...levelOne, kind }] }, price, partName(kind, g), { have: spec.accels.length, limit: boardLimit(spec, u, 'gpu'), key: 'gpuSlots' }, kind);
   }
   const price = scalePrice(installPrice(PARTS.storage, g), extraFactor(spec.drives.length));
-  return commit({ ...spec, drives: [...spec.drives, levelOne] }, price, partName('storage', g), { have: spec.drives.length, limit: boardLimit(spec, u, 'drive'), key: 'driveSlots' }, 'storage');
+  return commit({ ...spec, drives: [...spec.drives, { ...levelOne, speedLevel: 1 }] }, price, partName('storage', g), { have: spec.drives.length, limit: boardLimit(spec, u, 'drive'), key: 'driveSlots' }, 'storage');
 }
 
 /** Cold remove, scrapped (spec §4.5). A CPU's package, clock, levelOne, last core and the PSU stay. */
@@ -209,7 +219,7 @@ export function planRemove(state: GameState, ref: PartRef): Plan {
 }
 
 /** Hot: every RAM module, GPU/NPU or drive of generation g one level up; price is the sum (spec §12.3). */
-export function planUpgradeAll(state: GameState, system: SystemId, kind: 'ram' | 'gpu' | 'drive', g: number): Plan {
+export function planUpgradeAll(state: GameState, system: SystemId, kind: 'ram' | 'gpu' | 'drive', g: number, axis: MemoryUpgrade = 'capacity'): Plan {
   const spec = specOf(state, system);
   if (!spec) return fail('invalid', 'No such system');
   const list = kind === 'ram' ? spec.ram : kind === 'gpu' ? spec.accels : spec.drives;
@@ -220,7 +230,7 @@ export function planUpgradeAll(state: GameState, system: SystemId, kind: 'ram' |
     const entry = list[index]!;
     const generation = 'kind' in entry && entry.kind === 'gpu' ? gpuModel(entry.model)!.generation - 1 : entry.gen;
     if (generation !== g) continue;
-    const plan = planUpgrade({ ...state, build }, { unit: { kind: 'system', id: system }, slot: { kind, index } });
+    const plan = planUpgrade({ ...state, build }, { unit: { kind: 'system', id: system }, slot: { kind, index } }, axis);
     if (!plan.ok) return plan;
     build = plan.change.build;
     price += plan.change.price;

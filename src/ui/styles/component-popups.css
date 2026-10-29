@@ -1,0 +1,50 @@
+/* Component facts stay above the action. All purchase details fit the existing 48px key. */
+.v3-plate { padding: 8px; }
+.v3-plate .p-head { top: -8px; gap: 4px 8px; }
+.v3-plate .plate-footer { padding-top: 4px; }
+.v3-plate .keys, .v3-plate .opts { margin-top: 4px; gap: 4px; }
+.v3-plate button[data-purchase-action] {
+  display: grid; grid-template-columns: minmax(0, 1fr) auto; grid-template-rows: 16px 16px;
+  align-content: center; align-items: center; column-gap: 8px; row-gap: 0;
+  height: 48px; min-height: 48px; padding: 4px 8px; text-align: left;
+}
+.v3-plate button[data-purchase-action] .kl { min-width: 0; white-space: nowrap; }
+.v3-plate button[data-purchase-action] .pz { justify-self: end; }
+.v3-plate button[data-purchase-action] .action-detail {
+  grid-column: 1 / -1; min-width: 0; text-align: left; white-space: nowrap;
+  overflow: hidden; text-overflow: ellipsis; line-height: 16px; font-weight: 400;
+}
+.v3-plate button[data-purchase-action]:not(:has(.action-detail)) .kl,
+.v3-plate button[data-purchase-action]:not(:has(.action-detail)) .pz { grid-row: 1 / 3; }
+.component-options, .memory-extra { margin-top: 4px; padding-top: 0; }
+.component-options > summary, .memory-extra > summary {
+  display: flex; align-items: center; min-height: 44px; gap: 4px; cursor: pointer;
+  color: #b9b0df; list-style: none;
+}
+.component-options > summary::before, .memory-extra > summary::before { content: '›'; }
+.component-options[open] > summary::before, .memory-extra[open] > summary::before { content: '⌄'; }
+.component-options > summary::-webkit-details-marker, .memory-extra > summary::-webkit-details-marker { display: none; }
+.component-options .plate-section { margin-top: 4px; }
+.component-facts p { margin: 4px 0 0; }
+.component-picker { display: flex; align-items: center; gap: 8px; margin: 4px 0; }
+.component-picker select { flex: 1; min-width: 0; height: 44px; padding: 0 8px; background: #29234b; color: #efeaff; border: 1px solid #74679f; font: inherit; }
+.v3-plate .memory-action.main { padding-top: 0; }
+.v3-plate .memory-extra { margin-top: 4px; padding-top: 0; }
+.v3-plate .power-keys { margin-top: 4px; }
+.v3-plate .plate-content > .component-options:first-child { margin-top: 0; }
+.component-link { width: 100%; min-height: 44px; padding: 4px 0; background: transparent; color: #b9b0df; border: 0; text-align: left; font: inherit; cursor: pointer; }
+.v3-plate .generation-action, .v3-plate .generation-action[data-purchase-action] {
+  display: grid; grid-template-columns: minmax(0, 1fr) auto; grid-template-rows: 16px 16px;
+  align-content: center; align-items: center; gap: 0 8px; width: 100%; height: 44px; min-height: 44px;
+  margin-top: 4px; padding: 4px 0; border: 0; box-shadow: none; background: transparent;
+  color: #b9b0df; text-align: left; font: inherit; cursor: pointer;
+}
+.generation-label { grid-column: 1; grid-row: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-decoration: underline; text-underline-offset: 3px; }
+.v3-plate button.generation-action[data-purchase-action] .pz { grid-column: 2; grid-row: 1; justify-self: end; }
+.generation-spec { grid-column: 1 / -1; grid-row: 2; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #a99be6; }
+.generation-action:not(:has(.generation-spec)) .generation-label { grid-row: 1 / 3; }
+.generation-action:disabled { color: #8c82ac; cursor: not-allowed; }
+.generation-action:disabled .pz { color: #a99be6; }
+.generation-action:hover:not(:disabled) .generation-label { color: #efeaff; }
+.memory-upgrades { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; }
+.memory-upgrades .kl { overflow: hidden; text-overflow: ellipsis; }

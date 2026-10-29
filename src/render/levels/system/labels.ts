@@ -1,17 +1,17 @@
 // System value labels (Control deck main.js systemLabels): every installed part carries its size and speed.
 // Desktop: two-line labels in the board's side margins, with silkscreen leaders that end on the
 // part. Phone: one-line tags on the board beside each part. Values are snapshot fields, formatted.
-import { formatHertz, formatSize } from '../../../game';
+import { formatHertz, formatSize, formatWatts } from '../../../game';
 import type { SystemSnapshot } from '../../../game';
-import { P, R, wattsText, whole } from '../../core';
+import { P, R, whole } from '../../core';
 import type { LabelWriter, Rect, WorldForm, WorldFrame } from '../../core';
-import { BOARD, PSU, siteRect } from './layout';
+import { BOARD, siteRect } from './layout';
 import { boardModel } from './model';
 import { tierOf } from './memory';
 import type { Site } from './model';
 import { writeMemoryRows } from './memoryRows';
 
-export type LabelKey = 'cpu' | 'psu' | 'ram' | 'drive' | 'gpu';
+export type LabelKey = 'cpu' | 'ram' | 'drive' | 'gpu';
 export interface PartLabel {
   readonly key: LabelKey;
   readonly name: string;
@@ -61,8 +61,6 @@ function values(s: SystemSnapshot): Omit<PartLabel, 'top' | 'mid' | 'lx' | 'end'
   const cores = s.chip.cores.length;
   out.push({ key: 'cpu', name: 'CPU', value: `${formatHertz(s.chip.clock.hz)} · ${whole(cores)} ${cores === 1 ? 'core' : 'cores'}${times(s.cpuCount)}`,
     side: 'L', r: siteRect(b, 'cpu', 0) });
-  // the system's power supply (user: never "PSU" or "Board PSU")
-  out.push({ key: 'psu', name: 'Power supply', value: wattsText(s.psu.capacityW), side: 'R', r: { ...PSU } });
   const ram = m.installed.ram, drive = m.installed.drive, gpu = m.installed.gpu;
   // R40: per-stick capacity and the slowest channel ("16.4 + 16.4 kb · 1 kHz"); per-drive size and IO.
   if (ram.length) {
@@ -104,12 +102,11 @@ export function firstRow(frame: WorldFrame): number {
 
 function place(list: PartLabel[], form: WorldForm | undefined, first: number): void {
   if (form === 'phone') {
-    const top = BOARD.y - 16;
     for (const it of list) {
       const r = it.r;
       it.right = it.key === 'ram' || it.key === 'drive';
       it.tagX = q4(it.right ? r.x + r.w : r.x);
-      it.tagY = q4(it.key === 'psu' ? top : it.key === 'ram' ? r.y + r.h : it.key === 'gpu' ? r.y - 10
+      it.tagY = q4(it.key === 'ram' ? r.y + r.h : it.key === 'gpu' ? r.y - 10
         : it.key === 'drive' ? BOARD.y + BOARD.h + 4 : r.y + r.h + 2);
     }
     return;
@@ -154,6 +151,8 @@ export function drawLeaders(g: CanvasRenderingContext2D, s: SystemSnapshot, firs
 /** Desktop hardware labels stay outside the board. Memory has its own reserved rows. */
 export function writeLabels(s: SystemSnapshot, frame: WorldFrame, out: LabelWriter): void {
   writeMemoryRows(s, frame, out);
+  const powerY = BOARD.y - BOARD.z - Math.ceil(24 / (frame.scale ?? 2));
+  out.label('power-use', BOARD.x + 50, powerY).text('Power', 'name', true).text(formatWatts(s.drawW), 'power');
   const form = frame.form;
   if (form === 'phone') return;
   for (const it of partLabels(s, form, firstRow(frame))) {

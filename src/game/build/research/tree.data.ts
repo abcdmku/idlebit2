@@ -148,7 +148,7 @@ export const TREE_ROWS: readonly TreeRow[] = [
   n("closedLoop", "Closed loop", "cooling", ["chilledWater", "dataCenter"], "global", "ghz", 13, 4e8, [gen("roomCooler", 4)], ["heat", "energy"]),
   n("closedLoop2", "Two-phase loop", "cooling", ["closedLoop", "regions"], "global", "ghz", 14, 3e9, [gen("roomCooler", 5)], ["heat", "energy"]),
   n("systemBoard", "System", "structure", [], "system", "hz", 3, 40_000, [view("system"), gen("psu", 0), gen("ram", 0), gen("storage", 0), gen("gpu", 0), gen("npu", 0), cap("cpuSockets", 4), cap("ramSlots", 4), cap("gpuSlots", 2), cap("driveSlots", 4), rule("ecc", { price: 1.25, watts: 1.1 }), rule("accelBoard", { sockets: 2, ramSlots: 8, gpuSlots: 8 })], ["ram", "gpu", "storage"]),
-  n("rack", "Rack", "structure", ["fabKhz"], "rack", "khz", 7, 2.7e7, [view("rack"), gen("rackCooler", 0), gen("pdu", 0), gen("lb", 0), gen("switch", 0)], ["density", "rackDist"]),
+  n("rack", "Rack", "structure", ["fabKhz"], "rack", "khz", 7, 270_000, [view("rack"), gen("rackCooler", 0), gen("pdu", 0), gen("lb", 0), gen("switch", 0)], ["density", "rackDist"]),
   n("room", "Room", "structure", ["rack", "fabMhz"], "room", "mhz", 10, 1.2e8, [view("room"), gen("roomCooler", 0), gen("ups", 0), gen("row", 0)], ["density", "roomDist"]),
   n("dataCenter", "Data center", "structure", ["room", "stealRoom"], "global", "ghz", 12, 6e8, [view("global"), gen("dataPlane", 0), gen("grid", 0), gen("zone", 0), cap("siteZones", 2)], ["multiAz"]),
   n("regions", "Regions", "structure", ["dataCenter", "zoneAware"], "global", "ghz", 13, 1.2e9, [gen("site", 0), gen("backbone", 0), cap("sites", 4)], ["region"]),

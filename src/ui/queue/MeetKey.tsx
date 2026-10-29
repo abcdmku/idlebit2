@@ -5,7 +5,6 @@ import { CurrencyIcon } from '../Hud';
 import { useSavingUp } from '../deck/SavingUp';
 import { wholeText } from '../hooks/format';
 import { meetLabel } from './meet';
-import { OverSupplyNote } from '../plates/widgets';
 
 export function MeetKey({ quote: q, n, onAction, onResearch, researchName, className = 'key' }: {
   quote: Quote; n: number; onAction: (a: GameAction) => void; onResearch?: (id: ResearchId) => void;
@@ -21,6 +20,5 @@ export function MeetKey({ quote: q, n, onAction, onResearch, researchName, class
     <button type="button" className={className} data-qa-target data-testid="td-fix" disabled={!!lock || !q.affordable} onClick={() => onAction(q.action)}>
       {meetLabel(q, researchName)}{price !== null && <span className="pz"> <CurrencyIcon kind="credits" n={n} />{wholeText(price)}</span>}</button>
     {(lock || saving) && <p className="need">{lock?.text ?? saving}</p>}
-    <OverSupplyNote quote={q} onAction={x => onAction(x.action)} />
   </>;
 }

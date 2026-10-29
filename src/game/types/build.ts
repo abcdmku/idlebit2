@@ -9,6 +9,9 @@ export type { AccelBuild, GpuBuild, NpuBuild } from './gpu';
  * Changes only through actions and research effects. Owner of content: S5 (build/).
  */
 export interface PartLevel { readonly gen: number; readonly level: number }
+export type MemoryUpgrade = 'capacity' | 'speed';
+/** Capacity and bandwidth/IO have independent levels within one hardware generation. */
+export interface MemoryBuild extends PartLevel { readonly speedLevel: number }
 export interface SupplyBuild extends PartLevel {
   /** Power-cap switch (spec §9.5); only meaningful with the `powerCap` rule. */
   readonly capped: boolean;
@@ -29,7 +32,7 @@ export interface SchedulerBuild extends PartLevel {
   readonly optimization?: QueueOptimization;
   readonly batching?: boolean;
 }
-export interface RamModuleBuild extends PartLevel { readonly ecc: boolean }
+export interface RamModuleBuild extends MemoryBuild { readonly ecc: boolean }
 export interface SystemSettings {
   /** Upper bound on researched cache loaders; omitted means use the researched budget. */
   readonly queueLoaderLimit?: 1 | 2 | 4;
@@ -55,7 +58,7 @@ export interface SystemSpec {
   readonly scheduler: SchedulerBuild | null;
   readonly ram: readonly RamModuleBuild[];
   readonly accels: readonly AccelBuild[];
-  readonly drives: readonly PartLevel[];
+  readonly drives: readonly MemoryBuild[];
   readonly psu: SupplyBuild;
   readonly settings: SystemSettings;
 }

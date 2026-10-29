@@ -107,6 +107,7 @@ export function systemScene(stage: SystemStage, online: SystemSnapshot['online']
 function baseScene(stage: SystemStage, online: SystemSnapshot['online']): SystemSnapshot {
   const boot = stage === 'boot', full = stage === 'full', shard = stage === 'shard';
   return {
+    power: { actualW: 0.2, reservedW: 0.4, rackReservedW: 0.4, capacityW: 1, rackOpen: false },
     level: 'system', parent: null, systemId: ID, kind: 'server', board: full ? 'accelerator' : 'general', cpuCount: 1,
     ramSlots: full ? 8 : boot ? 1 : 4, etaCfg: 1, chip: chipScene(boot ? 'boot' : shard ? 'shard' : 'system', online), chips: [chipScene(boot ? 'boot' : shard ? 'shard' : 'system', online)], cpuBusy: [boot ? 0 : 0.75],
     online, timerS: online === 'boot' ? 6 : null, timerTotalS: online === 'boot' ? 10 : null,

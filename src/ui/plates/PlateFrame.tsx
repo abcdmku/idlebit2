@@ -4,6 +4,7 @@ import { placePlate } from './place';
 import { useDialogFocus } from '../hooks/useDialogFocus';
 import { Pips } from './widgets';
 import '../styles/plates.css';
+import '../styles/component-popups.css';
 
 /** Where a plate sits. Every field is optional: with none, the plate centres in its parent. */
 export interface PlatePosition {
@@ -122,7 +123,7 @@ export function PlateFrame({ title, sub, pips, head, footer, className = '', clo
       root.style.setProperty('--plate-safe-height', `${Math.max(0, at.room)}px`);
       const pad = full - headH - footerH - contentH;
       // Cramped: the head, the main option and the plate's padding leave too little body for what it holds.
-      const body = height - headH - footerH - Math.max(0, pad) - 24;
+      const body = height - headH - footerH - Math.max(0, pad) - (full > height ? 24 : 0);
       root.dataset.cramped = String(footerH > 0 && body < Math.min(CRAMPED_BODY, contentH));
       root.style.left = `${Math.round(at.x)}px`;
       // Above its part, the plate's foot sits 8 px over the part.
@@ -152,9 +153,11 @@ export function PlateFrame({ title, sub, pips, head, footer, className = '', clo
       position();
     };
     window.addEventListener('resize', resize);
+    // Explicitly opening settings can use more room. Runtime values keep the held geometry.
+    content.addEventListener('toggle', resize, true);
     const stop = subscribeFrame?.(position);
     observer?.observe(content);
-    return () => { stop?.(); observer?.disconnect(); changes.disconnect(); window.removeEventListener('resize', resize); content.removeEventListener('scroll', more); root.removeEventListener('scroll', more); };
+    return () => { stop?.(); observer?.disconnect(); changes.disconnect(); window.removeEventListener('resize', resize); content.removeEventListener('toggle', resize, true); content.removeEventListener('scroll', more); root.removeEventListener('scroll', more); };
   }, [bounds, readAnchor, subscribeFrame, pinTop, beside, tip, spill]);
 
   const body = <>

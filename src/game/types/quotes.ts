@@ -55,10 +55,10 @@ export interface MeetNeed {
 }
 
 export type Currency = 'credits' | 'data';
-export type LockCode = 'research' | 'ceiling' | 'cap' | 'fit' | 'roundState' | 'occupied';
+export type LockCode = 'research' | 'power' | 'ceiling' | 'cap' | 'fit' | 'roundState' | 'occupied';
 export interface LockReason {
   readonly code: LockCode;
-  /** The first missing research node, when code is 'research'. */
+  /** The first missing research node, including Rack at a starter power limit. */
   readonly node: ResearchId | null;
   /** Short copy, e.g. "Needs Rack water". */
   readonly text: string;
@@ -66,6 +66,8 @@ export interface LockReason {
 /** 'J': energy (a Power control battery's capacity). */
 export type CapacityUnit = 'ops/s' | 'bits' | 'bit/s' | 'Hz' | 'W' | 'J' | 'tasks/s' | 'slots' | 'cores' | 'ports' | 'ops';
 export interface EffectPreview {
+  /** A generation replacement can raise the ceiling while preserving current speed. */
+  readonly capacityLabel?: 'Limit';
   readonly capacityBefore: number;
   readonly capacityAfter: number;
   readonly unit: CapacityUnit;
@@ -113,11 +115,8 @@ export interface GpuPowerPreview {
   readonly before: GpuPowerPoint;
   readonly after: GpuPowerPoint;
 }
-/**
- * A buy whose full-load draw would exceed a supply (user, 26 Oct): the first one over, innermost first
- * (the system's power supply, its rack PDU, its room UPS). View watts (D36). A warning: the buy still runs.
- */
-export interface OverSupply { readonly part: 'psu' | 'pdu' | 'ups'; readonly capW: number; readonly afterW: number }
+/** A hardware purchase blocked by its rack or room full-load allocation, in view watts. */
+export interface OverSupply { readonly part: 'psu' | 'pdu' | 'ups'; readonly capW: number; readonly afterW: number; readonly rack?: RackId; readonly room?: RoomId }
 
 export interface Quote {
   /** Set when the plan's full-load draw would exceed a supply; absent otherwise. */

@@ -1,3 +1,5 @@
+import { rackPowerBudget } from '../build/powerBudget';
+import { viewW } from '../core/constants';
 import { MAX_RACK_PORTS, MAX_UPLINKS, RACK_SLOTS_PER_ROW, RACKS_PER_ROOM, SERVERS_PER_RACK, TICK_MS } from '../core/constants';
 import { familyId, systemId, type FamilyId, type NodeRef, type RackId } from '../types/ids';
 import type { RackSnapshot } from '../types/snapshot';
@@ -87,10 +89,10 @@ export function rackSnapshot(state: GameState, id: RackId, parent: NodeRef | nul
     tempF: h.tempF[id] ?? 70, eff: h.eff[id] ?? 1, crashS: ticksToS(h.crashTicks[id] ?? 0), crashed,
     throttled: (h.throttled[id] ?? 0) === 1,
     cooler: coolerView(c, h, id, b.cooler, rackSurroundF(state, id)),
-    pdu: supplyView('pdu', b.pdu, {
+    pdu: { reservedW: viewW(rackPowerBudget(state.build, id, state.research.unlocks).reserved), ...supplyView('pdu', b.pdu, {
       capacityW: c.pduCapW[id] ?? 0, usage: h.pduUsage[id] ?? 0, overTicks: h.pduOverTicks[id] ?? 0, failed,
       rebootTicks: h.pduRebootTicks[id] ?? 0, loss: c.pduLoss[id] ?? 0, capSwitch: (c.pduCapSwitch[id] ?? 0) === 1 && b.pdu.capped, capFactor: 1,
-    }, siteEnergyPrice(state, state.compiled.room.site[c.room[id] ?? 0] ?? 0)),
+    }, siteEnergyPrice(state, state.compiled.room.site[c.room[id] ?? 0] ?? 0)) },
     lb: lbView(state, b.lb, { kind: 0, id, strategy: c.lbStrategy[id] ?? 0, filters: c.lbFilters[id] ?? 0, routed: h.lbRouted[id] ?? 0, last: h.lbLast[id] ?? -1 }),
     switch: sw, powerCtl: powerCtlView(state, id), powerCtlLocked: !genUnlocked(state.research.unlocks, 'powerCtl', 0), servers,
     saveable: state.research.unlocks.rules.includes('configSave'),

@@ -1,5 +1,5 @@
 import { useCallback, useMemo, useRef } from 'react';
-import { REGION_IDS, researchId, selectResearchTree, selectUnitLabel, selectSavedConfigs, type GameAction, type SupplyView, type LevelSnapshot, type Quote, type QuoteRequest, type QuoteResult, type ResearchId, type ScopeRef, type UnitRef } from '../../game';
+import { REGION_IDS, researchId, selectResearchTree, selectUnitLabel, selectSavedConfigs, type GameAction, type LevelSnapshot, type PartRef, type Quote, type QuoteRequest, type ResearchId, type ScopeRef, type UnitRef } from '../../game';
 import type { HitTarget, Rect } from '../../render/core';
 import type { ShellLayout } from '../layout';
 import { useGameSelector, useQuote, useShell, useViewState } from '../storeHooks';
@@ -23,13 +23,11 @@ import { partFacts } from './partFacts';
 import { nextDefaultName, SavePrompt } from './SavePrompt';
 import { SupplyPlate } from './SupplyPlate';
 import { PowerCtlPlate } from './PowerCtlPlate';
-import { PowerKeys } from './PowerKeys';
 import { isPowerCtl } from './targets';
 import { blockedOn, firstBlockedFor, sameSupply } from './blocks';
 import { useMeet } from '../queue/meet';
 import { SitePlate } from './SitePlate';
-import { StartRow } from './StartRow';
-import { GenerationRow } from './GenerationRow';
+import { AuxPartPlate } from './AuxPartPlate';
 import { SwitchPlate } from './SwitchPlate';
 import type { PlateCommon } from './types';
 import { ServerPlate, UnitPlate } from './UnitPlate';
@@ -78,11 +76,12 @@ export function plateRequest(t: HitTarget, focus: LevelSnapshot): QuoteRequest |
   if (isInbound(t)) return { kind: 'inbound', at: t.owner };
   if ((t.kind === 'part' || t.kind === 'link') && t.part) {
     const s = t.part.slot, u = t.part.unit;
+    if (s.kind === 'roomStart' || s.kind === 'globalStart' || s.kind === 'generation') return { kind: 'power', unit: u };
     if (s.kind === 'switch' && u.kind === 'rack') return { kind: 'switch', sw: { kind: 'rack', id: u.id } };
     if (s.kind === 'roomSwitch' && u.kind === 'room') return { kind: 'switch', sw: { kind: 'room', id: u.id } };
     if (u.kind === 'rack' || u.kind === 'room') {
-      const infra = s.kind === 'rackCooler' || s.kind === 'roomCooler' ? 'cooling' : s.kind === 'pdu' || s.kind === 'ups' ? 'power'
-        : s.kind === 'lb' || s.kind === 'roomLb' ? 'lb' : null;
+      if (s.kind === 'pdu' || s.kind === 'ups' || s.kind === 'rackCooler' || s.kind === 'roomCooler') return { kind: 'part', part: t.part };
+      const infra = s.kind === 'lb' || s.kind === 'roomLb' ? 'lb' : null;
       if (infra) return { kind: 'infra', unit: u, slot: infra };
     }
     return { kind: 'part', part: t.part };
@@ -101,9 +100,9 @@ const partKindOf = (q: { action: { type: string } }): string | undefined => {
 /** D31: the optional power part a plate also sells: the room start controller on the UPS, the global one on the scheduler, a site's generation. */
 export function powerScope(t: HitTarget, focus: LevelSnapshot): ScopeRef | null {
   const s = t.part?.slot.kind;
-  if (s === 'ups' && focus.level === 'room') return { kind: 'room', id: focus.roomId };
-  if (s === 'globalScheduler' && focus.level === 'global') return { kind: 'global' };
-  if (t.kind === 'unit' && t.unit?.kind === 'site' && focus.level === 'global') return t.unit;
+  if (s === 'roomStart' && focus.level === 'room') return { kind: 'room', id: focus.roomId };
+  if (s === 'globalStart' && focus.level === 'global') return { kind: 'global' };
+  if (s === 'generation' && t.part?.unit.kind === 'site') return t.part.unit;
   return null;
 }
 
@@ -184,13 +183,20 @@ export function PlateLayer() {
   return <TargetPlate key={t.id} target={t} focus={focus} />;
 }
 
+function samePart(a: PartRef, b: PartRef): boolean {
+  return a.unit.kind === b.unit.kind && (a.unit.kind === 'global' || b.unit.kind !== 'global' && a.unit.id === b.unit.id)
+    && a.slot.kind === b.slot.kind
+    && (!('index' in a.slot) || 'index' in b.slot && a.slot.index === b.slot.index)
+    && (!('socket' in a.slot) || 'socket' in b.slot && a.slot.socket === b.slot.socket);
+}
+
 function TargetPlate({ target: t, focus }: { target: HitTarget; focus: LevelSnapshot }) {
   const shell = useShell();
   const { surface, view } = shell;
   const bootMs = useGameSelector((s) => s.bootMs);
   const credits = useGameSelector((s) => s.hud.credits, Object.is, 500);
-  const quotes = useQuote(plateRequest(t, focus));
-  const scope = powerScope(t, focus), power = useQuote(scope ? { kind: 'power', unit: scope } : null);
+  const requested = useQuote(plateRequest(t, focus));
+  const quotes = requested && t.part ? { ...requested, quotes: requested.quotes.filter(q => !('part' in q.action) || samePart(q.action.part, t.part!)) } : requested;
   const unblocks = useGameSelector(s => blockedOn(s.feed.window, t.part?.slot.kind), Object.is, 500);
   // The minimal-level buy that lets the first waiting task run, when it is this part (user, 26 Oct).
   const waiting = useGameSelector(s => firstBlockedFor(s.feed.window, t.part?.slot.kind), (a, b) => a?.key === b?.key && a?.blockedBy === b?.blockedBy, 500);
@@ -225,8 +231,6 @@ function TargetPlate({ target: t, focus }: { target: HitTarget; focus: LevelSnap
     researchName: (id) => researchNames.get(id) ?? String(id),
   };
 
-  const powerKeys = (installed: boolean, level: number, noun: string, wake: boolean) => <PowerKeys quotes={power} installed={installed} level={level} noun={noun} wake={wake}
-    onAction={common.onAction} onResearch={common.onResearch} researchName={common.researchName} />;
 
   const gpuSlot = gpuPlateSlot(t, focus);
   if (gpuSlot !== undefined && focus.level === 'system') {
@@ -275,23 +279,21 @@ function TargetPlate({ target: t, focus }: { target: HitTarget; focus: LevelSnap
     return null;
   }
   const save = (unit: UnitRef) => view.dispatch({ type: 'select', target: { ...t, id: `${t.id}:save`, kind: 'save', unit, rect: { ...t.rect } } });
-  if (t.kind === 'unit' && t.unit) return unitPlate(t.unit, focus, { ...common, onSave: save, market: marketOf(shell.store.getState(), t.unit), power, rowQuote, select: target => view.dispatch({ type: 'select', target, plate: true }) }, (slot) => {
+  if (t.kind === 'unit' && t.unit) return unitPlate(t.unit, focus, { ...common, onSave: save, market: marketOf(shell.store.getState(), t.unit), rowQuote, select: target => view.dispatch({ type: 'select', target, plate: true }) }, (slot) => {
     const next = { ...t, id: `${t.id.replace(/\d+$/, '')}${slot}`, slot, unit: focus.level === 'rack' && focus.servers[slot].systemId !== null
       ? { kind: 'system', id: focus.servers[slot].systemId! } as UnitRef : t.unit };
     view.dispatch({ type: 'select', target: next });
   }, () => { if (t.drill) view.dispatch({ type: 'drill', ref: t.drill }); }, selectUnitLabel(shell.store.getState(), t.unit));
   if ((t.kind === 'part' || t.kind === 'link') && t.part) {
     const s = t.part.slot;
-    const psu: SupplyView | undefined = focus.level === 'system' || focus.level === 'chip' ? focus.psu : undefined;
-    if (s.kind === 'psu' && psu && t.part.unit.kind === 'system') return <SupplyPlate {...common} quotes={quotes} supply={psu}>
-      <SystemPower system={t.part.unit.id} />
-    </SupplyPlate>;
     if (s.kind === 'pdu' && focus.level === 'rack') return <SupplyPlate {...common} quotes={quotes} supply={focus.pdu}></SupplyPlate>;
-    if (s.kind === 'ups' && focus.level === 'room' && focus.ups[s.index]) return <SupplyPlate {...common} quotes={quotes} supply={focus.ups[s.index]}>
-      {/* D31.2: the room start controller lives on the UPS: which racks are powered at round start. */}
-      {focus.power?.start && <StartRow unit={{ kind: 'room', id: focus.roomId }} scope="room" view={focus.power.start} onAction={common.onAction} />}
-      {powerKeys(!!focus.power?.start, focus.power?.start?.level ?? 0, 'Start controller', true)}
-    </SupplyPlate>;
+    if (s.kind === 'ups' && focus.level === 'room' && focus.ups[s.index]) return <SupplyPlate {...common} quotes={quotes} supply={focus.ups[s.index]} />;
+    if (s.kind === 'roomStart' && focus.level === 'room') return <AuxPartPlate {...common} quotes={quotes} unit={t.part.unit} kind="start" start={focus.power?.start} />;
+    if (s.kind === 'globalStart' && focus.level === 'global') return <AuxPartPlate {...common} quotes={quotes} unit={t.part.unit} kind="start" start={focus.start} />;
+    if (s.kind === 'generation' && focus.level === 'global' && t.part.unit.kind === 'site') {
+      const siteId = t.part.unit.id;
+      return <AuxPartPlate {...common} quotes={quotes} unit={t.part.unit} kind="generation" generation={focus.sites.find(site => site.siteId === siteId)?.generation} />;
+    }
     if (s.kind === 'grid' && focus.level === 'global' && t.part.unit.kind === 'site') {
       const id = t.part.unit.id, site = focus.sites.find((x) => x.siteId === id);
       if (site?.grid) return <SupplyPlate {...common} quotes={quotes} supply={site.grid} />;
@@ -308,8 +310,8 @@ function TargetPlate({ target: t, focus }: { target: HitTarget; focus: LevelSnap
       room={focus.roomId} zone={focus.zone} network={focus.network} racks={focus.racks.filter((r) => r.rackId !== null).length} />;
     if (s.kind === 'globalScheduler' && focus.level === 'global' && focus.scheduler) return <LbPlate {...common} quotes={quotes} queueQuote={queueQuote}
       unit={{ kind: 'global' }} view={focus.scheduler} child="site" title="Global scheduler">
-      {focus.start && <StartRow unit={{ kind: 'global' }} scope="global" view={focus.start} onAction={common.onAction} />}
-      {powerKeys(!!focus.start, focus.start?.level ?? 0, 'Start controller', true)}
+      <button type="button" className="component-link" onClick={() => view.dispatch({ type: 'select', plate: true,
+        target: { ...t, id: 'global-start', part: { unit: { kind: 'global' }, slot: { kind: 'globalStart' } } } })}>Start controller ›</button>
     </LbPlate>;
     const facts = partFacts(focus, s, t.part.unit.kind === 'site' ? t.part.unit.id : undefined);
     // CPU, RAM and storage choose between Upgrade, Add and Replace; the CPU's own view opens only from its key.
@@ -323,25 +325,12 @@ function TargetPlate({ target: t, focus }: { target: HitTarget; focus: LevelSnap
       if (scheduler) return <QueuePlate {...common} quotes={quotes} system={focus.systemId} view={scheduler} />;
     }
     if (facts) return <PartPlate {...common} quotes={quotes} {...facts} compactStatus={s.kind === 'cpu'} unblocks={unblocks} unblock={unblock}>
-      {s.kind === 'dataPlane' && siteRouter && lbUnit && <section className="site-routing"><p className="cfg-lab">Routing</p><LbBody unit={lbUnit} view={siteRouter} child="zone"
+      {s.kind === 'dataPlane' && siteRouter && lbUnit && <details className="component-options site-routing"><summary>Routing</summary><LbBody unit={lbUnit} view={siteRouter} child="zone"
         quotes={quotes ? { ...quotes, quotes: quotes.quotes.filter(q => q.action.type === 'setStrategy' || q.action.type === 'setFilter') } : null}
-        queueQuote={queueQuote} onAction={common.onAction} onResearch={common.onResearch} researchName={common.researchName} /></section>}
+        queueQuote={queueQuote} onAction={common.onAction} onResearch={common.onResearch} researchName={common.researchName} /></details>}
     </PartPlate>;
   }
   return null;
-}
-
-/**
- * A site's data-plane routing on the site's own plate (user, 26 Oct: one or two taps from play): tap the site, then
- * a strategy or filter. The same controls and quotes as the data plane's plate.
- */
-function SiteRouting({ site, router, onAction, onResearch, researchName }: { site: UnitRef & { kind: 'site' }; router: Parameters<typeof LbBody>[0]['view'] }
-  & Pick<PlateCommon, 'onAction' | 'onResearch' | 'researchName'>) {
-  const quotes = useQuote({ kind: 'part', part: { unit: site, slot: { kind: 'dataPlane' } } });
-  const queue = useQuote({ kind: 'routerQueue', unit: site })?.quotes[0] ?? null;
-  const routing = quotes ? { ...quotes, quotes: quotes.quotes.filter(q => q.action.type === 'setStrategy' || q.action.type === 'setFilter') } : null;
-  return <section className="site-routing"><p className="cfg-lab">Routing</p>
-    <LbBody unit={site} view={router} child="zone" quotes={routing} queueQuote={queue} onAction={onAction} onResearch={onResearch} researchName={researchName} /></section>;
 }
 
 /** A copy option's live mini, drawn by the level renderer from the parent's slot view. */
@@ -360,9 +349,9 @@ function drawCopyMini(shell: ReturnType<typeof useShell>, focus: LevelSnapshot, 
   } catch { /* A level mid-port: the well stays plain. */ }
 }
 
-function unitPlate(unit: UnitRef, focus: LevelSnapshot, all: Omit<PlateCommon, 'quotes'> & { onSave: (u: UnitRef) => void; market: MarketState | null; power: QuoteResult | null; rowQuote: Quote | null; select: (t: HitTarget) => void },
+function unitPlate(unit: UnitRef, focus: LevelSnapshot, all: Omit<PlateCommon, 'quotes'> & { onSave: (u: UnitRef) => void; market: MarketState | null; rowQuote: Quote | null; select: (t: HitTarget) => void },
   step: (slot: number) => void, goInside: () => void, name: string) {
-  const { onSave, power, rowQuote, select: _select, ...common } = all;
+  const { onSave, rowQuote, select: _select, ...common } = all;
   const saveKey = (saveable: boolean) => (saveable ? () => onSave(unit) : null);
   const chooseBuild = (slot: number) => all.select({ id: `build-${unit.kind}-${slot}`, kind: 'slot', owner: { level: focus.level, id: 'id' in unit ? unit.id : 0 } as HitTarget['owner'],
     drill: null, part: null, unit, sw: null, port: null, slot, rect: { x: 0, y: 0, w: 0, h: 0 } });
@@ -377,8 +366,9 @@ function unitPlate(unit: UnitRef, focus: LevelSnapshot, all: Omit<PlateCommon, '
       status={focus.level === 'system' ? `${focus.running.length} running · ${focus.queue.count} queued` : 'Chip'} mode={mode} timerS={timerS} bootS={total ?? common.bootS}
       onSave={saveKey(focus.level === 'system' && focus.saveable)} saveLabel="Save this server">
       {/* Never an empty plate (user, 26 Oct): what is in the box, each row opening its part, and Open CPU. */}
-      {focus.level === 'system' && <SystemSummary focus={focus}
-        onOpenPart={(part, key) => all.select({ id: `sum-${key}`, kind: 'part', owner: { level: 'system', id: focus.systemId } as never, drill: null, part, unit: null, sw: null, port: null, slot: null, rect: { x: 0, y: 0, w: 0, h: 0 } })} />}
+      {focus.level === 'system' && <SystemPower system={focus.systemId} />}
+      {focus.level === 'system' && <details className="component-options"><summary>Components</summary><SystemSummary focus={focus}
+        onOpenPart={(part, key) => all.select({ id: `sum-${key}`, kind: 'part', owner: { level: 'system', id: focus.systemId } as never, drill: null, part, unit: null, sw: null, port: null, slot: null, rect: { x: 0, y: 0, w: 0, h: 0 } })} /></details>}
     </UnitPlate>;
   }
   if (unit.kind === 'rack' && focus.level === 'rack') {
@@ -396,8 +386,10 @@ function unitPlate(unit: UnitRef, focus: LevelSnapshot, all: Omit<PlateCommon, '
       status={`${fahrenheit(focus.tempF)} · outside ${fahrenheit(focus.outsideF)}`} statusTone={focus.tempF > 80 ? 'warn' : ''}
       mode={focus.online} timerS={focus.timerS} onSave={saveKey(focus.saveable)} saveLabel="Save this zone">
       <button type="button" className="key ghost" disabled={free < 0} onClick={() => chooseBuild(free)}>Choose rack build</button>
+      <details className="component-options"><summary>Room settings</summary><button type="button" className="component-link" onClick={() => all.select({ id: 'room-start', kind: 'part', owner: { level: 'room', id: focus.roomId },
+        part: { unit, slot: { kind: 'roomStart' } }, drill: null, unit: null, sw: null, port: null, slot: null, rect: { x: 0, y: 0, w: 0, h: 0 } })}>Start controller ›</button>
       {rowQuote && <QuoteKey quote={rowQuote} label="Add rack row" onAction={q => common.onAction(q.action)}
-        onResearch={common.onResearch} researchName={common.researchName} />}
+        detail={focus.rows + ' \u2192 ' + Math.min(focus.maxRows, focus.rows + 1) + ' rows'} onResearch={common.onResearch} researchName={common.researchName} />}</details>
     </UnitPlate>;
   }
   if (unit.kind === 'site' && focus.level === 'global') {
@@ -406,11 +398,8 @@ function unitPlate(unit: UnitRef, focus: LevelSnapshot, all: Omit<PlateCommon, '
     const zones = site.zones.filter(z => z.roomId !== null).length;
     return <UnitPlate {...common} unit={unit} title={regionName(site.region)} sub={`${zones} ${zones === 1 ? 'zone' : 'zones'}`}
       status={`${fahrenheit(site.outsideF)} outside · hottest ${fahrenheit(site.hottestF)}`} mode={site.online} timerS={site.timerS} onSave={saveKey(site.open)} saveLabel="Save this site">
-      <GenerationRow generation={site.generation ?? null} />
-      <SiteSummary site={site} onOpen={part => all.select({ id: `site-${unit.id}-${part.slot.kind}`, kind: 'part', owner: { level: 'global', id: 0 },
-        drill: null, part, unit: null, sw: null, port: null, slot: null, rect: { x: 0, y: 0, w: 0, h: 0 } })} />
-      <PowerKeys quotes={power} installed={!!site.generation} level={site.generation?.level ?? 0} noun="Generation" onAction={common.onAction} onResearch={common.onResearch} researchName={common.researchName} />
-      {site.dataPlane?.router && <SiteRouting site={unit} router={site.dataPlane.router} onAction={common.onAction} onResearch={common.onResearch} researchName={common.researchName} />}
+      <details className="component-options"><summary>Components</summary><SiteSummary site={site} onOpen={part => all.select({ id: `site-${unit.id}-${part.slot.kind}`, kind: 'part', owner: { level: 'global', id: 0 },
+        drill: null, part, unit: null, sw: null, port: null, slot: null, rect: { x: 0, y: 0, w: 0, h: 0 } })} /></details>
     </UnitPlate>;
   }
   return null;

@@ -12,7 +12,7 @@ const TITLE: Readonly<Record<SupplyView['kind'], string>> = { psu: 'Power supply
 
 /** The overload timer appears only once it is nonzero; a failed supply shows its reboot. */
 export function supplyLines(s: SupplyView): Line[] {
-  const lines: Line[] = [];
+  const lines: Line[] = s.reservedW === undefined ? [] : [{ text: `Allocated ${watts(s.reservedW)} / ${watts(s.capacityW)} · full load`, tone: 'muted' }];
   if(s.kind==='psu'&&s.capacityW===0)return [{text:'No supply limit until Rack',tone:'muted'}];
   if (s.failed) lines.push({ text: `Failed · reboots in ${Math.ceil((s.rebootMs ?? 0) / 1000)} s`, tone: 'warn' });
   else if (s.overloadS > 0 && s.usage > 1) lines.push({ text: `Overloaded · fails in ${Math.max(0, Math.ceil(OVERLOAD_FAIL_S - s.overloadS))} s`, tone: 'warn' });

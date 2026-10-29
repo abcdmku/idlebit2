@@ -1,4 +1,4 @@
-import type { BoardKind, QueueOptimization, StartOrder } from './build';
+import type { BoardKind, MemoryUpgrade, QueueOptimization, StartOrder } from './build';
 import type { FilterId, QueueStrategyId, RouteStrategyId } from './catalog';
 import type { PartRef, RackId, ResearchId, RoomId, ScopeRef, SwitchRef, SystemId, UnitKind, UnitRef } from './ids';
 import type { GameState, TaskRef } from './state';
@@ -26,13 +26,13 @@ export type GameAction =
   | { readonly type: 'dismissTask'; readonly task: TaskRef }
   | { readonly type: 'setAutoReturn'; readonly on: boolean }
   | { readonly type: 'setOnline'; readonly unit: UnitRef; readonly online: boolean }
-  | { readonly type: 'upgradePart'; readonly part: PartRef }
+  | { readonly type: 'upgradePart'; readonly part: PartRef; readonly axis?: MemoryUpgrade }
   /** Every level from the part's current one up to `level`, atomically, for the summed price (hot like upgradePart). */
-  | { readonly type: 'upgradePartTo'; readonly part: PartRef; readonly level: number }
+  | { readonly type: 'upgradePartTo'; readonly part: PartRef; readonly level: number; readonly axis?: MemoryUpgrade }
   | { readonly type: 'installGpu'; readonly system: SystemId; readonly model: GpuModelId; readonly index: number | null }
   /** Cold replacement of all non-ECC RAM at the same generation, capacity and bandwidth. */
   | { readonly type: 'convertRamToEcc'; readonly system: SystemId }
-  | { readonly type: 'upgradeAll'; readonly system: SystemId; readonly kind: 'ram' | 'gpu' | 'drive'; readonly gen: number }
+  | { readonly type: 'upgradeAll'; readonly system: SystemId; readonly kind: 'ram' | 'gpu' | 'drive'; readonly gen: number; readonly axis?: MemoryUpgrade }
   | { readonly type: 'replacePart'; readonly part: PartRef; readonly generation: number; readonly preserveCapacity: boolean; readonly minimumCapacity?: number }
   | { readonly type: 'replaceCpu'; readonly system: SystemId }
   | { readonly type: 'addPart'; readonly system: SystemId; readonly kind: BoardPartKind; readonly generation: number; readonly ecc?: boolean }

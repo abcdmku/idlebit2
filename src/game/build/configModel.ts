@@ -8,7 +8,7 @@ import type { RuleId } from '../types/catalog';
 import { rackId, systemId } from '../types/ids';
 import type { LockReason } from '../types/quotes';
 import type { Unlocks } from '../types/state';
-import { capacity, installPrice, upgradesBetween, LADDERS, PARTS } from './catalog';
+import { LADDERS, PARTS } from './catalog';
 import { compileSystem } from './compile';
 import { ceilingLock, genLock, levelLock, optionLock, ruleLock } from './locks';
 import { boardLimit } from './partPlans';
@@ -49,37 +49,22 @@ export function fullLoadWatts(spec: SystemSpec, u: Unlocks): number {
   const hit=byUnlocks.get(u);if(hit!==undefined)return hit;
   const c = allocCompiled({ systems: 1, racks: 0, rooms: 0, sites: 0, links: 0 });
   compileSystem(c, { id: systemId(0), rack: rackId(0), slot: 0, online: true, spec }, u);
-  let watts = c.sys.coreIdleW[0]! + c.sys.coreLoadW[0]! + c.sys.clockIdleW[0]! + c.sys.clockLoadW[0]!;
+  let watts = c.sys.coreIdleW[0]! + c.sys.coreLoadW[0]! * (spec.settings.turbo && u.rules.includes('turbo') ? 1.8 : 1) + c.sys.clockIdleW[0]! + c.sys.clockLoadW[0]!;
   for (let r = 0; r < 4; r += 1) watts += c.sys.idleW[r]! + c.sys.loadW[r]!;
   byUnlocks.set(u,watts);
   return watts;
 }
 
-/** Cheapest researched supply that covers full load. Unlocking a luxury PSU must not make entry hardware unaffordable. */
-export function sizedPsu(spec: SystemSpec, u: Unlocks): SupplyBuild {
-  const need = fullLoadWatts(spec, u);
-  let best: SupplyBuild = { gen: 0, level: 11, capped: false }, price: bigint | null = null;
-  for (let gen = 0; gen < PARTS.psu.base.length; gen += 1) {
-    if ((u.gens.psu & (1 << gen)) === 0) continue;
-    const top = 11 + gen;
-    let level = 1;
-    while (level < top && capacity(PARTS.psu, gen, level) < need) level += 1;
-    const cap = capacity(PARTS.psu, gen, level);
-    if (cap < need) {
-      if (price === null && cap > capacity(PARTS.psu, best.gen, best.level)) best = { gen, level, capped: false };
-      continue;
-    }
-    const cost = installPrice(PARTS.psu, gen) + upgradesBetween(PARTS.psu, gen, 1, level);
-    if (price === null || cost < price) { best = { gen, level, capped: false }; price = cost; }
-  }
-  return best;
+/** Inert legacy save field. Systems receive power from their rack. */
+export function sizedPsu(_spec: SystemSpec, _u: Unlocks): SupplyBuild {
+  return { gen: 0, level: 1, capped: false };
 }
 
 const SIZED = new Map<string, SystemSpec>();
 /** One shared spec per (tier, board, kind, PSU), so barebones systems share their parts (R20). */
 export function barebonesSystemSpec(tier: number, u: Unlocks, board: BoardKind = 'general', storageNode = false): SystemSpec {
   const shape: SystemSpec = storageNode
-    ? { ...barebonesSpec(0, 'general'), kind: 'storageNode', cpu: null, cpuCount: 0, drives: [{ gen: Math.max(0, newestGen(u, 'storage', PARTS.storage.base.length)), level: 1 }] }
+    ? { ...barebonesSpec(0, 'general'), kind: 'storageNode', cpu: null, cpuCount: 0, drives: [{ gen: Math.max(0, newestGen(u, 'storage', PARTS.storage.base.length)), level: 1, speedLevel: 1 }] }
     : barebonesSpec(tier, board);
   const psu = sizedPsu(shape, u);
   const key = `${storageNode ? 's' : tier}:${board}:${shape.drives[0]?.gen ?? ''}:${psu.gen}:${psu.level}`;
@@ -121,7 +106,7 @@ export function systemLock(u: Unlocks, spec: SystemSpec): LockReason | null {
     checks.push(slots(u, cpu.cores.length, boardLimit(spec, u, 'core'), 'coreSites'), slots(u, spec.cpuCount, boardLimit(spec, u, 'socket'), 'cpuSockets'));
   }
   if (spec.scheduler) checks.push(...partOk(u, 'scheduler', spec.scheduler), () => (spec.scheduler!.strategy === 'fifo' ? null : optionLock(u, spec.scheduler!.strategy, 'queue')));
-  for (const m of spec.ram) checks.push(...partOk(u, 'ram', m, m.ecc), () => (m.ecc ? ruleLock(u, 'ecc') : null));
+  for (const m of spec.ram) checks.push(...partOk(u, 'ram', m, m.ecc), () => levelLock(u, 'ram', m.gen, m.speedLevel, m.ecc), () => (m.ecc ? ruleLock(u, 'ecc') : null));
   for (const a of spec.accels) {
     if (a.kind === 'npu') checks.push(...partOk(u, 'npu', a));
     else {
@@ -134,9 +119,8 @@ export function systemLock(u: Unlocks, spec: SystemSpec): LockReason | null {
       });
     }
   }
-  for (const d of spec.drives) checks.push(...partOk(u, 'storage', d));
+  for (const d of spec.drives) checks.push(...partOk(u, 'storage', d), () => levelLock(u, 'storage', d.gen, d.speedLevel));
   checks.push(slots(u, spec.ram.length, boardLimit(spec, u, 'ram'), 'ramSlots'), slots(u, spec.accels.length, boardLimit(spec, u, 'gpu'), 'gpuSlots'), slots(u, spec.drives.length, boardLimit(spec, u, 'drive'), 'driveSlots'));
-  checks.push(...partOk(u, 'psu', spec.psu), () => (spec.psu.capped ? ruleLock(u, 'powerCap') : null));
   checks.push(() => (spec.settings.dvfs ? ruleLock(u, 'dvfs') : null), () => (spec.settings.turbo ? ruleLock(u, 'turbo') : null));
   return first(checks);
 }

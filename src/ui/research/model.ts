@@ -15,7 +15,7 @@ type Part = Exclude<ResearchPartId, 'structure'>;
 /** Each tab's parts in board order. Structure projects sit in the tab's "Next level" section. */
 export const TAB_PARTS: Readonly<Record<ResearchTabId, readonly Part[]>> = {
   cpu: ['cores', 'clock', 'cache', 'queue', 'fab'],
-  system: ['cpu', 'ram', 'drive', 'gpu', 'psu', 'board'],
+  system: ['cpu', 'ram', 'drive', 'gpu', 'board'],
   rack: ['switch', 'lb', 'rackCooling', 'rackPower'],
   room: ['netRack', 'roomCooling', 'ups'],
   global: ['dataPlane', 'backbone', 'site', 'globalScheduler'],

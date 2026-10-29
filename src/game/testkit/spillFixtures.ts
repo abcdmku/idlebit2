@@ -31,9 +31,9 @@ const SMALL_RAM: SystemSpec = {
   cpu: { cpu: lvl(1, 1), cores: Array.from({ length: 4 }, () => lvl(1, 1)), clock: lvl(1, 1), cache: lvl(1, 1), },
   cpuCount: 1,
   scheduler: { gen: 1, level: 4, strategy: 'fifo' },
-  ram: [{ gen: 1, level: 4, ecc: false }],
+  ram: [{ gen: 1, level: 4, speedLevel: 4, ecc: false }],
   accels: [],
-  drives: [lvl(1, 1)],
+  drives: [{ ...lvl(1, 1), speedLevel: 1 }],
   psu: { gen: 1, level: 8, capped: false },
   settings: { dvfs: false, turbo: false, cStateLimit: 0 },
 };
@@ -51,13 +51,13 @@ const ECC_SPEC: SystemSpec = {
   cpu: { cpu: lvl(2, 1), cores: Array.from({ length: 4 }, () => lvl(2, 1)), clock: lvl(2, 1), cache: lvl(2, 1), },
   cpuCount: 1,
   scheduler: { gen: 2, level: 4, strategy: 'fifo' },
-  ram: [{ gen: 2, level: 5, ecc: true }, { gen: 2, level: 5, ecc: true }],
+  ram: [{ gen: 2, level: 5, speedLevel: 5, ecc: true }, { gen: 2, level: 5, speedLevel: 5, ecc: true }],
   accels: [],
   drives: [],
   // Four native MHz cores draw about 5.3e8 W under the CSV energy ratio (hardware-progression.md §3).
   psu: { gen: 3, level: 11, capped: false },
   settings: { dvfs: false, turbo: false, cStateLimit: 0 }, };
-const ECC_DRIVE: SystemSpec = { ...ECC_SPEC, ram: [{ gen: 2, level: 2, ecc: true }, { gen: 2, level: 2, ecc: true }], drives: [lvl(1, 4)] };
+const ECC_DRIVE: SystemSpec = { ...ECC_SPEC, ram: [{ gen: 2, level: 2, speedLevel: 2, ecc: true }, { gen: 2, level: 2, speedLevel: 2, ecc: true }], drives: [{ ...lvl(1, 4), speedLevel: 4 }] };
 /** Rack-scale families (D26.5 windows) are in the mix. */
 const WINDOW_INTENSITY = 27;
 

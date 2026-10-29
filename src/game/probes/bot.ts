@@ -62,7 +62,7 @@ function cpuNeedsCooling(state: GameState, rack: number): boolean {
 
 function cpuNeedsSupply(state: GameState, system: number, part: 'psu' | 'pdu' | 'ups' = 'psu'): boolean {
   const q = quote(state, {kind:'tray',at:{level:'chip',id:systemId(system)}}).quotes.find(q => q.action.type === 'replaceCpu');
-  if (!q || q.locked || !q.affordable || q.overSupply?.part !== part) return false;
+  if (!q || (q.locked && q.locked.code !== 'power') || !q.affordable || q.overSupply?.part !== part) return false;
   const payback = score(state, q);
   const researchBoost = state.research.active !== null && q.effect?.researchOpsBefore !== undefined && q.effect.researchOpsAfter !== undefined
     && q.effect.researchOpsAfter >= 8 * Math.max(1, q.effect.researchOpsBefore) && Number(q.cost) <= Number(state.wallet.credits) / 3;
@@ -435,8 +435,9 @@ function ramPastRatio(state: GameState, a: GameAction): boolean {
   if ((a.type !== 'upgradePart' && a.type !== 'upgradePartTo') || a.part.unit.kind !== 'system' || a.part.slot.kind !== 'ram') return false;
   const m = state.build.systems[a.part.unit.id]?.spec.ram[a.part.slot.index];
   if (!m) return false;
+  if (a.axis !== 'speed') return false;
   const era = (PARTS.ram.watts as { era: readonly number[] }).era[m.gen] ?? 0;
-  return energyRatio(era, ratedRate(PARTS.ram, m.gen, 1), ratedRate(PARTS.ram, m.gen, a.type === 'upgradePartTo' ? a.level : m.level + 1)) < RAM_MIN_RATIO;
+  return energyRatio(era, ratedRate(PARTS.ram, m.gen, 1), ratedRate(PARTS.ram, m.gen, a.type === 'upgradePartTo' ? a.level : m.speedLevel + 1)) < RAM_MIN_RATIO;
 }
 /** The action answers a failure detail of one of the last few rounds. */
 function answersRecentWall(state: GameState, a: GameAction): boolean {
@@ -509,16 +510,8 @@ function psuImproves(state: GameState, q: Quote): boolean {
 }
 
 /** Reject cards that exceed full-load supply headroom. Ask PSU quotes above. */
-function gpuFitsSupply(state: GameState, q: Quote): boolean {
-  if (!q.gpu) return true;
-  const id = q.action.type === 'installGpu' ? q.action.system
-    : q.action.type === 'upgradePart' && q.action.part.unit.kind === 'system' ? q.action.part.unit.id : null;
-  if (id === null) return true;
-  const c = state.compiled.sys;
-  const fullW = c.coreIdleW[id]! + c.coreLoadW[id]! + c.clockIdleW[id]!
-    + [0, 1, 2, 3].reduce((n, resource) => n + c.idleW[id * 4 + resource]! + c.loadW[id * 4 + resource]!, 0);
-  const beforeW = q.gpu.before ? (q.gpu.before.idleW + q.gpu.before.loadW) / POWER_SCALE : 0;
-  return fullW - beforeW + (q.gpu.after.idleW + q.gpu.after.loadW) / POWER_SCALE <= c.psuCapW[id]!;
+function gpuFitsSupply(_state: GameState, q: Quote): boolean {
+  return !q.overSupply;
 }
 
 /** Do not repeatedly scrap a card for the same tray model, or buy a weaker replacement. */
@@ -594,7 +587,7 @@ function buyParts(state: GameState, policy: Policy, log: BotEvent[], need: MeetN
     const quotes = candidates;
     const dependencies = new Set<Quote>();
     for (const q of [...quotes]) {
-      if (q.locked || !q.affordable || !q.overSupply || !gpuImproves(q) || score(s, q) === null) continue;
+      if ((q.locked && q.locked.code !== 'power') || !q.affordable || !q.overSupply || !gpuImproves(q) || score(s, q) === null) continue;
       const prep = supplyPreparation(s, q);
       if (prep && Number(prep.cost) + Number(q.cost) + Number(s.round.reports.at(-1)?.energy ?? 0) <= Number(s.wallet.credits)) {
         quotes.push(prep); dependencies.add(prep);
@@ -681,7 +674,7 @@ function milestonePath(tree: ReturnType<typeof selectResearchTree>): { path: Set
 }
 
 /** Off-path research that unblocks income; a sensible player takes it as soon as the budget allows. */
-const ESSENTIAL = ['psu80', 'lbCapability', 'sw100k', 'gddr6', 'gpuGen2', 'meteredPdu', 'rackVarSpeed'];
+const ESSENTIAL = ['lbCapability', 'sw100k', 'gddr6', 'gpuGen2', 'meteredPdu', 'rackVarSpeed'];
 /** Off-path research since the last milestone started may spend this share of the next milestone path's Data. */
 const OFF_PATH_SHARE = 0.5;
 
@@ -755,8 +748,8 @@ function supplyResearchPath(state: GameState, byId: ReadonlyMap<string, Research
     if (next?.locked?.node) add(next.locked.node);
   }
   for (const request of candidateRequests(state)) for (const q of quote(state, request).quotes) {
-    if (q.locked || !q.affordable || !q.overSupply || score(state, q) === null) continue;
-    const node = supplyResearch(state, q);
+    if ((q.locked && q.locked.code !== 'power') || !q.affordable || !q.overSupply || score(state, q) === null) continue;
+    const node = q.locked?.node ?? supplyResearch(state, q);
     if (node) add(node);
   }
   if (state.research.unlocks.levels.rack) add('rackVarSpeed');

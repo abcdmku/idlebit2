@@ -14,7 +14,7 @@ export interface PartPlateProps extends PlateCommon {
   status: string;
   statusTone?: Tone;
   progress?: number | null;
-  /** Up to `lineSlots` lines; empty slots keep their height. */
+  /** Current facts only; empty rows are omitted. */
   lines?: readonly Line[];
   lineSlots?: number;
   className?: string;
@@ -30,17 +30,15 @@ export interface PartPlateProps extends PlateCommon {
 
 /** Any part with an upgrade-versus-replace choice: board parts, supplies, coolers, links. */
 export function PartPlate({ title, sub, level, pips, status, statusTone = '', progress, lines = [], lineSlots = 0,
-  className = '', children, beforeKeys = false, compactStatus = false, quotes, onAction, onResearch, researchName, unblocks, unblock, ...frame }: PartPlateProps) {
+  className = '', children, beforeKeys: _beforeKeys = false, compactStatus = false, quotes, onAction, onResearch, researchName, unblocks, unblock, ...frame }: PartPlateProps) {
   const keys = { quotes, level, onAction, onResearch, researchName, unblocks, eccPriority: unblock?.action.type === 'convertRamToEcc' };
   const main = partMain(quotes?.quotes ?? [], level, keys.eccPriority);
-  // The main option and its consequence (effect, downtime, supply warning and fix) stay pinned with its key, so the
-  // key never shows without what it does; the other options and details scroll above it.
+  // The component's upgrade stays pinned. Stats and limits live inside its fixed-height key.
   return <PlateFrame {...frame} title={title} sub={compactStatus ? `${sub} · ${status}` : sub} pips={pips} className={`part ${className}`}
     footer={main && <PartKeys {...keys} part="primary" />}>
-    {!compactStatus && <Status text={status} tone={statusTone} progress={progress} />}
+    {!compactStatus && status && <Status text={status} tone={statusTone} progress={progress} />}
     <Lines lines={lines} slots={lineSlots} />
-    {beforeKeys && children}
+    {children && <details className="component-options"><summary>Settings</summary>{children}</details>}
     <PartKeys {...keys} part="rest" />
-    {!beforeKeys && children}
   </PlateFrame>;
 }

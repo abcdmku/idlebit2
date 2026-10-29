@@ -1,6 +1,7 @@
 import type { SystemId } from '../types/ids';
 import type { GameState } from '../types/state';
-import { ECC_PRICE_FACTOR, installPrice, PARTS, scalePrice, upgradesBetween } from './catalog';
+import { ECC_PRICE_FACTOR, PARTS, scalePrice } from './catalog';
+import { memoryPrice } from './memory';
 import { ruleLock } from './locks';
 import { withSpec } from './partAccess';
 import { coldScopes, fail, locked, planned, type Plan } from './plan';
@@ -13,8 +14,7 @@ export function planRamEcc(state: GameState, system: SystemId): Plan {
   if (lock) return locked(lock, label);
   const missing = spec.ram.filter(m => !m.ecc);
   if (!missing.length) return locked({ code: 'ceiling', node: null, text: 'All RAM is ECC' }, label);
-  const price = missing.reduce((sum, m) => sum + scalePrice(installPrice(PARTS.ram, m.gen)
-    + upgradesBetween(PARTS.ram, m.gen, 1, m.level, 1), ECC_PRICE_FACTOR), 0n);
+  const price = missing.reduce((sum, m) => sum + scalePrice(memoryPrice(PARTS.ram, m), ECC_PRICE_FACTOR), 0n);
   const unit = { kind: 'system', id: system } as const;
   return planned({ build: withSpec(state.build, system, { ...spec, ram: spec.ram.map(m => m.ecc ? m : { ...m, ecc: true }) }),
     price, cold: coldScopes(state, unit) }, label);

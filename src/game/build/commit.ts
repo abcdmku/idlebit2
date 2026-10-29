@@ -1,3 +1,5 @@
+import { reject } from '../core/actions';
+import { overSupply, powerLock } from './overSupply';
 import { amount } from '../amount';
 import { debitCredits } from '../core/actions';
 import { MODE, restingMode, setUnitMode, startTransition } from '../core/timers';
@@ -68,6 +70,8 @@ function inventoryChanges(before: BuildState, change: BuildChange): { changed: n
  * runs, resting modes otherwise.
  */
 export function commitBuild(state: GameState, change: BuildChange): ActionOutcome {
+  const over = overSupply(state, change.build);
+  if (over) return reject(state, 'cap', powerLock(state, over).text);
   let next = state;
   if (change.price > 0n) {
     const paid = debitCredits(state, amount(change.price.toString()));

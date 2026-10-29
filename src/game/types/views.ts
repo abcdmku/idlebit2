@@ -72,7 +72,17 @@ export interface ShardDoneView {
 export const UNIT_MODES = ['empty', 'onMarket', 'asleep', 'boot', 'goingOffline', 'draining', 'offline', 'paused', 'cold', 'crashed', 'dark', 'standby'] as const;
 export type UnitMode = (typeof UNIT_MODES)[number];
 
+export interface PowerBudgetView {
+  readonly actualW: number;
+  readonly reservedW: number;
+  readonly rackReservedW: number;
+  readonly capacityW: number;
+  readonly rackOpen: boolean;
+}
+
 export interface SupplyView {
+  /** Installed full-load allocation, independent of current utilization. */
+  readonly reservedW?: number;
   readonly kind: SupplyKind;
   readonly generation: number;
   readonly level: number;
@@ -190,6 +200,8 @@ export interface MemTierView {
 
 export type PartViewKind = 'cpu' | 'core' | 'clock' | 'cache' | 'scheduler' | 'ram' | 'gpu' | 'npu' | 'drive' | 'psu';
 export interface PartView {
+  /** Independent bandwidth/IO level on RAM and drives. */
+  readonly speedLevel?: number;
   /** Capacity of this RAM stick or drive, in bits. Set for ram and drive. */
   readonly capacityBits?: number;
   /** This RAM stick's channel rate or drive's IO rate, in bit/s. Set for ram and drive. */

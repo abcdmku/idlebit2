@@ -31,7 +31,7 @@ export interface PhysSettings {
   readonly economizer: boolean;
   readonly dualFeed: boolean;
   readonly rideThrough: boolean;
-  /** The board PSU exists as a supply (System opened, spec §9.2). */
+  /** Actual component draw begins at System. The legacy board-supply switch stays false. */
   readonly realDraw: boolean;
   readonly psuLive: boolean;
 }
@@ -55,8 +55,8 @@ export function deriveSettings(build: BuildState, unlocks: Unlocks, nSys: number
   const sys = new Uint8Array(nSys), cmax = new Uint8Array(nSys);
   build.systems.forEach((s) => {
     if (!s || s.id >= nSys) return;
-    const { settings, psu } = s.spec;
-    sys[s.id] = (dvfs && settings.dvfs ? SYS_DVFS : 0) | (turbo && settings.turbo ? SYS_TURBO : 0) | (cap && psu.capped ? SYS_CAPPED : 0);
+    const { settings } = s.spec;
+    sys[s.id] = (dvfs && settings.dvfs ? SYS_DVFS : 0) | (turbo && settings.turbo ? SYS_TURBO : 0);
     cmax[s.id] = Math.min(cResearched, limitIndex(settings.cStateLimit));
   });
   const pduCapped = new Uint8Array(nRack), rackSetpointF = new Float64Array(nRack);
@@ -76,7 +76,7 @@ export function deriveSettings(build: BuildState, unlocks: Unlocks, nSys: number
     sys, cmax, pduCapped, rackSetpointF, roomSetpointF, upsCount, upsRide,
     packageIdle: has('packageIdle'), s3Sleep: has('s3Sleep'), throttle: has('thermalThrottle'),
     rackSetpoint: has('rackSetpoint'), roomSetpoint: has('roomSetpoint'), economizer: has('economizer'),
-    dualFeed: has('dualFeed'), rideThrough: has('upsRideThrough'), realDraw: unlocks.levels.system, psuLive: unlocks.levels.system,
+    dualFeed: has('dualFeed'), rideThrough: has('upsRideThrough'), realDraw: unlocks.levels.system, psuLive: false,
   };
 }
 

@@ -27,9 +27,9 @@ const MID_SPEC: SystemSpec = {
   cpu: { cpu: lvl(1, 1), cores: Array.from({ length: 8 }, () => lvl(1, 1)), clock: lvl(1, 1), cache: lvl(1, 8), },
   cpuCount: 1,
   scheduler: { gen: 1, level: 4, strategy: 'fifo' },
-  ram: [{ gen: 1, level: 8, ecc: false }, { gen: 1, level: 8, ecc: false }],
+  ram: [{ gen: 1, level: 8, speedLevel: 8, ecc: false }, { gen: 1, level: 8, speedLevel: 8, ecc: false }],
   accels: [{ kind: 'gpu', model: '1330' }],
-  drives: [lvl(1, 2)],
+  drives: [{ ...lvl(1, 2), speedLevel: 2 }],
   psu: { gen: 1, level: 8, capped: false },
   settings: { dvfs: false, turbo: false, cStateLimit: 0 },
 };

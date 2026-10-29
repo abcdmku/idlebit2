@@ -42,6 +42,7 @@ const ROOM_RACKS: readonly RackSlotView[] = Array.from({ length: 16 }, (_, i) =>
 export const LEVEL_FIXTURES: { readonly [L in LevelId]: Extract<LevelSnapshot, { level: L }> } = {
   chip: CHIP,
   system: {
+    power: { actualW: 0.2, reservedW: 0.4, rackReservedW: 0.4, capacityW: 1, rackOpen: false },
     level: 'system', parent: { level: 'rack', id: rackId(0) }, systemId: systemId(0), kind: 'server', board: 'general', cpuCount: 1, ramSlots: 1, etaCfg: 1,
     online: 'onMarket', timerS: null, timerTotalS: null, chip: CHIP, chips: [CHIP], cpuBusy: [1],
     cpu: { slot: 0, kind: 'cpu', generation: 0, level: 1, active: true, resourceBusy: 1 },

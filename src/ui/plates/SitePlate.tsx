@@ -2,19 +2,17 @@
 // never spends (user, 26 Oct); the second tap buys: the generation already on the board (or a CPU socket's copy
 // of CPU 1) is the pinned main key with its consequence, the other routine generations one-line keys.
 // Placed like every plate, so it never covers the site.
-import type { ReactNode } from 'react';
-import type { LevelSnapshot, PartRef, Quote, QuoteResult, SystemSnapshot } from '../../game';
+import type { GameAction, LevelSnapshot, PartRef, Quote, QuoteResult, SystemSnapshot } from '../../game';
 import type { HitTarget } from '../../render/core';
 import { calloutModel } from '../callout/model';
 import { useShellOffers } from '../deck/useOffers';
-import { useSavingUp } from '../deck/SavingUp';
 import { leadAdd, useBoardPart, type BoardSlot } from './BoardPartPlate';
 import { MemoryAdd } from './MemoryPart';
 import { partFacts } from './partFacts';
-import { improves, OptionList, OptionRow, routine, type Option } from './OptionRow';
+import { OptionList, OptionRow, routine, type Option } from './OptionRow';
 import { PlateFrame } from './PlateFrame';
 import { QuoteKey, Status } from './widgets';
-import { useQuote, useShell } from '../storeHooks';
+import { useShell } from '../storeHooks';
 import type { PlateCommon } from './types';
 
 export interface SitePlateProps extends Omit<PlateCommon, 'quotes'> {
@@ -72,13 +70,6 @@ export function SitePlate({ target, focus, quotes, onAction, onResearch, researc
   const holds = siteHolds(target, focus);
   const part = useBoardPart({ active: !!holds, slot: holds?.slot ?? 'ram', focus: focus as SystemSnapshot, facts: holds ? partFacts(focus, holds.part.slot) : null,
     part: holds?.part, onOpenCpu: holds?.slot === 'cpu' ? onOpenCpu : undefined, quotes, onAction, onResearch, researchName, wide: !!frame.bounds });
-  const proxy = holds ? null : siteProxy(target, focus);
-  const proxyQuotes = useQuote(proxy ? { kind: 'part', part: proxy.part } : null);
-  const later = useBoardPart({ active: !!proxy, slot: proxy?.slot ?? 'ram', focus: focus as SystemSnapshot, facts: proxy ? partFacts(focus, proxy.part.slot) : null,
-    part: proxy?.part, onOpenCpu: proxy?.slot === 'cpu' ? onOpenCpu : undefined, quotes: proxyQuotes, onAction, onResearch, researchName, wide: !!frame.bounds });
-  // Rendered only while the frame measures itself (CSS .plate-reserve), never shown, never hit.
-  const reserve = (now: ReactNode, then: ReactNode) => later
-    ? <div className="reserve-stack">{now}<div className="plate-reserve" aria-hidden="true">{then}</div></div> : now;
   const adds = quotes?.quotes.filter(q => boardAdd(q)) ?? [];
   // A RAM or drive is always added after the last one: name it by where it goes, not by which "+" was tapped.
   const next = focus.level !== 'system' ? target.slot ?? 0 : /ram/.test(target.id) ? focus.ram.length : /drive/.test(target.id) ? focus.storage.length : target.slot ?? 0;
@@ -89,22 +80,26 @@ export function SitePlate({ target, focus, quotes, onAction, onResearch, researc
   // The pinned add is the installed generation's, or else the first that improves without a loss (R16); when every
   // generation trades something away (a pooled bandwidth drop), none is pinned and each says what it costs.
   const lead = options[adds.indexOf(leadAdd(adds, installed)!)];
-  const main = lead && improves(lead.quote) ? lead : options.find(o => improves(o.quote)) ?? null;
+  const main = lead ?? options[0] ?? null;
   // Unpinned, the matching generation still comes first among the keys (the common action first).
   const rest = routine([...(lead ? [lead] : []), ...options.filter(o => o !== lead)].filter(o => o !== main));
   const q = m.offer?.quote ?? null, lock = q?.locked;
-  const saving = useSavingUp(m.offer?.price ?? null, !!m.offer?.affordable);
-  const buy = (x: Quote) => onAction(x.action);
+  const purchase = (action: GameAction) => {
+    const before = store.getState().build.revision;
+    onAction(action);
+    if (!holds && store.getState().build.revision !== before) frame.onClose();
+  };
+  const buy = (x: Quote) => purchase(x.action);
   const row = { onAction: buy, onResearch, researchName };
   // The same frame throughout (a purchase never re-places it): the part this site now holds, else its add.
   if (part) return <PlateFrame key={part.title} {...frame} title={part.title} sub={part.sub} head={part.head} className="part site" footer={part.footer}>{part.body}</PlateFrame>;
   if (focus.level === 'system' && kind && adds.length) return <PlateFrame key={`add-${kind}`} {...frame} title={`Add ${kind === 'ram' ? 'RAM' : 'drive'}`} className="part memory-site">
-    <MemoryAdd quotes={adds} preferred={lead?.quote} onAction={onAction} onResearch={onResearch} researchName={researchName} />
+    <MemoryAdd quotes={adds} preferred={lead?.quote} onAction={purchase} onResearch={onResearch} researchName={researchName} />
   </PlateFrame>;
   if (main || rest.length) return <PlateFrame {...frame} title={m.name} className="part site"
-    sub={later && <span className="plate-reserve">{later.sub}</span>} head={later?.head && <span className="plate-reserve">{later.head}</span>}
-    footer={reserve(main && <OptionRow option={main} primary {...row} />, later?.footer)}>
-    {reserve(<div><OptionList options={rest} {...row} /></div>, later?.body)}
+    footer={main && <OptionRow option={main} primary {...row} />}>
+    {rest.some(o => o.quote.locked?.code !== 'research') && <details className="component-options"><summary>Type</summary>
+      <OptionList options={rest.filter(o => o.quote.locked?.code !== 'research')} {...row} /></details>}
   </PlateFrame>;
   // A board site with nothing to add says why; it never offers the deck row's buy (that would act on another part).
   if (focus.level === 'system') return <PlateFrame {...frame} title={m.name} className="part site">
@@ -113,10 +108,7 @@ export function SitePlate({ target, focus, quotes, onAction, onResearch, researc
   return <PlateFrame {...frame} title={m.name} className="part site">
     <Status text={m.change || ' '} tone={m.research ? 'warn' : ''} />
     <div className="keys">
-      {lock?.code === 'research' && lock.node && onResearch
-        ? <button type="button" className="key locked-action" data-qa-target onClick={() => onResearch(lock.node!)}>
-          Research {researchName?.(lock.node) ?? lock.text.replace(/^Needs /, '')}</button>
-        : q ? <QuoteKey quote={q} label={m.change ? `Buy · ${m.change}` : 'Buy'} reason={saving ?? undefined} onAction={buy} onResearch={onResearch} researchName={researchName} />
+      {q ? <QuoteKey quote={q} label={m.change ? `Buy · ${m.change}` : 'Buy'} onAction={buy} onResearch={onResearch} researchName={researchName} />
         : <p className="key-slot">{lock?.text ?? 'Nothing to add here yet'}</p>}
     </div>
   </PlateFrame>;

@@ -19,7 +19,6 @@ const plural = (n: number, one: string, many = `${one}s`): string => `${n} ${n =
 const routerSpec = (r: RouterBuild): string => `${ROUTE_NAMES[r.strategy].name} · queue ${r.queueLevel}`;
 const switchSpec = (sw: SwitchBuild): string =>
   sw.ports.length ? `${formatHertz(ladderSpeed(Math.max(...sw.ports)))} · ${plural(sw.ports.length, 'port')}` : NONE;
-const psuName = (gen: number): string => partName('psu', gen);
 
 /** The system the specs are read at: the focused system, the first system of a focused rack or room, else the player's first. */
 function systemAt(state: GameState, at: NodeRef | null): number {
@@ -61,7 +60,7 @@ export function researchPartSpecs(state: GameState, at: NodeRef | null = null): 
     drive: line(spec?.drives[0] && s >= 0 ? `${partName('storage', spec.drives[0].gen)} · ${formatSize(c.sys.storageCap[s] ?? 0)}` : NONE),
     gpu: line(models.length ? `GPU ${gpuText}`
       : npus[0]?.kind === 'npu' ? partName('npu', npus[0].gen) : NONE),
-    psu: line(spec ? psuName(spec.psu.gen) : NONE),
+    psu: line(NONE),
     board: line(spec ? (spec.board === 'accelerator' ? 'Accelerator board' : 'General board') : NONE),
     switch: line(openRack ? switchSpec(openRack.switch) : NONE),
     lb: line(openRack ? routerSpec(openRack.lb) : NONE),

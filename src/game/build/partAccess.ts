@@ -1,17 +1,18 @@
-import type { BuildState, CpuBuild, PartLevel, SystemSpec } from '../types/build';
+import type { BuildState, CpuBuild, MemoryBuild, PartLevel, SystemSpec } from '../types/build';
 import type { PartId } from '../types/catalog';
 import type { PartRef, UnitRef } from '../types/ids';
 import type { GpuBuild } from '../types/gpu';
 import { evaluateGpu, gpuAtTierIndex } from './catalog/gpuModels';
 
 /** A part as the catalog sees it. For the data plane and backbone `level` is the ladder index k; for a switch it is 0. */
-export interface PartAt { readonly id: PartId; readonly gen: number; readonly level: number; readonly gpu?: GpuBuild }
+export interface PartAt { readonly id: PartId; readonly gen: number; readonly level: number; readonly speedLevel?: number; readonly gpu?: GpuBuild }
 
 type ChipKind = 'cpu' | 'clock' | 'cache';
 const CHIP: readonly string[] = ['cpu', 'clock', 'cache', 'core'];
 export const isChipSlot = (ref: PartRef): boolean => CHIP.includes(ref.slot.kind);
 
-const at = (id: PartId, p: PartLevel | null | undefined): PartAt | null => (p ? { id, gen: p.gen, level: p.level } : null);
+const at = (id: PartId, p: PartLevel | null | undefined): PartAt | null => (p ? { id, gen: p.gen, level: p.level,
+  ...('speedLevel' in p ? { speedLevel: (p as MemoryBuild).speedLevel } : {}) } : null);
 
 /** D31 part slots: optional, installed into an empty slot by a replace, and hot. */
 export const POWER_SLOTS: readonly string[] = ['powerCtl', 'roomStart', 'globalStart', 'generation'];
@@ -74,6 +75,8 @@ export function readPart(build: BuildState, ref: PartRef): PartAt | null {
 
 const replaceAt = <T>(list: readonly T[], i: number, value: T): T[] => list.map((x, j) => (j === i ? value : x));
 const setLevel = <T extends PartLevel>(p: T, gen: number, level: number): T => ({ ...p, gen, level });
+const setMemory = <T extends MemoryBuild>(p: T, gen: number, level: number): T =>
+  ({ ...p, gen, level, speedLevel: gen === p.gen ? p.speedLevel : 1 });
 
 /** Every CPU in a system is the one CpuBuild (D7.3), so a chip-part edit applies to all of them. */
 function writeChip(sys: SystemSpec, ref: PartRef, gen: number, level: number): SystemSpec | null {
@@ -103,7 +106,7 @@ export function writePart(build: BuildState, ref: PartRef, gen: number, level: n
     if (isChipSlot(ref)) next = writeChip(sys, ref, gen, level);
     else if (slot.kind === 'scheduler') next = sys.scheduler && { ...sys, scheduler: setLevel(sys.scheduler, gen, level) };
     else if (slot.kind === 'psu') next = { ...sys, psu: setLevel(sys.psu, gen, level) };
-    else if (slot.kind === 'ram' && sys.ram[slot.index]) next = { ...sys, ram: replaceAt(sys.ram, slot.index, setLevel(sys.ram[slot.index]!, gen, level)) };
+    else if (slot.kind === 'ram' && sys.ram[slot.index]) next = { ...sys, ram: replaceAt(sys.ram, slot.index, setMemory(sys.ram[slot.index]!, gen, level)) };
     else if (slot.kind === 'gpu' && sys.accels[slot.index]) {
       const card = sys.accels[slot.index]!;
       if (card.kind === 'npu') next = { ...sys, accels: replaceAt(sys.accels, slot.index, setLevel(card, gen, level)) };
@@ -114,7 +117,7 @@ export function writePart(build: BuildState, ref: PartRef, gen: number, level: n
         next = { ...sys, accels: replaceAt(sys.accels, slot.index, { kind: 'gpu', model }) };
       }
     }
-    else if (slot.kind === 'drive' && sys.drives[slot.index]) next = { ...sys, drives: replaceAt(sys.drives, slot.index, setLevel(sys.drives[slot.index]!, gen, level)) };
+    else if (slot.kind === 'drive' && sys.drives[slot.index]) next = { ...sys, drives: replaceAt(sys.drives, slot.index, setMemory(sys.drives[slot.index]!, gen, level)) };
     return next && withSpec(build, unit.id, next);
   }
   if (unit.kind === 'rack') {

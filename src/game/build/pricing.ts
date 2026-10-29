@@ -5,6 +5,7 @@ import {
 } from './catalog';
 import { gpuInstallPrice } from './catalog/gpuModels';
 import { lbQueueStepsTo } from './catalog/network';
+import { memorySteps } from './memory';
 
 /**
  * Prices of building things from nothing (spec §12.3, §13.3), whole Credits as bigint.
@@ -15,8 +16,11 @@ export const extraFactor = (n: number, growth = EXTRA_UNIT_GROWTH): number => (n
 /** Cores a CPU's clock drives (spec §12.3 `drive`, D34). */
 export const cpuCores = (cpu: CpuBuild): number => cpu.cores.length;
 
-export const partFromNothing = (row: CatalogRow, p: PartLevel, nth = 0, growth = EXTRA_UNIT_GROWTH, driven = 1): bigint =>
-  scalePrice(installPrice(row, p.gen), extraFactor(nth, growth)) + upgradesBetween(row, p.gen, 1, p.level, driven);
+export const partFromNothing = (row: CatalogRow, p: PartLevel & { readonly speedLevel?: number }, nth = 0, growth = EXTRA_UNIT_GROWTH, driven = 1): bigint =>
+  scalePrice(installPrice(row, p.gen), extraFactor(nth, growth))
+  + (p.speedLevel !== undefined && (row.id === 'ram' || row.id === 'storage')
+    ? memorySteps(row, p.gen, 1, p.level) + memorySteps(row, p.gen, 1, p.speedLevel)
+    : upgradesBetween(row, p.gen, 1, p.level, driven));
 
 /**
  * One CPU: package, cores (extra-core growth), clock (priced per core driven), caches. D34: Replace CPU passes
@@ -31,7 +35,7 @@ export function cpuPrice(cpu: CpuBuild, coreGrowth = EXTRA_CORE_GROWTH): bigint 
   return total;
 }
 
-/** A whole system spec: CPUs × count, scheduler, RAM (ECC × 1.25), accelerators, drives, PSU, storage chassis. */
+/** A whole system spec: CPUs × count, scheduler, RAM (ECC × 1.25), accelerators, drives and storage chassis. */
 export function systemSpecPrice(spec: SystemSpec): bigint {
   let total = spec.cpu ? cpuPrice(spec.cpu) * BigInt(spec.cpuCount) : 0n;
   if (spec.kind === 'storageNode') total += BigInt(SHELLS.storageNode.price);
@@ -45,7 +49,6 @@ export function systemSpecPrice(spec: SystemSpec): bigint {
     seen[a.kind] += 1;
   }
   spec.drives.forEach((d, n) => { total += partFromNothing(PARTS.storage, d, n); });
-  total += partFromNothing(PARTS.psu, spec.psu);
   return total;
 }
 

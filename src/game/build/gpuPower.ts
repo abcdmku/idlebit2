@@ -1,3 +1,4 @@
+import { rackPowerBudget } from './powerBudget';
 import { allocCompiled, allocHot, RACK_HOT, SYS_COMPILED, SYS_HOT } from '../core/buffers';
 import { DT_S, MAX_ACCELS } from '../core/constants';
 import { resetRow } from '../core/table';
@@ -64,5 +65,9 @@ function fullLoadPoint(state: GameState, sys: number, spec: SystemSpec): GpuPowe
 
 /** Separate from measured card-duty/payback previews: these figures expose whole-system supply fit. */
 export function gpuPowerPreview(state: GameState, sys: number, after: SystemSpec): GpuPowerPreview {
-  return { before: fullLoadPoint(state, sys, state.build.systems[sys]!.spec), after: fullLoadPoint(state, sys, after) };
+  const id = state.build.systems[sys]!.rack;
+  const build = { ...state.build, systems: state.build.systems.map((s, i) => i === sys && s ? { ...s, spec: after } : s) };
+  const a = rackPowerBudget(state.build, id, state.research.unlocks), b = rackPowerBudget(build, id, state.research.unlocks);
+  const point = (spec: SystemSpec, budget: typeof a) => ({ ...fullLoadPoint(state, sys, spec), capacityW: budget.capacity, headroomW: budget.capacity - budget.reserved });
+  return { before: point(state.build.systems[sys]!.spec, a), after: point(after, b) };
 }

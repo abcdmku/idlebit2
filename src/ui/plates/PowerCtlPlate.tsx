@@ -7,7 +7,7 @@ import { quantity } from './format';
 import { PlateFrame } from './PlateFrame';
 import { PowerKeys } from './PowerKeys';
 import { StartRow } from './StartRow';
-import { Lines, Status, type Line } from './widgets';
+import { Status } from './widgets';
 import type { PlateCommon } from './types';
 
 /** The battery line: "BAT 4:12 left" while it carries the rack (the rack LCD's clock, QA-14), "On grid" once empty. */
@@ -25,26 +25,17 @@ export interface PowerCtlPlateProps extends PlateCommon {
   research: ResearchId | null;
 }
 
-export function PowerCtlPlate({ rack, view, research, ...common }: PowerCtlPlateProps) {
+export function PowerCtlPlate({ rack, view, research: _research, ...common }: PowerCtlPlateProps) {
   const { quotes, onAction, onResearch, researchName, ...frame } = common;
   if (!view) {
-    const lines: Line[] = [{ text: 'Runs the rack on battery at round start; wakes servers as tasks need them', tone: 'muted' }];
     return <PlateFrame {...frame} title="Power control" sub="Empty slot" className="part power-ctl">
-      <Status text="Battery and start control" />
-      <Lines lines={lines} slots={1} />
-      {research && onResearch
-        ? <div className="keys"><button type="button" className="key locked-action" onClick={() => onResearch(research)}>Research Power control</button></div>
-        : <PowerKeys quotes={quotes} installed={false} level={0} noun="Power control" onAction={onAction} onResearch={onResearch} researchName={researchName} />}
+      <PowerKeys quotes={quotes} installed={false} level={0} noun="Power control" onAction={onAction} onResearch={onResearch} researchName={researchName} />
     </PlateFrame>;
   }
   const b = view.battery;
-  const lines: Line[] = [
-    { text: `Capacity ${quantity(b.capacityJ, 'J')}`, tone: 'muted' },
-  ];
   return <PlateFrame {...frame} title="Power control" sub={`${genName('powerCtl', view.generation)} · L${view.level}`} className="part power-ctl">
-    <Status text={batteryText(b)} tone={b.discharging ? '' : 'warn'} progress={b.capacityJ > 0 ? b.chargeJ / b.capacityJ : 0} />
-    <Lines lines={lines} slots={1} />
-    <StartRow unit={{ kind: 'rack', id: rack }} scope="rack" view={view.start} onAction={(a: GameAction) => onAction(a)} />
+    <Status text={quantity(b.chargeJ, 'J') + ' / ' + quantity(b.capacityJ, 'J') + (b.discharging ? ' on battery' : ' on grid')} tone={b.discharging ? '' : 'warn'} progress={b.capacityJ > 0 ? b.chargeJ / b.capacityJ : 0} />
+    <details className="component-options"><summary>Start settings</summary><StartRow unit={{ kind: 'rack', id: rack }} scope="rack" view={view.start} onAction={(a: GameAction) => onAction(a)} /></details>
     <PowerKeys quotes={quotes} installed level={view.level} noun="Power control" onAction={onAction} onResearch={onResearch} researchName={researchName} />
   </PlateFrame>;
 }

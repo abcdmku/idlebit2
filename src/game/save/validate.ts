@@ -9,6 +9,7 @@ import { FAMILIES } from '../market/families';
 import { validateAccelBuilds, validateAccelRuntime } from './accelerators';
 import { validatePreload } from './preload';
 import { validateRoundRewards } from './roundRewards';
+import { validateMemoryBuilds } from './memory';
 
 type Obj = Record<string, unknown>;
 class SaveError extends Error {}
@@ -99,6 +100,7 @@ function check(raw: unknown): GameState {
   arr(events.entries, 'events.entries');
   validateQueue(raw as GameState);
   validateAccelBuilds(raw as GameState, fail);
+  validateMemoryBuilds(raw as GameState, fail);
   validateAccelRuntime(raw as GameState, fail);
   validatePreload(raw as GameState, fail);
   validateRoundRewards(raw as GameState, fail);
