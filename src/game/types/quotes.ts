@@ -125,6 +125,8 @@ export interface Quote {
   readonly gpu?: { readonly before: GpuStats | null; readonly after: GpuStats };
   /** Additional Credit fee when the primary currency is Data. */
   readonly creditCost?: Amount;
+  /** Whole Credits returned by a downgrade or removal. */
+  readonly refund?: Amount;
   readonly action: GameAction;
   readonly label: string;
   readonly cost: Amount;

@@ -11,7 +11,8 @@ export const SAVE_SCHEMA = 'bitrouge-v3' as const;
 // One cache per CPU replaces the former multi-part cache shape. Earlier pre-live saves reset.
 // Wallet history is now saved. Earlier pre-live saves reset.
 // Independent RAM and drive speed levels. Earlier pre-live saves reset.
-export const SAVE_VERSION = 36;
+// Paid hardware histories support 50% Credit refunds. Earlier pre-live saves reset.
+export const SAVE_VERSION = 37;
 
 export interface SaveEnvelope {
   readonly schema: typeof SAVE_SCHEMA;

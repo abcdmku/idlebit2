@@ -7,6 +7,7 @@ import { POWER_SLOTS } from './partAccess';
 import { powerInstallPlans } from './powerParts';
 import type { InfraSlot } from '../types/catalog';
 import { amount, amountCompare } from '../amount';
+import { investmentChange } from './investments';
 import { MAX_ACCELS, TICK_MS } from '../core/constants';
 import type { GameAction } from '../types/actions';
 import { FILTER_IDS, ROUTE_STRATEGY_IDS, QUEUE_STRATEGY_IDS } from '../types/catalog';
@@ -156,7 +157,9 @@ export function toQuote(state: GameState, action: GameAction, plan: Plan, effect
   const shownEffect = warning.overSupply && rawEffect?.marketEstimate
     ? { ...rawEffect, paybackS: null, paybackBlockedBySupply: true } : rawEffect;
   return {
-    action, label: plan.label, cost, currency, affordable: amountCompare(wallet, cost) >= 0,
+    action, label: plan.label, cost, currency, affordable: price <= 0n || amountCompare(wallet, cost) >= 0,
+    ...(plan.ok && (action.type === 'downgradePart' || action.type === 'removePart' || action.type === 'removeUnit')
+      ? { refund: amount(investmentChange(state.build, plan.change.build, plan.change.price, action).refund.toString()) } : {}),
     locked: warning.overSupply ? powerLock(state, warning.overSupply) : plan.ok ? null : plan.lock ?? { code: plan.code === 'occupied' ? 'occupied' : plan.code === 'roundState' ? 'roundState' : 'fit', node: null, text: plan.reason },
     cold, downtimeMs: cold && state.round.phase === 'running' ? state.research.unlocks.bootTicks * TICK_MS : 0,
     effect: shownEffect, workOps: null, ...gpuMetadata(state, action, plan), ...warning,

@@ -26,7 +26,7 @@ const otherGpus = (accels: readonly AccelBuild[], index: number | null) =>
 
 /**
  * An empty slot installs any researched model at its value. An occupied GPU slot moves to a later generation at
- * the same type and tier, a cold change that costs the difference in value (the card is traded in, so tier
+ * the same type and tier, a live change that costs the difference in value (the card is traded in, so tier
  * steps already bought carry over).
  */
 export function planInstallGpu(state: GameState, system: SystemId, model: GpuModelId, index: number | null): Plan {
@@ -50,9 +50,8 @@ export function planInstallGpu(state: GameState, system: SystemId, model: GpuMod
   const card = { kind: 'gpu' as const, model };
   const accels = index === null ? [...spec.accels, card] : spec.accels.map((prev, slot) => slot === index ? card : prev);
   return planned({ build: withSpec(state.build, system, { ...spec, accels }), price,
-    // Spec §4.5: a card into an empty slot is hot and keeps the system's work; replacing a card is cold.
-    ...(index === null ? {} : { cold: coldScopes(state, { kind: 'system', id: system }), kill: [{ kind: 'system' as const, id: system }],
-      inventoryChangedSystems: [system] }) }, label);
+    // Compatibility is checked at commit; supported jobs retain completed work.
+    ...(index === null ? {} : { cold: coldScopes(state, { kind: 'system', id: system }) }) }, label);
 }
 
 /** Tier up in place: hot, running work kept, priced at the difference in value. Tier 90 is the top. */

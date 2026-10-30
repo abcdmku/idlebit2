@@ -86,6 +86,16 @@ function check(raw: unknown): GameState {
   const lengths = ['systems', 'racks', 'rooms', 'sites'].map((k) => arr(build[k], `build.${k}`).length);
   obj(build.global, 'build.global');
   int(build.revision, 'build.revision');
+  const investments = obj(build.investments, 'build.investments');
+  for (const [key, raw] of Object.entries(investments)) {
+    const history = arr(raw, `build.investments.${key}`);
+    if (!history.length) fail(`build.investments.${key}`, 'empty payment history');
+    for (const payment of history) {
+      const p = obj(payment, `build.investments.${key}`);
+      if (typeof p.version !== 'string') fail(`build.investments.${key}`, 'missing component version');
+      whole(p.credits, `build.investments.${key}.credits`);
+    }
+  }
   const research = obj(s.research, 'research');
   arr(research.completed, 'research.completed');
   arr(research.queue, 'research.queue');

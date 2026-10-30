@@ -226,7 +226,7 @@ A task is **met** when its last shard completes (§6.8). It **fails** with exact
 | `misroute` | Misrouted | One of its shards was delivered to a system that cannot run that shard (§7.5). |
 | `power` | Power | One of its shards was queued or running on a system that lost power (§9.4). |
 | `heat` | Heat | One of its shards was queued or running on a system whose rack or zone crashed (§10.7). |
-| `swap` | Swap | One of its shards was queued or running on a system that took a cold change, was removed (§4.5), or was switched offline (§4.4). |
+| `swap` | Swap | Required hardware was removed or reduced below an active shard's needs (§4.5), its system was removed, or it was switched offline (§4.4). Compatible hardware edits preserve work. |
 | `late` | Late | It has a completion window (§5.1) and was not met by the end of tick `takeTick + deadline − 1`, counting from the tick it was taken, router-queue time included (D26.5). |
 
 A split task fails when any shard is lost and `checkpointing` does not save it (D25.5, §7.8). It records the root cause of that shard's loss and counts once, with its full `W`. Nothing is paid, including the work of shards that already finished. Its other shards are aborted at once: queued, running and in-transfer shards and router-queue shares are freed (slots, memory, VRAM, threads) and their work is discarded. There is no separate shard or member cause.
@@ -266,7 +266,7 @@ Every system, rack, zone and site has an online switch, `intent ∈ {online, off
 
 **Room.** A system **has room** when `admitted + reserved < slots`, where `admitted` and `reserved` count shards (an unsplit task is one shard) and `reserved` counts those routed to it and still in transfer: every route reserves its slot (§7.6). A router has room when a system below it has room or its own queue has a free slot (§7.1). A system without room is **full**: with no scheduler, that means busy; with a scheduler, its queue is full. Every router, the base first-fit included, sends a task only to a system that can admit it now (§7.7). Systems that are not `onMarket` or `asleep` count as full (program D1.5).
 
-**`bootSeconds`** is one boot time, 10 s at base, lowered by Boot loader research (D45) (program D1.8). It sets the online and offline transitions, the boot of a unit added mid-round, the cold-change downtime, the reboot after a supply failure, and the minimum crash recovery.
+**`bootSeconds`** is one boot time, 10 s at base, lowered by Boot loader research (D45) (program D1.8). It sets the online and offline transitions, the boot of a unit added mid-round, the reboot after a supply failure, and the minimum crash recovery. Hardware edits do not reboot existing systems.
 
 The static fleet capability check counts systems in `onMarket`, `asleep`, `boot` and `cold`: they will accept work within `bootSeconds`. It does not count `offline`, `goingOffline`, `paused`, `dark` or `crashed`.
 
@@ -298,34 +298,19 @@ While a round runs, every online/offline change takes `bootSeconds` (10 s at bas
 - **Back to rest.** Systems sleep by `s3Sleep`. A room controller returns a rack to `standby` after all its systems have slept 30 s; a global controller returns a site after all its racks have been in standby 60 s. A unit holding research (D27) never rests.
 - **Pace.** Generation 0 doubles a rack's awake systems in at most 12 s and a room's racks in at most 24 s; generation 1 doubles any scope in about 3 s. D30 demand doubles every 1.18 `I`, about 30–70 s at the fleet's limit. So a head waits at most `X + latency` extra (4 s at defaults) and waking keeps pace without SLA cost.
 
-### 4.5 Hot and cold changes
+### 4.5 Live hardware edits and refunds
 
-| Change | Kind | Scope |
-|---|---|---|
-| Level upgrade of any part; port speed step; port count step; uplink step | hot | none |
-| Strategy, filter, router queue level (§12.7), setpoint, toggle, C-state limit, DVFS or turbo switch | hot | none (program D1.6) |
-| Replace a part with a newer generation (never the same or a lower one, D39) | cold | the unit that owns it |
-| Add a part into an empty slot (socket, core, RAM module, GPU, NPU, drive, scheduler) | hot | none |
-| Add a second UPS; remove a part | cold | the owning unit |
-| Scrap a system, storage node or rack | cold | that unit; removal is permanent |
-| Load a configuration onto an existing unit (§13.4) | cold if a part is installed or removed, otherwise hot | that unit |
+All hardware upgrades and generation changes are live. Adding components, changing settings and applying configurations also retain compatible work. Existing systems stay in their current mode; only newly installed systems take their normal boot latency. Hot-plug drives and Hot swap research are retired because these edits need no research exception.
 
-Owning unit: socket and board parts → the system; rack cooler, PDU, load balancer and switch → the rack and all its systems; network rack parts, room cooling, UPS and rows → the zone; data plane and grid feed → the site; a backbone link → that link (it carries nothing during the downtime); the global scheduler → global routing stops during the downtime.
+Active jobs retain their completed work, remaining work and frozen memory placement. GPU work is rebound to compatible hardware without repeating completed operations. Queued work and in-flight transfers remain intact, including when recompilation changes link or slot indices. A slower component changes processing speed without failing a job.
 
-Exceptions that make a cold change hot:
-- **`hotPlug`:** adding, removing or replacing a drive.
-- **`hotSwap`:** any cold change whose scope is one system in a rack, including loading a configuration onto it. Running tasks continue at the new rates. If the change removes capacity the running tasks need (memory, a GPU a task is bound to), the tasks that no longer fit fail with `swap`.
+Removing hardware or reducing capacity fails only jobs that can no longer use the remaining hardware. Check held cache, RAM, local/shared disk, physical threads and accelerator requirements. Preserve older work first when reduced capacity cannot hold all active jobs. Removing a GPU can fail jobs bound to it; compatible work on surviving cards continues after slot compaction. Removing a system or rack fails its work. Existing full-load power reservations still prevent reducing a supply below the installed load. Reduced queues grandfather their waiting tasks and stop new admissions until space is available.
 
-A cold change while a round runs:
-1. **Base:** every task queued or running on the systems in scope fails with `swap`. Transfers heading there return to the queue front. **With `gracefulDrain`:** the systems first drain as in §4.4, then the downtime starts.
-2. **With `liveMigration`:** before step 1, each running task migrates (§6.11).
-3. The systems are `cold` for `bootSeconds`. Afterwards they return to the mode §4.3 gives them, with no extra boot.
+Downgrade and removal return 50% of the actual paid Credit investment relinquished, rounded down once per action. A single step down returns half its paid upgrade cost; removing hardware returns half its remaining paid basis. RAM and drive capacity and speed retain independent cost histories, including bulk upgrades. Extra-part prices and bundled purchases record their actual paid cost. Free starter or research-granted hardware has zero paid basis. Refunds cannot increase when other hardware later raises a replacement price. Configurations also refund hardware they remove. Refunds update wallet history without counting as task earnings. Research Data is not refunded. Save version 37 stores these histories; older pre-live saves reset without migration.
 
-Between rounds a cold change is instant.
+The existing Downgrade and Remove controls show their refund inline. Compact memory minus buttons retain their geometry and expose the exact Credit refund in their tooltip and accessible name. Remove remains a text button.
 
-**`rollingUpgrade`** applies one configuration to every server of a rack as a single purchase. During a round the servers change one at a time in slot order: each drains, takes its cold downtime, and the next starts when it returns. Waiting servers keep their old hardware and continue working. The quoted total is paid once and the reserved changes survive saving and loading. Reserved servers reject conflicting hardware edits until their turn finishes. Between rounds all outstanding paid changes complete immediately. Hot changes need no downtime.
-
-Purchases are never refunded. A replaced or removed part is scrapped.
+**Rolling upgrade** applies one saved configuration to the rack's servers in one purchase. Hardware compatibility is checked for each existing job; there is no drain or reboot for a compatible edit.
 
 ### 4.6 Auto-return
 
@@ -1269,9 +1254,9 @@ Special prices:
 ### 12.4 Upgrade versus replace
 
 - **Upgrade** keeps the generation and adds one level. It is hot.
-- **Replace** installs the newest researched generation at level 1. It is cold (§4.5). The plate also offers a **capacity-preserving replace**: the lowest native level whose primary capacity is at least the current one, priced as install plus every intervening upgrade.
+- **Replace** installs the newest researched generation at level 1. Compatible work continues (§4.5). The plate also offers a **capacity-preserving replace**: the lowest native level whose primary capacity is at least the current one, priced as install plus every intervening upgrade.
 - **Replace only moves up** (D39, user bug). A replace offers, and the action accepts, only generations above the installed one, in catalog order; this covers every part, the switch, Power control, the start controllers and site generation (solar, wind, fuel cell, own plant). A replacement GPU must be a strictly better model natively: more ops/s and no less VRAM (hot pushes are not a tier), so a cross-series sidegrade is not offered.
-- **Replace CPU** on the System board replaces, in one cold change, every package, core, clock and cache of the system with the newest researched CPU generation: cores carried over one for one and caches at the lowest level that preserves their bits, the clock at L1. Its price is the sum, with each core at the new generation's core price (D34: no extra-core surcharge on a replace).
+- **Replace CPU** on the System board replaces, in one live change, every package, core, clock and cache of the system with the newest researched CPU generation: cores carried over one for one and caches at the lowest level that preserves their bits, the clock at L1. Its price is the sum, with each core at the new generation's core price (D34: no extra-core surcharge on a replace).
 - CPU and RAM quotes preview throughput, full-use electrical draw and normalized energy ratio. RAM replacement preserves capacity bits and shows bandwidth separately. If the part's operating cost exceeds its output, show **Costs more to run than it produces**. The warning does not disable an upgrade. Do not show payback times. Fab research must be affordable on a profitable prior-era fleet before loss-making overclocks are needed. See `hardware-progression.md` §§5–6.
 - A replacement that cannot hold what the part holds is not offered at that level; the plate names the shortfall.
 - Within a generation, capacity grows as `x` while load watts grow as `x^1.3` (§9.1), so energy per unit of work rises as you push old parts. A native generation starts back at `push = 1` and opens a higher level ceiling. Replace wins over a horizon; upgrade wins short.
@@ -1313,7 +1298,7 @@ portStep(k→k+1) = ceil(m × u / 0.7 × ((x / b)^α − (y / b)^α))
 
 `gpu-progression.md` is the accepted numeric catalog. A GPU is its generation, type and tier. Research opens generations 1–9. Types 3/5/7/9 emphasize cores, VRAM, clock/efficiency and all specs. Tiers advance **30 → 50 → 60 → 70 → 80 → 90** in place. The nine clock classes remain 1 kHz through 100 GHz. `3350` is generation 3, core type, tier 50.
 
-Save `GpuBuild {kind:'gpu', model:GpuModelId}` and validate through one central evaluator. No model objects, inferred IDs or separate push counts enter new saves. Tier steps are hot and preserve running work. They double cores and VRAM, raise clock and improve energy per operation. Generation replacement is cold and retains type and tier; it increases ordinary work 20× and VRAM 16×. Changing type at the same generation and tier is cold: charge any rise in card value, with no refund on a fall. An empty bay offers tier 30 of the newest affordable researched generation (newest if none is affordable), one key per type; requirement/fix actions may install higher researched tiers directly.
+Save `GpuBuild {kind:'gpu', model:GpuModelId}` and validate through one central evaluator. No model objects, inferred IDs or separate push counts enter new saves. Tier steps are hot and preserve running work. They double cores and VRAM, raise clock and improve energy per operation. Generation replacement is live and retains type and tier; it increases ordinary work 20× and VRAM 16×. Changing type at the same generation and tier is live: charge any rise in card value, with no refund on a fall. An empty bay offers tier 30 of the newest affordable researched generation (newest if none is affordable), one key per type; requirement/fix actions may install higher researched tiers directly.
 
 Generation 1 base value is 1,000,000 Credits; later bases are `4,000,000 × 10^(g-1)`. Type 9 multiplies value by 4. Tier multipliers are `1,3,7,16,36,80`. With `n` other GPUs, `V(model,n)=ceil(P(model) × 5^e / 4^e)`, `e=max(0,n-1)`. Exclude the target and NPUs. An install or configuration copy pays `V`; a tier or generation step pays **V(after,n) − V(before,n)**. Subtract rounded whole values so ladder purchases telescope exactly at a fixed install position. Use bigint and `Amount`.
 
@@ -1385,7 +1370,7 @@ With `configSave`, the save icon's plate can apply a saved configuration of the 
 - different generation, or missing: install it (cold);
 - present but not in the configuration: remove it (cold).
 
-Settings (strategies, filters, toggles, setpoints) are applied for free. Port speeds never step down. The change is cold if any part is installed or removed, otherwise hot. The price is shown before confirming.
+Settings (strategies, filters, toggles, setpoints) are applied for free. Port speeds never step down. The change is live; jobs continue unless their required hardware is removed or undersized (§4.5). The price is shown before confirming.
 
 ### 13.5 Saving and names
 
@@ -1725,7 +1710,7 @@ const upgradePrice = (r: PartRow, g: number, L: number, lanes = 1) =>
 |---|---|
 | `tickMs` | 100 **(s)** |
 | `headSeconds` | 10: the head must be taken by the end of tick `headTick + 99` |
-| `bootSeconds` (online and offline transitions, mid-round add, cold change, supply reboot, crash minimum) | 10 s at base; Boot loader levels 1-36 use `(946 - 26 * level) / 100` s, rounded to the nearest simulation tick (9.2 s at level 1, 0.1 s at level 36). |
+| `bootSeconds` (online and offline transitions, mid-round add, supply reboot, crash minimum) | 10 s at base; Boot loader levels 1-36 use `(946 - 26 * level) / 100` s, rounded to the nearest simulation tick (9.2 s at level 1, 0.1 s at level 36). |
 | `slaThreshold` | 0.80 |
 | `slaGrace` (G) | 10 × the largest of the five opening tasks' work **(s)** |
 | `overloadFailSeconds` | 10 |
@@ -1843,7 +1828,7 @@ Points where this spec differs from the research doc, and what the research doc 
 |---|---|---|---|
 | Cooling generations (program D1.11) | Rack: Air `rack`, Water `rackWater` (gen 1). Room: 3 generations. | Rack: 2 air + 2 water generations; `rackWater` is gen 2. Room: 2 air, 2 water, 2 closed loop. | Add nodes `rackAir2`, `rackWater2`, `roomAir2`, `chilledWater2`, `closedLoop2`; renumber `rackWater` to gen 2, `closedLoop` to gen 4. |
 | GPU progression and VRAM | Nine `gpuGen` nodes; separate tensor technology and total VRAM multipliers. | Accepted GSMT catalog, core/VRAM gates and runtime domains, §§6, 12.6. | Regenerate tree and fees from the research appendix; no separate VRAM part. |
-| Boot loader (D45) | One repeatable entry, 36 levels. | One boot latency for transitions, adds, cold changes, reboots and crash minimum. | Uses the CPU CSV effects and the D45 purchase prices. |
+| Boot loader (D45) | One repeatable entry, 36 levels. | One boot latency for transitions, adds, reboots and crash minimum. | Uses the CPU CSV effects and the D45 purchase prices. |
 | Base router (D1.5) | Base is round robin, blind to state and full queues. | Base is `firstFit` at every scope; it already skips full, booting, crashed and offline units. | Add a `roundRobin` strategy node. Update the "Base behavior" table. `lbHealth` and `binPacking` keep the research doc's definitions (D4.4); §8.3 and §8.4 follow them. |
 | Offline cap (D1.10, D19.3) | Fixed at 8 h. | 8 → 12 → 24 → 48 h by research (`offline12`, `offline24`, `offline48`). | Add two nodes with an `offlineCap` rule (suggest `cronTuning` and `researchQueue` as hosts, as the research doc proposed). |
 | `lbCapability` | Checks "threads". | `threads` is gone (D25.3); the grain is never a gate (§6.3). | Done under D25. |

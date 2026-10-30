@@ -8,13 +8,11 @@ import { switchAt, withSwitch } from './ports';
 
 const edit = <T>(rows: readonly (T | null)[], id: number, change: (row: T) => T) => rows.map((row, i) => i === id && row ? change(row) : row);
 const drop = <T>(rows: readonly T[], id: number) => rows.filter((_, i) => i !== id);
-const scope = (state: GameState, ref: PartRef) => ref.unit.kind === 'global'
-  ? state.build.sites.flatMap(site => site ? [{ kind: 'site' as const, id: site.id }] : []) : [ref.unit];
 function result(state: GameState, ref: PartRef, build: BuildState | null, label: string): Plan {
-  return build ? planned({ build, price: 0n, cold: coldScopes(state, coldScope(ref), ref), kill: scope(state, ref) }, label) : fail('invalid', 'No such component');
+  return build ? planned({ build, price: 0n, cold: coldScopes(state, coldScope(ref), ref) }, label) : fail('invalid', 'No such component');
 }
 
-/** A free step down. Parts are scrapped without a Credit refund, as with removal. */
+/** Step down without a purchase charge. Commit returns half the relinquished paid cost. */
 export function planDowngrade(state: GameState, ref: PartRef, axis: MemoryUpgrade = 'capacity'): Plan {
   const part = readPart(state.build, ref);
   if (!part || part.level < 0 || (!isLadder(part.id) && part.level === 0) || ref.slot.kind === 'core') return fail('invalid', 'No lower level');

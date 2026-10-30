@@ -84,6 +84,7 @@
 .v3-plate .component-maintenance { display: flex; gap: 4px; margin-top: 4px; }
 .v3-plate .maintenance-action { display: inline-flex; align-items: center; justify-content: center; box-sizing: border-box; min-height: 32px; flex: 0 0 auto; padding: 4px 8px; border: 1px solid #5d5296; background: #29234b; color: #c9c2ee; font: inherit; line-height: 16px; text-align: center; cursor: pointer; }
 .maintenance-minus { display: block; width: 8px; height: 2px; background: currentColor; }
+.maintenance-refund { display: inline-flex; align-items: center; gap: 3px; margin-left: 6px; color: #ffd238; text-decoration: none; white-space: nowrap; }
 .v3-plate .maintenance-action:disabled { color: #776d96; border-color: #342c55; cursor: not-allowed; }
 .v3-plate .maintenance-action.remove { min-width: 44px; margin-left: auto; padding-inline: 0; border: 0; box-shadow: none; background: transparent; color: #b9b0df; text-decoration: underline; text-underline-offset: 3px; }
 .v3-plate .maintenance-action.remove:hover:not(:disabled) { color: #efeaff; }

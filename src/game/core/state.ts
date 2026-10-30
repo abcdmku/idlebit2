@@ -49,6 +49,7 @@ export function bootBuild(): BuildState {
   const room = barebonesRoom(roomId(0), siteId(0), 0, false);
   const site = barebonesSite(siteId(0), 'us-east', false);
   return {
+    investments: {},
     systems: [barebonesSystem(systemId(0), rackId(0), 0)],
     racks: [{ ...rack, servers: rack.servers.map((s, i) => (i === 0 ? systemId(0) : s)) }],
     rooms: [{ ...room, racks: room.racks.map((r, i) => (i === 0 ? rackId(0) : r)) }],

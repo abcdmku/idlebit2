@@ -93,7 +93,7 @@ export function buildFleet(spec: FleetSpec): BuildState {
     const site = { ...barebonesSite(sid, REGION_IDS[s]!, open.global), zones };
     sites.push(spec.site ? spec.site(site) : site);
   }
-  return { systems, racks, rooms, sites, global: spec.global ?? { scheduler: null, start: null }, revision: 0 };
+  return { systems, racks, rooms, sites, global: spec.global ?? { scheduler: null, start: null }, revision: 0, investments: {} };
 }
 
 /** Builds a complete, consistent GameState for any fleet up to the caps. */

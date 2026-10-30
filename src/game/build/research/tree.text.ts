@@ -128,9 +128,9 @@ export const EFFECT_TEXT: Readonly<Record<string, string>> = {
   gracefulDrain: "Lets running tasks finish before hardware goes offline or starts a change that requires downtime.",
   configSave: "Lets you save hardware configurations and use them when adding units.",
   rollingUpgrade: "Lets you apply a saved configuration to every server in a rack, one server at a time.",
-  hotPlug: "Lets you add or replace storage without taking the system offline.",
+  hotPlug: "Hardware edits are live by default. This project is retired.",
   liveMigration: "Moves running tasks to another server in the rack when their server goes offline, changes hardware or crashes.",
-  hotSwap: "Lets you replace servers without downtime from the Rack view onward.",
+  hotSwap: "Hardware edits are live by default. This project is retired.",
   checkpointing: "Lets a split task survive losing a shard if a replacement is placed within 10 s and restarts that shard's work.",
 
 };
@@ -264,8 +264,8 @@ export const SHORT_TEXT: Readonly<Record<string, string>> = {
   gracefulDrain: "Units finish tasks before going down.",
   configSave: "Save server configurations.",
   rollingUpgrade: "Upgrade a whole rack in one action.",
-  hotPlug: "Swap storage with no downtime.",
+  hotPlug: "Included by default.",
   liveMigration: "Tasks move off failing servers.",
-  hotSwap: "Replace servers with no downtime.",
+  hotSwap: "Included by default.",
   checkpointing: "Recovers split tasks after a lost shard.",
 };

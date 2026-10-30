@@ -4,6 +4,8 @@ import type { HitTarget } from '../../render/core';
 import { useQuote, useShell } from '../storeHooks';
 import { plateRequest } from './PlateLayer';
 import { purchaseGain, purchaseReason } from './purchaseText';
+import { CoinIcon } from './icons';
+import { wholeText } from './format';
 
 const Context = createContext<ReactNode>(null);
 export const useComponentActions = () => useContext(Context);
@@ -11,11 +13,13 @@ export const useComponentActions = () => useContext(Context);
 export function MaintenanceAction({ quote: q, label, actionLabel = label, className = '', icon, onAction }: {
   quote: Quote; label: string; actionLabel?: string; className?: string; icon?: 'minus'; onAction: (quote: Quote) => void;
 }) {
-  const reason = purchaseReason(q), title = [actionLabel, purchaseGain(q), reason,
+  const refund = q.refund && q.refund !== '0' ? q.refund : null;
+  const reason = purchaseReason(q), title = [actionLabel, purchaseGain(q), refund ? `Returns ${refund} Credits` : '', reason,
     q.cold && q.downtimeMs > 0 ? `${Math.ceil(q.downtimeMs / 1000)}s offline` : ''].filter(Boolean).join(' · ');
   return <button type="button" className={`maintenance-action${q.action.type === 'removePart' ? ' remove' : ''} ${className}`}
     title={title} aria-label={title} disabled={!!reason} data-maintenance-action={JSON.stringify(q.action)} onClick={() => onAction(q)}>
     {icon === 'minus' ? <span className="maintenance-minus" aria-hidden="true" /> : label}
+    {icon !== 'minus' && refund && <span className="maintenance-refund">+<CoinIcon />{wholeText(refund)}</span>}
   </button>;
 }
 

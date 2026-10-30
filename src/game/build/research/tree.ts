@@ -8,6 +8,8 @@ import { LEVEL_RESEARCH } from './levels';
 import { REWARD_RESEARCH } from '../../rewards/research';
 
 const creditsOnly = new Set(CREDITS_ONLY);
+// Hardware edits are live by default; these former downtime unlocks are no longer offered.
+const retired = new Set(['hotPlug', 'hotSwap']);
 
 /**
  * The research tree (docs/research.md §9). Work volume comes from the node's tier. D32: a node priced
@@ -20,7 +22,7 @@ export const RESEARCH: readonly ResearchDef[] = [...TREE_ROWS.map(([id, name, ca
     data: creditsOnly.has(id) ? 0 : price,
     // The fixed starter power ceiling bounds research throughput before Rack (D67).
     work: id === 'rack' ? 18e6 : WORK_TIER_OPS[tier], creditCost: amount((BigInt(price) * BigInt(CREDITS_PER_DATA)).toString()), effects: runtime?.effects ?? effects,
-    effect: runtime?.effect ?? EFFECT_TEXT[id] ?? '', summary: SHORT_TEXT[id] ?? '', answers, implemented: !['psu80', 'psuBronze', 'psuGold', 'psuPlatinum', 'psuTitanium'].includes(id),
+    effect: runtime?.effect ?? EFFECT_TEXT[id] ?? '', summary: SHORT_TEXT[id] ?? '', answers, implemented: !retired.has(id) && !['psu80', 'psuBronze', 'psuGold', 'psuPlatinum', 'psuTitanium'].includes(id),
   };
 }), ...LEVEL_RESEARCH, ...REWARD_RESEARCH];
 

@@ -1,3 +1,4 @@
+import type { Amount } from '../amount';
 import type { FilterId, QueueStrategyId, RegionId, RouteStrategyId } from './catalog';
 import type { RackId, RoomId, SiteId, SystemId } from './ids';
 import type { AccelBuild } from './gpu';
@@ -156,7 +157,10 @@ export interface GlobalBuild {
   readonly start: StartCtl | null;
 }
 
+export interface HardwarePayment { readonly version: string; readonly credits: Amount }
 export interface BuildState {
+  /** Actual paid hardware costs, by physical component. Free starting hardware has no payment. */
+  readonly investments: Readonly<Record<string, readonly HardwarePayment[]>>;
   readonly systems: readonly (SystemBuild | null)[];
   readonly racks: readonly (RackBuild | null)[];
   readonly rooms: readonly (RoomBuild | null)[];

@@ -128,8 +128,7 @@ export function planApplyConfig(state: GameState, unit: UnitRef, name: string): 
     const r = mergeSpec(sys.spec, want);
     const l = systemLock(u, want);
     if (l) return locked(l, saved.name, r.price);
-    return planned({ build: withSpec(state.build, unit.id, r.spec), price: r.price, cold: r.cold ? coldScopes(state, unit) : [],
-      kill: r.accelCold ? [unit] : [], inventoryChangedSystems: r.accelCold ? [unit.id] : [] }, saved.name);
+    return planned({ build: withSpec(state.build, unit.id, r.spec), price: r.price, cold: r.cold ? coldScopes(state, unit) : [] }, saved.name);
   }
   if (unit.kind === 'rack') {
     const rack = state.build.racks[unit.id];
@@ -156,20 +155,17 @@ export function planApplyConfig(state: GameState, unit: UnitRef, name: string): 
     if (ctlLock) return locked(ctlLock, saved.name, m.price);
     let build: BuildState = { ...state.build, racks: state.build.racks.map((r, i) => (i === unit.id && r ? { ...r, cooler, pdu, lb: { ...want.lb, gen: lbPart.gen, level: lbPart.level, queueLevel }, switch: { ...sw, ports, sameSpeed: want.switch.sameSpeed }, powerCtl } : r)) };
     const cold = new Set<number>();
-    const kill: UnitRef[] = [];
-    const inventoryChangedSystems: number[] = [];
     rack.servers.forEach((s, slot) => {
       const w = want.servers[slot];
       if (s === null || !w) return;
       const r = mergeSpec(build.systems[s]!.spec, w.spec);
       m.price += r.price;
       if (r.cold) cold.add(s);
-      if (r.accelCold) { kill.push({ kind: 'system', id: s }); inventoryChangedSystems.push(s); }
       build = withSpec(build, s, r.spec);
     });
     if (l) return locked(l, saved.name, m.price);
     const scopes = m.cold ? coldScopes(state, unit) : [...cold].flatMap((s) => coldScopes(state, { kind: 'system', id: s as never }));
-    return planned({ build, price: m.price, cold: scopes, kill, inventoryChangedSystems }, saved.name);
+    return planned({ build, price: m.price, cold: scopes }, saved.name);
   }
   return fail('invalid', 'Apply a zone or site configuration by building a new one');
 }

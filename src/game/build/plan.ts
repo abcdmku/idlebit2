@@ -1,10 +1,9 @@
-import type { ActionOutcome, RejectionCode } from '../types/actions';
+import type { ActionOutcome, GameAction, RejectionCode } from '../types/actions';
 import type { PartRef, UnitRef } from '../types/ids';
 import type { LockReason } from '../types/quotes';
 import type { GameState } from '../types/state';
 import { reject } from '../core/actions';
 import { commitBuild, type BuildChange } from './commit';
-import { hasRule } from './research/unlocks';
 
 /**
  * A priced, validated change. Handlers commit it; quotes show it. Both call the same planner, so
@@ -21,23 +20,13 @@ export const locked = (lock: LockReason, label = '', price: bigint | null = null
 export const planned = (change: BuildChange, label: string): Plan => ({ ok: true, change, label });
 
 /** Runs a plan as an action. */
-export const commitPlan = (state: GameState, plan: Plan): ActionOutcome =>
-  plan.ok ? commitBuild(state, plan.change) : reject(state, plan.code, plan.reason);
+export const commitPlan = (state: GameState, plan: Plan, action?: GameAction): ActionOutcome =>
+  plan.ok ? commitBuild(state, plan.change, action) : reject(state, plan.code, plan.reason);
 
 export const planPrice = (plan: Plan): bigint | null => (plan.ok ? plan.change.price : plan.price);
 export const isCold = (plan: Plan): boolean => plan.ok && (plan.change.cold?.length ?? 0) > 0;
 
-/**
- * The scopes a cold change takes down, after the hot exceptions (spec §4.5): `hotPlug` makes drive
- * changes hot; `hotSwap` makes any change scoped to one system in an opened rack hot.
- */
-export function coldScopes(state: GameState, scope: UnitRef | null, ref?: PartRef): UnitRef[] {
-  if (!scope) return [];
-  const u = state.research.unlocks;
-  if (ref?.slot.kind === 'drive' && hasRule(u, 'hotPlug')) return [];
-  if (scope.kind === 'system' && hasRule(u, 'hotSwap')) {
-    const rack = state.build.racks[state.build.systems[scope.id]?.rack ?? -1];
-    if (rack?.opened) return [];
-  }
-  return [scope];
+/** All hardware edits are live; compatibility is checked during commit. */
+export function coldScopes(_state: GameState, _scope: UnitRef | null, _ref?: PartRef): UnitRef[] {
+  return [];
 }
