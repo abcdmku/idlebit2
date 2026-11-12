@@ -1,0 +1,38 @@
+/* Fleet health: the SLA key's fault lamp in the band, and the Health popup. Lamps are steady and show the sim's state. */
+.sla-key { pointer-events: auto; grid-template-columns: minmax(0, 1fr); justify-items: start; margin: 0; padding: 0; border: 0; background: none;
+  color: inherit; font: inherit; text-align: left; cursor: pointer; -webkit-tap-highlight-color: transparent; }
+.sla-key:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+.sla-key:hover .fig { text-decoration: underline; text-underline-offset: 3px; }
+.sla-key .sla-title { gap: 6px; }
+.sla-lamp, .health-lamp { flex: none; width: calc(3 * var(--n, 2px)); height: calc(3 * var(--n, 2px)); background: #2c2552; box-shadow: 0 0 0 1px var(--ink); }
+.sla-lamp.risk, .health-lamp.risk { background: var(--warn); }
+.sla-key .sla-lamp { margin-right: -2px; }
+
+/* On the icon's top-right 8 px cell, so it stays on the layout grid at every rung size. */
+.rung-fault { position: absolute; right: calc((100% - 16 * var(--n)) / 2); top: calc((100% - 16 * var(--n)) / 2); width: 8px; height: 8px; box-sizing: border-box;
+  border: 1px solid var(--ink); pointer-events: none; }
+.rung-fault.risk { background: var(--warn); }
+
+.v3-plate.health-plate { width: 352px; z-index: 20; }
+.health-facts { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 0 12px; margin: 0; }
+.health-facts dt { color: var(--muted); }
+.health-facts dd { margin: 0; text-align: right; white-space: nowrap; }
+.health-causes, .health-list { list-style: none; margin: 4px 0 0; padding: 0; }
+.health-causes { padding-top: 4px; border-top: 1px solid var(--panel-hi); }
+.health-causes li { display: flex; justify-content: space-between; gap: 12px; }
+.health-causes span { color: var(--muted); min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.health-plate .health-link { min-height: 44px; margin-top: 4px; border-top: 1px solid var(--panel-hi); }
+.health-plate .health-ok { margin: 4px 0 0; padding-top: 4px; border-top: 1px solid var(--panel-hi); }
+.health-list { display: grid; gap: 4px; padding-top: 8px; border-top: 1px solid var(--panel-hi); }
+.health-plate .health-row { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 8px; width: 100%; min-height: 44px;
+  box-sizing: border-box; padding: 4px 8px; border: 0; background: var(--well); color: var(--paper); font: inherit; text-align: left; cursor: pointer;
+  box-shadow: inset 0 0 0 1px var(--panel-hi); }
+.health-plate .health-row:hover { box-shadow: inset 0 0 0 1px #74679f; }
+.health-where { display: grid; min-width: 0; }
+.health-where b { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* A unit with several issues may take a second line; nothing is cut. */
+.health-what { overflow-wrap: anywhere; }
+.health-what { color: var(--muted); }
+.health-row.risk .health-what { color: var(--warn); }
+.health-go { color: var(--dim); }
+.health-more { text-align: right; }

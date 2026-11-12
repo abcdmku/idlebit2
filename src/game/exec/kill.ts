@@ -13,7 +13,7 @@ import type { FailCause } from '../types/events';
 import type { UnitRef } from '../types/ids';
 import { resetClocks } from './clocks';
 import { CAUSE, failRecord, releaseReservation, returnParent, returnTask } from './outcome';
-import { recountSummaries } from './slots';
+import { noteRelease, recountSummaries } from './slots';
 import { recountResearchThreads } from './researchTask';
 import { NRES } from './shape';
 
@@ -133,6 +133,7 @@ export function dropAllWork(w: World): void {
   h.preloadRec.fill(-1); h.preloadThread.fill(-1); h.preloadStart.fill(0); h.preloadFinish.fill(Infinity); h.batchSavedBits.fill(0);
   h.residentFamily.fill(-1); h.residentBits.fill(0);
   h.queueHead.fill(-1); h.queueTail.fill(-1); h.queueLen.fill(0); h.running.fill(0); h.reserved.fill(0);
+  noteRelease();
   h.busyThreads.fill(0); h.usedCache.fill(0); h.usedRam.fill(0); h.usedDisk.fill(0); h.usedVram.fill(0); h.ioHolds.fill(0);
   h.wAnchor.fill(0); h.eAnchor.fill(0); h.rate.fill(0); h.due.fill(Infinity); h.head.fill(-1); h.active.fill(0);
   h.accelUsedVram.fill(0); h.accelHolders.fill(0);

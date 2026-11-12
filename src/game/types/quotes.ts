@@ -1,7 +1,7 @@
 import type { Amount } from '../amount';
 import type { InfraSlot } from './catalog';
 import type { GameAction } from './actions';
-import type { NodeRef, PartRef, RackId, ResearchId, RoomId, ScopeRef, SwitchRef, SystemId } from './ids';
+import type { NodeRef, PartRef, RackId, ResearchId, RoomId, ScopeRef, SiteId, SwitchRef, SystemId } from './ids';
 import type { GpuGeneration, GpuStats } from './gpu';
 
 export type QuoteRequest =
@@ -115,8 +115,8 @@ export interface GpuPowerPreview {
   readonly before: GpuPowerPoint;
   readonly after: GpuPowerPoint;
 }
-/** A hardware purchase blocked by its rack or room full-load allocation, in view watts. */
-export interface OverSupply { readonly part: 'psu' | 'pdu' | 'ups'; readonly capW: number; readonly afterW: number; readonly rack?: RackId; readonly room?: RoomId }
+/** A hardware purchase blocked by its rack, zone or site full-load allocation, in view watts. */
+export interface OverSupply { readonly part: 'psu' | 'pdu' | 'ups' | 'grid'; readonly capW: number; readonly afterW: number; readonly rack?: RackId; readonly room?: RoomId; readonly site?: SiteId }
 
 export interface Quote {
   /** Set when the plan's full-load draw would exceed a supply; absent otherwise. */

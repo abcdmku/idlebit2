@@ -14,16 +14,18 @@ import { canAdmit, hasLink, noteAdmit, noteAdmitted, noteTake, STORAGE_NODE } fr
  * D25), and hold one slot and those threads until the project completes. It carries no payload
  * and pays nothing. A holder that stops running (dark, crashed, cold, offline) lets go; when none
  * is left the project is back at the queue front with its progress kept. Between rounds the
- * market is paused but research still runs: every powered, linked server with a free thread takes it.
+ * market is paused and the project waits in line for Return to market, unless the player started
+ * it during this break (G.researchBreak): then every powered, linked server with a free thread takes it.
  *
  * State: hot.sys.researchThreads per holder, G.researchHolders, and G.researchProject (the
  * TREE_INDEX the holders work for). ResearchState.active and activeProgress stay the project.
  */
 
-/** The TREE_INDEX of the project that should be in line or running, or -1. */
+/** The TREE_INDEX of the project systems may hold now, or -1: none, stopped, or waiting for Return to market. */
 function wanted(w: World): number {
   const r = w.research;
   if (r.active === null || r.stoppedInsolvent) return -1;
+  if (w.round.phase !== 'running' && w.hot.g[G.researchBreak] !== 1) return -1;
   return TREE_INDEX.get(r.active) ?? -1;
 }
 
@@ -80,7 +82,10 @@ export function releaseResearch(w: World): void {
   w.hot.g[G.researchProject] = -1;
 }
 
-/** Round end freed every thread count (dropAllWork): holders keep holding, so their threads are counted again. */
+/**
+ * Round end and hardware edits reset every thread count: holders keep holding, so their threads are
+ * counted again. After a round end the next take phase lets them go (the project waits for Return).
+ */
 export function recountResearchThreads(w: World): void {
   const h = w.hot.sys;
   if (w.hot.g[G.researchHolders]! === 0) return;

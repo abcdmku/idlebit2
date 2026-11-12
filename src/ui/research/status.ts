@@ -1,6 +1,6 @@
-// What a research project is right now, in one truthful state, and the one key it shows.
-// D27: Start pays the price and puts the project at the front of the market line; one project is in
-// line or running at a time; Pause keeps its progress, and Resume is free.
+// What a research project is right now, in one truthful state, the tag its row shows and the one key
+// its open row shows. D27: Start pays the price and puts the project at the front of the market line;
+// one project is in line or running at a time; Pause keeps its progress, and Resume is free.
 import type { GameAction, ResearchId, ResearchNodeView, ResearchTreeView } from '../../game';
 import { CURRENCY_NAME, priceOf, shortfalls, type Shortfall, type Wallet } from './money';
 import { wholeText } from '../plates/format';
@@ -24,32 +24,19 @@ export type NodeStatus =
   | { readonly kind: 'running' | 'next' | 'stopped' | 'paused'; readonly progress: number }
   | { readonly kind: 'queued' }
   | { readonly kind: 'ready' }
-  /** Paid for and its prerequisites met, but another project holds the line (D27: one at a time). */
+  /** Affordable and its prerequisites met, but another project holds the line (D27: one at a time). */
   | { readonly kind: 'after'; readonly line: string }
-  /** Startable once the wallet pays: the slowest shortfall first, then the other one. */
+  /** Startable once the wallet pays. */
   | { readonly kind: 'short'; readonly short: readonly Shortfall[] }
-  /** `needs`: the first unmet prerequisite; `first`: the project to research first (its prerequisites met). */
-  | { readonly kind: 'locked'; readonly needs: ResearchId; readonly first: ResearchId };
+  | { readonly kind: 'locked' };
 
 export interface StatusContext {
   readonly byId: ReadonlyMap<ResearchId, ResearchNodeView>;
   readonly line: LineState;
   readonly wallet: Wallet;
 }
-
-const unmet = (n: ResearchNodeView, byId: StatusContext['byId']) => n.requires.filter(id => byId.get(id)?.state !== 'done');
-
-/** The project to research first for a locked one: the first unmet prerequisite whose own prerequisites are met. */
-export function firstStep(n: ResearchNodeView, byId: StatusContext['byId'], seen = new Set<ResearchId>()): ResearchId | null {
-  for (const id of unmet(n, byId)) {
-    const r = byId.get(id);
-    if (!r || seen.has(id)) continue;
-    seen.add(id);
-    if (r.state !== 'locked') return id;
-    const deeper = firstStep(r, byId, seen);
-    if (deeper) return deeper;
-  }
-  return null;
+export interface KeyContext extends StatusContext {
+  readonly tree: Pick<ResearchTreeView, 'queue' | 'queueSlots'>;
 }
 
 export function nodeStatus(n: ResearchNodeView, c: StatusContext): NodeStatus {
@@ -59,10 +46,7 @@ export function nodeStatus(n: ResearchNodeView, c: StatusContext): NodeStatus {
     case 'active': return { kind: c.line.stopped ? 'stopped' : c.line.running ? 'running' : 'next', progress: n.progress };
     case 'parked': return { kind: 'paused', progress: n.progress };
     case 'queued': return { kind: 'queued' };
-    case 'locked': {
-      const needs = n.lockedBy ?? unmet(n, c.byId)[0] ?? n.id;
-      return { kind: 'locked', needs, first: firstStep(n, c.byId) ?? needs };
-    }
+    case 'locked': return { kind: 'locked' };
     case 'available': {
       const short = shortfalls(priceOf(n), c.wallet);
       if (short.length) return { kind: 'short', short };
@@ -71,77 +55,61 @@ export function nodeStatus(n: ResearchNodeView, c: StatusContext): NodeStatus {
   }
 }
 
-const pct = (p: number) => `${Math.floor(p * 100)}%`;
-export const amountText = (s: Shortfall) => `${wholeText(s.need)} ${CURRENCY_NAME[s.currency]}`;
-const nameOf = (id: ResearchId, byId: StatusContext['byId']) => byId.get(id)?.name ?? id;
+const queueRoom = (c: KeyContext) => c.tree.queueSlots > 0 && c.tree.queue.length + 1 < c.tree.queueSlots;
+/** The project can be started, bought or queued with one press now: the tab counts and the Ready tag. */
+export const startable = (s: NodeStatus, c: KeyContext): boolean => s.kind === 'ready' || s.kind === 'after' && queueRoom(c);
 
-/** The row's status word. */
-export function statusText(s: NodeStatus, byId: StatusContext['byId']): string {
+/** List order (ready-first): in the line, paused, queued, startable, short of funds, locked. */
+export function rank(s: NodeStatus, c: KeyContext): number {
   switch (s.kind) {
-    case 'milestone': return `Claim the ${wholeText(s.count)}-task reward`;
-    case 'done': return 'Done';
-    case 'running': return `Running ${pct(s.progress)}`;
-    case 'next': return 'Next in line';
-    case 'stopped': return 'Stopped: no Credits';
-    case 'paused': return `Paused ${pct(s.progress)}`;
-    case 'queued': return 'Queued';
-    case 'ready': return 'Ready';
-    case 'after': return `After ${s.line}`;
-    case 'short': return `Need ${amountText(s.short[0]!)}`;
-    case 'locked': return `Needs ${nameOf(s.needs, byId)}`;
+    case 'running': case 'next': case 'stopped': return 0;
+    case 'paused': return 1;
+    case 'queued': return 2;
+    case 'ready': return 3;
+    case 'after': return queueRoom(c) ? 3 : 4;
+    case 'short': return 4;
+    case 'milestone': case 'locked': return 5;
+    case 'done': return 6;
   }
 }
 
-export type KeyTone = 'go' | 'jump' | 'run' | 'wait' | 'off';
+export const pct = (p: number) => `${Math.floor(p * 100)}%`;
+export type Tone = 'go' | 'run' | 'warn' | 'mute';
+/** The closed row's state word; null when the price alone tells the state (short of funds: its figure is red). */
+export function rowTag(s: NodeStatus, c: KeyContext): { readonly text: string; readonly tone: Tone } | null {
+  switch (s.kind) {
+    case 'running': return { text: `Running ${pct(s.progress)}`, tone: 'run' };
+    case 'next': return { text: 'In line', tone: 'run' };
+    case 'stopped': return { text: 'No Credits', tone: 'warn' };
+    case 'paused': return { text: `Paused ${pct(s.progress)}`, tone: 'mute' };
+    case 'queued': return { text: 'Queued', tone: 'run' };
+    case 'ready': return { text: 'Ready', tone: 'go' };
+    // Affordable, but the line is taken and no queue slot is free: the open row names the project it waits for.
+    case 'after': return queueRoom(c) ? { text: 'Ready', tone: 'go' } : { text: 'Line busy', tone: 'mute' };
+    case 'short': return null;
+    case 'milestone': case 'locked': return { text: 'Locked', tone: 'mute' };
+    case 'done': return { text: 'Done', tone: 'mute' };
+  }
+}
+
 export interface KeyModel {
   readonly label: string;
-  readonly tone: KeyTone;
+  /** `go`: starts or resumes work. `quiet`: pauses or unqueues. `off`: the label is the blocker. */
+  readonly tone: 'go' | 'quiet' | 'off';
   readonly action: GameAction | null;
-  /** A locked project's key jumps to the project to research first. */
-  readonly jump: ResearchId | null;
-  /** The key fills with the project's progress while it is in line. */
-  readonly progress: number | null;
-  /** The smaller key beside it: Pause or Remove. */
-  readonly aside: { readonly label: string; readonly action: GameAction } | null;
 }
-const key = (label: string, tone: KeyTone, over: Partial<KeyModel> = {}): KeyModel =>
-  ({ label, tone, action: null, jump: null, progress: null, aside: null, ...over });
+const off = (label: string): KeyModel => ({ label, tone: 'off', action: null });
 
-export interface KeyContext extends StatusContext {
-  readonly tree: Pick<ResearchTreeView, 'queue' | 'queueSlots'>;
-  /** No round is running: a started project runs at once on the paused servers. */
-  readonly between: boolean;
-}
-
-/** The detail's key: what tapping it does, said plainly. */
-export function keyFor(n: ResearchNodeView, s: NodeStatus, c: KeyContext): KeyModel {
-  const pause = { label: 'Pause', action: { type: 'cancelResearch' } as const };
+/** The open row's one key, or null when nothing can be pressed (locked rows link their prerequisites instead). */
+export function keyFor(n: ResearchNodeView, s: NodeStatus, c: KeyContext): KeyModel | null {
   const other = c.line.id && c.line.id !== n.id ? c.line.name : null;
   switch (s.kind) {
-    case 'milestone': return key(`Claim ${wholeText(s.count)}-task reward`, 'off');
-    case 'done': return key('Done', 'off');
-    case 'running': {
-      return key(`Running ${pct(s.progress)}`, 'run', { progress: s.progress, aside: pause });
-    }
-    case 'next': return key('Next in line', 'wait', { progress: s.progress, aside: pause });
-    case 'stopped': return key('Resume', 'go', { action: { type: 'resumeResearch' }, progress: s.progress, aside: pause });
-    case 'paused': return other ? key(`Wait for ${other}`, 'off')
-      : key('Resume · free', 'go', { action: { type: 'startResearch', project: n.id } });
-    case 'queued': return key('Queued', 'wait', { aside: { label: 'Remove', action: { type: 'unqueueResearch', project: n.id } } });
-    case 'locked': {
-      const first = c.byId.get(s.first);
-      return key(first?.state === 'available' ? `Research ${first.name} first` : `Needs ${nameOf(s.first, c.byId)}`, 'jump', { jump: s.first });
-    }
-    case 'short': {
-      const top = s.short[0]!;
-      return key(`Need ${wholeText(top.need)} more ${CURRENCY_NAME[top.currency]}`, 'off');
-    }
-    case 'after':
-      return c.tree.queueSlots > 0 && c.tree.queue.length + 1 < c.tree.queueSlots
-        ? key(`Queue after ${s.line}`, 'go', { action: { type: 'queueResearch', project: n.id } })
-        : key(`Wait for ${s.line}`, 'off');
-    case 'ready':
-      // Between rounds it runs at once; in a round it goes to the front of the line. The tile header shows the price.
-      return key(n.purchase ? 'Buy' : c.between ? 'Start' : 'Start next', 'go', { action: { type: 'startResearch', project: n.id } });
+    case 'milestone': case 'locked': case 'done': return null;
+    case 'running': case 'next': case 'stopped': return { label: 'Pause', tone: 'quiet', action: { type: 'cancelResearch' } };
+    case 'paused': return other ? off(`Wait for ${other}`) : { label: 'Resume', tone: 'go', action: { type: 'startResearch', project: n.id } };
+    case 'queued': return { label: 'Remove from queue', tone: 'quiet', action: { type: 'unqueueResearch', project: n.id } };
+    case 'short': return off(`Need ${s.short.map(x => `${wholeText(x.need)} ${CURRENCY_NAME[x.currency]}`).join(' · ')}`);
+    case 'after': return queueRoom(c) ? { label: 'Queue', tone: 'go', action: { type: 'queueResearch', project: n.id } } : off(`Wait for ${s.line}`);
+    case 'ready': return { label: n.purchase ? 'Buy' : 'Start', tone: 'go', action: { type: 'startResearch', project: n.id } };
   }
 }

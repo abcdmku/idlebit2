@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import type { QueueEntryView, ResearchQueueEntryView } from '../../game';
+import type { Amount, QueueEntryView, ResearchQueueEntryView } from '../../game';
 import { taskBits, waitingShort } from '../hooks/taskRequirements';
 import { clockTone, useHeadSeconds } from '../hooks/headClock';
 import { box, useLayout } from '../shell/geometry';
@@ -11,6 +11,8 @@ import { returnToMarket } from '../input/commands';
 import { roundOf } from '../queue/taskText';
 import { ArtCanvas } from '../art/ArtCanvas';
 import { drawMiniIcon, type PartIconKind } from '../art/deckArt';
+import { amountText } from '../hooks/format';
+import { CoinIcon } from '../plates/icons';
 import '../styles/task-dock.css';
 
 interface DockProps {
@@ -21,6 +23,8 @@ interface DockProps {
   status: string;
   round: ReturnType<typeof roundOf>;
   primaryLabel: string;
+  /** The fix's quoted price when the primary key buys it. */
+  primaryCost: Amount | null;
   onPrimary(): void;
 }
 
@@ -29,7 +33,10 @@ function shortStatus(t: QueueEntryView): string {
     case 'gpu': return t.tensor ? 'Needs tensor' : 'Needs GPU';
     case 'gpuCores': return 'GPU too small';
     case 'vram': return 'Needs VRAM';
-    case 'cache': case 'ram': case 'disk': return 'Needs memory';
+    // The part to upgrade, by the name it wears on the board.
+    case 'cache': return 'Needs cache';
+    case 'ram': return 'Needs RAM';
+    case 'disk': return 'Needs disk';
     case 'members': return 'Needs servers';
     case 'zones': return 'Needs zones';
     default: return t.blockedBy ? 'Blocked' : t.waitingFor === 'queue' ? 'Queue full' : waitingShort(t, true);
@@ -84,20 +91,25 @@ export function TaskDock(props: DockProps) {
   </>;
 }
 
-function TaskDrawer({ head, research, status, blocked, running, primaryLabel, onPrimary, onClose }: DockProps & { onClose(): void }) {
+/** The drawer's fixed frame: its head, three 32 px rows (pay, needs, status) and the action key. */
+const DRAWER_H = 224;
+
+function TaskDrawer({ head, research, status, blocked, running, primaryLabel, primaryCost, onPrimary, onClose }: DockProps & { onClose(): void }) {
   const L = useLayout(), ref = useRef<HTMLElement>(null);
   useDialogFocus(ref, onClose);
   return <section ref={ref} id="task-drawer" className={`panel task-drawer${blocked ? ' blocked' : ''}`} role="dialog" aria-modal="true"
     aria-label="Next task requirements" data-testid="task-drawer"
-    style={{ left: L.now.x, bottom: L.h - L.now.y + 8, width: L.now.w, height: Math.min(280, L.view.h - 16) }}
+    style={{ left: L.now.x, bottom: L.h - L.now.y + 8, width: L.now.w, height: Math.min(DRAWER_H, L.view.h - 16) }}
     onPointerDown={e => e.stopPropagation()} onWheel={e => e.stopPropagation()}>
     <header><b>{research?.name ?? head?.label ?? 'Next task'}</b><button type="button" className="skey task-drawer-close" onClick={onClose} aria-label="Close task drawer" data-qa-target><i className="x-glyph" /></button></header>
-    <div className="task-drawer-body">
-      {head && <><TaskRewards task={head} label /><div className="task-drawer-requirements"><TaskFacts task={head} detailed /></div></>}
-      {research && <p className="rnd">Research {Math.floor(research.progress * 100)}% done</p>}
-      <p className={blocked ? 'warn' : 'mute'} data-testid="now-wait">{status}</p>
-    </div>
+    {/* Labelled rows in the fixed frame (D58): what it pays, what it needs, where it stands. A long list of needs scrolls. */}
+    <dl className="task-drawer-body">
+      {head && <><dt>Pays</dt><dd><TaskRewards task={head} /></dd>
+        <dt>Needs</dt><dd><TaskFacts task={head} detailed /></dd></>}
+      {research && <><dt>Research</dt><dd className="rnd">{Math.floor(research.progress * 100)}% done</dd></>}
+      <dt>Status</dt><dd className={blocked ? 'warn' : 'mute'} data-testid="now-wait">{status}</dd>
+    </dl>
     {head && <button type="button" className={`skey task-drawer-details${blocked ? ' warn' : ''}`} disabled={!running}
-      data-testid="now-detail" data-qa-target onClick={onPrimary}>{primaryLabel}</button>}
+      data-testid="now-detail" data-qa-target onClick={onPrimary}>{primaryLabel}{primaryCost !== null && <span className="task-reward"><CoinIcon />{amountText(primaryCost)}</span>}</button>}
   </section>;
 }

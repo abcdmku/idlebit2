@@ -6,7 +6,7 @@ import { ComponentRow } from './ComponentRow';
 export function SiteSummary({ site, onOpen }: { site: SiteView; onOpen: (part: PartRef) => void }) {
   if (site.siteId === null) return null;
   const unit = { kind: 'site', id: site.siteId } as const;
-  return <ul className="sys-summary" aria-label="Site infrastructure">
+  return <ul className="sys-summary three" aria-label="Site infrastructure">
     <li><ComponentRow label="Generation" value={site.generation ? watts(site.generation.outputW) : 'None'}
       part={{ unit, slot: { kind: 'generation' } }} onOpen={() => onOpen({ unit, slot: { kind: 'generation' } })} /></li>
     {site.grid && <li><ComponentRow label="Grid supply" value={watts(site.grid.deliveredW) + ' of ' + watts(site.grid.capacityW)}

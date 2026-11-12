@@ -1,7 +1,8 @@
-// Round over: a compact in-world report over the paused world. It leads with the goal ruler,
-// then Net and Data against the last round, earned, energy, counts, causes (all seven, zeros
-// dimmed so the grid never moves), failures by type. One Return to market key. Closing it dismisses the report.
-import { useEffect, useLayoutEffect, useRef, type CSSProperties } from 'react';
+// Round over: a compact in-world report over the paused world. The main view is the goal ruler, Net and
+// Data against the last round, auto return and Return to market. The Details key opens the rest in place:
+// earned, energy, counts, causes (all seven, zeros dimmed so the grid never moves) and failures by type.
+// The title names why the round ended. Closing it dismisses the report.
+import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties } from 'react';
 import { FAIL_CAUSES, formatOps } from '../game';
 import type { EnergyBreakdown, FailCause, RoundReport, RoundTypeTally } from '../game';
 import { P, drawCause, typeColor, typeName } from '../render/core';
@@ -13,8 +14,9 @@ import { amountText, wholeText } from './hooks/format';
 import { returnToMarket } from './input/commands';
 import type { ShellLayout } from './layout';
 import { useLayout } from './shell/geometry';
-import { useGameSelector, useShell, useViewState } from './storeHooks';
-import { GoalBar, ReachDetails, reportBadge } from './frontier/Reach';
+import { useGameSelector, useOfflineStatus, useShell, useViewState } from './storeHooks';
+import { offlineLayerUp } from './offline/OfflineLayer';
+import { GoalBar, RoundTotals, reportBadge } from './frontier/Reach';
 
 function CauseIcon({ cause, lit }: { cause: FailCause; lit: boolean }) {
   const ref = useRef<HTMLCanvasElement>(null);
@@ -44,27 +46,54 @@ function failedByType(rows: readonly RoundTypeTally[]): { type: RoundTypeTally['
   });
 }
 
-/** Where the plate sits: centred over the free world; on phone below the queue strip, clear of the head (A15). */
-function plateStyle(L: ShellLayout): CSSProperties {
+/**
+ * Where the plate sits: on desktop the closed report is centred over the free world; on phone it hangs below
+ * the queue strip, clear of the head (A15). Open, it grows downward from the same top edge, then rises only as
+ * far as the details need: on desktop to the top of the sheet area, on a portrait phone over the queue strip.
+ * What still does not fit scrolls inside.
+ */
+function plateStyle(L: ShellLayout, size: PlateSize | null): CSSProperties {
   const v = L.kind === 'desktop' ? L.lab : L.view, gap = L.kind === 'desktop' ? L.lat : 8;
-  return L.kind === 'desktop'
-    ? { left: v.x + v.w / 2, top: v.y + v.h / 2, transform: 'translate(-50%, -50%)', maxHeight: v.h - 2 * gap }
-    : { left: v.x + v.w / 2, top: v.y + gap, transform: 'translateX(-50%)', maxHeight: v.h - 2 * gap };
+  const closedTop = v.y + (L.kind === 'desktop' ? Math.max(gap, Math.floor((v.h - (size?.closed ?? v.h)) / 2)) : gap);
+  // Portrait phone: the strip sits above the view in the same column, and an open report may cover it.
+  const ceiling = (L.kind === 'phone' && L.strip.x === v.x ? L.strip.y : v.y) + gap;
+  const top = size ? Math.max(ceiling, Math.min(closedTop, v.y + v.h - gap - size.full)) : closedTop;
+  // Never wider than its view: in landscape the report stays clear of the left column.
+  return { left: v.x + v.w / 2, top, transform: 'translateX(-50%)', maxWidth: v.w - 2 * gap, maxHeight: v.y + v.h - gap - top };
 }
+
+/** Why the round ended (spec §4.7), after "Round over": short enough for a 320 px report with the NEW BEST badge. */
+const END_REASON: Readonly<Record<RoundReport['endedBy'], { text: string; label: string }>> = {
+  sla: { text: 'SLA', label: 'SLA fell below 80%' }, player: { text: 'by you', label: 'ended by you' },
+  stall: { text: 'stalled', label: 'no task completed for two minutes' },
+};
+
+/** The report's height with Details closed, and as it is now. */
+interface PlateSize { readonly closed: number; readonly full: number }
+
+/** Details stay as the player left them until the page reloads. */
+let detailsOpen = false;
 
 export function RoundReportPlate({ report, onReturn, onClose }: {
   report: RoundReport; onReturn: () => void; onClose: () => void;
 }) {
   const ref = useRef<HTMLElement>(null), contentRef = useRef<HTMLDivElement>(null), L = useLayout();
   const shell = useShell();
+  const [open, setOpen] = useState(detailsOpen), [size, setSize] = useState<PlateSize | null>(null);
+  const toggle = () => { detailsOpen = !open; setOpen(detailsOpen); };
   useDialogFocus(ref, onClose);
   const updateMore = () => {
     const root = ref.current, body = contentRef.current;
     if (!root || !body) return;
     const css = getComputedStyle(root), keys = root.querySelector<HTMLElement>('.keys');
-    const fullHeight = (root.querySelector<HTMLElement>('.p-head')?.offsetHeight ?? 0) + body.scrollHeight
-      + (keys?.offsetHeight ?? 0) + parseFloat(css.paddingTop) + parseFloat(css.paddingBottom);
-    root.dataset.scrollable = String(fullHeight > parseFloat(css.maxHeight) + 2);
+    const head = root.querySelector<HTMLElement>('.p-head')?.offsetHeight ?? 0;
+    const chrome = head + (keys?.offsetHeight ?? 0) + parseFloat(css.paddingTop) + parseFloat(css.paddingBottom)
+      + parseFloat(css.borderTopWidth) + parseFloat(css.borderBottomWidth);
+    // The closed report's own height: everything above the details panel, measured even while it is open.
+    const details = body.querySelector<HTMLElement>('.round-details');
+    const full = Math.ceil(chrome + body.scrollHeight), closed = full - (details?.offsetHeight ?? 0);
+    setSize(was => was && was.closed === closed && was.full === full ? was : { closed, full });
+    root.dataset.scrollable = String(full > parseFloat(css.maxHeight) + 2);
     root.dataset.more = String(body.scrollHeight - body.scrollTop - body.clientHeight > 2);
   };
   useLayoutEffect(() => {
@@ -76,24 +105,31 @@ export function RoundReportPlate({ report, onReturn, onClose }: {
     if (keys) ro?.observe(keys);
     const body = contentRef.current;
     return () => { ro?.disconnect(); body?.removeEventListener('toggle', updateMore, true); };
-  }, [L, report]);
+  }, [L, report, open, size]);
+  // Opening Details in a short plate brings its key to the top of the scroller, so the details show at once.
+  useLayoutEffect(() => {
+    const body = contentRef.current, key = body?.querySelector<HTMLElement>('.rp-details-key');
+    if (body && key) body.scrollTop = open ? key.offsetTop - body.offsetTop : 0;
+  }, [open, size]);
   const failed = FAIL_CAUSES.reduce((sum, c) => sum + report.failedByCause[c], 0);
   const chips = failedByType(report.byType ?? []);
   const energy = report.energy ?? null;
   const prev = shell.store.getState().round.reports.find(r => r.index === report.index - 1) ?? null;
-  const badge = reportBadge(report);
-  return <section ref={ref} className="v3-plate round-plate has-x" role="dialog" aria-modal="true" aria-label="Round over" tabIndex={-1}
-    data-testid="round-plate" style={plateStyle(L)} onPointerDown={e => e.stopPropagation()} onWheel={e => e.stopPropagation()}>
+  const badge = reportBadge(report), why = END_REASON[report.endedBy];
+  return <section ref={ref} className="v3-plate round-plate has-x" role="dialog" aria-modal="true" aria-label={`Round over: ${why.label}`} tabIndex={-1}
+    data-testid="round-plate" style={plateStyle(L, size)} onPointerDown={e => e.stopPropagation()} onWheel={e => e.stopPropagation()}>
     <header className="p-head">
-      <b className="p-title">Round over</b>
+      <b className="p-title">Round over<span className="rp-why" data-testid="rp-why" data-reason={report.endedBy} title={why.label}> · {why.text}</span></b>
       {badge && <span className="rp-badge" data-testid="rp-badge">{badge}</span>}
       <button type="button" className="p-x" aria-label="Close report" onClick={onClose}>
         <i className="x-glyph" aria-hidden="true" style={{ width: 12, height: 12, '--x-w': '1px' } as CSSProperties} /></button>
     </header>
     <div className="round-content" ref={contentRef} onScroll={updateMore}>
     <GoalBar report={report} />
-    <section className="round-details">
-    <ReachDetails report={report} prev={prev} />
+    <RoundTotals report={report} prev={prev} />
+    <button type="button" className="rp-details-key" data-testid="rp-details" data-qa-target aria-expanded={open}
+      aria-controls="round-details" onClick={toggle}><span>Details</span><i className="disclosure" aria-hidden="true" /></button>
+    {open && <section className="round-details" id="round-details" aria-label="Round details">
     <ul className="p-list rp-bottom">
       <li><span>Earned</span><span className="v gold"><CoinIcon />{amountText(report.gross)}</span></li>
       {energy !== null && <li><span>Energy</span><span className="v mute" data-testid="rp-energy">−<CoinIcon />{amountText(energy)}</span></li>}
@@ -120,9 +156,8 @@ export function RoundReportPlate({ report, onReturn, onClose }: {
       {energyLines(report.energyBreakdown).map(l => <li key={l.key} data-line={l.key}><span>{l.label}</span>
         <span className={`v ${l.paid ? 'mute' : 'ben'}`}>{l.paid ? '−' : ''}<CoinIcon />{amountText(report.energyBreakdown[l.key])}{l.paid ? '' : ' saved'}</span></li>)}
     </ul>}
-    </section>
+    </section>}
     </div>
-    <div className="report-more" aria-hidden="true">More ↓</div>
     <div className="keys">
       <AutoReturnControl />
       <button type="button" className="key go" data-testid="rp-return" onClick={onReturn}>Return to market</button>
@@ -146,10 +181,12 @@ export function energyLines(e: EnergyBreakdown | null | undefined): typeof ENERG
 
 /** Mounted by the shell: shows while the round state is `ended`. */
 export function RoundPlate() {
-  const shell = useShell(), view = useViewState();
+  const shell = useShell(), view = useViewState(), offline = useOfflineStatus();
   const r = useGameSelector(s => (s.round.state === 'ended' && s.round.lastReport ? s.round.lastReport : null));
-  // A round may end while Settings is open; show its report after the player closes Settings.
-  if (!r || view.sheet === 'settings' || view.sheet === 'roundRewards') return null;
+  // One dialog at a time: a round may end while a sheet (Settings, Research, Health, the wallet, rewards) is open,
+  // and a sheet may open over the report; the report shows again when the sheet closes. It also waits under the
+  // offline return report (a round that ended while away).
+  if (!r || view.sheet !== null || offlineLayerUp(offline, false)) return null;
   return <RoundReportPlate report={r}
     onReturn={() => returnToMarket(shell)} onClose={() => shell.dispatch({ type: 'dismissReport' })} />;
 }

@@ -5,8 +5,8 @@ import type { SystemSnapshot } from '../../../game';
 import { P, R, copyRect, partVersionOf, resetHitTarget, setRect } from '../../core';
 import type { HitTarget, LevelRegistry, LevelRenderer, Rect } from '../../core';
 import { writeLabels } from './labels';
-import { CABLE_X, CONNECTOR, FOCUS, SAVE, WORLD, packageRect, siteRect, worldRect } from './layout';
-import { boardModel, boardPartRef, slotOf } from './model';
+import { CABLE_X, CONNECTOR, boardOf, packageRect, setRestArea, siteRect, worldRect } from './layout';
+import { boardModel, boardPartRef, openGroup, slotOf } from './model';
 import { drawSystemMini } from './mini';
 import { drawBoard } from './world';
 
@@ -33,11 +33,16 @@ const NAME: Rect = { x: 56, y: 28, w: 36, h: 8 };
 export function createSystemRenderer(registry: LevelRegistry): LevelRenderer<'system'> {
   return {
     id: 'system', name: 'System',
-    /** Shown whole, never panned (D15.2). */
-    wholeAtRest: true,
-    size: (_s, out, form) => worldRect(form, out),
-    focus: (_s, _vp, out) => copyRect(FOCUS, out),
-    miniRect: (_s, out) => copyRect(WORLD, out),
+    /**
+     * Shown whole (D15.2): layout.ts picks the floorplan that fits the free world, and the core the largest
+     * scale it fits at. Only a phone too small for every plan at 2 pans, opening on the board's top edge.
+     */
+    wholeAtRest: true, plansAtRest: true,
+    restCentre(s, out) { const f = boardOf(s.board).focus; out.x = f.x + f.w / 2; out.y = f.y; },
+    size: (s, out, form) => worldRect(boardOf(s.board), form, out),
+    // (a call without the area, off the rest path, keeps the last plan)
+    focus(s, _vp, out, _form, area) { if (area) setRestArea(area); return copyRect(boardOf(s.board).focus, out); },
+    miniRect: (s, out) => copyRect(boardOf(s.board).world, out),
     /** The pipe runs all the way down onto the board's gold edge connector (D35: no port, no stem). */
     // the pipe's 2 px ink cap lands on the pad's top edge, so its gold stays in view under the pipe's end
     entry: (_s, out) => { out.x = CABLE_X; out.y = CONNECTOR.y - 2; return out; },
@@ -60,8 +65,12 @@ export function createSystemRenderer(registry: LevelRegistry): LevelRenderer<'sy
         const v = slotOf(s, site);
         if (!v) continue;
         const add = site.state === 'open';
+        // Open RAM and drive slots all buy the same next module: one add tile over them (model.ts openGroup).
+        const shared = add && (site.type === 'ram' || site.type === 'drive') ? openGroup(m, site.type) : null;
+        if (shared && shared.site !== site) continue;
         const t = resetHitTarget(out[i++]!, add ? `add:${site.type}${site.index}` : `slot-${site.type}${site.index}`, add ? 'add' : 'slot', owner(s));
-        t.slot = v.index; t.unit = { kind: 'system', id: s.systemId }; siteRect(b, site.type, site.index, t.rect);
+        t.slot = v.index; t.unit = { kind: 'system', id: s.systemId };
+        if (shared) copyRect(shared.rect, t.rect); else siteRect(b, site.type, site.index, t.rect);
       }
       for (const site of m.sites) {
         if (site.state !== 'part' || i >= out.length) continue;
@@ -77,7 +86,7 @@ export function createSystemRenderer(registry: LevelRegistry): LevelRenderer<'sy
       }
       if (s.saveable && i < out.length) {
         const t = resetHitTarget(out[i++]!, 'save', 'save', owner(s));
-        t.unit = { kind: 'system', id: s.systemId }; setRect(t.rect, SAVE.x, SAVE.y, 7, 7);
+        t.unit = { kind: 'system', id: s.systemId }; setRect(t.rect, b.save.x, b.save.y, 7, 7);
       }
       return i;
     },

@@ -83,7 +83,7 @@ export class Feedback {
       const t = completionMs(c, s.tick);
       if (timeMs - t >= POP_LIFE_MS) continue;
       const key = level.payoutAnchor(s.focus as never, c, this.scratch, form);
-      if (key >= 0) this.pops.add(key, this.scratch, t, c.credits, c.data, level.popWindowMs?.(s.focus as never));
+      if (key >= 0) this.pops.add(key, this.scratch, t, c.credits, c.data, level.popWindowMs?.(s.focus as never), !!level.popInside);
     }
   }
 

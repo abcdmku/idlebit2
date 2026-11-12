@@ -7,6 +7,7 @@ import {
   applyAction, quote, rackId, REGIONS, roomId, selectMarketQueue, selectResearchTree, systemId,
   type GameAction, type GameState, type MeetNeed, type Quote, type QuoteRequest, type ResearchNodeView, type ScopeRef,
 } from '../index';
+import { G } from '../core/buffers';
 import { MAX_UPS } from '../core/constants';
 import { rqLen, rqLevel, rqRow } from '../core/routerQueue';
 import { energyRatio, LADDERS, ladderSpeed, PARTS, portSpeedPrice, ratedRate } from '../build/catalog';
@@ -865,7 +866,13 @@ export function decide(state: GameState, policy: Policy, log: BotEvent[], need: 
   }
   // D27: research holds threads and the market waits behind it, so a player lets a short project
   // finish between rounds before returning.
-  if (s.round.phase !== 'running' && !(s.research.active !== null && !s.research.stoppedInsolvent && researchLeftS(s) <= RESEARCH_WAIT_S)) {
+  const finishing = s.research.active !== null && !s.research.stoppedInsolvent && researchLeftS(s) <= RESEARCH_WAIT_S;
+  if (s.round.phase !== 'running' && finishing && s.hot.g[G.researchBreak] !== 1) {
+    // Spec §11.3: a project carried over from the round waits for Return unless the player runs it now.
+    const next = tryAction(s, { type: 'resumeResearch' });
+    if (next) { log.push({ tick: s.clock.tick, kind: 'configure', label: 'Research between rounds', cost: '0' }); s = next; }
+  }
+  if (s.round.phase !== 'running' && !finishing) {
     const next = tryAction(s, { type: 'returnToMarket' });
     if (next) {
       log.push({ tick: s.clock.tick, kind: 'return', label: `round ${next.round.index}`, cost: '0' });

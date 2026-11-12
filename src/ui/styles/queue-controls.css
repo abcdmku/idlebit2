@@ -1,9 +1,117 @@
+/* Queue and router operating controls: one compact row rhythm, and one reserved line that says what the
+   selected choice does. Nothing here moves when a choice or a live value changes. */
 .queue-controls { display: grid; gap: 4px; min-width: 0; margin-block: 2px 4px; }
-.queue-controls > label { display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: center; gap: 8px; }
-.queue-controls select { min-width: 0; width: 100%; height: 32px; min-height: 32px; padding: 4px 6px; font: inherit;
-  color: var(--paper); background: var(--well); border: 1px solid var(--panel-hi); }
-.queue-controls > .queue-batching { display: flex; align-items: center; min-height: 28px; gap: 6px; }
-.queue-batching input { width: 16px; height: 16px; margin: 0; accent-color: #77a7ff; }
-.queue-controls > .p-line { min-height: 0; margin: 0; }
-.queue-preparation { color: #a8c6ff; }
-.queue-preparation .p-line { margin: 0; }
+/* Order keys are as wide as their names plus an equal share of the spare room, so no name touches its key's edge. */
+.v3-plate .queue-order { display: grid; grid-auto-flow: column; grid-auto-columns: auto; }
+.v3-plate .queue-order button { display: flex; align-items: center; justify-content: center; gap: 4px; padding-inline: 4px; white-space: nowrap; }
+.v3-plate .choice-strip button.lock { color: #a99be6; border-style: dashed; cursor: pointer; }
+.v3-plate .choice-strip button.lock:disabled { cursor: default; }
+.v3-plate .choice-strip .px-ic.lock { width: 7px; height: 8px; }
+.queue-loading { display: grid; gap: 4px; min-width: 0; margin: 0; padding: 0; border: 0; }
+.queue-loading:disabled .inline-setting > span { color: #776d96; }
+.queue-loading .inline-setting > span { min-width: 7em; white-space: nowrap; }
+.v3-plate .choice-effect { margin: 0; min-height: var(--lh); color: #c9c1e5; }
+.v3-plate .queue-batching { display: flex; align-items: center; gap: 6px; min-width: 0; padding: 1px 6px;
+  border: 1px solid #5d5296; background: #29234b; cursor: pointer; }
+.v3-plate .queue-batching:has(input:checked) { border-color: #8ef5ff; background: #193546; }
+.v3-plate .queue-batching input { flex: none; width: 16px; height: 16px; margin: 0; accent-color: #8ef5ff; }
+.v3-plate .queue-batching span { display: grid; min-width: 0; line-height: var(--lh); }
+.v3-plate .queue-batching b { font-weight: 600; }
+.v3-plate .queue-batching small { color: #a99be6; }
+
+/* Router plates: the measured result, the next queue slot, the strategy grid with its effect line, and the filter
+   switches. The body lays itself out by its own width (a phone, a docked landscape plate, a wide plate), never by
+   the screen's: .lb-box is the measured container, .lb-body the grid. */
+.lb-box { container-type: inline-size; min-width: 0; }
+.lb-body { display: grid; grid-template-columns: minmax(0, 1fr); gap: 4px; }
+.v3-plate .lb-body > .keys { margin-top: 0; }
+.v3-plate .lb-body > .keys:empty { display: none; }
+.v3-plate .lb-body > .routing-controls { grid-column: 1 / -1; grid-row: auto; margin-top: 0; }
+.v3-plate .route-result { display: grid; align-content: center; gap: 2px; min-width: 0; }
+.v3-plate .route-result .p-status { margin: 0; white-space: nowrap; }
+.v3-plate .route-result .p-status .warn { color: #ffab98; }
+.v3-plate .route-result .lb-queue { flex-wrap: nowrap; min-height: var(--lh); margin: 0; }
+.v3-plate .route-result .lb-wells { flex: none; flex-wrap: nowrap; margin-left: 0; }
+.v3-plate .route-result .lb-due { margin-left: auto; white-space: nowrap; }
+.v3-plate .route-result .lb-due.mute { color: #a99be6; }
+.v3-plate .route-result .lb-due.warn { color: #ffab98; }
+/* Strategy names are always whole. Three columns as wide as their longest name, stretched to the plate. */
+.v3-plate .routing-controls > .route-strategies.route-strategies.choice-strip { display: grid; grid-template-columns: repeat(3, auto); gap: 4px; }
+.v3-plate .route-strategies button { display: flex; align-items: center; justify-content: center; gap: 4px; padding: 2px 4px; white-space: nowrap; }
+.v3-plate .route-effect { margin: 0; min-height: var(--lh); color: #c9c1e5; }
+.v3-plate .routing-controls > .filter-options.filter-options { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 4px; }
+.v3-plate .route-filter { display: flex; align-items: center; gap: 5px; min-width: 0; padding: 1px 4px 1px 6px;
+  border: 1px solid #5d5296; background: #29234b; color: #efeaff; font: inherit; line-height: var(--lh); text-align: left; cursor: pointer; }
+.v3-plate .route-filter u { flex: none; width: 10px; height: 10px; background: #15122a; box-shadow: 0 0 0 2px #0e0b1c; }
+.v3-plate .route-filter.on { border-color: #8ef5ff; background: #193546; }
+.v3-plate .route-filter.on u { background: #8ef5ff; }
+.v3-plate .route-filter span { display: grid; min-width: 0; }
+.v3-plate .route-filter b { font-weight: 600; }
+.v3-plate .route-filter small { color: #a99be6; white-space: nowrap; }
+.v3-plate .route-filter.on small { color: #b9dfe9; }
+.v3-plate .route-filter.lock { color: #a99be6; border-style: dashed; }
+.v3-plate .route-filter.lock:disabled { cursor: default; }
+.v3-plate .route-filter .px-ic.lock { width: 7px; height: 8px; margin: 0 1px; }
+/* The global scheduler's link to its start controller: a full 44px row. */
+.v3-plate .lb-body > .component-link { min-height: 44px; padding: 0 6px; background: #221b44; color: #efeaff; }
+/* A portrait phone: three equal columns, and a long name takes its key's second line (the keys are two lines
+   tall there). The effect line keeps room for its second line. */
+@container (max-width: 28em) {
+  .v3-plate .routing-controls > .route-strategies.route-strategies.choice-strip { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  /* Every name keeps 6px clear of its key's edges: a long one wraps at a space, or after its hyphen when even one
+     word is wider than the key (320px: "Latency-" over "aware"). The lock sits in the corner, off the text line. */
+  .v3-plate .route-strategies button { white-space: normal; text-align: center; line-height: var(--lh); padding: 2px 6px; }
+  .v3-plate .route-strategies button.lock .px-ic.lock { position: absolute; left: 3px; top: 3px; }
+  .v3-plate .route-effect { min-height: calc(2 * var(--lh)); }
+}
+/* A mouse reads every name on one line: the desktop router plate is as wide as its three columns. */
+.l-desktop .v3-plate:has(.lb-box) { width: 31em; }
+/* A docked landscape plate: the result beside its queue key, four strategies and three filters a row. */
+@container (min-width: 33em) {
+  .lb-body { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); column-gap: 8px; }
+  .lb-body > :not(.route-result, .keys) { grid-column: 1 / -1; }
+  .v3-plate .routing-controls > .route-strategies.route-strategies.choice-strip { grid-template-columns: repeat(4, auto); }
+  .v3-plate .routing-controls > .filter-options.filter-options { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}
+/* A wide plate: the result, queue key and links on the left, the choices on the right, all in view at once. */
+@container (min-width: 46em) {
+  .lb-body { grid-template-columns: 250px minmax(0, 1fr); grid-auto-rows: min-content; column-gap: 12px; }
+  .lb-body > :is(.route-result, .keys, .component-link) { grid-column: 1; }
+  .v3-plate .lb-body > .routing-controls { grid-column: 2; grid-row: 1 / span 4; }
+}
+
+/* Plates that lay themselves out by their own width: two panes need 560px; a narrower plate (a phone, or a
+   landscape plate docked beside the world) stacks, and the frame widens a plate that then would not fit. */
+.v3-plate:is(.hardware-queue, .power-ctl, .auxiliary, .unit) { container-type: inline-size; }
+@container (max-width: 559px) {
+  .v3-plate:is(.hardware-queue, .power-ctl, .auxiliary, .unit) > .plate-content.plate-content { display: block; }
+  .v3-plate.unit > .plate-content > .keys.keys { display: flex; }
+  .v3-plate:is(.power-ctl, .auxiliary) .start-row.start-row { margin-top: 4px; padding-top: 4px; }
+}
+@container (min-width: 430px) and (max-width: 559px) {
+  .v3-plate .sys-summary.sys-summary { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}
+@media (min-width: 700px) and (max-height: 480px) { .v3-plate .build-options { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+
+/* Start controls: both wake sliders share one label column, and the order choices stay on one row. */
+.v3-plate .start-row .range-setting { grid-template-columns: 11em minmax(48px, 1fr) 2.8em; white-space: nowrap; }
+.v3-plate .start-row .inline-setting > .choice-strip { display: grid; grid-auto-flow: column; grid-auto-columns: auto; }
+.v3-plate .start-row .inline-setting > .choice-strip button { padding-inline: 4px; }
+
+/* Unit plates. The market row: the unit's state beside its switch, one fixed 44px row. */
+.v3-plate .p-online { grid-template-columns: minmax(0, 1fr) minmax(120px, 42%); align-items: center; min-height: 44px; margin-top: 4px; }
+.v3-plate .p-online .sw-t { display: grid; justify-content: start; align-content: center; gap: 0; }
+.v3-plate .p-online .sw-s:empty { display: none; }
+/* Power settings: a locked one shows a lock where its switch will be and opens its research. */
+.v3-plate .cx-tog.lock { color: #a99be6; background: #1f1838; }
+.v3-plate .cx-tog.lock .lock-well { flex: none; display: flex; align-items: center; justify-content: center; width: 30px; height: 16px; }
+.v3-plate .cx-tog.lock .px-ic.lock { width: 7px; height: 8px; }
+.v3-plate .cx-tog.lock small { color: #8d84b3; }
+/* What is in the box: equal cells, the part over its value, both left-aligned on one line each. */
+.v3-plate .sys-summary .sum-row { display: grid; align-content: center; justify-items: start; gap: 0; min-height: 44px; padding: 2px 6px; line-height: var(--lh); }
+/* A value is never cut: two cells a row hold the longest ("999 mW of 2.09 kW"), and a longer one would wrap. */
+.v3-plate .sys-summary .sum-row > span:last-child { margin-left: 0; max-width: 100%; overflow-wrap: anywhere; }
+.v3-plate .sys-summary .sum-row:disabled { color: #efeaff; }
+
+/* The add-new plate: one priced key per build. */
+.v3-plate .build-options { display: grid; gap: 4px; margin-top: 4px; }

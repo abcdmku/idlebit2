@@ -14,6 +14,7 @@ import { blockedText, taskBits, waitingText } from '../hooks/taskRequirements';
 import { pointAt, pointFix } from '../input/pointAt';
 import { PlateFrame } from '../plates/PlateFrame';
 import { useLayout } from '../shell/geometry';
+import { hasTaskDock } from '../layout';
 import { shallowEqual, useGameSelector, useShell, useViewState } from '../storeHooks';
 import { HeadClock, InQueue, TaskIcon } from './taskText';
 import { useMeet } from './meet';
@@ -55,7 +56,7 @@ const lowerFirst = (s: string) => (/^[A-Z][a-z]/.test(s) ? s[0]!.toLowerCase() +
 
 /** Status in plain words. */
 export function statusLine(t: QueueEntryView, running: boolean): { text: string; tone: '' | 'warn' | 'mute' } {
-  if (!running) return { text: 'Next round', tone: 'mute' };
+  if (!running) return { text: 'After Return', tone: 'mute' };
   if (t.blockedBy) return { text: keepUnits(`Blocked: ${lowerFirst(blockedText(t) ?? '')}`), tone: 'warn' };
   return { text: waitingText(t), tone: 'mute' };
 }
@@ -112,9 +113,17 @@ function OpenTask({ taskKey: key }: { taskKey: string }) {
   const status = statusLine(t, f.running), fixes = t.blockedBy && !meet.length && !point ? fixLines(t, offers) : [];
   const needs = needLines(t).filter((_, i) => !(i === 0 && t.workingSetBits > 0 && ['cache', 'ram', 'disk'].includes(t.blockedBy ?? '')));
   const close = () => shell.view.dispatch({ type: 'back' });
-  const area = plateArea(L, L.view);
+  // Desktop docks it in the right gutter, clear of the hardware the task runs on; the strip marks the open card.
+  // Portrait phone: right under the tapped card, with a pointer to it, inside the world (a long recipe scrolls; the
+  // strip and the bar stay whole). A world under 480 px tall has no room for that: the detail is a sheet instead,
+  // from the band to the stage's foot, so nothing shows half covered.
+  // Landscape: over the world, beside the column that holds the card.
+  const desk = L.kind === 'desktop', dock = hasTaskDock(L), sheet = dock && L.view.h < 480, under = dock && !sheet;
+  const top = L.band.y + L.band.h;
+  const area = sheet ? { x: L.view.x, y: top - 4, w: L.view.w, h: L.h - 8 - top + 8 } : dock ? L.view : plateArea(L, desk ? L.calloutBounds : L.view);
   return <PlateFrame title={familyName(t.family)} sub={<span style={{ color }}>{typeName(typeOf(t.family))}</span>}
-    className="task-detail" bounds={area} spill={plateSpill(L, area)} readAnchor={readAnchor} tip onClose={close}
+    className={`task-detail${dock ? ' dock' : ''}${sheet ? ' sheet-fill' : ''}`} bounds={area} spill={desk || dock ? null : plateSpill(L, area)}
+    readAnchor={under ? readAnchor : null} beside={desk} tip={under} onClose={close}
     head={<span className="td-ic"><TaskIcon task={t} n={L.N} /></span>}>
     <p className={`p-line td-status ${status.tone}`} data-testid="td-status">{status.text}</p>
     <dl className="td-facts">

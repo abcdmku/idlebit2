@@ -23,12 +23,17 @@ export function Price({ cost, currency = 'credits' }: { cost: Amount | number; c
 export type Tone = '' | 'ben' | 'warn' | 'muted';
 export interface Line { readonly text: string; readonly tone?: Tone }
 
+/** A usage meter. Its figure is the plate's inline usage on the title line. */
+export function Bar({ progress, tone = '', label }: { progress: number; tone?: Tone | 'rnd'; label: string }) {
+  const pct = Math.round(Math.max(0, Math.min(1, progress)) * 100);
+  return <div className={`p-bar ${tone}`} role="meter" aria-valuemin={0} aria-valuemax={100} aria-valuenow={pct} aria-label={label}>
+    <b style={{ width: `${pct}%` }} /></div>;
+}
+
 export function Status({ text, tone = '', progress }: { text: string; tone?: Tone | 'rnd'; progress?: number | null }) {
   return <>
     <p className={`p-status ${tone}`}>{text}</p>
-    {progress != null && <div className={`p-bar ${tone}`} role="meter" aria-valuemin={0} aria-valuemax={100}
-      aria-valuenow={Math.round(Math.max(0, Math.min(1, progress)) * 100)} aria-label={text}>
-      <b style={{ width: `${Math.round(Math.max(0, Math.min(1, progress)) * 100)}%` }} /></div>}
+    {progress != null && <Bar progress={progress} tone={tone} label={text} />}
   </>;
 }
 
@@ -83,8 +88,18 @@ export interface QuoteKeyProps {
   onResearch?: (id: ResearchId) => void;
 }
 /** One purchase, its stat gain and price. Limits disable this same key. */
-export function QuoteKey({ quote, label, detail, tone = '', researchName, onAction, ariaLabel }: QuoteKeyProps) {
+export function QuoteKey({ quote, label, detail, tone = '', researchName, onAction, onResearch, ariaLabel }: QuoteKeyProps) {
   const why = purchaseReason(quote, researchName);
+  // A purchase research still locks is a key to that project, as on every locked choice; it never buys.
+  const node = quote.locked?.code === 'research' ? quote.locked.node : null;
+  if (node && onResearch) {
+    const project = `Research ${researchName?.(node) ?? quote.locked!.text.replace(/^Needs /, '')}`;
+    return <button type="button" className="key generation-action replace" data-research-target={node}
+      aria-label={`${ariaLabel ?? (typeof label === 'string' ? label : quote.label)}, locked. ${project}`}
+      onClick={(e) => { e.stopPropagation(); onResearch(node); }}>
+      <span className="kl">{label}</span><span className="pz"><LockIcon /></span><span className="action-detail clip">{project}</span>
+    </button>;
+  }
   const gain = detail ?? purchaseGain(quote);
   const noPower = !!quote.overSupply || quote.locked?.code === 'power';
   const shownLabel = noPower ? "Can't upgrade" : quote.gpu && typeof label === 'string' ? `${label} · ${quote.gpu.after.cores} ${quote.gpu.after.cores === 1 ? 'core' : 'cores'}` : label;

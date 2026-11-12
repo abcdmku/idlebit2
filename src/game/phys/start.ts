@@ -123,7 +123,7 @@ export function applyStart(w: World): void {
   w.hot.g[G.startTriggerTick] = -1;
 }
 
-/** Round end: every unit powered again (between rounds hardware is paused, and research may run). */
+/** Round end: every unit powered again (between rounds hardware is paused; a project the player starts then may run). */
 export function resetPower(w: World): void {
   const { rack, room, site } = w.hot;
   for (let r = 0; r < rack.len; r += 1) { rack.powered[r] = 1; rack.wakeTicks[r] = 0; rack.ctlTriggerTick[r] = -1; rack.ctlBusy[r] = 0; }
@@ -210,6 +210,20 @@ function rackBusy(w: World, r: number): { busy: number; awake: number } {
   return { busy: cap > 0 ? run / cap : 0, awake };
 }
 
+/** Whether a build has any start controller (rack power control, room or global). Per build object, which is replaced, never written. */
+const controlled = new WeakMap<World['build'], boolean>();
+let lastBuild: World['build'] | null = null, lastControlled = false;
+function hasController(build: World['build']): boolean {
+  if (build === lastBuild) return lastControlled;
+  let any = controlled.get(build);
+  if (any === undefined) {
+    any = build.global.start != null || build.racks.some((rack) => rack?.powerCtl != null) || build.rooms.some((room) => room?.start != null);
+    controlled.set(build, any);
+  }
+  lastBuild = build; lastControlled = any;
+  return any;
+}
+
 export function startPhase(w: World): void {
   if (!running(w)) return;
   const c = w.compiled, h = w.hot;
@@ -262,7 +276,8 @@ export function startPhase(w: World): void {
   // Rack controllers: systems. A powered rack keeps its busy EMA only when a controller reads it
   // (its own, its room's or the global one), so a fleet without controllers pays nothing here.
   const site = new Float64Array(c.site.len), siteN = new Float64Array(c.site.len);
-  for (let r = 0; r < c.rack.len; r += 1) {
+  // Without a controller anywhere, no rack below reads or writes anything.
+  for (let r = hasController(w.build) ? 0 : c.rack.len; r < c.rack.len; r += 1) {
     if (c.rack.alive[r] !== 1 || h.rack.powered[r] !== 1) continue;
     if (!w.build.racks[r]?.powerCtl && !w.build.rooms[c.rack.room[r]!]?.start && !gctl) continue;
     const { busy, awake } = rackBusy(w, r);

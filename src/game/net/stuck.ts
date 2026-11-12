@@ -1,4 +1,6 @@
+import type { CompiledBuffers } from '../core/buffers';
 import { MAX_SHARDS } from '../core/constants';
+import { eligibility } from '../core/modes';
 import type { World } from '../core/world';
 import { FAMILIES } from '../market/families';
 import { DETAIL_CODE, gateOnClass, isEligibleMode } from '../market/fleet';
@@ -21,6 +23,30 @@ function anySystemBelow(w: World, kind: number, id: number, visit: (s: number) =
  * fails this can never dispatch, so it must not hold its queue (net/hops.ts).
  */
 export function gateBelow(w: World, kind: number, id: number, family: number, units: number, size: number, whole: boolean): number {
+  const m = ASKED[((id * 131 + kind * 7 + family * 31 + (whole ? 1 : 0)) >>> 0) % ASKED.length]!;
+  if (m.kind === kind && m.id === id && m.family === family && m.units === units && m.size === size && m.whole === whole
+    && m.compiled === w.compiled && m.mode === w.hot.sys.mode && m.changes === eligibility.changes) return m.gate;
+  const gate = scanBelow(w, kind, id, family, units, size, whole);
+  m.kind = kind; m.id = id; m.family = family; m.units = units; m.size = size; m.whole = whole;
+  m.compiled = w.compiled; m.mode = w.hot.sys.mode; m.changes = eligibility.changes; m.gate = gate;
+  return gate;
+}
+
+/**
+ * The last answers, by router, family and `whole`. A blocked queue entry asks the same question
+ * every tick it is tried again. The answer reads the compiled buffers (replaced, never written)
+ * and which systems are in the capability set, so it stands while the buffers, the mode column and
+ * the eligibility count are the same.
+ */
+interface Asked {
+  kind: number; id: number; family: number; units: number; size: number; whole: boolean;
+  compiled: CompiledBuffers | null; mode: Uint8Array | null; changes: number; gate: number;
+}
+const ASKED: Asked[] = Array.from({ length: 256 }, () => ({
+  kind: -1, id: -1, family: -1, units: 0, size: 0, whole: false, compiled: null, mode: null, changes: -1, gate: 0,
+}));
+
+function scanBelow(w: World, kind: number, id: number, family: number, units: number, size: number, whole: boolean): number {
   const c = w.compiled, mode = w.hot.sys.mode, f = FAMILIES[family]!;
   const minSplit = whole && f.members > 1;
   let capable = 0, eligible = 0, first = 0;

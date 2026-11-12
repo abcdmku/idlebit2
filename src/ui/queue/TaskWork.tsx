@@ -28,7 +28,7 @@ export function TaskWork({ task }: { task: QueueEntryView }) {
         <button key={item.id} type="button" className={`tw-catalog${family === item.id ? ' on' : ''}`}
           onClick={() => { setPreview(item.id); setLibrary(false); }}><WorkIcon icon={item.key} /><span>{item.name}</span></button>)}</div>
     </div> : <>
-      <div className="tw-columns muted"><span>Operation</span><span>Count</span><span>CPU ops</span></div>
+      <div className="tw-columns mute"><span>Operation</span><span>Count</span><span>CPU ops</span></div>
       <ul className="tw-breakdown scroll-list">{rows.map(row => <li key={row.key} className={row.primitive ? 'primitive' : 'recipe'}>
         <span className="tw-operation" style={{ paddingLeft: Math.min(2, Math.max(0, row.depth - 1)) * 6 }} title={row.label}><WorkIcon icon={row.icon} /><span>{row.label}</span></span>
         <span title={row.count}>{wholeText(row.count)}</span><span title={row.ops}>{wholeText(row.ops)}</span>

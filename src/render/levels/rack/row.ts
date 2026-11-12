@@ -56,19 +56,20 @@ const span: Span = { lo: 0, hi: 0 };
  * rack stops at the view's left edge and its last at the right edge (A06); a row narrower than the
  * view is centred.
  */
-export function clampScroll(s: RackSnapshot, offset: number, step = 1, viewW = 0): number {
+export function clampScroll(s: RackSnapshot, offset: number, step = 1, viewW = 0, lead = 0): number {
   builtSpan(s, span);
   const col = rackCol(s), v = Number.isFinite(offset) ? Math.round(offset / step) * step : 0;
   if (!(viewW > 0)) return Math.max((span.lo - col) * ROW_PITCH, Math.min((span.hi - col) * ROW_PITCH, v));
   const c0 = colX(col) + FOCUS.x + FOCUS.w / 2, left = colX(span.lo) + FOCUS.x, right = colX(span.hi) + FOCUS.x + FOCUS.w;
-  if (right - left <= viewW) return Math.round(((left + right) / 2 - c0) / step) * step;
-  const lo = Math.ceil((left + viewW / 2 - c0) / step) * step, hi = Math.floor((right - viewW / 2 - c0) / step) * step;
+  if (right - left + lead <= viewW) return Math.round(((left + right) / 2 - c0) / step) * step;
+  // `lead`: art px the rest frames left of the cabinet (the phone's tag gutter); the view centre sits lead / 2 left of the rack's.
+  const lo = Math.ceil((left + viewW / 2 - c0 - lead / 2) / step) * step, hi = Math.floor((right - viewW / 2 - c0 + lead / 2) / step) * step;
   return lo > hi ? Math.round((lo + hi) / 2 / step) * step : Math.max(lo, Math.min(hi, v));
 }
 /** The offset nearest `offset` at which a rack's left edge meets the view's left edge. */
-export function snapScroll(offset: number, viewW: number): number {
+export function snapScroll(offset: number, viewW: number, lead = 0): number {
   // Rack k's left edge sits at the view's left edge when offset = colX(k - col) + viewW / 2 - FOCUS.w / 2.
-  const base = viewW > 0 ? viewW / 2 - FOCUS.w / 2 : 0;
+  const base = viewW > 0 ? viewW / 2 - FOCUS.w / 2 - lead / 2 : 0;
   return base + Math.round((offset - base) / ROW_PITCH) * ROW_PITCH;
 }
 /**
@@ -108,13 +109,13 @@ export interface RackRowScroll {
 
 export interface ScrollState extends RackRowScroll {
   /** The renderer applies the offset to the focus snapshot: re-bases on a new rack, clamps to its row. */
-  apply(s: RackSnapshot, area?: RestArea): number;
+  apply(s: RackSnapshot, area?: RestArea, lead?: number): number;
 }
 export function createRowScroll(): ScrollState {
   let offset = 0, step = 8, dragging = false, hold = false, settle = false, rack: RackId | null = null, slot = -1;
-  let last: RackSnapshot | null = null, viewW = 0, scale = 1;
-  const clamp = (v: number): number => (last ? clampScroll(last, v, step, viewW) : 0);
-  const snap = (v: number): number => (last ? clamp(snapScroll(v, viewW)) : 0);
+  let last: RackSnapshot | null = null, viewW = 0, scale = 1, lead = 0;
+  const clamp = (v: number): number => (last ? clampScroll(last, v, step, viewW, lead) : 0);
+  const snap = (v: number): number => (last ? clamp(snapScroll(v, viewW, lead)) : 0);
   return {
     get offset() { return offset; },
     get dragging() { return dragging; },
@@ -130,8 +131,8 @@ export function createRowScroll(): ScrollState {
     release(velocity = 0) { dragging = false; offset = snap(offset + (Number.isFinite(velocity) ? velocity * 0.15 : 0)); return offset; },
     holdView() { hold = true; },
     reset() { offset = 0; hold = false; settle = false; },
-    apply(s, area) {
-      if (area) { scale = rackScale(area); viewW = area.w / scale; }
+    apply(s, area, gutter = 0) {
+      if (area) { scale = rackScale(area); viewW = area.w / scale; lead = gutter; }
       if (s.rackId !== rack) {
         const next = rowSlot(s), sameRow = slot >= 0 && Math.floor(slot / ROW_COLS) === Math.floor(next / ROW_COLS);
         // A tapped neighbour: for one frame the offset absorbs the column change, so the camera
@@ -140,7 +141,7 @@ export function createRowScroll(): ScrollState {
         offset = settle ? offset + ((slot % ROW_COLS) - (next % ROW_COLS)) * ROW_PITCH : 0;
         rack = s.rackId; slot = next; dragging = false; hold = false;
       } else if (settle && !dragging) { settle = false; offset = 0; }
-      last = s; offset = clampScroll(s, offset, step, viewW);
+      last = s; offset = clampScroll(s, offset, step, viewW, lead);
       return offset;
     },
   };

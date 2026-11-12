@@ -18,7 +18,17 @@ html, body, #root { margin: 0; width: 100%; height: 100%; overflow: hidden; back
 .world-controls { position: absolute; inset: 0; pointer-events: none; z-index: 2; }
 .world-key { position: absolute; pointer-events: none; opacity: 0; }
 .world-key:focus-visible { opacity: 1; background: #120d28e8; color: var(--focus); text-align: center !important; padding: 8px; }
+/* The pan cue: the edge a panned rest cuts fades into the level's ground under a chevron that points to the rest of it. */
+.pan-edge { position: absolute; height: 32px; pointer-events: none; color: var(--focus); }
+.pan-above { background: linear-gradient(to top, transparent, var(--world-bg, #0e0b1c) 85%); }
+.pan-below { background: linear-gradient(to bottom, transparent, var(--world-bg, #0e0b1c) 85%); }
+.pan-edge::after { content: ''; position: absolute; left: calc(50% - 1px); width: 2px; height: 2px; background: currentColor; }
+.pan-below::after { bottom: 6px; box-shadow: -2px -2px, 2px -2px, -4px -4px, 4px -4px, -6px -6px, 6px -6px,
+  0 2px #120d28, -2px 0 #120d28, 2px 0 #120d28, -4px -2px #120d28, 4px -2px #120d28, -6px -4px #120d28, 6px -4px #120d28, -8px -6px #120d28, 8px -6px #120d28; }
+.pan-above::after { top: 6px; box-shadow: -2px 2px, 2px 2px, -4px 4px, 4px 4px, -6px 6px, 6px 6px,
+  0 -2px #120d28, -2px 0 #120d28, 2px 0 #120d28, -4px 2px #120d28, 4px 2px #120d28, -6px 4px #120d28, 6px 4px #120d28, -8px 6px #120d28, 8px 6px #120d28; }
 .source-control { position: absolute; pointer-events: none; }
+.source-text { display: contents; }
 .source-buy { position: absolute; inset: 0; display: grid; grid-template-columns: minmax(0, 1fr) auto; grid-template-rows: 16px 16px;
   align-content: start; gap: 0 6px; padding: 4px 8px !important; min-height: 44px; line-height: 16px; }
 .source-name { grid-column: 1; font-weight: 700; white-space: nowrap; }
@@ -27,31 +37,41 @@ html, body, #root { margin: 0; width: 100%; height: 100%; overflow: hidden; back
 .source-price .pz { gap: 3px; }
 .source-control .px-ic { width: 10px; height: 10px; }
 .source-buy:disabled .source-price, .source-buy:disabled .pz { color: var(--muted); }
-.source-link .source-buy { background: var(--well); border: 1px solid var(--panel-hi); }
-.source-add .source-buy { align-content: end; padding-bottom: 5px !important; background: #15122ae8; }
-.source-add .source-name { display: none; }
-.source-add .source-price { grid-column: 1 / -1; justify-self: center; }
-.source-add .source-gain { text-align: center; }
 .source-control[data-narrow="true"] .source-buy { grid-template-columns: 1fr; }
 .source-control[data-narrow="true"] .source-name { grid-row: 1; }
 .source-control[data-narrow="true"] .source-gain { grid-row: 2; }
 .source-control[data-narrow="true"] .source-price { grid-row: 3; grid-column: 1; padding-top: 4px; }
-.source-add[data-narrow="true"] .source-price { grid-row: 1; padding-top: 0; }
-.source-add[data-narrow="true"] .source-buy { padding-inline: 2px !important; }
 .source-part[data-narrow="true"] .source-buy { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; }
 .source-part[data-narrow="true"] .source-gain { white-space: normal; }
 .source-part[data-narrow="true"] .source-name { white-space: normal; }
 .source-part[data-narrow="true"] .source-price { padding-top: 0; }
 .source-buy:focus-visible { pointer-events: auto; background: var(--well); }
-.source-compute .source-buy { display: flex; flex-direction: column; align-items: center; justify-content: center;
-  padding: 0 2px !important; background: transparent; min-height: 44px; gap: 0; }
-.source-compute .source-name { display: block; font-weight: 500; }
-.source-compute .source-price { padding: 0 !important; }
-.source-compute .source-buy:disabled .source-name { color: var(--muted); }
+/* An empty site names what it adds over its price, centred in the site. A price not yet met dims both; nothing reads as an error. */
+.source-add .source-buy { display: flex; flex-direction: column; align-items: center; justify-content: center;
+  padding: 0 2px !important; background: transparent; min-height: 44px; gap: 0; text-align: center; }
+.source-add .source-name { display: block; }
+.source-add .source-name, .source-add .source-price { flex: none; width: max-content; white-space: nowrap; }
+.source-add[data-foot="true"] .source-buy { justify-content: flex-end; }
+.source-add[data-foot="true"] .source-text { display: flex; flex-direction: column; align-items: center; justify-content: center; height: var(--foot); }
+.source-from, .source-lock { color: var(--muted); font-weight: 500; }
+.source-add[data-from="false"] .source-from { display: none; }
+.source-add .source-buy.short .source-price .pz { color: var(--muted); }
+/* A flat site (a rack bay) reads on one line; a site narrower than its text wears it as a tag at its edge. */
+.source-add[data-mode="row"] .source-buy { flex-direction: row; gap: 8px; }
+/* The World list's closed regions: the research that opens them, on the head line of their plate. */
+.source-add[data-mode="head"] .source-buy { align-items: flex-start; justify-content: flex-start; padding: 4px 16px !important; }
+.source-add[data-mode="stack3"] .source-price { display: flex; flex-direction: column; align-items: center; }
+.source-add[data-mode="out"] .source-buy { display: block; overflow: visible; }
+.source-add[data-mode="out"] .source-text { position: absolute; left: var(--tag-x, 0); top: var(--tag-y, 100%); height: 20px; display: flex;
+  align-items: center; gap: 8px; padding: 0 6px; background: #120d28e8; white-space: nowrap; }
+.source-add .source-gain { display: none; max-width: 100%; }
+.source-add[data-roomy="true"] .source-gain { display: block; }
+.source-add .source-price { padding: 0 !important; }
+.source-add .source-buy:disabled .source-name { color: var(--muted); font-weight: 500; }
 .source-compute[data-tight="true"] .source-price .px-ic { display: none; }
 .source-short { display: none; }
-.source-compute[data-tight="true"] .source-full { display: none; }
-.source-compute[data-tight="true"] .source-short { display: inline; }
+.source-compute[data-brief="true"] .source-full { display: none; }
+.source-compute[data-brief="true"] .source-short { display: inline; }
 
 /* text runs and art */
 .t { position: absolute; white-space: nowrap; line-height: var(--lh); }
@@ -73,13 +93,6 @@ b, .b { font-weight: 700; }
 .head-slot.blocked, .now.blocked { --fill: #2b1a14; }
 .now-detail { position: absolute; }
 .now-detail:hover { box-shadow: inset 0 0 0 1px var(--cyan); }
-.now-fix { padding: 4px 8px; background: #ffcc3d; color: #2a1700; display: flex; flex-direction: column; justify-content: center; gap: 0;
-  box-shadow: inset 0 -3px #c4861c, inset 0 2px #fff1a6; text-align: left; }
-.now-fix:hover { box-shadow: inset 0 -3px #c4861c, inset 0 2px #fff1a6; }
-.now-fix > b { display: flex; justify-content: space-between; gap: 4px; width: 100%; white-space: nowrap; }
-.now-fix > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 100%; }
-.now-fix .fix-price { display: inline-flex; align-items: center; gap: 3px; }
-.now-fix .fix-note { display: flex; justify-content: space-between; width: 100%; gap: 4px; }
 .task-accent { position: absolute; background: var(--task-color); pointer-events: none; }
 .task-type { display: inline-flex; align-items: center; gap: 8px; }
 .task-type canvas { flex: none; image-rendering: pixelated; }
@@ -125,9 +138,6 @@ b, .b { font-weight: 700; }
 .row { position: absolute; width: 100%; }
 .row:hover:not(:disabled) { background: #ffffff0d; }
 .row.best { background: #2e2409; box-shadow: inset var(--n) 0 0 0 var(--gold); }
-.srow { position: absolute; }
-.srow.best { box-shadow: inset calc(2 * var(--n)) 0 0 var(--gold); }
-.srow-hit { position: absolute; }
 .skey.close-key { justify-content: center; color: var(--muted); }
 .x-glyph { position: relative; display: block; }
 .x-glyph::before, .x-glyph::after { content: ""; position: absolute; left: -15%; width: 130%; top: calc(50% - var(--x-w)); height: calc(2 * var(--x-w));
@@ -140,16 +150,17 @@ b, .b { font-weight: 700; }
 .band { position: absolute; inset: 0; pointer-events: none; z-index: 5; }
 .band-bg { position: absolute; background: #0e0b1cdb; box-shadow: inset 0 -1px 0 #2a2350; }
 .l-phone .band-bg { background: linear-gradient(#0e0b1cdb 0 47px, #1d1838 47px 48px, #0e0b1cdb 48px); }
-.rung { position: absolute; pointer-events: auto; line-height: 0; }
+/* Landscape: the band heads its own column beside the world, so it has no backing and no rules. */
+.l-phone .band.side .band-bg { background: none; }
+.br-shell:not(.sandbox) .band.side .band-bg { box-shadow: none; }
+.rungs { position: absolute; display: flex; }
+.rung { position: relative; flex: none; pointer-events: auto; line-height: 0; }
 /* The band passes taps to the world; its controls take them back (QA-01). */
 .band .end-round { pointer-events: auto; padding: calc(2 * var(--n)) calc(var(--n) + 4px) calc(3 * var(--n)); line-height: var(--lh); }
 .end-round-label { display: block; min-width: 0; max-width: 100%; text-align: center; }
 .rung.locked .art { opacity: 0.35; }
 .rung[aria-pressed="true"] { background: #29234b; box-shadow: inset 0 0 0 var(--n) var(--paper); }
 .rung-label { position: absolute; white-space: nowrap; }
-.figrow { position: absolute; display: flex; align-items: center; gap: 8px; white-space: nowrap; }
-.figrow.r { justify-content: flex-end; }
-.hud-coin { position: absolute; line-height: 0; }
 .fig { font-weight: 700; line-height: 1; }
 .fig.big { font-size: var(--big); }
 .fig.mid { font-size: var(--mid); }
@@ -170,9 +181,6 @@ b, .b { font-weight: 700; }
 .round-plate .p-head .p-title { margin-right: auto; }
 .round-content { min-height: 0; overflow-y: auto; overscroll-behavior: contain; scrollbar-width: thin; }
 .v3-plate.round-plate[data-more="true"]::after { display: none; }
-.round-plate .report-more { display: none; flex: none; height: 24px; align-items: center; justify-content: center; color: var(--paper); visibility: hidden; }
-.round-plate[data-scrollable="true"] .report-more { display: flex; }
-.round-plate[data-more="true"] .report-more { visibility: visible; }
 .l-desktop .round-plate { width: 480px; } .l-phone .round-plate { width: min(352px, calc(100% - 32px)); }
 .round-plate .rp-causes { display: grid; grid-template-columns: 1fr 1fr; gap: 4px 12px; }
 .round-plate .rp-c { display: flex; align-items: center; gap: 8px; }
@@ -187,25 +195,18 @@ b, .b { font-weight: 700; }
 .l-desktop .round-plate .rp-causes { grid-template-columns: repeat(3, 1fr); }
 .round-plate .rp-types { display: flex; flex-wrap: wrap; gap: 4px 12px; min-height: var(--lh); }
 .round-plate .rp-chip b { font-weight: 700; }
-.g-meter { position: relative; display: block; flex: 1; height: 6px; background: #2a1d4a; box-shadow: 0 0 0 1px var(--ink); }
-.g-meter b { display: block; height: 100%; background: var(--ok); }
-.g-meter em { position: absolute; left: 50%; top: -2px; width: 2px; height: 10px; background: var(--paper); }
 
 @media (prefers-reduced-motion: reduce) {
   .br-shell *, .br-shell *::before, .br-shell *::after { animation-duration: .001ms !important; transition-duration: .001ms !important; }
 }
 
 
-/* the research sheet: relevant projects only, priority as one compact choice */
-.research-sheet { --fill: #181232; --rim: #ff6bd6; }
 .link { position: absolute; color: var(--muted); text-align: center !important; text-decoration: underline; }
 
 /* the callout's leader to its part (A07) and the one-beat flash of a bought "x → y" (A10) */
 .flash { animation: flash-gold 300ms steps(1) 1; }
 @keyframes flash-gold { 0% { color: var(--gold); } }
 
-/* a name that may take two lines on a narrow card, never cut mid-word */
-.t.wrap2 { white-space: normal; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; text-overflow: clip; }
 /* earnings 2 × 2 at every size (QA-06); the Return key stays in view while the report scrolls */
 .round-plate .rp-bottom .v { display: inline-flex; align-items: center; gap: 4px; white-space: nowrap; }
 .round-plate .keys { flex: none; margin: 0; padding: 8px 0 0; gap: 8px; background: #1b1437; z-index: 1; }
@@ -231,10 +232,21 @@ b, .b { font-weight: 700; }
 .v3-plate.task-detail .td-facts { row-gap: 4px; }
 .v3-plate.task-detail .keys { margin-top: 8px; gap: 8px; }
 .v3-plate.task-detail .keys .key { min-height: 48px; }
-.v3-plate.task-detail .task-notes { margin-top: 8px; }
-.v3-plate.task-detail .task-notes > p { margin: 4px 0 0; }
 @media (max-height: 480px) {
   .l-phone .round-plate { width: min(480px, calc(100% - 32px)); }
   .round-plate .keys { flex-direction: row; }
   .round-plate .keys > * { flex: 1 1 0; min-width: 0; }
 }
+/* A part shorter than a key (a rack bay): one line on the part, inside the centred 44 px target. */
+.source-part[data-flat="true"] .source-buy { display: flex; flex-direction: row; align-items: center; gap: 8px; padding: 0 8px !important;
+  background: linear-gradient(transparent var(--bay-top, 12px), var(--well) 0, var(--well) calc(var(--bay-top, 12px) + var(--bay-h, 20px)), transparent 0); }
+.source-part[data-flat="true"] .source-gain { flex: 1 1 0; min-width: 0; }
+.source-part[data-flat="true"][data-gain="false"] .source-gain { display: none; }
+.source-part[data-flat="true"][data-gain="false"] .source-price { margin-left: auto; }
+.source-part[data-flat="true"] .source-price { padding: 0; }
+/* The first purchase: the cheapest upgrade's price on its part until the build first changes (FirstBuy). */
+.first-buy { position: absolute; display: inline-flex; align-items: center; gap: 6px; pointer-events: none; white-space: nowrap;
+  line-height: 16px; font-weight: 600; color: var(--gold); }
+.first-buy .pz { gap: 3px; }
+.first-buy .px-ic { width: 10px; height: 10px; }
+.first-buy.short, .first-buy.short .pz { color: var(--muted); }

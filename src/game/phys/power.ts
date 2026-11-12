@@ -4,11 +4,11 @@ import { MODE, setUnitMode } from '../core/timers';
 import { touchSystem } from '../core/touch';
 import type { World } from '../core/world';
 import { CAP_STEPS_MAX, CSTATES, S3_AFTER_TICKS, S3_WAKE_TICKS } from './constants';
-import { DRAW_NONE, capTenths, drawKind, publishClockFactor, systemDraw, updateCState, updatePStates } from './draw';
+import { DRAW_NONE, capTenths, drawKind, publishClockFactor, systemDraw, thermalDuty, updateCState, updatePStates } from './draw';
 import { billSite, billUtility, linkWatts, routerW, sitePrice } from './energy';
 import { generationFuelShare, siteGenerationW } from './start';
 import { forRackSystems, syncMode, zoneDark } from './modes';
-import { collectSteps, noteDue, noteUnstable, powerCache, recordInputs, refreshRackContexts, resumRack, type PowerCache } from './powerCache';
+import { collectSteps, noteDue, noteUnstable, powerCache, recordInputs, refreshRackContexts, resumRack, writeRackDraw, type PowerCache } from './powerCache';
 import { scratch } from './scratch';
 import { SYS_CAPPED, physSettings, type PhysSettings } from './settings';
 import {
@@ -48,22 +48,22 @@ export function powerPhase(w: World): void {
     if (systemStep(w, s, settings, researchOn, k)) (psuFails ??= []).push(s);
   }
   for (let r = 0; r < c.rack.len; r += 1) {
-    if (k.rackResum[r] === 1 || k.rackForce[r] === 1) resumRack(w, r, k);
+    if (k.rackResum[r] === 1 || k.rackForce[r] === 1) resumRack(r, k);
     k.rackResum[r] = 0; k.rackForce[r] = 0;
   }
 
-  /* Rack PDUs: system inputs plus cooler, switch and load balancer (spec §9.2). */
+  /* Rack PDUs: system inputs at the rack's thermal duty, plus cooler, switch and load balancer (spec §9.2, §10.4). */
   const roomIn = scratch('roomIn', c.room.len), roomHeat = scratch('roomHeat', c.room.len), roomAny = scratch('roomAny', c.room.len);
   // D31.3: watts each room's racks drew from their batteries this tick (not billed).
   const roomBat = scratch('roomBat', c.room.len), roundOn = w.round.phase === 'running';
   const battery = hr0(h), rackPowered = h.rack.powered;
   let pduFails: number[] | null = null;
   {
-    // Hoisted: tables are dictionary-mode objects (built by computed keys), so a per-row column lookup is a hash probe.
+    // Columns hoisted: one load each for the whole loop.
     const cr = c.rack, hr = h.rack, roomCrashed = h.room.crashed;
     const alive = cr.alive, roomOf = cr.room, openedOf = cr.opened, pduCapW = cr.pduCapW, pduLoss = cr.pduLoss;
     const lbIdleW = cr.lbIdleW;
-    const crashedOf = hr.crashed, pduFailed = hr.pduFailed, coolerWOf = hr.coolerW, capFactor = hr.capFactor, eff = hr.eff;
+    const crashedOf = hr.crashed, pduFailed = hr.pduFailed, coolerWOf = hr.coolerW, capFactor = hr.capFactor, tempF = hr.tempF;
     const pduOver = hr.pduOverTicks, drawW = hr.drawW, pduUsage = hr.pduUsage, heatW = hr.heatW, pduCapped = settings.pduCapped;
     for (let r = 0; r < cr.len; r += 1) {
       if (alive[r] !== 1) continue;
@@ -74,12 +74,16 @@ export function powerPhase(w: World): void {
       const switchW = powered ? links.rack[r]! : 0;
       const lbW = powered ? routerW(lbIdleW[r]!) : 0;
       const coolerW = powered ? coolerWOf[r]! : 0;
-      const delivered = k.rackIn[r]! + switchW + lbW + coolerW;
+      // Above 80 °F the rack's systems duty-cycle: their draw, and so their heat, falls with their speed.
+      const duty = thermalDuty(tempF[r]!);
+      if (duty !== 1 || k.rackDuty[r] !== 1) writeRackDraw(w, r, k, duty);
+      const systemsW = k.rackIn[r]! * duty;
+      const delivered = systemsW + switchW + lbW + coolerW;
       const cap = opened ? pduCapW[r]! : 0;
       const usage = supplyUsage(delivered, cap);
       const loss = cap > 0 ? supplyLossW(delivered, cap, pduLoss[r]!) : 0;
       const capped = cap > 0 && pduCapped[r] === 1;
-      const capLoad = k.rackCapLoad[r]!;
+      const capLoad = k.rackCapLoad[r]! * duty;
       const fixed = delivered - capLoad * capFactor[r]!;
       pduOver[r] = stepOverload(pduOver[r]!, usage, !capped || fixed > cap);
       const nextCap = capped && delivered > 0 ? stepCap(capTenths(capFactor[r]!), fixed, capLoad, cap) / CAP_STEPS_MAX : capped ? capFactor[r]! : 1;
@@ -96,7 +100,8 @@ export function powerPhase(w: World): void {
         battery[r] = charge - covered;
         roomBat[room] = roomBat[room]! + covered / DT_S;
       }
-      heatW[r] = opened ? k.rackCompute[r]! / eff[r]! + k.rackPlain[r]! + loss + switchW + lbW : 0;
+      // Heat is the watts drawn in the rack (spec §10.3): systems, their PSU losses, PDU loss, switch and LB.
+      heatW[r] = opened ? systemsW + loss + switchW + lbW : 0;
       roomIn[room] = roomIn[room]! + delivered + loss;
       roomHeat[room] = roomHeat[room]! + coolerW;
       if (delivered > 0 || crashed) roomAny[room] = 1;

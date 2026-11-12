@@ -3,7 +3,7 @@ import { accrue, CADENCE_MS, chunkSpan, rebase, startCadence, take, type Cadence
 import { createGameOfflineRunner, type GameOfflineRunner } from './offline';
 import { bitRougePersistence, type PersistenceAdapter } from './persistence';
 import { mergeReports } from './reports';
-import { DURABILITY_NOTICE, loadGame, saveGame } from './saveGame';
+import { DURABILITY_NOTICE, loadGame, saveGame, type PendingAbsence } from './saveGame';
 import type { RuntimeStore } from './store';
 
 export interface RuntimeOptions {
@@ -64,6 +64,8 @@ export function createRuntime(store: RuntimeStore, options: RuntimeOptions = {})
   let pausedAt = 0, pausedGap = 0;
   /** Wall time the store's state stands for. Saves record it; time away is measured from it. */
   let representedAt = wallNow(), lastSave = monoNow();
+  /** The absence being caught up, until its catch-up finishes. An interrupted one keeps its share of the cap. */
+  let absence: PendingAbsence | null = null;
   let resolveReady = () => {};
   const ready = new Promise<void>(resolve => { resolveReady = resolve; });
 
@@ -75,7 +77,7 @@ export function createRuntime(store: RuntimeStore, options: RuntimeOptions = {})
     if (disposed || !hydrated || stopped) return;
     lastSave = monoNow();
     if (paused && !catching) representedAt = wallNow();
-    try { if (!saveGame(store.getState(), representedAt, persistence)) notice(null); }
+    try { if (!saveGame(store.getState(), representedAt, persistence, absence)) notice(null); }
     catch { store.setNotice('Save failed. Progress remains in this tab.'); }
   };
   const advanceBy = (elapsedMs: number) => {
@@ -132,16 +134,18 @@ export function createRuntime(store: RuntimeStore, options: RuntimeOptions = {})
    * Advances `spanMs` through the worker in chunks, then skips `skipMs` (time away past the cap).
    * The state crosses to the worker once and stays there; it comes back at the end and at wall
    * checkpoints, which are the only points saved and shown. Actions queued meanwhile ride along
-   * with the next chunk and apply at its start.
+   * with the next chunk and apply at its start. `tracked` is a real absence: its progress counts
+   * from what an interrupted catch-up already credited, and it holds `absence` until it finishes.
    */
-  const catchUp = async (spanMs: number, awayMs: number, skipMs: number) => {
+  const catchUp = async (spanMs: number, awayMs: number, skipMs: number, tracked = false) => {
     catching = true; stopFrames();
+    const priorMs = tracked && absence ? absence.creditedMs : 0, totalMs = priorMs + spanMs;
     const epoch = store.getState().epoch;
     let report: AdvanceReport | null = null, unconfirmed: AdvanceReport | null = null;
     let done = 0, sinceCheckpoint = 0, lastCheckpoint = monoNow(), interrupted = false;
     store.batch(() => {
       store.flushQueued();
-      store.setLifecycle({ catchingUp: true }); store.setCatchUp({ simulatedMs: 0, totalMs: spanMs, awayMs });
+      store.setLifecycle({ catchingUp: true }); store.setCatchUp({ simulatedMs: priorMs, totalMs, awayMs });
     });
     try {
       const chunks = chunkSpan(spanMs, chunkMs);
@@ -150,17 +154,18 @@ export function createRuntime(store: RuntimeStore, options: RuntimeOptions = {})
         const returnState = i === chunks.length - 1 || actions.some(a => a.type === 'reset')
           || monoNow() - lastCheckpoint >= CHECKPOINT_WALL_MS;
         const result = await runner.run({ state: i === 0 ? store.getState() : undefined, actions, elapsedMs: chunks[i], returnState },
-          p => store.setCatchUp({ simulatedMs: done + p.simulatedMs, totalMs: spanMs, awayMs }));
+          p => store.setCatchUp({ simulatedMs: priorMs + done + p.simulatedMs, totalMs, awayMs }));
         if (disposed) return;
         done += chunks[i]; sinceCheckpoint += chunks[i]; unconfirmed = mergeReports(unconfirmed, result.report);
-        store.setCatchUp({ simulatedMs: done, totalMs: spanMs, awayMs });
+        store.setCatchUp({ simulatedMs: priorMs + done, totalMs, awayMs });
         if (result.state) {
+          if (tracked && absence) absence = { departedAtMs: absence.departedAtMs, creditedMs: absence.creditedMs + sinceCheckpoint };
           store.replaceState(result.state); representedAt += sinceCheckpoint; sinceCheckpoint = 0;
           representedAt += pausedGap; pausedGap = 0;
           report = report && unconfirmed ? mergeReports(report, unconfirmed) : unconfirmed; unconfirmed = null;
           // A reset ends the absence: the new game starts now, not at departure.
           const reset = result.state.epoch !== epoch;
-          if (reset) { representedAt = wallNow(); report = null; }
+          if (reset) { representedAt = wallNow(); report = null; absence = null; }
           write(); lastCheckpoint = monoNow();
           if (reset) { interrupted = true; break; }
         }
@@ -173,15 +178,18 @@ export function createRuntime(store: RuntimeStore, options: RuntimeOptions = {})
         // A terminal runner error must not retry the same failing absence in
         // returnFromAway's visible-lag loop. Keep the last confirmed state.
         representedAt = wallNow();
-        pausedGap = 0;
+        pausedGap = 0; absence = null;
         store.setNotice('Offline recovery stopped. Unprocessed time skipped.');
       }
       interrupted = true;
     }
     representedAt += pausedGap; pausedGap = 0;
+    if (tracked && !interrupted) absence = null;
     catching = false;
     store.batch(() => {
-      if (report && report.ticks > 0) store.setOfflineReport(report);
+      // Folded into a report the player has not dismissed: the visible-lag pass after a long catch-up must not replace it.
+      // The absence rides with the report, so the capped line does not depend on who watched the catch-up.
+      if (report && report.ticks > 0) store.setOfflineReport(mergeReports(store.getOfflineReport(), report), { awayMs, totalMs });
       store.setCatchUp(null); store.setLifecycle({ catchingUp: false });
       store.flushQueued();
     });
@@ -191,10 +199,14 @@ export function createRuntime(store: RuntimeStore, options: RuntimeOptions = {})
   const returnFromAway = async () => {
     if (disposed || stopped) return;
     cadence = rebase(monoNow());
-    const awayMs = Math.max(0, Math.floor(wallNow() - representedAt));
-    const spanMs = Math.min(awayMs, Math.floor(offlineCapMs(store.getState())));
-    if (awayMs > FRAME_BUDGET_MS) await catchUp(spanMs, awayMs, awayMs - spanMs);
-    else advanceBy(awayMs);
+    // Time not simulated yet, and the whole absence it belongs to (longer after an interrupted catch-up).
+    const owedMs = Math.max(0, Math.floor(wallNow() - representedAt));
+    const awayMs = absence ? Math.max(owedMs, Math.floor(wallNow() - absence.departedAtMs)) : owedMs;
+    const spanMs = Math.min(owedMs, Math.max(0, Math.floor(offlineCapMs(store.getState())) - (absence?.creditedMs ?? 0)));
+    if (owedMs > FRAME_BUDGET_MS) {
+      absence ??= { departedAtMs: representedAt, creditedMs: 0 };
+      await catchUp(spanMs, awayMs, owedMs - spanMs, true);
+    } else { absence = null; advanceBy(owedMs); }
     // Time spent catching up while visible is play time, not away time: no cap.
     for (let lag = Math.floor(wallNow() - representedAt); visible && !disposed && !paused && !stopped && lag > FRAME_BUDGET_MS;
       lag = Math.floor(wallNow() - representedAt)) await catchUp(lag, lag, 0);
@@ -214,7 +226,7 @@ export function createRuntime(store: RuntimeStore, options: RuntimeOptions = {})
     if (visible || disposed || stopped) return;
     visible = true;
     if (!hydrated || catching) return;
-    if (paused) { representedAt = wallNow(); return; }
+    if (paused) { representedAt = wallNow(); absence = null; return; }
     recover();
   };
   const settleAction = () => {
@@ -239,7 +251,7 @@ export function createRuntime(store: RuntimeStore, options: RuntimeOptions = {})
       store.replaceState(loaded ? loaded.state : createInitialState(options.seed));
       notice(loaded?.resetReason ?? null);
     });
-    representedAt = loaded?.savedAtMs ?? wallNow();
+    representedAt = loaded?.savedAtMs ?? wallNow(); absence = loaded?.absence ?? null;
     hydrated = true;
     store.setLifecycle({ hydrated: true });
     store.flushQueued();
@@ -273,7 +285,7 @@ export function createRuntime(store: RuntimeStore, options: RuntimeOptions = {})
       if (!paused || catching || disposed || stopped) throw new Error('simulateOffline needs a paused, idle runtime');
       const spanMs = Math.min(awayMs, Math.floor(offlineCapMs(store.getState())));
       await catchUp(spanMs, awayMs, 0);
-      representedAt = wallNow();
+      representedAt = wallNow(); absence = null;
       write();
     },
     dispose() {

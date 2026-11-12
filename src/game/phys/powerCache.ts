@@ -67,12 +67,12 @@ export interface PowerCache {
   /** Per rack: supply/lump context bits and PDU cap factor last seen; members to re-add. */
   readonly rackCtx: Int32Array;
   readonly rackCap: Float64Array;
+  /** Per rack: the thermal duty its members' drawW was last written at (0: not yet). */
+  readonly rackDuty: Float64Array;
   readonly rackForce: Uint8Array;
   readonly rackResum: Uint8Array;
   /** Per rack sums of member contributions (the old per-tick scratch accumulators). */
   readonly rackIn: Float64Array;
-  readonly rackCompute: Float64Array;
-  readonly rackPlain: Float64Array;
   readonly rackCapLoad: Float64Array;
   readonly rackAny: Uint8Array;
   /** Alive systems by rack, ascending (CSR): members of rack r are memberIds[memberAt[r]..memberAt[r+1]). */
@@ -131,8 +131,8 @@ function allocCache(c: CompiledBuffers): PowerCache {
     queueLen: new Uint16Array(n), reserved: new Uint16Array(n), running: new Uint16Array(n), wake: new Int32Array(n),
     cap: new Float64Array(n), cstate: new Uint8Array(n), dvfs: new Uint8Array(n), turbo: new Uint8Array(n), pipeBits: new Float64Array(n), duty: new Float64Array(n * MAX_ACCELS),
     delivered: new Float64Array(n), loss: new Float64Array(n), capLoad: new Float64Array(n),
-    rackCtx: new Int32Array(nr).fill(-1), rackCap: new Float64Array(nr), rackForce: new Uint8Array(nr), rackResum: new Uint8Array(nr),
-    rackIn: new Float64Array(nr), rackCompute: new Float64Array(nr), rackPlain: new Float64Array(nr), rackCapLoad: new Float64Array(nr),
+    rackCtx: new Int32Array(nr).fill(-1), rackCap: new Float64Array(nr), rackDuty: new Float64Array(nr), rackForce: new Uint8Array(nr), rackResum: new Uint8Array(nr),
+    rackIn: new Float64Array(nr), rackCapLoad: new Float64Array(nr),
     rackAny: new Uint8Array(nr), memberAt, memberIds, steps: new Int32Array(n),
     log: null, lastTick: -2, unstable: new Int32Array(n), unstableN: 0, nextUnstable: new Int32Array(n), nextUnstableN: 0,
     dueAt: new Map(), candAt: new Int32Array(n), candStamp: 0, cand: new Int32Array(n),
@@ -273,8 +273,7 @@ export function collectSteps(w: World, k: PowerCache, out: Int32Array): number {
 
 /**
  * Every system compared: the first tick of an advance call, after a skip, or without a log.
- * Columns are hoisted once: tables are dictionary-mode objects (built by computed keys), so a
- * per-row lookup is a hash probe.
+ * Columns are hoisted once, so the loop loads each a single time rather than once a row.
  */
 function collectAll(w: World, k: PowerCache, out: Int32Array): number {
   const c = w.compiled.sys, h = w.hot.sys, tick = w.tick;
@@ -330,7 +329,7 @@ function collectCandidates(w: World, k: PowerCache, log: TouchLog, out: Int32Arr
   for (let i = 0; i < m; i += 1) materialize(w, k, cand[i]!, tick - 1);
   k.lazyLast = tick;
   const h = w.hot.sys, idleSince = h.idleSinceTick, emptySince = h.emptySinceTick, stampIdle = k.stampIdle, stampEmpty = k.stampEmpty;
-  // collectAll's comparison over the candidates, columns hoisted (dictionary-mode tables).
+  // collectAll's comparison over the candidates, columns hoisted.
   const rackOf = c.sys.rack, duty = k.duty;
   const mode = h.mode, busy = h.busy, active = h.active, queueLen = h.queueLen, reserved = h.reserved, running = h.running;
   const wake = h.wakeTicks, reboot = h.psuRebootTicks, over = h.psuOverTicks, cap = h.capFactor, cstate = h.cstate;
@@ -374,19 +373,28 @@ export function recordInputs(w: World, s: number, k: PowerCache): void {
   for (let p = s * MAX_ACCELS, end = p + MAX_ACCELS; p < end; p += 1) k.duty[p] = taskS[p]! + researchS[p]!;
 }
 
+/**
+ * Writes the watts rack r's members draw at thermal duty `duty` (their step stores the draw at
+ * duty 1). Called while the rack is hot and once when it is cool again, so sys.drawW is what is billed.
+ */
+export function writeRackDraw(w: World, r: number, k: PowerCache, duty: number): void {
+  const drawW = w.hot.sys.drawW;
+  for (let i = k.memberAt[r]!; i < k.memberAt[r + 1]!; i += 1) {
+    const s = k.memberIds[i]!;
+    drawW[s] = k.delivered[s]! * duty;
+  }
+  k.rackDuty[r] = duty;
+}
+
 /** Re-adds rack r from its members' contributions, in the full pass's ascending system order. */
-export function resumRack(w: World, r: number, k: PowerCache): void {
-  const kind = w.compiled.sys.kind;
-  let input = 0, compute = 0, plain = 0, capLoad = 0, any = 0;
+export function resumRack(r: number, k: PowerCache): void {
+  let input = 0, capLoad = 0, any = 0;
   for (let i = k.memberAt[r]!; i < k.memberAt[r + 1]!; i += 1) {
     const s = k.memberIds[i]!;
     const delivered = k.delivered[s]!, loss = k.loss[s]!;
     input = input + delivered + loss;
-    if (kind[s] === 0) compute = compute + delivered;
-    else plain = plain + delivered;
-    plain = plain + loss;
     capLoad = capLoad + k.capLoad[s]!;
     if (delivered > 0) any = 1;
   }
-  k.rackIn[r] = input; k.rackCompute[r] = compute; k.rackPlain[r] = plain; k.rackCapLoad[r] = capLoad; k.rackAny[r] = any;
+  k.rackIn[r] = input; k.rackCapLoad[r] = capLoad; k.rackAny[r] = any;
 }

@@ -41,7 +41,7 @@ export const PKG = '#1d3a2e', PKG_HI = '#2c5440';
 
 /** The board, the package and the die's bus metal: IN down to the queue, cache, then each core. */
 export function staticCpu(f: Floor, form: WorldForm): HTMLCanvasElement {
-  return cached(`v3-cpu:${form}:${f.pkg.h}`, f.world.w, f.world.h, g => {
+  return cached(`v4-cpu:${form}:${f.key}`, f.world.w, f.world.h, g => {
     board(g, f.world); cpuPackage(g, f.pkg, f.die);
     const cx = f.inp.x;
     R(g, cx - 1, f.die.y, 2, f.cores.y - f.die.y - 4, METAL);
@@ -86,10 +86,10 @@ export function bar(g: G, x: number, y: number, w: number, f: number, c: string)
 export function clockBlock(g: G, r: Rect, tick: boolean): void {
   const top = prism(g, r.x, r.y + 3, r.w, r.h - 3, 3, { top: P.waferHi, front: P.wafer });
   if (r.w > r.h * 2) {
-    // a Clock row (phone): the crystal can at the right end, its tick lamp just left of it
-    const cx = top.x + top.w - 14, cy = top.y + (top.h >> 1);
-    R(g, cx - 9, cy - 5, 18, 11, P.ink); R(g, cx - 8, cy - 4, 16, 9, P.steel);
-    R(g, cx - 8, cy - 4, 16, 1, P.steelHi); R(g, cx - 8, cy + 4, 16, 1, P.steelLo); R(g, cx - 6, cy - 2, 12, 5, mix(P.steel, P.steelHi, 0.4));
+    // a Clock row (phone): the crystal can at the right end, its tick lamp just left of it (a one-line row takes a lower can)
+    const cx = top.x + top.w - 14, cy = top.y + (top.h >> 1), k = top.h >= 13 ? 4 : 2;
+    R(g, cx - 9, cy - k - 1, 18, 2 * k + 3, P.ink); R(g, cx - 8, cy - k, 16, 2 * k + 1, P.steel);
+    R(g, cx - 8, cy - k, 16, 1, P.steelHi); R(g, cx - 8, cy + k, 16, 1, P.steelLo); R(g, cx - 6, cy - k + 2, 12, 2 * k - 3, mix(P.steel, P.steelHi, 0.4));
     const lx = cx - 16, ly = cy - 1;
     R(g, lx - 1, ly - 1, 4, 4, P.ink); R(g, lx, ly, 2, 2, tick ? P.amber : '#3b2a12');
     if (tick) { g.globalAlpha = 0.35; R(g, lx - 2, ly - 2, 6, 6, P.amber); g.globalAlpha = 1; }
@@ -156,7 +156,7 @@ export function queueBlock(g: G, r: Rect, wells: readonly Rect[], queue: readonl
     const w = wells[i]!, e = queue[i];
     R(g, w.x - 1, w.y - 1, w.w + 2, w.h + 2, P.ink); R(g, w.x, w.y, w.w, w.h, mix(P.logicLo, P.ink, 0.45));
     if (e) {
-      if (w.w >= 16) drawFamilyIcon(g, e.family, w.x, w.y - 2); else R(g, w.x, w.y, w.w, w.h, e.preloading ? P.preload : P.bitLo);
+      if (w.w >= 14) drawFamilyIcon(g, e.family, w.x + ((w.w - 16) >> 1), w.y - 2); else R(g, w.x, w.y, w.w, w.h, e.preloading ? P.preload : P.bitLo);
       if (e.preloading) R(g, w.x, w.y + w.h - 2, Math.round(w.w * Math.max(0, Math.min(1, e.preloadProgress ?? 0))), 2, P.preload);
       continue;
     }
@@ -169,7 +169,7 @@ export function queueBlock(g: G, r: Rect, wells: readonly Rect[], queue: readonl
     const a = g.globalAlpha, colour = bandColor(incoming!.family!);
     // Its icon dimmed on a wide well; a narrow well (16 slots) is tinted in the task's type colour instead.
     g.globalAlpha = a * 0.35;
-    if (w.w >= 16) drawFamilyIcon(g, incoming!.family!, w.x, w.y - 2); else R(g, w.x, w.y, w.w, w.h - 2, colour);
+    if (w.w >= 14) drawFamilyIcon(g, incoming!.family!, w.x + ((w.w - 16) >> 1), w.y - 2); else R(g, w.x, w.y, w.w, w.h - 2, colour);
     g.globalAlpha = a;
     R(g, w.x, w.y + w.h - 2, Math.round(w.w * Math.max(0, Math.min(1, incoming!.progress))), 2, colour);
   }

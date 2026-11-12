@@ -3,7 +3,8 @@
 // port, the power light is power, red is halted. A dark rack is fully unlit.
 import { KIND, P, R, frame as outline, drawTypeMini, drawUnitLamp, lampState, mix, px, typeOf } from '../../core';
 import type { RackSnapshot, ServerSlotView } from '../../../game';
-import { BEZEL, OFF, ears, label, lcdChars, lcdText, typeText } from './art';
+import { BEZEL, OFF, ears } from './art';
+import { LCD_DY, LCD_H, SRV_LCD, SRV_LEDS, sledDy } from './layout';
 
 type G = CanvasRenderingContext2D;
 /** Between rounds a sled is 'paused' (on market: it runs next round, LCD READY) or 'out' (its switch or an ancestor's is off: it sits out, LCD OFF). */
@@ -29,33 +30,14 @@ export function serverLook(s: RackSnapshot, v: ServerSlotView, paused: boolean):
 }
 /** Chassis grade from the real core count: bigger servers wear brighter metal. */
 export const tierOf = (cores: number): number => (cores >= 32 ? 3 : cores >= 8 ? 2 : cores >= 2 ? 1 : 0);
-/** The status LCD's window on a server face at (x, y), as `drawServer` lays it out. */
-export function serverLcd(x: number, y: number, cores: number, out: { x: number; y: number; w: number; h: number }): void {
-  const cols = Math.max(1, Math.min(4, cores)), tier = tierOf(cores);
-  out.x = x + 7 + cols * 3 + 2 + 1; out.y = y + 3; out.w = LW[tier]! - 2; out.h = 6;
+/** The status display's window on a server face at (x, y), as `drawServer` lays it out: the label line and the shard drain. */
+export function serverLcd(x: number, y: number, _cores: number, out: { x: number; y: number; w: number; h: number }): void {
+  out.x = x + SRV_LCD.dx; out.y = y + sledDy() + LCD_DY; out.w = SRV_LCD.w; out.h = LCD_H;
 }
-const LW = [26, 30, 34, 38], BAYS = [2, 3, 4, 4];
-const LCD_BG = [mix(P.ledOff, P.ink, 0.4), mix(P.sramLo, P.ink, 0.35)], LCD_FG = [P.led, P.cacheOn];
-/** Idle and offline lines: the lit segment colour at 60% over the LCD, readable but quiet (A19). */
-export const LCD_IDLE = [mix(LCD_FG[0]!, LCD_BG[0]!, 0.4), mix(LCD_FG[1]!, LCD_BG[1]!, 0.4)];
+/** A half sled's busy share starts here (a text column, a multiple of 4 art px), 2 px after its type's mini; `lx` is its display's x. */
+export const halfShareX = (lx: number): number => Math.ceil((lx + 8) / 4) * 4;
+const LCD_BG = [mix(P.ledOff, P.ink, 0.55), mix(P.sramLo, P.ink, 0.5)];
 const HALT = mix(P.fault, P.ink, 0.25), SLEEP_LED = mix(P.led, P.ink, 0.55), box = { x: 0, y: 0, w: 0, h: 0 };
-
-function lcdLine(v: ServerSlotView, look: ServerLook, max: number): string {
-  switch (look) {
-    case 'crash': return 'HALT';
-    case 'noport': return max >= 7 ? 'NO PORT' : 'NO NET';
-    case 'offline': return max >= 7 ? 'OFFLINE' : 'OFF';
-    case 'paused': return 'READY';
-    case 'out': return 'OFF';
-    case 'asleep': return 'SLEEP';
-    case 'waking': return label('WAKE ', Math.max(1, Math.ceil((v.wakeMs ?? 0) / 1000)));
-    case 'boot': { const n = Math.max(0, Math.ceil(v.timerS ?? 0)); return n >= 10 && max < 7 ? label('BT ', n) : label('BOOT ', n); }
-    default: break;
-  }
-  if (v.running > 0) return label('RUN ', v.running);
-  if (v.port?.active) return 'RECV';
-  return 'IDLE';
-}
 
 /**
  * Lit LEDs (0..3) of core column `c` of `cols`: the mean busy of its cores (`coreBusy`, core order),
@@ -74,7 +56,12 @@ export function litLeds(v: ServerSlotView, c: number, cols: number): number {
   const f = sum / (hi - lo);
   return f > 0 ? Math.max(1, Math.round(f * 3)) : 0;
 }
-/** One server face at (x, y), OPEN.w × U. */
+/**
+ * One server face at (x, y), `w` × `h`: NIC, the status display, one LED column per core, the lamp in the right ear.
+ * The display's words and the busy figure are the core's crisp label (labels.ts); here it is a dark window with the
+ * port's real transfer progress along its top, and on a half sled the mini of the task type it runs. The LEDs and the
+ * right ear stand under the payout pop (targets.ts), which so covers no word.
+ */
 export function drawServer(g: G, x: number, y: number, w: number, h: number, v: ServerSlotView, look: ServerLook, heat: number, paused: boolean): void {
   const tier = tierOf(v.cores), bez = BEZEL[tier], hi = mix(bez, '#ffffff', 0.16), lo = mix(bez, P.ink, 0.35);
   const dark = look === 'dark', face = dark ? mix(bez, P.ink, 0.55) : bez, alpha = g.globalAlpha;
@@ -83,60 +70,40 @@ export function drawServer(g: G, x: number, y: number, w: number, h: number, v: 
   R(g, x + 1, y + 1, w - 2, 1, dark ? lo : tier === 3 ? P.logicHi : hi);
   R(g, x + 1, y + h - 2, w - 2, 1, lo);
   box.x = x; box.y = y; box.w = w; box.h = h; ears(g, box, face, tier);
-  const live = look === 'live';
+  const live = look === 'live', half = w < 60, fy = y + ((h - 12) >> 1);
   // NIC jack with its link light (left ear): lit only while a real transfer runs on its port
-  R(g, x + 2, y + 3, 3, 3, P.ink); px(g, x + 3, y + 4, P.substrateHi);
-  px(g, x + 4, y + 2, live && v.port?.active ? P.net : OFF);
-  px(g, x + w - 4, y + 3, look === 'crash' ? P.fault : dark || look === 'offline' || look === 'out' ? OFF : look === 'boot' || look === 'waking' ? P.amber : look === 'asleep' ? SLEEP_LED : P.led);
-
-  // one LED column per core (up to 4; past 4, each column is its share of the cores in core order),
-  // lit from the foot by how busy those very cores are now, so a busy core stays where it really is
-  const cols = Math.max(1, Math.min(4, v.cores)), bottom = y + 2 + 9 - 1;
-  let cx = x + 7;
-  for (let c = 0; c < cols; c++, cx += 3) {
-    const lit = live ? litLeds(v, c, cols) : 0;
-    for (let k = 0; k < 3; k++) R(g, cx, bottom - k * 3 - 2, 2, 2, k < lit ? KIND.compute : OFF);
-  }
-  cx += 2;
+  R(g, x + (half ? 1 : 2), fy + 3, 3, 3, P.ink); px(g, x + (half ? 2 : 3), fy + 4, P.substrateHi);
+  px(g, x + (half ? 3 : 4), fy + 2, live && v.port?.active ? P.net : OFF);
+  px(g, x + w - 4, fy + 3, look === 'crash' ? P.fault : dark || look === 'offline' || look === 'out' ? OFF : look === 'boot' || look === 'waking' ? P.amber : look === 'asleep' ? SLEEP_LED : P.led);
 
   // status display
-  const lw = LW[tier], hiLcd = tier >= 2 ? 1 : 0;
-  R(g, cx, y + 2, lw, 8, P.ink); R(g, cx + 1, y + 3, lw - 2, 6, dark ? P.ink : LCD_BG[hiLcd]);
-  if (!dark) {
-    // A19, set F: a running task shows as its type: the type's 5×5 mini and the type name.
-    // The 16 art px type icon does not fit the 6 px LCD window (a server face is one 12 px U).
-    const type = look === 'live' && v.running > 0 && v.family !== null ? typeOf(v.family) : null;
-    if (type) {
-      drawTypeMini(g, type, cx + 2, y + 3);
-      lcdText(g, cx + 8, y + 3, typeText(type, (lw - 8) >> 2), LCD_FG[hiLcd]!, cx + 1, cx + lw - 1);
-    } else {
-      const line = lcdLine(v, look, lcdChars(lw));
-      const c = look === 'crash' ? HALT : look === 'noport' ? P.amber : look === 'offline' || look === 'out' || look === 'asleep' || line === 'IDLE' ? LCD_IDLE[hiLcd]! : LCD_FG[hiLcd]!;
-      lcdText(g, cx + 2, y + 3, line, c, cx + 1, cx + lw - 1);
-    }
-    // a task landing over its port: the line is the transfer's real progress
-    if (live && v.port?.active) R(g, cx + 1, y + 9, Math.round((lw - 2) * Math.min(1, v.port.progress)), 1, P.net);
-  }
-  cx += lw + 2;
+  const lx = x + SRV_LCD.dx, lw = SRV_LCD.w;
+  R(g, lx - 1, fy + LCD_DY - 1, lw + 2, LCD_H + 2, P.ink);
+  R(g, lx, fy + LCD_DY, lw, LCD_H, dark ? P.ink : look === 'crash' ? P.faultLo : LCD_BG[tier >= 2 ? 1 : 0]);
+  // a task landing over its port: the line is the transfer's real progress
+  if (live && v.port?.active) R(g, lx, fy + LCD_DY, Math.round(lw * Math.min(1, v.port.progress)), 1, P.net);
+  // a half sled has no room for the type's name: its mini stands before the busy share
+  if (half && live && v.running > 0 && v.family !== null) drawTypeMini(g, typeOf(v.family), halfShareX(lx) - 7, fy + LCD_DY + 2);
 
-  // drive bays: more with grade
-  const bay = mix(bez, P.ink, 0.5);
-  for (let i = 0; i < BAYS[tier]; i++, cx += 6) {
-    R(g, cx, y + 2, 5, 8, P.ink); R(g, cx + 1, y + 3, 3, 6, bay); R(g, cx + 1, y + 7, 3, 1, P.steelLo);
-    px(g, cx + 1, y + 3, live && v.kind === 'storageNode' && v.busyCores + v.running > 0 ? P.led : P.ledOff);
+  // one LED column per core (up to 4, a half sled 2; past that, each column is its share of the cores in core order),
+  // lit from the foot by how busy those very cores are now, so a busy core stays where it really is
+  const cols = Math.max(1, Math.min(SRV_LEDS.max, v.cores)), bottom = fy + 2 + 9 - 1;
+  for (let c = 0, cx = x + SRV_LEDS.dx; c < cols; c++, cx += SRV_LEDS.pitch) {
+    const lit = live ? litLeds(v, c, cols) : 0;
+    for (let k = 0; k < 3; k++) R(g, cx, bottom - k * 3 - 2, SRV_LEDS.w, 2, k < lit ? KIND.compute : OFF);
   }
-  cx += 1;
-  const vx1 = x + w - 8;
-  if (tier === 0) { for (let yy = y + 4; yy < y + h - 3; yy += 3) R(g, cx + 1, yy, vx1 - cx - 1, 1, lo); }
-  else for (let yy = y + 3; yy < y + h - 3; yy += 2) for (let xx = cx + ((yy >> 1) & 1); xx < vx1; xx += 2) px(g, xx, yy, lo);
-  // the server's online lamp: real mode, draining over a real boot or switch
-  if (!dark) if (look === 'waking') drawUnitLamp(g, x + w - 14, y + 9, 6, 'switching', v.wakeMs ?? 0, Math.max(WAKE_MS, v.wakeMs ?? 0), paused);
-  else drawUnitLamp(g, x + w - 14, y + 9, 6, look === 'out' ? 'offline' : lampState(v.state), (v.timerS ?? 0) * 1000, (v.timerTotalS ?? 0) * 1000, paused);
+  // a storage node's bay light (lit while it serves)
+  if (!half && v.kind === 'storageNode') { R(g, x + w - 9, fy + 3, 3, 4, P.ink); px(g, x + w - 8, fy + 4, live && v.busyCores + v.running > 0 ? P.led : P.ledOff); }
+  // the server's online lamp, in its right ear: real mode, draining over a real boot or switch
+  const lampX = x + w - 5, lampY = fy + 7;
+  if (!dark) if (look === 'waking') drawUnitLamp(g, lampX, lampY, 3, 'switching', v.wakeMs ?? 0, Math.max(WAKE_MS, v.wakeMs ?? 0), paused);
+  else drawUnitLamp(g, lampX, lampY, 3, look === 'out' ? 'offline' : lampState(v.state), (v.timerS ?? 0) * 1000, (v.timerTotalS ?? 0) * 1000, paused);
 
-  if (look === 'crash') { g.globalAlpha = alpha * 0.45; R(g, x + 1, y + 1, w - 2, h - 2, P.ink); g.globalAlpha = alpha; outline(g, x, y, w, h, HALT); }
-  // Between rounds: a sled that sits out is clearly darker; a ready one is only slightly dimmed.
+  // A crashed sled is red-framed at full strength; a sled that sits out is clearly darker; a ready one only slightly dimmed.
+  if (look === 'crash') { outline(g, x, y, w, h, P.fault); outline(g, x + 1, y + 1, w - 2, h - 2, HALT); }
   else if (look === 'noport' || look === 'offline' || look === 'out' || look === 'paused' || look === 'asleep') {
     g.globalAlpha = alpha * (look === 'out' ? 0.55 : look === 'paused' ? 0.15 : look === 'asleep' ? 0.35 : 0.3); R(g, x + 1, y + 1, w - 2, h - 2, P.ink); g.globalAlpha = alpha;
+    if (look === 'noport') outline(g, x, y, w, h, P.amber);
   }
   else if (live && heat > 0.6) { g.globalAlpha = alpha * Math.min(0.85, (heat - 0.6) * 2.5); R(g, x + 6, y + 1, w - 12, 1, P.heat); g.globalAlpha = alpha; }
 }

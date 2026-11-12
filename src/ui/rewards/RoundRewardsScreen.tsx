@@ -32,7 +32,8 @@ function Contents() {
       <span className="reward-result">{row.status === 'ready' ? <><b>Claim</b><span className="reward-amounts"><span className="pz"><CoinIcon />{wholeText(row.credits)}</span><span className="pz d"><GemIcon />{wholeText(row.data)}</span></span></>
         : row.status === 'claimed' ? 'Claimed' : 'Locked'}</span>
     </button>)}</div>
-    {!later && rows.length < data.rows.length && <button type="button" className="component-link" data-qa-target onClick={() => setLater(true)}>Later milestones</button>}
+    {firstLocked >= 0 && firstLocked + 2 < data.rows.length && <button type="button" className="reward-more" data-qa-target aria-expanded={later}
+      onClick={() => setLater(v => !v)}><span>Later milestones</span><i className="disclosure" aria-hidden="true" /></button>}
   </PlateFrame>;
 }
 

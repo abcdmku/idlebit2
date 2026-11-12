@@ -1,5 +1,5 @@
 import { DT_S, FLOOR_TEMP_F, HOME_TEMP_F, REGIONS, SETTLE_EPS_F } from '../core/constants';
-import type { CompiledBuffers, HotBuffers } from '../core/buffers';
+import { G, type CompiledBuffers, type HotBuffers } from '../core/buffers';
 import type { World } from '../core/world';
 import { COOLER_DELTA_F, ECONOMIZER_MARGIN_F, ECONOMIZER_WATTS, LIFT_BELOW_F, LIFT_PER_F } from './constants';
 import { efficiency, rackHealth, roomHealth } from './efficiency';
@@ -147,12 +147,12 @@ function memoize(m: LumpMemo, i: number, temp: number, heat: number, surround: n
 export function thermalPhase(w: World): void {
   const settings = physSettings(w);
   const c = w.compiled, h = w.hot;
-  const advancing = w.round.phase === 'running' || (w.research.active !== null && !w.research.stoppedInsolvent);
+  const advancing = w.round.phase === 'running' || h.g[G.researchHolders]! > 0;
   const roomMoved = scratch('roomMoved', c.room.len), roomG = scratch('roomG', c.room.len);
   const memo = lumpMemos(w, settings);
 
   {
-    // Hoisted: tables are dictionary-mode objects (built by computed keys), so a per-row column lookup is a hash probe.
+    // Columns hoisted: one load each for the whole loop.
     const cr = c.rack, hr = h.rack, roomOpened = c.room.opened, roomTemp = h.room.tempF, roomCrashed = h.room.crashed;
     const alive = cr.alive, openedOf = cr.opened, roomOf = cr.room, coolerQc = cr.coolerQc, leakOf = cr.leak, tau = cr.coolerTau;
     const coolerIdleW = cr.coolerIdleW, coolerLoadW = cr.coolerLoadW;

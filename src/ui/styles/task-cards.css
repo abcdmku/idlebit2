@@ -18,27 +18,41 @@
 .l-desktop .task-market .market-task-heading canvas { grid-column: 1; grid-row: 1 / 3; align-self: center; }
 .l-desktop .task-market .market-task-heading b { grid-column: 2; grid-row: 1; white-space: nowrap; }
 .l-desktop .task-market .market-task > .task-rewards, .l-desktop .task-market .research-market > .rnd { grid-column: 2; grid-row: 2; padding: 0; }
-.task-now .task-now-content { display: grid; grid-template-columns: minmax(160px, 1fr) minmax(120px, .7fr) minmax(160px, 1fr) 112px;
-  gap: 16px; align-items: center; box-sizing: border-box; height: 100%; padding: 16px 16px 32px 24px; }
+/* The desktop head card is one row: what it is and pays, what it needs, where it stands, then its two keys.
+   Column widths are fixed per art scale, so nothing shifts as tasks and states change. */
+.task-now .task-now-content { display: grid; grid-template-columns: max(204px, calc(88 * var(--n))) calc(48 * var(--n)) minmax(0, 1fr) auto;
+  column-gap: calc(4px + 4 * var(--n)); align-items: center; box-sizing: border-box; height: 100%; padding: 0 8px 0 16px; }
 .task-now .task-identity, .task-now .task-state, .task-now .task-hardware { min-width: 0; }
-.task-now .task-identity { display: flex; flex-direction: column; gap: 8px; }
-.task-now .task-heading { display: flex; align-items: center; gap: 8px; min-height: 32px; }
-.task-now .task-heading canvas { flex: none; }
-.task-now .task-facts { display: flex; flex-direction: column; gap: 8px; }
-.task-now .task-state { display: flex; flex-direction: column; gap: 8px; }
-.task-now .task-actions { display: grid; gap: 8px; }
-.task-now .task-action { position: relative; width: 100%; min-height: 48px; padding: 4px 8px; gap: 4px; flex-wrap: wrap; }
-.task-now .task-clock { display: block; }
+.task-now .task-identity { display: grid; grid-template-columns: auto minmax(0, 1fr); grid-template-rows: var(--lh) var(--lh); column-gap: 8px; }
+.task-now .task-heading { display: contents; }
+.task-now .task-heading canvas { grid-column: 1; grid-row: 1 / 3; align-self: center; }
+.task-now .task-heading b { grid-column: 2; grid-row: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.task-now .task-identity > .task-rewards, .task-now .task-identity > .rnd { grid-column: 2; grid-row: 2; }
+.task-now .task-facts { display: flex; flex-direction: column; white-space: nowrap; }
+.task-now .task-state { display: flex; flex-direction: column; line-height: min(var(--lh), 20px); }
+.task-now .task-actions { display: grid; grid-template-columns: repeat(2, calc(16px + 32 * var(--n))); gap: 8px; }
+.task-now .task-action { position: relative; width: 100%; height: 48px; padding: 0 8px; column-gap: 4px; flex-wrap: wrap; align-content: center; line-height: 16px; }
+.task-now .task-clock { display: block; min-height: min(var(--lh), 20px); }
 .l-phone .task-market .market-task { padding: 8px; }
-.l-phone .task-now .task-now-content { grid-template-columns: minmax(0, 1fr); grid-template-rows: 32px 16px 32px 48px;
-  padding: 8px 8px 24px; gap: 0; align-items: stretch; }
-.l-phone .task-now .task-identity { display: grid; grid-template-columns: 1fr; grid-template-rows: 16px 16px; gap: 0; }
-.l-phone .task-now .task-heading { min-height: 0; }
+/* Landscape column: the head slot right above already names the task and its pay, so the card starts at what it
+   needs. With no task in line the same row says so. Rows: needs, state (one line), then the keys 8 px below. The
+   notice line sits in the gutter under the card. */
+.l-phone .task-now .task-now-content { grid-template-columns: minmax(0, 1fr); grid-template-rows: 16px 16px 56px;
+  padding: 8px; gap: 0; align-items: stretch; }
+.l-phone .task-now .task-identity { display: grid; grid-template-columns: 1fr; grid-template-rows: 16px; gap: 0; grid-row: 1; grid-column: 1; overflow: hidden; }
+.l-phone .task-now.has-head .task-identity { display: none; }
+.l-phone .task-now .task-hardware { grid-row: 1; grid-column: 1; }
+.l-phone .task-now .task-state { grid-row: 2; }
+.l-phone .task-now .task-actions { grid-row: 3; align-self: end; }
+.l-phone .task-now .task-heading { display: flex; align-items: center; min-height: 0; }
 .l-phone .task-now .task-heading canvas { display: none; }
+.l-phone .task-now .task-identity > .task-rewards, .l-phone .task-now .task-identity > .rnd { grid-column: 1; }
+.l-phone .task-now .task-action { height: auto; min-height: 48px; padding: 4px 8px; }
 .l-phone .task-now .task-rewards { align-self: start; }
 .l-phone .task-now .task-facts { flex-direction: row; flex-wrap: wrap; gap: 4px 16px; }
 .l-phone .task-now .task-state { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px; padding: 0; align-items: start; }
 .l-phone .task-now .task-clock { text-align: right; }
+.l-phone .task-now .task-state > :first-child { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .l-phone .task-now .task-actions { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 8px; }
 .task-market-compact .market-task { display:grid!important; grid-template-columns:32px minmax(0,1fr); grid-template-rows:16px 16px;
   align-content:center; gap:0 8px; padding:8px!important; }
@@ -69,3 +83,39 @@
   .task-now.blocked .task-state > [data-testid="now-wait"],
   .task-dock.blocked .task-peek-state > :first-child { animation:none; }
 }
+
+/* The open card in the strip, and its detail. Desktop docks the detail in the right gutter, clear of the hardware. */
+.task-market .market-task.open { box-shadow: inset 0 0 0 var(--n) var(--paper); }
+.l-desktop .v3-plate.task-detail { width: 304px; }
+.br-shell .v3-plate.task-detail .td-status { margin-top: 4px; font-weight: 500; }
+.br-shell .v3-plate.task-detail .td-status.warn { font-weight: 700; }
+.br-shell .v3-plate.task-detail .td-facts { grid-template-columns: max-content minmax(0, 1fr); gap: 4px 12px; margin-top: 8px; }
+/* Dismiss is the secondary action: a quiet key at its own width, right of the fix keys' column. */
+.br-shell .v3-plate.task-detail .keys .key.quiet { width: auto; min-width: 112px; align-self: flex-end; padding-inline: 16px; font-weight: 600; }
+.br-shell .v3-plate.task-detail .tw-key { min-height: 44px; padding: 4px 12px; }
+/* Landscape: the detail is two columns. Its keys end the left column on the plate's bottom edge, level with the
+   end of the work table, at the column's width, so no key floats mid-plate. */
+@media (min-width: 700px) and (max-height: 480px) {
+  /* The work table takes the wider column, so operation names keep one line. */
+  .br-shell .v3-plate.task-detail > .plate-content { grid-template-rows: auto auto minmax(0, 1fr) auto; grid-template-columns: minmax(0, 5fr) minmax(0, 7fr); }
+  .br-shell .v3-plate.task-detail .keys { grid-row: 4; align-self: end; margin-top: 0; }
+  .br-shell .v3-plate.task-detail .keys .key.quiet { align-self: stretch; width: 100%; }
+}
+.br-shell .v3-plate.task-detail .tw-columns { color: var(--muted); }
+/* A short portrait phone: the detail is a sheet from the band to the stage's foot (TaskDetail), so nothing shows half covered. */
+.br-shell .v3-plate.task-detail.sheet-fill { min-height: var(--sheet-h); }
+/* A portrait phone has one scroller, the recipe or the library list: it takes the height the plate has left (at least
+   three rows) and fades at a cut edge, so the status, pay and keys above it never scroll away. */
+.br-shell .v3-plate.task-detail.dock > .plate-content, .br-shell .v3-plate.task-detail.dock :is(.task-work, .tw-library) { display: flex; flex-direction: column; }
+.br-shell .v3-plate.task-detail.dock > .plate-content > *, .br-shell .v3-plate.task-detail.dock :is(.task-work, .tw-library) > * { flex: none; }
+.br-shell .v3-plate.task-detail.dock .task-work, .br-shell .v3-plate.task-detail.dock .tw-library { flex: 1 1 auto; min-height: 0; }
+.br-shell .v3-plate.task-detail.dock :is(.tw-breakdown, .tw-catalog-list) { flex: 1 1 auto; min-height: 88px; max-height: none; }
+/* A long operation name wraps; none is cut. On a phone the library's rows and search field are full touch targets. */
+.br-shell .v3-plate.task-detail .tw-operation span { white-space: normal; overflow: visible; overflow-wrap: anywhere; }
+.l-phone .v3-plate.task-detail .tw-catalog, .l-phone .v3-plate.task-detail .tw-library input { min-height: 44px; }
+/* The detail's head: the icon, then the task's name over its type, clear of the close key. */
+.br-shell .v3-plate.task-detail .p-head { display: grid; grid-template-columns: auto minmax(0, 1fr); column-gap: 8px; align-items: center; }
+.br-shell .v3-plate.task-detail .p-head .td-ic { grid-column: 1; grid-row: 1 / 3; }
+.br-shell .v3-plate.task-detail .p-head .p-title { grid-column: 2; grid-row: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.br-shell .v3-plate.task-detail .p-head .p-sub { grid-column: 2; grid-row: 2; }
+.br-shell .v3-plate.task-detail .p-head .p-head-actions { grid-column: 2; grid-row: 1; justify-self: end; }

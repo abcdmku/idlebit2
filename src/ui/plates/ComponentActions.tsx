@@ -31,8 +31,10 @@ export function ComponentActions({ target, children }: { target: HitTarget; chil
     unit: { kind: 'system' as const, id: focus.systemId }, slot: { kind: 'core' as const, socket: focus.socket, index: focus.cores.length - 1 },
   } : null;
   const result = useQuote(part ? { kind: 'part', part } : plateRequest(target, focus));
-  const qs = result?.quotes.filter(q => q.action.type === 'removePart' || q.action.type === 'downgradePart'
-    && q.action.part.slot.kind !== 'ram' && q.action.part.slot.kind !== 'drive') ?? [];
+  const all = result?.quotes ?? [];
+  // Downgrade, then Remove: the left group of the plate's bottom row.
+  const qs = [...all.filter(q => q.action.type === 'downgradePart' && q.action.part.slot.kind !== 'ram' && q.action.part.slot.kind !== 'drive'),
+    ...all.filter(q => q.action.type === 'removePart')];
   const fire = (q: Quote) => { if (shell.dispatch(q.action)?.ok && q.action.type === 'removePart') shell.view.dispatch({ type: 'cancel' }); };
   const actions = qs.length ? <div className="component-maintenance" aria-label="Downgrade or remove component">
     {qs.map((q, i) => {

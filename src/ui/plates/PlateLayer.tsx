@@ -156,6 +156,8 @@ export function plateArea(layout: ShellLayout, bounds: Rect | null): Rect | null
   // A short landscape (R16): the world is a narrow band right of the strip and deck, so a plate may also cover that
   // column while open, which leaves room beside its part for the main option; the HUD with the wallet stays clear.
   if (layout.w >= 640 && layout.h < 480) {
+    // The landscape column layout stands the world clear of the HUD at full height: a plate that fits stays over it.
+    if (layout.band.w < layout.w / 2) return bounds;
     const top = layout.band.y + layout.band.h + 8;
     return { x: 8, y: top, w: layout.w - 16, h: layout.h - 8 - top };
   }
@@ -183,7 +185,8 @@ export function PlateLayer() {
   const view = useViewState();
   const t = view.selected;
   const focus = useGameSelector((s) => s.focus);
-  const direct = !!t && !!actionAtSource(shell, t);
+  // A source with several builds or cards is a choice: its plate is the picker and stays open.
+  const direct = !!t && actionAtSource(shell, t)?.choice === false;
   // Navigation to a one-action part reveals its source control; it never spends while inspecting.
   useEffect(() => { if (direct && !view.sheet) shell.view.dispatch({ type: 'cancel' }); }, [shell, direct, t, view.sheet]);
   if (direct) return null;
@@ -317,10 +320,9 @@ function TargetPlate({ target: t, focus }: { target: HitTarget; focus: LevelSnap
       quotes={s.kind === 'roomSwitch' ? quotes : null} lbQuotes={s.kind === 'roomLb' ? quotes : roomLb} queueQuote={queueQuote} initialView={s.kind === 'roomLb' ? 'lb' : 'ports'}
       room={focus.roomId} zone={focus.zone} network={focus.network} racks={focus.racks.filter((r) => r.rackId !== null).length} />;
     if (s.kind === 'globalScheduler' && focus.level === 'global' && focus.scheduler) return <LbPlate {...common} quotes={quotes} queueQuote={queueQuote}
-      unit={{ kind: 'global' }} view={focus.scheduler} child="site" title="Global scheduler">
-      <button type="button" className="component-link" onClick={() => view.dispatch({ type: 'select', plate: true,
-          target: { ...t, id: 'global-start', part: { unit: { kind: 'global' }, slot: { kind: 'globalStart' } } } })}>Start controller →</button>
-    </LbPlate>;
+      unit={{ kind: 'global' }} view={focus.scheduler} child="site" title="Global scheduler"
+      actions={<button type="button" className="p-save" onClick={() => view.dispatch({ type: 'select', plate: true,
+        target: { ...t, id: 'global-start', part: { unit: { kind: 'global' }, slot: { kind: 'globalStart' } } } })}>Start controller</button>} />;
     const facts = partFacts(focus, s, t.part.unit.kind === 'site' ? t.part.unit.id : undefined);
     // CPU, RAM and storage choose between Upgrade, Add and Replace; the CPU's own view opens only from its key.
     if (facts && focus.level === 'system' && (s.kind === 'cpu' || s.kind === 'ram' || s.kind === 'drive')) {
@@ -333,7 +335,7 @@ function TargetPlate({ target: t, focus }: { target: HitTarget; focus: LevelSnap
       if (scheduler) return <QueuePlate {...common} quotes={quotes} system={focus.systemId} view={scheduler} />;
     }
     if (facts) return <PartPlate {...common} quotes={quotes} {...facts} compactStatus={s.kind === 'cpu'} unblocks={unblocks} unblock={unblock}
-      extraFooter={s.kind === 'dataPlane' && queueQuote && <QuoteKey quote={queueQuote} label="Queue slots"
+      extraFooter={s.kind === 'dataPlane' && queueQuote && <QuoteKey quote={queueQuote} label="Queue"
         onAction={q => common.onAction(q.action)} onResearch={common.onResearch} researchName={common.researchName} />}>
       {s.kind === 'dataPlane' && siteRouter && lbUnit && <section className="component-options site-routing"><LbBody unit={lbUnit} view={siteRouter} child="zone"
         quotes={quotes ? { ...quotes, quotes: quotes.quotes.filter(q => q.action.type === 'setStrategy' || q.action.type === 'setFilter') } : null}
@@ -376,7 +378,7 @@ function unitPlate(unit: UnitRef, focus: LevelSnapshot, all: Omit<PlateCommon, '
       status={focus.level === 'system' ? `${focus.running.length} running · ${focus.queue.count} queued` : 'Chip'} mode={mode} timerS={timerS} bootS={total ?? common.bootS}
       onSave={saveKey(focus.level === 'system' && focus.saveable)} saveLabel="Save this server">
       {/* Never an empty plate (user, 26 Oct): what is in the box, each row opening its part, and Open CPU. */}
-      {focus.level === 'system' && <SystemPower system={focus.systemId} />}
+      {focus.level === 'system' && <SystemPower system={focus.systemId} onResearch={common.onResearch} researchName={common.researchName} />}
       {focus.level === 'system' && <section className="component-options"><SystemSummary focus={focus}
         onOpenPart={(part, key) => all.select({ id: `sum-${key}`, kind: 'part', owner: { level: 'system', id: focus.systemId } as never, drill: null, part, unit: null, sw: null, port: null, slot: null, rect: { x: 0, y: 0, w: 0, h: 0 } })} /></section>}
     </UnitPlate>;

@@ -2,12 +2,13 @@ import { LINK_KIND, type CompiledBuffers } from '../core/buffers';
 import { ACCEL_CLOCKS, DT_S, MAX_ZONES_PER_SITE, RACKS_PER_ROOM, SERVERS_PER_RACK } from '../core/constants';
 import type { World } from '../core/world';
 import { estOn, estRecord } from '../exec/est';
-import { canAdmit, keffOf } from '../exec/slots';
+import { canAdmit, keffOf, routeChanges } from '../exec/slots';
 import { NRES } from '../exec/shape';
 import { classesOf } from '../market/fleet';
 import { transferBits } from './links';
 import { someSystem } from './metrics';
 import { linkOf } from './paths';
+import { rackUniform } from './rackUniform';
 import { decisionFor, memo, Stamped } from './routeMemo';
 import { RACK, ROOM, SITE } from './scope';
 
@@ -32,6 +33,17 @@ export function classIndex(c: CompiledBuffers): Int32Array {
 const list = new Stamped(), sysFinish = new Stamped(), rackLb = new Stamped(), rackMin = new Stamped(), rackUp = new Stamped();
 /** Per rack, for the phase: a system standing for it, and whether its systems share one est (1) or not (0). */
 let rackRep = new Int32Array(0), rackSame = new Uint8Array(0);
+/**
+ * Per rack, for the phase (rackBound), for rackShared. One admitting system per distinct est input
+ * (class, etaCfg, clock factor), up to REPS of them: rackRepN is their count, 0 when there are more
+ * or one is unknown; slotGroup is each server slot's group (NO_GROUP: not admitting then). Then the
+ * rack's admitting systems as last listed (rackBound, relist), in slot order: each one's est
+ * group, listSeconds and reservation. `rackReleases` / `rackTakes`: routeChanges at that listing.
+ */
+const REPS = 4, NO_GROUP = 255;
+let rackReps = new Int32Array(0), rackRepN = new Uint8Array(0), slotGroup = new Uint8Array(0);
+let rackAdmits = new Uint8Array(0), admitGroup = new Uint8Array(0), admitList = new Float64Array(0), admitReserved = new Float64Array(0);
+let rackReleases = new Float64Array(0), rackTakes = new Uint32Array(0);
 /** classIndex of the world being routed (set by ensure). */
 let classOf: Int32Array = new Int32Array(0);
 
@@ -132,11 +144,31 @@ export function finishOn(w: World, s: number, r: number): number {
 function rackBound(w: World, rack: number): number {
   if (rackLb.at[rack] === memo.phase) return rackLb.val[rack]!;
   const c = w.compiled, cls = classOf;
-  let lb = Infinity, rep = -1, same = 1;
+  let lb = Infinity, rep = -1, same = 1, reps = 0, admits = 0;
   for (let k = 0; k < SERVERS_PER_RACK; k += 1) {
     const s = c.rack.servers[rack * SERVERS_PER_RACK + k]!;
+    slotGroup[rack * SERVERS_PER_RACK + k] = NO_GROUP;
     if (s < 0 || c.sys.alive[s] !== 1 || !canAdmit(w, s)) continue;
-    lb = Math.min(lb, listSeconds(w, s) / keffOf(w, s));
+    const secs = listSeconds(w, s);
+    lb = Math.min(lb, secs / keffOf(w, s));
+    if (reps >= 0) {
+      if (c.sys.rack[s] !== rack || (cls[s] ?? -1) < 0) reps = -1;
+      else {
+        let j = 0;
+        for (; j < reps; j += 1) {
+          const q = rackReps[rack * REPS + j]!;
+          if (cls[s] === cls[q] && Object.is(c.sys.etaCfg[s], c.sys.etaCfg[q]) && Object.is(w.hot.sys.clockFactor[s], w.hot.sys.clockFactor[q])) break;
+        }
+        if (j === reps && reps === REPS) reps = -1;
+        else {
+          if (j === reps) { rackReps[rack * REPS + reps] = s; reps += 1; }
+          const at = rack * SERVERS_PER_RACK + admits;
+          admitGroup[at] = j; admitList[at] = secs; admitReserved[at] = w.hot.sys.reserved[s]!;
+          slotGroup[rack * SERVERS_PER_RACK + k] = j;
+          admits += 1;
+        }
+      }
+    }
     if (c.sys.rack[s] !== rack) { rep = -2; same = 0; continue; }
     if (rep === -1) { rep = s; if ((cls[s] ?? -1) < 0) same = 0; continue; }
     if (rep < 0) continue;
@@ -145,17 +177,87 @@ function rackBound(w: World, rack: number): number {
   }
   // A system filed under another rack has another partial path: no tight bound then (rep -1).
   rackLb.at[rack] = memo.phase; rackLb.val[rack] = lb; rackRep[rack] = Math.max(rep, -1); rackSame[rack] = same;
+  rackRepN[rack] = Math.max(reps, 0); rackAdmits[rack] = admits;
+  rackReleases[rack] = routeChanges.releases; rackTakes[rack] = rack < routeChanges.takes.length ? routeChanges.takes[rack]! : 0;
   return lb;
+}
+
+const groupOwn = new Float64Array(REPS), groupBacklog = new Float64Array(REPS);
+
+/**
+ * Lists the rack's admitting systems again after a take or a release. False when one of them was
+ * not admitting when the phase bound was taken (it has no group), or has no phase listSeconds.
+ */
+function relist(w: World, rack: number): boolean {
+  const c = w.compiled, base = rack * SERVERS_PER_RACK;
+  let admits = 0;
+  for (let k = 0; k < SERVERS_PER_RACK; k += 1) {
+    const s = c.rack.servers[base + k]!;
+    if (s < 0 || c.sys.alive[s] !== 1 || !canAdmit(w, s)) continue;
+    const j = slotGroup[base + k]!;
+    if (j === NO_GROUP || list.at[s] !== memo.phase) return false;
+    admitGroup[base + admits] = j; admitList[base + admits] = list.val[s]!; admitReserved[base + admits] = w.hot.sys.reserved[s]!;
+    admits += 1;
+  }
+  rackAdmits[rack] = admits;
+  rackReleases[rack] = routeChanges.releases; rackTakes[rack] = rack < routeChanges.takes.length ? routeChanges.takes[rack]! : 0;
+  return true;
+}
+
+/**
+ * rackExact's minimum without visiting the systems, or NaN when it must visit them. It applies to a
+ * uniform rack (rackUniform) with at most REPS est groups and no NaN term. Its admitting systems
+ * and their reservations are listed with the phase bound and again after any take or release
+ * (routeChanges), each with the phase's listSeconds, which finishOn reads for the whole phase.
+ * Then finishOn of an admitting system is fl(fl(fl(backlog / Keff) + own) + path) with its group's
+ * own and the rack's Keff and path: the same float expression, and nondecreasing in the backlog, so
+ * a group's minimum is that expression at its least backlog (the listSeconds plus the reservations
+ * costed at own, as finishOn sums them).
+ */
+function rackShared(w: World, rack: number, r: number): number {
+  const reps = rackRepN[rack]!;
+  if (reps === 0 || rackLb.at[rack] !== memo.phase || rackLb.val[rack] !== rackLb.val[rack]) return NaN;
+  const u = rackUniform(w.compiled);
+  if (u.uni[rack] !== 1) return NaN;
+  if ((rackReleases[rack] !== routeChanges.releases || rackTakes[rack] !== (rack < routeChanges.takes.length ? routeChanges.takes[rack]! : 0))
+    && !relist(w, rack)) return NaN;
+  // pathFrom's sum, the same for every system of the rack.
+  const bits = bitsOf(w, r);
+  let path = upperPath(w, rackReps[rack * REPS]!, bits);
+  if (u.port[rack] === 1) {
+    const speed = u.speed[rack]!;
+    path += (speed > 0 ? bits / speed : Infinity) + u.lat[rack]! * DT_S;
+  }
+  if (path !== path) return NaN;
+  for (let j = 0; j < reps; j += 1) {
+    const own = ownOf(w, rackReps[rack * REPS + j]!, r);
+    if (own !== own) return NaN;
+    groupOwn[j] = own; groupBacklog[j] = Infinity;
+  }
+  const base = rack * SERVERS_PER_RACK, admits = rackAdmits[rack]!;
+  for (let i = 0; i < admits; i += 1) {
+    const j = admitGroup[base + i]!, reserved = admitReserved[base + i]!;
+    let backlog = admitList[base + i]!;
+    if (reserved > 0) backlog += reserved * groupOwn[j]!;
+    if (backlog < groupBacklog[j]!) groupBacklog[j] = backlog;
+  }
+  const keff = u.keff[rack]!;
+  let min = Infinity;
+  for (let j = 0; j < reps; j += 1) min = Math.min(min, groupBacklog[j]! / keff + groupOwn[j]! + path);
+  return min;
 }
 
 /** A rack's exact minimum finish over its admitting systems (decision memo; min is order-free). */
 function rackExact(w: World, rack: number, r: number): number {
   if (rackMin.at[rack] === memo.decision) return rackMin.val[rack]!;
-  const c = w.compiled;
-  let min = Infinity;
-  for (let k = 0; k < SERVERS_PER_RACK; k += 1) {
-    const s = c.rack.servers[rack * SERVERS_PER_RACK + k]!;
-    if (s >= 0 && c.sys.alive[s] === 1 && canAdmit(w, s)) min = Math.min(min, finishOn(w, s, r));
+  let min = rackShared(w, rack, r);
+  if (min !== min) {
+    const c = w.compiled;
+    min = Infinity;
+    for (let k = 0; k < SERVERS_PER_RACK; k += 1) {
+      const s = c.rack.servers[rack * SERVERS_PER_RACK + k]!;
+      if (s >= 0 && c.sys.alive[s] === 1 && canAdmit(w, s)) min = Math.min(min, finishOn(w, s, r));
+    }
   }
   rackMin.at[rack] = memo.decision; rackMin.val[rack] = min;
   return min;
@@ -202,12 +304,23 @@ function collectRoom(w: World, room: number, r: number, best: number, bound: num
   return best;
 }
 
+/** The compiled buffers and stamp epoch the memo columns were last sized for. */
+let ensuredFor: CompiledBuffers | null = null, ensuredEpoch = -1;
+
 /** Sizes the memo columns for this world (once per call that may use them). */
 function ensure(w: World): void {
+  if (w.compiled === ensuredFor && memo.epoch === ensuredEpoch) return;
+  ensuredFor = w.compiled; ensuredEpoch = memo.epoch;
   classOf = classIndex(w.compiled);
   const n = w.compiled.sys.len, racks = w.compiled.rack.len;
   list.ensure(n); sysFinish.ensure(n); rackLb.ensure(racks); rackMin.ensure(racks); rackUp.ensure(racks);
-  if (rackRep.length < racks) { rackRep = new Int32Array(racks * 2); rackSame = new Uint8Array(racks * 2); }
+  if (rackRep.length < racks) {
+    rackRep = new Int32Array(racks * 2); rackSame = new Uint8Array(racks * 2);
+    rackReps = new Int32Array(racks * 2 * REPS); rackRepN = new Uint8Array(racks * 2);
+    rackAdmits = new Uint8Array(racks * 2); rackReleases = new Float64Array(racks * 2); rackTakes = new Uint32Array(racks * 2);
+    admitGroup = new Uint8Array(racks * 2 * SERVERS_PER_RACK); admitList = new Float64Array(racks * 2 * SERVERS_PER_RACK);
+    admitReserved = new Float64Array(racks * 2 * SERVERS_PER_RACK); slotGroup = new Uint8Array(racks * 2 * SERVERS_PER_RACK);
+  }
 }
 
 /**
@@ -236,6 +349,29 @@ export function finishBelow(w: World, kind: number, u: number, r: number, bound:
       }
   }
   return settle(w, r, best, bound);
+}
+
+/** The score of the candidate leastFinish last returned. */
+export const least = { score: Infinity };
+
+/**
+ * The candidate a lowest-finish-first order puts first, when that is all the caller needs: the index
+ * in cand[0..n) of the first candidate with the strictly lowest finish(c, task), its score in
+ * `least.score`. Returns -1 when the caller must order every candidate instead: outside the route
+ * phase, above the room, when a score is NaN, or when the lowest is not below 1e290 (weights of
+ * such scores no longer order as the scores do).
+ */
+export function leastFinish(w: World, kind: number, cand: Int32Array, n: number, r: number): number {
+  if (!memo.exact || (kind !== RACK && kind !== ROOM)) return -1;
+  let best = Infinity, at = -1;
+  for (let i = 0; i < n; i += 1) {
+    const v = finishBelow(w, kind, cand[i]!, r, Infinity);
+    if (v !== v) return -1;
+    if (v < best) { best = v; at = i; }
+  }
+  if (at < 0 || !(best <= 1e290)) return -1;
+  least.score = best;
+  return at;
 }
 
 /** finish(c, task): for an aggregate, the minimum over its systems that can admit now. */

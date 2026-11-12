@@ -7,9 +7,9 @@
 import { P, R, copyRect, partVersionOf, px, setRect } from '../../core';
 import type { LevelRegistry, LevelRenderer, Rect } from '../../core';
 import { createFanBank } from './art';
-import { CAB_RECT, FOCUS, PHONE_TAG_GUTTER, PLINTH, ROW_W, U0, UP_X, WORLD, colX, serverRect } from './layout';
+import { CAB_RECT, FOCUS, PHONE_TAG_GUTTER, PLINTH, ROW_W, U, U0, UP_X, WORLD, colX, plan, planFor, serverRect, setPlan } from './layout';
 import { drawRackMini } from './mini';
-import { rackLabels } from './labels';
+import { gutter, rackLabels } from './labels';
 import { rackCol, rackRowScroll } from './row';
 import { rackChildren, rackTargets, rackPayoutAnchor, rackShardAnchor } from './targets';
 import { drawRow } from './world';
@@ -18,6 +18,8 @@ import { rackDark } from './sprites';
 export { rackRowScroll, clampScroll, createRowScroll, snapScroll } from './row';
 export type { RackRowScroll } from './row';
 
+/** The Room's row span, art px: eight 16 px racks on a 15 px pitch, 30 tall (room/layout.ts). */
+const SPAN = { w: 121, h: 30, pitch: 15, rack: 16 } as const;
 function icon(g: CanvasRenderingContext2D): void {
   g.clearRect(0, 0, 16, 16);
   R(g, 3, 0, 11, 16, P.ink);
@@ -32,14 +34,29 @@ export function createRackRenderer(registry: LevelRegistry): LevelRenderer<'rack
   return {
     id: 'rack', name: 'Rack',
     size: (_s, out) => setRect(out, 0, 0, ROW_W, WORLD.h),
+    /** The cabinet is planned for the free world (layout.ts): the core frames it before any other geometry of a rest frame. */
+    plansAtRest: true,
     /** The active rack, shifted by the row scroll (clamped to the row's built racks). */
     focus(s, _vp, out, form, area) {
-      copyRect(FOCUS, out); out.x += colX(rackCol(s)) + rackRowScroll.apply(s, area);
+      if (area) setPlan(planFor(area));
+      // the tag gutter is the tower's: a twin names its units on its own panel, a half cabinet on their faceplates (labels.ts)
+      const wide = plan.id === 'tower' && (!area || area.w >= (FOCUS.w + PHONE_TAG_GUTTER) * 2);
+      copyRect(FOCUS, out); out.x += colX(rackCol(s)) + rackRowScroll.apply(s, area, form === 'phone' && wide ? PHONE_TAG_GUTTER : 0);
       // Phone: the rest also frames a gutter left of the cabinet, so the pipe tags beside the first
       // drop never touch it (the cabinet rests right of centre; 174 art px fits at 2 from a 348 px view).
       // A narrower view (320 px) keeps the whole cabinet instead: the gutter would crop its PDU strip.
-      if (form === 'phone' && (!area || area.w >= (out.w + PHONE_TAG_GUTTER) * 2)) { out.x -= PHONE_TAG_GUTTER; out.w += PHONE_TAG_GUTTER; }
+      if (area) gutter.on = form !== 'phone' || wide;
+      if (form === 'phone' && wide) { out.x -= PHONE_TAG_GUTTER; out.w += PHONE_TAG_GUTTER; }
       return out;
+    },
+    /**
+     * What the Room's row span shows (Room ↔ Rack). A tower row is that span at 8:1, whole. A twin or half row is not, so
+     * the zoom takes a window of the span's shape whose centre puts the active cabinet on its own slot.
+     */
+    miniRect(s, out) {
+      if (plan.id === 'tower') return setRect(out, 0, 0, ROW_W, WORLD.h);
+      const col = rackCol(s), w = Math.round(WORLD.h * SPAN.w / SPAN.h);
+      return setRect(out, Math.round(colX(col) + WORLD.w / 2 - w * (col * SPAN.pitch + SPAN.rack / 2) / SPAN.w), 0, w, WORLD.h);
     },
     /** The pipe tags keep clear of the active cabinet itself, not the phone gutter beside it. */
     tagClear(s, out) { copyRect(FOCUS, out); out.x += colX(rackCol(s)) + rackRowScroll.offset; return out; },
@@ -51,10 +68,15 @@ export function createRackRenderer(registry: LevelRegistry): LevelRenderer<'rack
     followFocus: () => rackRowScroll.dragging,
     draw: (g, s, view, frame) => drawRow(g, s, view, frame, ctx),
     drawMini: (g, v, rect, frame) => drawRackMini(g, v, rect, frame.paused),
-    /** D35: the switch's one speed. */
-    labels: (s, _view, frame, out) => rackLabels(s, frame, out),
+    /** Every word on the rack: sled states, °F, PDU load, the name tags (labels.ts). */
+    labels: (s, view, frame, out) => rackLabels(s, view, frame, out),
+    /** A cabinet no plan fits whole (a view under 284 × 324 CSS px) rests on its roof: sleds fill from the top. It pans by whole units. */
+    restCentre(_s, out) { out.y = 0; },
+    panSnap: () => ({ x: 0, y: U }),
     children: rackChildren,
     targets: (s, _view, out, from) => rackTargets(s, out, from),
+    // A pop stays on its sled's left end, clear of every display's words.
+    popInside: true,
     payoutAnchor: rackPayoutAnchor,
     shardAnchor: rackShardAnchor,
     /** Purchase flash (A10): cooler, PDU, balancer and switch generations and levels. */

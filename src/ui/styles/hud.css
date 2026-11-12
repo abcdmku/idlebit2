@@ -15,7 +15,14 @@
 .l-phone .round-rewards-key { flex-direction:column; gap:0; line-height:16px; }
 .l-phone .sla-gauge { gap:4px; }
 .l-phone .hud-tasks { gap:3px; }
-@media (max-width:359px) { .l-phone .hud-tasks { gap:2px; } }
+/* A 320 px phone's slot can't hold the label, count and milestone on one line: "Tasks 235" sits over the milestone, on the
+   SLA's two rows, right-aligned against the Rewards key the milestone belongs to, so the slack stands between it and the SLA. */
+@media (max-width:359px) {
+  .l-phone .sla-gauge:not(.compact) .hud-tasks { display:grid; grid-template-columns:auto auto; grid-template-rows:16px 24px;
+    align-content:center; align-items:center; justify-content:end; justify-items:end; gap:0 4px; padding-right:4px; line-height:16px; }
+  .l-phone .sla-gauge:not(.compact) .hud-tasks [data-testid="hud-next-milestone"] { grid-column:1 / -1; grid-row:2; }
+  .l-phone .sla-gauge.compact .hud-tasks { gap:2px; }
+}
 .sla-gauge.compact .sla-reading { grid-template-rows:12px 18px; }
 .sla-gauge.compact .sla-title { line-height:12px; }
 .sla-gauge.compact .fig.big { font-size:var(--big); line-height:18px; }
@@ -23,3 +30,21 @@
 .rung.newly-unlocked { animation: level-unlocked 1s steps(2,end) infinite; }
 @keyframes level-unlocked { 0%,100% { background:#6b5324; box-shadow:inset 0 0 0 2px var(--gold); } 50% { background:#211c35; box-shadow:inset 0 0 0 2px #9d7d36; } }
 @media (prefers-reduced-motion:reduce) { .rung.newly-unlocked { animation:none; background:#6b5324; box-shadow:inset 0 0 0 2px var(--gold); } }
+/* The reward glyph: one cup before the next reward milestone and on the Rewards key, so the number reads as that key's target. */
+.hud-tasks > .dim { display: none; }
+.hud-tasks [data-testid="hud-next-milestone"], .round-rewards-count { display: inline-flex; align-items: center; gap: 2px; }
+.hud-tasks [data-testid="hud-next-milestone"] { margin-left: 2px; }
+.hud-tasks [data-testid="hud-next-milestone"]::before, .round-rewards-key:not(.ready)::before, .round-rewards-count::before { content: ''; flex: none;
+  width: calc(5 * var(--n)); height: calc(6 * var(--n)); background: currentColor;
+  -webkit-mask: var(--reward-glyph) center / 100% 100% no-repeat; mask: var(--reward-glyph) center / 100% 100% no-repeat; }
+.sla-gauge { --reward-glyph: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 5 6' shape-rendering='crispEdges'%3E%3Cpath d='M0 0h5v3h-1v1h-1v1h1v1h-3v-1h1v-1h-1v-1h-1z'/%3E%3C/svg%3E"); }
+.round-rewards-count { gap: 4px; }
+.l-phone .round-rewards-key:not(.ready) { gap: 2px; }
+/* A 48 px End round key keeps its full two-line label. */
+.band .end-round.compact { padding-left: 2px; padding-right: 2px; }
+/* Phones draw the cup on a finer grid (7 × 8 art px), so it stands as tall as its figure. */
+.l-phone .sla-gauge { --reward-glyph: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 7 8' shape-rendering='crispEdges'%3E%3Cpath d='M0 0h7v3h-1v1h-1v1h-1v1h1v1h1v1h-5v-1h1v-1h1v-1h-1v-1h-1v-1h-1z'/%3E%3C/svg%3E"); }
+.l-phone .hud-tasks [data-testid="hud-next-milestone"]::before, .l-phone .round-rewards-key:not(.ready)::before, .l-phone .round-rewards-count::before {
+  width: calc(7 * var(--n)); height: calc(8 * var(--n)); }
+/* The armed second tap: a solid amber face with ink text, so the question reads at a glance. */
+.band .end-round.warn { --face: var(--warn); --hi: #ffd98a; --lo: #b36b12; color: var(--ink); }

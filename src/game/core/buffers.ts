@@ -270,6 +270,8 @@ export const G = {
   recUsed: 25, parentUsed: 26,
   /** Exec: build revision + research mode it last anchored rates against; the global scheduler's last pick. */
   execStamp: 27, globalLast: 28,
+  /** 1 while the active project may run between rounds: the player started it during this break (spec §11.3). */
+  researchBreak: 29,
   failedWork: 30,
   /** This tick's met and failed work; the SLA step folds them into the round sums. */
   metWorkTick: 31, failWorkTick: 32,

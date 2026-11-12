@@ -1,46 +1,10 @@
-/* GPU tier ruling: the card's state first, then at most two buys. Same plate rim and keys as the board. */
-.v3-plate.gpu-picker { width: 440px; max-width: min(calc(100% - 16px), var(--plate-safe-width, 440px)); }
-.l-desktop .v3-plate.gpu-picker { width: 440px; }
-.gpu-picker .key { justify-content: space-between; gap: var(--s2); min-height: 44px; margin-top: 0; overflow-wrap: anywhere; }
-.gpu-picker .key:disabled .gpu-price { color: inherit; }
-.v3-plate .gpu-note { min-height: var(--lh); margin: 0; color: #a99be6; }
-.v3-plate .gpu-note.warn { color: #ffab98; }
-
-/* The card as it is: art, model and type, generation, the tier ladder and live duty (fixed height: updates in place). */
-.gpu-state { padding-bottom: var(--s2); border-bottom: 2px solid #332767; }
-.gpu-model { display: flex; align-items: center; gap: var(--s2); min-height: 44px; }
-.gpu-model canvas { width: 96px; height: 42px; flex: none; image-rendering: pixelated; }
-.gpu-model > div { display: flex; flex-direction: column; }
-.gpu-model b { color: #ff7ad9; }
-.gpu-model span { color: #a99be6; }
-.gpu-ladder { list-style: none; margin: var(--s2) 0 0; padding: 0; display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: var(--s1); }
-.gpu-ladder li { min-height: var(--lh); display: flex; align-items: center; justify-content: center; color: #6f64a8; background: #1f1a3a; }
-.gpu-ladder li.done { color: #efeaff; background: #3a2f70; }
-.gpu-ladder li.now { color: #171127; background: #ff7ad9; font-weight: 600; }
-.v3-plate .gpu-live { min-height: var(--lh); margin: 0; color: #c9c1e5; font-variant-numeric: tabular-nums; }
-
-/* One buy: what it is, before → after, what it costs in time, its key. */
-.gpu-step { padding: var(--s2) 0; border-bottom: 2px solid #332767; }
-.v3-plate .gpu-step-title { min-height: var(--lh); margin: 0; }
-.v3-plate .gpu-step-title b { color: #efeaff; }
-.gpu-delta { list-style: none; margin: var(--s1) 0 0; padding: 0; display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--s1); }
-.gpu-delta li { display: flex; justify-content: space-between; gap: var(--s2); min-width: 0; }
-.gpu-delta li span { color: #a99be6; }
-.gpu-delta li b { font-weight: 600; white-space: nowrap; }
-.gpu-delta li.up b { color: #8ef5ff; }
-.gpu-research-price { display: flex; flex-wrap: wrap; align-items: center; gap: var(--s2); margin-top: var(--s1); }
-.gpu-research-price .px-ic { margin-right: var(--s1); vertical-align: -1px; }
-.gpu-remove { padding-top: var(--s2); }
-.gpu-picker .gpu-npu { padding: var(--s2) 0; border-bottom: 2px solid #332767; }
-
-.gpu-tasks { margin: var(--s2) 0 0; padding: 0; list-style: none; display: grid; gap: var(--s1); color: #a99be6; }
-.gpu-tasks li { display: flex; align-items: center; gap: var(--s2); min-height: var(--lh); }
-.gpu-task-family { color: var(--paper); }
-/* The two pinned steps: equal halves, fixed height, always in view. */
-.gpu-picker .gpu-keys { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: var(--s2); }
-.gpu-picker .gpu-keys .key { margin-top: 0; }
-.v3-plate .gpu-why { min-height: var(--lh); margin: 0; }
-.gpu-type-keys { margin-top: var(--s2); display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: var(--s2); }
-.gpu-type-keys .key { margin-top: 0; }
-
-.v3-plate .gpu-keys .key .kl { white-space: nowrap; }
+/* GPU plate reading order: the card, its next tier, the next generation, then another type. */
+.gpu-picker .gpu-actions { display: grid; grid-template-columns: minmax(0, 1fr); gap: 4px; margin-top: 6px; }
+.gpu-picker .gpu-types { padding-top: 4px; border-top: 1px solid #332767; }
+.gpu-picker .choice-strip { flex-wrap: nowrap; }
+.gpu-picker .choice-strip button { flex: 1 1 0; }
+/* An empty bay: one row per card family, one selection across both. Every card shows its own price. */
+.gpu-picker .gpu-choose .inline-setting > span { width: 28px; }
+.gpu-picker .gpu-choose .choice-strip button { display: grid; justify-items: center; align-content: center; padding: 2px; line-height: var(--lh); }
+.gpu-picker .gpu-choose .choice-strip .pz { font-weight: 400; gap: 3px; }
+.gpu-picker .gpu-choose .choice-strip button.short .pz { color: #b9b0df; }

@@ -5,9 +5,9 @@ import { formatClock, type GameAction, type PowerCtlView, type RackId, type Rese
 import { genName } from './copy';
 import { quantity } from './format';
 import { PlateFrame } from './PlateFrame';
-import { PowerKeys } from './PowerKeys';
+import { PowerKeys, powerGeneration } from './PowerKeys';
 import { StartRow } from './StartRow';
-import { Status } from './widgets';
+import { Bar } from './widgets';
 import type { PlateCommon } from './types';
 
 /** The battery line: "BAT 4:12 left" while it carries the rack (the rack LCD's clock, QA-14), "On grid" once empty. */
@@ -32,9 +32,10 @@ export function PowerCtlPlate({ rack, view, research: _research, ...common }: Po
       <PowerKeys quotes={quotes} installed={false} level={0} noun="Power control" onAction={onAction} onResearch={onResearch} researchName={researchName} />
     </PlateFrame>;
   }
-  const b = view.battery;
-  return <PlateFrame {...frame} title="Power control" sub={`${genName('powerCtl', view.generation)} · L${view.level}`} className="part power-ctl">
-    <Status text={quantity(b.chargeJ, 'J') + ' / ' + quantity(b.capacityJ, 'J') + (b.discharging ? ' · Battery' : ' · Grid')} progress={b.capacityJ > 0 ? b.chargeJ / b.capacityJ : 0} />
+  const b = view.battery, charge = quantity(b.chargeJ, 'J') + ' / ' + quantity(b.capacityJ, 'J') + (b.discharging ? ' · Battery' : ' · Grid');
+  return <PlateFrame {...frame} title="Power control" sub={`${genName('powerCtl', view.generation).replace(/ power control$/i, '')} · L${view.level}`} usage={charge} className="part power-ctl"
+    generation={powerGeneration({ quotes, installed: true, onAction, onResearch, researchName })}>
+    <Bar progress={b.capacityJ > 0 ? b.chargeJ / b.capacityJ : 0} label={charge} />
     <section className="component-options"><StartRow unit={{ kind: 'rack', id: rack }} scope="rack" view={view.start} onAction={(a: GameAction) => onAction(a)} /></section>
     <PowerKeys quotes={quotes} installed level={view.level} noun="Power control" onAction={onAction} onResearch={onResearch} researchName={researchName} />
   </PlateFrame>;

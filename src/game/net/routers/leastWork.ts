@@ -1,5 +1,5 @@
 import { beginDecision } from '../routeMemo';
-import { finish } from '../finish';
+import { finish, least, leastFinish } from '../finish';
 import { summarized, summaryRank } from '../summary';
 import { sortBy, type RouteStrategy } from './types';
 
@@ -14,12 +14,25 @@ export const leastWork: RouteStrategy = {
   weighted: true,
   plan(w, kind, _id, r, cand, slot, weight, n) {
     beginDecision();
-    const score = new Float64Array(n);
+    if (score.length < n) score = new Float64Array(n * 2);
     for (let i = 0; i < n; i += 1) {
       score[i] = summarized(kind) ? summaryRank(w, kind, cand[i]!, r) : finish(w, kind, cand[i]!, r);
       weight[i] = Number.isFinite(score[i]!) ? 1 / Math.max(1e-9, score[i]!) : 1e-300;
     }
-    sortBy(cand, slot, weight, n, (i) => score[i]!);
+    sortBy(cand, slot, weight, n, scoreAt);
     return n;
   },
+  /**
+   * One shard goes to the largest weight, ties to the first in score order: with no NaN score and a
+   * lowest score under 1e290 (so its weight beats every non-finite score's 1e-300), that is the
+   * first candidate with the lowest score, since a weight never rises with its score.
+   */
+  single(w, kind, _id, r, cand, weight, n) {
+    beginDecision();
+    const at = leastFinish(w, kind, cand, n, r);
+    if (at >= 0) weight[at] = 1 / Math.max(1e-9, least.score);
+    return at;
+  },
 };
+let score = new Float64Array(64);
+const scoreAt = (i: number): number => score[i]!;

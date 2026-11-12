@@ -5,7 +5,7 @@ import type { ChipSnapshot } from '../../../game';
 import { P, R, copyRect, partVersionOf, resetHitTarget, sumVersions } from '../../core';
 import type { HitTarget, LevelRegistry, LevelRenderer, Rect, WorldForm, WorldFrame } from '../../core';
 import { chipLabels } from './labels';
-import { coreSites } from './layout';
+import { coreSites, setRestArea } from './layout';
 import { partRef } from './model';
 import type { TargetId } from './model';
 import { drawChipMini } from './mini';
@@ -29,26 +29,22 @@ function slot(s: ChipSnapshot, out: HitTarget[], i: number, id: TargetId, r: Rec
 export function createChipRenderer(_registry: LevelRegistry): LevelRenderer<'chip'> {
   const pickups = new QueuePickups();
   let lastFrame: WorldFrame | null = null;
-  let restForm: WorldForm = 'desktop', restHeight = Infinity;
+  let restForm: WorldForm = 'desktop';
   return {
-    id: 'chip', name: 'CPU',
-    /** The die grows with its cores (user): it keeps 3× desktop / 2× phone and pans down rather than shrink. */
-    panAtRestScale: true,
+    id: 'chip', name: 'CPU', plansAtRest: true, panCue: true,
+    // The die rests whole (D15.2): layout.ts picks the floorplan that fits the free world, and the core
+    // the largest scale it fits at. Only a die with no plan that fits rests at 2 and pans down.
     size: (s, out, form) => copyRect(chipFloor(s, form).world, out),
     focus(s, _vp, out, form, area) {
       restForm = form ?? 'desktop';
-      if (area) restHeight = area.h / area.scale;
+      // (a call without the area, off the rest path, keeps the last plan)
+      if (area) setRestArea(area);
       return copyRect(chipFloor(s, restForm).focus, out);
     },
     miniRect: (s, out, form) => copyRect(chipFloor(s, form).pkg, out),
     entry(s, out, form) { const f = chipFloor(s, form); out.x = f.inp.x; out.y = f.inp.y; return out; },
-    /** Short phones open on the clock and working cores. The full queue/cache remain reachable by panning. */
-    restCentre(s, out) {
-      const f = chipFloor(s, restForm), first = coreSites(f, siteCount(s))[0];
-      out.x = f.pkg.x + f.pkg.w / 2;
-      out.y = restForm === 'phone' && first && restHeight < first.y + first.h - f.focus.y
-        ? (f.clock.y + first.y + first.h) / 2 : f.focus.y;
-    },
+    /** A die too tall for the view opens on its top: the queue, the cache and the first cores (tasks take the lowest free core). The rest is a pan away. */
+    restCentre(s, out) { const f = chipFloor(s, restForm); out.x = f.pkg.x + f.pkg.w / 2; out.y = f.focus.y; },
     draw(g, s, view, frame) {
       lastFrame = frame; const form = frame.form ?? 'desktop';
       const queue = pickups.update(s, frame);

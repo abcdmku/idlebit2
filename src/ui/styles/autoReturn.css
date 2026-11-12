@@ -8,3 +8,13 @@
 .research-mode-times span { white-space: normal; }
 
 .auto-return-control b { min-width: 32px; text-align: right; }
+/* A portrait phone's report: both keys share one row, so the details keep the height. The switch names itself, then its state and timer. */
+@media (max-width: 479px) {
+  .v3-plate.round-plate .keys { flex-direction: row; }
+  .v3-plate.round-plate .keys > * { flex: 1 1 0; min-width: 0; }
+  .round-plate .auto-return-control { display: grid; grid-template-columns: auto minmax(0, 1fr); grid-template-areas: "label label" "state time";
+    align-content: center; gap: 0 6px; padding: 0 8px; white-space: nowrap; }
+  .round-plate .auto-return-control > span:first-child { grid-area: label; }
+  .round-plate .auto-return-control b { grid-area: state; min-width: 0; text-align: left; }
+  .round-plate .auto-return-control .auto-return-time { grid-area: time; margin: 0; text-align: left; }
+}

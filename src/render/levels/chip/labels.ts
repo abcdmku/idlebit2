@@ -41,8 +41,10 @@ export function chipLabels(chip: ChipSnapshot, frame: WorldFrame, out: LabelWrit
   // (One level: the in-use run fits the desktop cache row at either scale; the phone row has no room for it.)
   const clockName = form === 'phone' && chip.cpuCount > 1 ? `CPU ${chip.socket + 1} · Clock` : 'Clock';
   if (!view?.sourceActions?.includes('clock')) {
-    const clock = out.label('clock', f.clock.x + pad, f.clock.y + (f.clockAbove ? 8 : pad)).text(clockName, 'name', true);
-    (f.clockAbove ? clock : clock.br()).text(formatHertz(chip.clock.hz), 'value');
+    // a Clock row carries name and speed on one line; a Clock block (beside the cores or the cache) stacks them
+    const row = f.clockAbove && f.clock.w > 2 * f.clock.h;
+    const clock = out.label('clock', f.clock.x + pad, f.clock.y + (row ? (f.clock.h - 8) / 2 : pad)).text(row ? clockName : 'Clock', 'name', true);
+    (row ? clock : clock.br()).text(formatHertz(chip.clock.hz), 'value');
   }
 
   const n = siteCount(chip), sites = coreSites(f, n), price = view?.sourceActions?.includes('add:core') ? null : addCorePrice(view, chip);
@@ -62,7 +64,8 @@ export function chipLabels(chip: ChipSnapshot, frame: WorldFrame, out: LabelWrit
       const r = sites[i]!, core = chip.cores[i]!;
       if (!tileLabelFits(core, r, frame)) continue;
       out.label(LABEL_IDS[i]!, r.x + r.w / 2, r.y + 2, 'center').text(readySpeedText(core, chip, live), coreSleep(core) || !live ? 'dim' : 'value');
-      if (live) out.label(`${LABEL_IDS[i]}a`, r.x + r.w / 2, r.y + 10, 'center')
+      // (a dense plan's short tile has no line for the activity: its type mark and progress stay)
+      if (live && r.h >= 26) out.label(`${LABEL_IDS[i]}a`, r.x + r.w / 2, r.y + 10, 'center')
         .text(coreActivityText(core, true), coreActivityTone(core));
     }
     return;

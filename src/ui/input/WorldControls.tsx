@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { restPan, type HitTarget, type Rect } from '../../render/core';
+import { BG, restPan, type HitTarget, type Rect } from '../../render/core';
 import { rackRowScroll } from '../../render/levels/rack';
 import { REGION_IDS } from '../../game';
 import { regionName, SLOT_TITLE, UNIT_NOUN } from '../plates/copy';
@@ -7,6 +7,7 @@ import { useLayout } from '../shell/geometry';
 import { useShell } from '../storeHooks';
 import { LEVEL_NAMES } from '../viewState';
 import { activateTarget } from './commands';
+import { FirstBuy } from './FirstBuy';
 import { SourceControl } from './SourceControl';
 import { sourceRequest } from './sourceAction';
 
@@ -19,6 +20,7 @@ export function targetLabel(t: HitTarget): string {
   if (t.kind === 'port') return t.port === -1 ? 'Uplink' : `Port ${(t.port ?? 0) + 1}`;
   if (t.part) return `${SLOT_TITLE[t.part.slot.kind]}${'index' in t.part.slot ? ` ${t.part.slot.index + 1}` : ''}`;
   if (t.id === 'queue') return 'Add scheduler';
+  if (t.id === 'locked') return 'Locked regions';
   if (t.owner.level === 'global' && t.kind === 'slot' && t.unit?.kind !== 'site' && t.slot !== null)
     return `Add site in ${regionName(REGION_IDS[t.slot]!)}`;
   if (t.kind === 'unit' && t.unit) return `${UNIT_NOUN[t.unit.kind]} ${'id' in t.unit ? t.unit.id + 1 : ''}`.trim();
@@ -33,14 +35,30 @@ export function WorldControls() {
   const [targets, setTargets] = useState<readonly HitTarget[]>([]);
   const buttons = useRef(new Map<string, HTMLButtonElement>());
   const current = useRef(new Map<string, HitTarget>());
+  const above = useRef<HTMLDivElement>(null), below = useRef<HTMLDivElement>(null);
+  // The pan cue: where a panned rest cuts the level, that edge fades out under a chevron, so the cut reads as
+  // "more this way". Real state: each edge shows only while the window can still move toward it.
   useEffect(() => {
-    let key = '', nextRead = 0;
+    const cue = () => {
+      const a = above.current, b = below.current, renderer = shell.surface.renderer;
+      if (!a || !b) return;
+      const cut = !!renderer && !renderer.transition && restPan.active && restPan.fullH > restPan.viewH, at = restPan.shareY;
+      a.hidden = !cut || at <= 0.001; b.hidden = !cut || at >= 0.999;
+      if (cut) a.parentElement!.style.setProperty('--world-bg', BG[shell.store.getSnapshot().focus.level]);
+    };
+    shell.surface.frameListeners.add(cue);
+    return () => { shell.surface.frameListeners.delete(cue); };
+  }, [shell]);
+  useEffect(() => {
+    let key = '', nextRead = 0, moving = false;
     const bounds: Rect = { x: 0, y: 0, w: 0, h: 0 };
     const read = (_simTime: number, nowS: number) => {
-      if (nowS < nextRead) return;
-      nextRead = nowS + 0.25;
       const renderer = shell.surface.renderer;
       if (!renderer) return;
+      // A zoom that starts or lands is read at once: the landed level's add controls mount on that frame, not a cadence later.
+      const zooming = renderer.transition !== null;
+      if (nowS < nextRead && zooming === moving) return;
+      nextRead = nowS + 0.25; moving = zooming;
       const list = renderer.getTargets();
       current.current = new Map(list.map(t => [t.id, t]));
       const next = list.map(t => `${t.owner.level}:${t.owner.id}:${t.id}:${targetLabel(t)}`).join('|');
@@ -72,11 +90,17 @@ export function WorldControls() {
     if (restPan.active) restPan.scrollBy(dx / restPan.scale, dy / restPan.scale);
     else if (t.owner.level === 'rack') rackRowScroll.scrollBy(dx / rackRowScroll.scale);
   };
-  return <div className="world-controls" role="group" aria-label="Hardware parts" data-free="art">
+  // Like the canvas labels, nothing here draws outside the world's view: a site the pan cuts is cut with it.
+  const clip = `inset(${L.view.y}px ${L.w - L.view.x - L.view.w}px ${L.h - L.view.y - L.view.h}px ${L.view.x}px)`;
+  const edge = { left: L.view.x, width: L.view.w };
+  return <div className="world-controls" role="group" aria-label="Hardware parts" data-free="art" style={{ clipPath: clip }}>
     {targets.map(t => <button key={t.id} type="button" className="world-key" aria-label={targetLabel(t)}
       ref={el => { if (el) buttons.current.set(t.id, el); else buttons.current.delete(t.id); }}
       onFocus={() => focus(t.id)} onBlur={() => shell.surface.renderer?.press(null)}
       onClick={() => { const live = current.current.get(t.id); if (live) activateTarget(shell, live); }}>{targetLabel(t)}</button>)}
     {targets.filter(t => sourceRequest(t, shell.store.getSnapshot().focus)).map(t => <SourceControl key={`source-${t.id}`} target={t} />)}
+    <FirstBuy targets={targets} />
+    <div ref={above} className="pan-edge pan-above" style={{ ...edge, top: L.view.y }} data-pan-cue="above" aria-hidden="true" hidden />
+    <div ref={below} className="pan-edge pan-below" style={{ ...edge, top: L.view.y + L.view.h - 32 }} data-pan-cue="below" aria-hidden="true" hidden />
   </div>;
 }

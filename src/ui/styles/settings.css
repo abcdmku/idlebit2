@@ -2,16 +2,36 @@
 .settings-veil .settings-page { position: relative; display: flex; flex-direction: column; --rim: #5d5296; }
 .settings-head { flex: none; position: relative; min-height: 64px; display: flex; align-items: center; padding: 0 72px 0 16px; }
 .settings-head h1 { font-size: var(--head); margin: 0; }
-.settings-body { min-height: 0; overflow-y: auto; overscroll-behavior: contain; padding: 0 16px 16px; }
-.settings-body h2 { font-size: var(--body); margin: 0; }
-.music-heading { display: flex; align-items: center; justify-content: space-between; min-height: 44px; }
+/* A cut edge shows a rim line while more of the list lies beyond it (the covers scroll away with the content). */
+.settings-body { min-height: 0; overflow-y: auto; overscroll-behavior: contain; padding: 0 16px 16px;
+  --edge: calc(100% - 16px);
+  background: linear-gradient(var(--fill), var(--fill)) top / var(--edge) 8px no-repeat local, linear-gradient(var(--fill), var(--fill)) bottom / var(--edge) 8px no-repeat local,
+    linear-gradient(var(--rim), var(--rim)) 50% 1px / var(--edge) 2px no-repeat scroll, linear-gradient(var(--rim), var(--rim)) 50% calc(100% - 1px) / var(--edge) 2px no-repeat scroll; }
+.settings-body h2 { font-size: var(--head); margin: 0; }
+.settings-body p { margin: 0; }
+/* One column: sections stack under hairlines. Wide: music and tracks left; effects, keys and save right. */
+.settings-section { min-width: 0; }
+.settings-section + .settings-section { margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--panel-hi); }
+.settings-section > h2 { padding: 0 0 8px; }
+.settings-body.wide { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); grid-template-rows: auto auto 1fr; column-gap: 24px;
+  grid-template-areas: "music effects" "tracks keys" "tracks save"; align-items: start; }
+.wide .settings-music { grid-area: music; }
+.wide .settings-effects { grid-area: effects; margin-top: 0; padding-top: 0; border-top: 0; }
+.wide .settings-tracks { grid-area: tracks; }
+.wide .settings-controls { grid-area: keys; }
+/* Desktop: Save ends the right column on the last track's bottom edge, so both columns end level. (A landscape phone
+   scrolls this body, so there Save stays right under Effects, in view.) */
+.wide .settings-save { grid-area: save; }
+.l-desktop .wide .settings-save { align-self: end; }
+.music-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 48px; }
+.music-heading h2, .music-heading .skey { flex: none; }
 .settings-page .music-play { position: relative; width: 96px; height: 48px; }
-.music-volume { display: grid; grid-template-columns: 1fr auto; align-items: center; margin-top: 8px; }
-.music-volume output { color: var(--cyan); text-align: right; }
-.music-volume input { grid-column: 1 / -1; width: 100%; min-width: 0; height: 44px; margin: 0; cursor: pointer; accent-color: var(--cyan); }
+.music-volume { display: grid; grid-template-columns: auto minmax(0, 1fr) 5ch; align-items: center; column-gap: 12px; }
+.music-volume label { grid-area: 1 / 1; }
+.music-volume input { grid-area: 1 / 2; width: 100%; min-width: 0; height: 44px; margin: 0; cursor: pointer; accent-color: var(--cyan); }
+.music-volume output { grid-area: 1 / 3; color: var(--cyan); text-align: right; }
 .music-volume input:focus-visible { outline: 2px solid var(--focus); outline-offset: -2px; }
-.music-tracks-title { padding: 8px 0; }
-.music-tracks { display: flex; flex-direction: column; gap: 2px; }
+.music-tracks { display: flex; flex-direction: column; gap: 2px; margin: 0; padding: 0; list-style: none; }
 .music-track { width: 100%; min-height: 44px; display: grid; grid-template-columns: 16px minmax(0, 1fr) auto;
   align-items: center; gap: 8px; padding: 4px 8px !important; box-sizing: border-box; background: var(--well) !important;
   box-shadow: inset 0 0 0 2px var(--panel-hi); text-align: left; }
@@ -21,7 +41,22 @@
 .music-track-tier { color: var(--muted); white-space: nowrap; }
 .music-track:disabled { color: var(--dim); }
 .music-track:disabled .music-track-mark { color: var(--dim); }
-.music-status { min-height: var(--lh); margin: 8px 0 0; color: var(--warn); }
+.music-status { flex: 1; min-width: 0; color: var(--warn); text-align: right; }
+.shortcuts { display: flex; flex-wrap: wrap; gap: 8px 24px; margin: 0; }
+.shortcuts > div { display: flex; align-items: center; gap: 8px; }
+.shortcuts dt { display: flex; gap: 4px; }
+.shortcuts dd { margin: 0; color: var(--muted); }
+.shortcuts kbd { box-sizing: border-box; min-width: 24px; height: 24px; padding: 0 6px; display: inline-flex; align-items: center; justify-content: center;
+  font: inherit; font-weight: 600; background: var(--well); box-shadow: inset 0 0 0 2px var(--panel-hi); }
+.save-keys { display: flex; gap: 8px; }
+.settings-page .save-keys .skey, .settings-page .save-reset { position: relative; flex: 1; min-width: 0; height: 48px; }
+/* One reserved line: every message is short, so Reset never moves. */
+.save-status { min-height: var(--lh); margin: 8px 0 !important; color: var(--muted); }
+.save-status.bad { color: var(--warn); }
+.settings-page .save-reset { width: 100%; --face: #2a1422; --hi: #7a2a3a; --lo: #190a14; color: var(--fault-text); }
+/* Armed Import: a solid amber face with ink text, as the HUD's armed End round. */
+.settings-page .save-keys .skey.warn { --face: var(--warn); --hi: #ffd98a; --lo: #b36b12; color: var(--ink); }
+.settings-page .save-reset.armed { --face: #7a1622; --hi: var(--fault); --lo: #3a0a10; color: var(--paper); }
 .l-desktop .settings-head { min-height: 80px; padding-left: 16px; padding-right: 96px; }
 .l-desktop .settings-body { padding: 0 16px 16px; }
 @media (max-width: 359px) {

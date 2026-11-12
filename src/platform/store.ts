@@ -18,6 +18,12 @@ export interface CatchUpProgress {
   readonly awayMs: number;
 }
 
+/** The absence behind the pending offline report: its full length and the sim time its cap allowed. */
+export interface OfflineAbsence {
+  readonly awayMs: number;
+  readonly totalMs: number;
+}
+
 /** What UI and render read. Everything else on RuntimeStore belongs to the runtime. */
 export interface GameStore {
   getState(): GameState;
@@ -30,6 +36,8 @@ export interface GameStore {
   getCatchUp(): CatchUpProgress | null;
   /** Totals of the last catch-up, until dismissed. */
   getOfflineReport(): AdvanceReport | null;
+  /** Null without a report. Of several catch-ups folded into one report, the one the cap cut most. */
+  getOfflineAbsence(): OfflineAbsence | null;
   dismissOfflineReport(): void;
   getNotice(): string | null;
   /** Applies at once, or queues while hydrating or catching up (returns null) and applies at the next chunk boundary. */
@@ -47,7 +55,7 @@ export interface RuntimeStore extends GameStore {
   takeQueued(): GameAction[];
   setLifecycle(update: Partial<Lifecycle>): void;
   setCatchUp(progress: CatchUpProgress | null): void;
-  setOfflineReport(report: AdvanceReport | null): void;
+  setOfflineReport(report: AdvanceReport | null, absence?: OfflineAbsence): void;
   setNotice(notice: string | null): void;
   /** Settles a live dispatch before applying it; may start catch-up or return false after a fatal error. Queued replay skips it. */
   setActionBoundary(callback: (() => boolean | void) | null): void;
@@ -74,6 +82,7 @@ export function createGameStore(options: StoreOptions = {}): RuntimeStore {
   let snapshot: RenderSnapshot | null = null, stale = true;
   let lifecycle: Lifecycle = { hydrated: false, catchingUp: false, saveDriver: 'memory' };
   let catchUp: CatchUpProgress | null = null, offlineReport: AdvanceReport | null = null, notice: string | null = null;
+  let offlineAbsence: OfflineAbsence | null = null;
   let depth = 0, dirty = false, disposed = false, boundary: (() => boolean | void) | null = null;
   /**
    * True once `state` came from the store's own ticking advance, so no one else can hold its hot
@@ -93,7 +102,7 @@ export function createGameStore(options: StoreOptions = {}): RuntimeStore {
     const outcome = applyAction(state, action);
     if (outcome.ok) {
       state = outcome.state; owned = false;
-      if (action.type === 'reset') offlineReport = null;
+      if (action.type === 'reset') { offlineReport = null; offlineAbsence = null; }
       changed(true);
     }
     return outcome;
@@ -110,6 +119,7 @@ export function createGameStore(options: StoreOptions = {}): RuntimeStore {
     getLifecycle: () => lifecycle,
     getCatchUp: () => catchUp,
     getOfflineReport: () => offlineReport,
+    getOfflineAbsence: () => offlineAbsence,
     dismissOfflineReport() { store.setOfflineReport(null); },
     getNotice: () => notice,
     dispatch(action) {
@@ -159,7 +169,13 @@ export function createGameStore(options: StoreOptions = {}): RuntimeStore {
         && progress.totalMs === catchUp.totalMs && progress.awayMs === catchUp.awayMs)) return;
       catchUp = progress; changed(false);
     },
-    setOfflineReport(report) { if (report !== offlineReport) { offlineReport = report; changed(false); } },
+    setOfflineReport(report, absence) {
+      if (report === offlineReport) return;
+      offlineReport = report;
+      if (!report) offlineAbsence = null;
+      else if (absence && (!offlineAbsence || absence.awayMs - absence.totalMs > offlineAbsence.awayMs - offlineAbsence.totalMs)) offlineAbsence = absence;
+      changed(false);
+    },
     setNotice(next) { if (next !== notice) { notice = next; changed(false); } },
     setActionBoundary(callback) { boundary = callback; },
     batch(operation) {

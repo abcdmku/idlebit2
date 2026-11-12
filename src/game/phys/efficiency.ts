@@ -7,8 +7,9 @@ import { publishClockFactor } from './draw';
 import { forRackSystems, syncRack, syncRoom } from './modes';
 
 /**
- * e(T) (spec §10.4): 1.10 at or below 50 °F, +0.5%/°F below 70, flat 70–80, −2.5%/°F above 80 to
- * a 0.25 floor (0.50 at 100 °F). Scales compute and GPU rates and divides the heat a rack makes.
+ * e(T) (spec §10.4): 1.10 at or below 50 °F, +0.5%/°F below 70, flat 70–80, −2.5%/°F above 80
+ * (0.50 at 100 °F) to a 0.01 floor near 120 °F. Scales compute and GPU rates. Above 80 °F the
+ * rack's draw falls on the same line (thermalDuty), so heat falls with the work done.
  */
 export function efficiency(tempF: number): number {
   if (tempF <= FLOOR_TEMP_F) return EFF_MAX;

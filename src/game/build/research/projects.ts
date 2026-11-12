@@ -50,6 +50,8 @@ function complete(w: World, id: ResearchId): void {
   r.completed = [...r.completed, id];
   r.active = null;
   r.activeProgress = 0;
+  // The next queued project was not started by the player this break: between rounds it waits for Return.
+  w.hot.g[G.researchBreak] = 0;
   r.unlocks = deriveUnlocks(r.completed);
   const opened = openContainers(w.build, r.unlocks);
   w.build = { ...opened, revision: w.build.revision + 1 };

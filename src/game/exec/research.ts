@@ -5,8 +5,8 @@ import { hwThreads } from './est';
 
 /**
  * Research rate (D27, spec §11.2). Research is a task that cuts the line: it runs only on the
- * systems that took it (`hot.sys.researchThreads`), on the threads they hold for it, during a round
- * and between rounds alike. There are no research shares: tasks always run at full rate, and idle
+ * systems that took it (`hot.sys.researchThreads`), on the threads they hold for it: during a round,
+ * and between rounds when the player started the project in that break (spec §11.3). There are no research shares: tasks always run at full rate, and idle
  * threads and GPUs do not research. Exec tallies research ops into G.researchOps; build applies
  * them (R22). Taking, holding and releasing live in researchTask.ts.
  */

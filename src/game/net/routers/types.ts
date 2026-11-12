@@ -15,6 +15,13 @@ export interface RouteStrategy {
   readonly id: RouteStrategyId;
   readonly weighted: boolean;
   plan(w: World, kind: number, id: number, r: number, cand: Int32Array, slot: Int32Array, weight: Float64Array, n: number): number;
+  /**
+   * When the split cuts one shard, only the candidate `plan` would give it to matters. Optional:
+   * returns that candidate's index in cand[0..n) (slot order, nothing reordered) with its weight
+   * written at that index, or -1 to have `plan` decide. Must pick exactly what `plan` and the
+   * split's choice would. Not for strategies the split clamps to one site.
+   */
+  single?(w: World, kind: number, id: number, r: number, cand: Int32Array, weight: Float64Array, n: number): number;
   /** After the split is reserved: `lastSlot` is the last child slot in walk order that got a share. */
   used?(w: World, kind: number, id: number, lastSlot: number): void;
 }

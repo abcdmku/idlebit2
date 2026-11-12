@@ -4,11 +4,11 @@
 import type { ServerSlotView } from '../../../game';
 import { P, R, frame as outline, lampState, mix, px } from '../../core';
 import type { Rect, WorldFrame } from '../../core';
-import { BOARD, BOARDS, WORLD, packageRect } from './layout';
+import { boardOf, packageRect } from './layout';
 
 type G = CanvasRenderingContext2D;
 const FACE = '#2b2842', FACE_HI = '#3d3a5a', BAY = '#1d1b30';
-const PKG = packageRect(BOARDS.general, 0);
+const PKG = { x: 0, y: 0, w: 0, h: 0 };
 
 function powerColour(slot: ServerSlotView, paused: boolean): string {
   switch (lampState(slot.state)) {
@@ -48,6 +48,9 @@ function frontPanel(g: G, slot: ServerSlotView, r: Rect, frame: WorldFrame): voi
 
 /** The board seen from above, at the full world's own proportions, so a zoom dissolves into it. */
 function topView(g: G, slot: ServerSlotView, r: Rect): void {
+  // the general board on the floorplan it rests on now (layout.ts boardOf)
+  const b = boardOf('general'), WORLD = b.world, BOARD = b.board;
+  packageRect(b, 0, PKG);
   const k = Math.min(r.w / WORLD.w, r.h / WORLD.h);
   const ox = r.x + (r.w - WORLD.w * k) / 2, oy = r.y + (r.h - WORLD.h * k) / 2;
   const X = (v: number) => Math.round(ox + v * k), Y = (v: number) => Math.round(oy + v * k);

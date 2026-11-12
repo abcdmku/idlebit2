@@ -30,10 +30,10 @@ export function CoolerPlate({ unit, cooler: c, lump, maxLevel, ...common }: Cool
       ? <div className="setpoint" role="group" aria-label="Setpoint">
         <span>Setpoint</span>
         <button type="button" className="step" aria-label="Lower setpoint" disabled={c.setpointF <= SETPOINT_MIN_F}
-          onClick={() => set(c.setpointF! - SETPOINT_STEP_F)}>−</button>
+          onClick={() => set(c.setpointF! - SETPOINT_STEP_F)}><i className="step-glyph" aria-hidden="true" /></button>
         <b aria-live="polite">{fahrenheit(c.setpointF)}</b>
         <button type="button" className="step" aria-label="Raise setpoint" disabled={c.setpointF >= SETPOINT_MAX_F}
-          onClick={() => set(c.setpointF! + SETPOINT_STEP_F)}>+</button>
+          onClick={() => set(c.setpointF! + SETPOINT_STEP_F)}><i className="step-glyph plus" aria-hidden="true" /></button>
       </div>
       : null}
   </PartPlate>;

@@ -66,7 +66,7 @@ export const BG: Readonly<Record<'chip' | 'system' | 'rack' | 'room' | 'global',
   system: '#1a1631',
   rack: '#141226',
   room: '#121022',
-  global: '#0f0d1e',
+  global: '#161d43', // open sea, mix(P.seaDeep, P.ink, 0.35): the World map's own sea colour, so the view has no map edge
 };
 
 // Stage-kind colours used by lanes, pads and packets.

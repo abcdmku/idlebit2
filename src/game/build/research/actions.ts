@@ -7,6 +7,7 @@ import { withoutKey } from './projects';
 import { researchDef } from './tree';
 import { deriveUnlocks } from './effects';
 import { compileAll, syncHotSizes } from '../../core/topology';
+import { G } from '../../core/buffers';
 import { commitWorld, openWorld } from '../../core/world';
 import { pushEvent } from '../../core/events';
 import { researchCosts } from '../../rewards/research';
@@ -49,11 +50,23 @@ export function researchLock(r: ResearchState, id: ResearchId, pending: readonly
 const withResearch = (state: GameState, research: Partial<ResearchState>): GameState => ({ ...state, research: { ...state.research, ...research } });
 const solvent = (state: GameState) => amountCompare(state.wallet.credits, 0) >= 0;
 
+/**
+ * Spec §11.3: between rounds a project runs only when the player starts it during that break.
+ * Sets or clears that request; a running round ignores and clears it.
+ */
+function withBreak(state: GameState, on: boolean): GameState {
+  const value = on && state.round.phase !== 'running' && solvent(state) ? 1 : 0;
+  if (state.hot.g[G.researchBreak] === value) return state;
+  const g = Float64Array.from(state.hot.g);
+  g[G.researchBreak] = value;
+  return { ...state, hot: { ...state.hot, g } };
+}
+
 /** Resumes paid progress free; a first start atomically pays Data and its optional Credit fee. */
 function start(state: GameState, id: ResearchId): ActionOutcome {
   if (researchDef(id)?.purchase) return purchase(state, id);
   const r = state.research;
-  if (r.active === id) return accept(state);
+  if (r.active === id) return accept(withBreak(state, true));
   const lock = researchLock(r, id, [], state.roundRewards.claimed);
   if (lock) return reject(state, lock.code, lock.reason);
   let next = state;
@@ -67,10 +80,10 @@ function start(state: GameState, id: ResearchId): ActionOutcome {
     next = paid.state;
   }
   const parked = r.active !== null ? { ...withoutKey(r.parked, id), [r.active]: r.activeProgress } : withoutKey(r.parked, id);
-  return accept(withResearch(next, {
+  return accept(withBreak(withResearch(next, {
     active: id, activeProgress: r.parked[id] ?? 0, parked, queue: r.queue.filter((q) => q !== id),
     needsData: false, stoppedInsolvent: !solvent(state),
-  }));
+  }), true));
 }
 
 export const researchHandlers: HandlerMap = {
@@ -112,13 +125,18 @@ export const researchHandlers: HandlerMap = {
   cancelResearch: (state) => {
     const r = state.research;
     if (r.active === null) return reject(state, 'invalid', 'No active project');
-    return accept(withResearch(state, { active: null, activeProgress: 0, parked: { ...r.parked, [r.active]: r.activeProgress }, stoppedInsolvent: false }));
+    return accept(withBreak(withResearch(state, { active: null, activeProgress: 0, parked: { ...r.parked, [r.active]: r.activeProgress }, stoppedInsolvent: false }), false));
   },
 
-  /** Resumes a project stopped for insolvency, once the wallet is non-negative (spec §11.4). */
+  /**
+   * Resumes the active project: lifts an insolvency stop once the wallet is non-negative (spec §11.4),
+   * and between rounds runs it now instead of at Return to market (spec §11.3).
+   */
   resumeResearch: (state) => {
-    if (!state.research.stoppedInsolvent) return accept(state);
+    const r = state.research;
+    if (r.active === null) return accept(state);
+    if (!r.stoppedInsolvent) return accept(withBreak(state, true));
     if (!solvent(state)) return reject(state, 'funds', 'Credits are negative');
-    return accept(withResearch(state, { stoppedInsolvent: false }));
+    return accept(withBreak(withResearch(state, { stoppedInsolvent: false }), true));
   },
 };

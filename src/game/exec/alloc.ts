@@ -12,7 +12,7 @@ import { freeHierarchy, unifiedRoom } from './memory';
 import { queueInsertAfter, queuePush, queueUnlink } from './lists';
 import { strategyOf } from './schedulers';
 import { memberPayload, shapeOf, wantThreads, workingSetOf } from './shape';
-import { admittedOf, keffOf, noteAdmit, noteAdmitted, noteTake, queueCapped, reserve, slotsOf, takesLeft, canAdmit } from './slots';
+import { admittedOf, keffOf, noteAdmit, noteAdmitted, noteRelease, noteTake, queueCapped, reserve, slotsOf, takesLeft, canAdmit } from './slots';
 import { startRecord } from './stages';
 import { CAUSE, returnTask } from './outcome';
 import { releaseQueuedPreload } from './preload';
@@ -84,6 +84,7 @@ export function landPipe(w: World, s: number, tau: number): void {
   h.pipeT0[s] = tau;
   addTransit(w.hot, -1);
   const before = canAdmit(w, s);
+  noteRelease();
   h.reserved[s] = h.reserved[s]! - 1;
   enqueue(w, s, r);
   noteAdmit(w, s, before);

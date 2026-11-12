@@ -1,11 +1,36 @@
 import { G, LOC, PARENT, RECORD, type HotBuffers } from './buffers';
-import { copyRow, growTable, resetRow } from './table';
+import { allocTable, copyRow, growTable, resetRow } from './table';
 import { unlinkDeadline } from './deadlines';
 
 /**
  * Record and parent pools with free lists (architecture §1.4, D25), and doubly linked list ops over
  * rec.prev / rec.next. Only call on a World's cloned hot buffers.
  */
+
+/**
+ * resetRow(RECORD, rec, r) written out by column: the route phase allocates a record per shard and
+ * per split attempt, and the generic row reset was its largest single cost. The check below fails
+ * at load if RECORD and this list ever disagree.
+ */
+function resetRecord(rec: HotBuffers['rec'], r: number): void {
+  rec.accelDomain[r] = -1; rec.family[r] = 0; rec.count[r] = 0; rec.stage[r] = 0; rec.units[r] = 0; rec.payout[r] = 0;
+  rec.shard[r] = 0; rec.sib[r] = -1; rec.start[r] = 0; rec.finish[r] = 0; rec.taken[r] = 0; rec.taskId[r] = 0;
+  rec.flags[r] = 0; rec.deadline[r] = -1; rec.thread0[r] = -1;
+  rec.memC[r] = 0; rec.memR[r] = 0; rec.memD[r] = 0; rec.memN[r] = 0; rec.trafR[r] = 0; rec.trafD[r] = 0;
+  rec.vramR[r] = 0; rec.vramD[r] = 0; rec.vramN[r] = 0; rec.part[r] = 0;
+  rec.preloadBits[r] = 0; rec.preloadDone[r] = 0; rec.batchBits[r] = 0;
+  rec.loaderThread[r] = -1; rec.loaderStart[r] = 0; rec.loaderFinish[r] = Infinity;
+  rec.loc[r] = 0; rec.owner[r] = -1; rec.target[r] = -1; rec.prev[r] = -1; rec.next[r] = -1; rec.parent[r] = -1; rec.threads[r] = 0;
+}
+{
+  const a = allocTable(RECORD, 1, 1), b = allocTable(RECORD, 1, 1);
+  for (const key of Object.keys(RECORD) as (keyof typeof RECORD)[]) { a[key].fill(7); b[key].fill(7); }
+  resetRow(RECORD, a, 0);
+  resetRecord(b, 0);
+  for (const key of Object.keys(RECORD) as (keyof typeof RECORD)[]) {
+    if (a[key].length !== 1 || !Object.is(a[key][0], b[key][0])) throw new Error(`pool: resetRecord does not reset RECORD.${key}`);
+  }
+}
 
 export function allocRecord(hot: HotBuffers): number {
   const rec = hot.rec;
@@ -17,7 +42,7 @@ export function allocRecord(hot: HotBuffers): number {
     r = rec.len;
     rec.len += 1;
   }
-  resetRow(RECORD, rec, r);
+  resetRecord(rec, r);
   hot.g[G.recUsed] = hot.g[G.recUsed]! + 1;
   return r;
 }

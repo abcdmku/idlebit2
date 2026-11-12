@@ -106,23 +106,24 @@ export function startRecord(w: World, s: number, r: number, tau: number, span: S
  * so a task never moves to another core when an earlier one finishes. Exact, and O(running on s).
  */
 const occupied: Uint8Array = new Uint8Array(512);
+/** Marks the threads running record x holds, below `total`. */
+function markThreads(rec: World['hot']['rec'], x: number, total: number): void {
+  const t0 = rec.thread0[x]!;
+  if (t0 < 0) return;
+  const held = rec.count[x]! * rec.threads[x]!;
+  for (let t = t0; t < t0 + held && t < total; t += 1) occupied[t] = 1;
+}
 function bindThreads(w: World, s: number, r: number, n: number, at: number): void {
   const rec = w.hot.rec, h = w.hot.sys;
   const total = Math.min(occupied.length, Math.max(1, w.compiled.sys.threads[s]!));
   occupied.fill(0, 0, total);
   for (let q = h.queueHead[s]!; q >= 0; q = rec.next[q]!) if (rec.loaderThread[q]! >= 0) occupied[rec.loaderThread[q]!] = 1;
-  const mark = (x: number) => {
-    const t0 = rec.thread0[x]!;
-    if (t0 < 0) return;
-    const held = rec.count[x]! * rec.threads[x]!;
-    for (let t = t0; t < t0 + held && t < total; t += 1) occupied[t] = 1;
-  };
   for (let res = 0; res < NRES; res += 1) {
     if (res === GPU) continue;
-    for (let x = h.head[s * NRES + res]!; x >= 0; x = rec.next[x]!) if (x !== r) mark(x);
+    for (let x = h.head[s * NRES + res]!; x >= 0; x = rec.next[x]!) if (x !== r) markThreads(rec, x, total);
   }
   for (let a = 0; a < ACCEL_CLOCKS; a += 1) {
-    for (let x = h.accelHead[s * ACCEL_CLOCKS + a]!; x >= 0; x = rec.next[x]!) if (x !== r) mark(x);
+    for (let x = h.accelHead[s * ACCEL_CLOCKS + a]!; x >= 0; x = rec.next[x]!) if (x !== r) markThreads(rec, x, total);
   }
   let first = -1, run = 0;
   for (let t = 0; t < total; t += 1) {

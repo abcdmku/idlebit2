@@ -70,6 +70,7 @@ export interface ViewPresentation {
   readonly picked: string | null;
   /** Tray quotes the UI already holds for the visible level; null leaves ghosts unpriced. */
   readonly quotes: QuoteResult | null;
+  /** Target ids whose name and price the UI draws on the site: the level draws no label or "+" there. The renderer fills this in from `CanvasRenderer.claim`. */
   readonly sourceActions?: readonly string[];
   readonly reducedMotion: boolean;
   /** The level a multi-level zoom is heading for (ViewState.goal), so its steps play as one move. */
@@ -155,8 +156,16 @@ export interface LevelRenderer<L extends LevelId = LevelId> {
   partVersion?(snapshot: SnapshotOf<L>, id: string): number | null;
   /** Optional: seconds the rest camera eases to a new focus (default 0.25; the rack row snaps in 0.15). */
   restEaseS?(snapshot: SnapshotOf<L>): number;
-  /** The level is always shown whole at rest (System, D15.2): never panned, even below scale 2 on phone. */
+  /** The level is shown whole at rest (System, D15.2): never panned on desktop. A phone too small for it at 2 pans it (restPan.ts). */
   readonly wholeAtRest?: boolean;
+  /** True when `focus()` lays the level out for the free world it is given (CPU, World): the core calls it before any other geometry method of a rest frame. */
+  readonly plansAtRest?: boolean;
+  /** Optional (desktop): the level's free world also takes the callout dock's gutter, up to a lattice from the view's right edge (the World map). */
+  readonly spansDock?: boolean;
+  /** Optional: a payout pop stays inside its `payoutAnchor` rect: it starts on the rect's foot and rises to its top at most, so it never crosses the labels around it (World). */
+  readonly popInside?: boolean;
+  /** Optional: while the rest pans down this level, the core marks the window's place in the focus on the view's right edge (restPan.ts `drawPanCue`). */
+  readonly panCue?: boolean;
   /** Optional: rest at the framing's own scale N always; a focus too big for it pans (restPan) instead of dropping the scale (the CPU's growing die). */
   readonly panAtRestScale?: boolean;
   /**
@@ -201,6 +210,11 @@ export interface CanvasRenderer {
   getTargets(): readonly HitTarget[];
   /** A touch press on `target` (from `hit`): its reduced-strength bracket until `press(null)`. Hover uses `ViewPresentation.hoverId`. */
   press(target: HitTarget | null): void;
+  /**
+   * The UI's DOM control now stands on target `id` (or no longer does). A claimed target draws no canvas label or
+   * "+". A change redraws the last frame at once, so no painted frame shows both labels or neither.
+   */
+  claim(id: string, on: boolean): void;
   /** The zoom in progress. The UI drops the scope partner once this is null again. */
   readonly transition: TransitionInfo | null;
   dispose(): void;
@@ -208,6 +222,8 @@ export interface CanvasRenderer {
 export interface CanvasRendererDebug extends CanvasRenderer {
   /** Freeze the zoom at a progress (QA); null releases it. */
   hold(progress: number | null): void;
+  /** QA: the rest labels' lines (text and CSS rect), for the DOM/canvas overlap probe. */
+  labelRects(): readonly { readonly id: string; readonly text: string; readonly x: number; readonly y: number; readonly w: number; readonly h: number }[];
   readonly bufferCount: number;
 }
 

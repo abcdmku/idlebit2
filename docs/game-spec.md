@@ -308,7 +308,7 @@ Removing hardware or reducing capacity fails only jobs that can no longer use th
 
 Downgrade and removal return 50% of the actual paid Credit investment relinquished, rounded down once per action. A single step down returns half its paid upgrade cost; removing hardware returns half its remaining paid basis. RAM and drive capacity and speed retain independent cost histories, including bulk upgrades. Extra-part prices and bundled purchases record their actual paid cost. Free starter or research-granted hardware has zero paid basis. Refunds cannot increase when other hardware later raises a replacement price. Configurations also refund hardware they remove. Refunds update wallet history without counting as task earnings. Research Data is not refunded. Save version 37 stores these histories; older pre-live saves reset without migration.
 
-The existing Downgrade and Remove controls show their refund inline. Compact memory minus buttons retain their geometry and expose the exact Credit refund in their tooltip and accessible name. Remove remains a text button.
+The existing Downgrade and Remove controls show their refund inline. Compact memory minus buttons retain their geometry and expose the exact Credit refund in their tooltip and accessible name. Downgrade and Remove are matching boxed keys (D78).
 
 **Rolling upgrade** applies one saved configuration to the rack's servers in one purchase. Hardware compatibility is checked for each existing job; there is no drain or reboot for a compatible edit.
 
@@ -957,7 +957,7 @@ Loss is real power: it is billed and becomes heat in the lump that holds the sup
 
 D67: there is no board power-supply component, purchase or loss. The starter system has a fixed 1 view W allocation supplied by its hidden rack's basic PDU. Actual component power is shown on the board. Rack unlock exposes PDU upgrades, which raise that same allocation.
 
-Every hardware purchase or upgrade reserves the full installed load of its whole rack, including offline hardware, peak pipe/network traffic, enabled turbo and rack infrastructure. The starter allocation reserves the existing rack parts before the Rack view opens, so unlocking it cannot overload an approved board build. Cooling reserves its full draw at maximum supported lift. A purchase exceeding PDU capacity is rejected before charging Credits. Open rooms also enforce their shared UPS capacity. Quotes show the same limit. The component buy button stays disabled with Power limit; it never offers a PDU, UPS or research purchase from another component popup. Downgrades that reduce an existing excess remain possible. Cooling capacity never locks a build.
+Every hardware purchase or upgrade reserves the full installed load of its whole rack, including offline hardware, peak pipe/network traffic, enabled turbo and rack infrastructure. The starter allocation reserves the existing rack parts before the Rack view opens, so unlocking it cannot overload an approved board build. Cooling reserves its full draw at maximum supported lift. A purchase exceeding PDU capacity is rejected before charging Credits. Open rooms also enforce their shared UPS capacity, and open sites their grid feed: the sum of their zones' allocations plus UPS losses (D79). A purchase or downgrade that would exceed any of the three is rejected with Power limit, so no supply can overload or fail in legal play. Quotes show the same limit. The component buy button stays disabled with Power limit; it never offers a PDU, UPS or research purchase from another component popup. Downgrades that reduce an existing excess remain possible. Cooling capacity never locks a build.
 
 Basic PDU capacity starts at 1 view W and doubles per level. Rack research costs 270k Data and 2.7M Credits, with 18M CPU ops of work. The active seed-42 campaign reaches the starter limit near 3.5 h and unlocks Rack at about 4 h. No timer grants this access.
 
@@ -1012,7 +1012,7 @@ Each site bills at its region's energy price (§3.3). Parts fed from utility (gl
 
 ### 9.7 What draws between rounds
 
-Between rounds hardware is `paused` and draws nothing, unless research runs (§11.3). A paused unit costs nothing.
+Between rounds hardware is `paused` and draws nothing, unless the player runs research in that break (§11.3, D79). A paused unit costs nothing.
 
 ### 9.8 Ledger: payouts, Data and energy
 
@@ -1076,8 +1076,8 @@ All lumps start at their surroundings' temperature and never go below the 50 °F
 ### 10.3 Heat input
 
 ```text
-Hrack = Σ over its systems (Σ actualW of their parts) / (η_cfg × e(Track))
-      + storage node part watts
+Hrack = Σ over its systems (Σ actualW of their parts) × duty(Track)
+      + storage node part watts × duty(Track)
       + PDU loss + switch W + load balancer W
 
 Hzone = Σ over its racks (moved out of the rack this tick, §10.5)
@@ -1087,7 +1087,7 @@ Hzone = Σ over its racks (moved out of the rack this tick, §10.5)
 
 Rack cooler watts heat the zone, not the rack. Room cooling watts go outside. Grid feed loss goes outside.
 
-Lower configuration or thermal efficiency means more heat for the same electrical draw: a system at `η_cfg × e = 0.5` heats its rack twice as much as one at 1. The CPU/RAM hardware ratio `E` already affects electrical watts in §9.1. Do not apply that ratio again here. Heat is a game quantity; the bill still counts electrical watts once.
+Heat is the electrical watts drawn in the rack (D79). A slowed rack draws less and so heats less. The CPU/RAM hardware ratio `E` already affects electrical watts in §9.1. Do not apply that ratio again here.
 
 ### 10.4 Efficiency e(T)
 
@@ -1098,7 +1098,9 @@ Lower configuration or thermal efficiency means more heat for the same electrica
 | `T <= 50` | 1.10 |
 | `50 < T < 70` | `1 + 0.005 × (70 − T)` **(s)** |
 | `70 <= T <= 80` | 1.00 |
-| `T > 80` | `max(0.25, 1 − 0.025 × (T − 80))` **(s)**: 0.50 at 100 °F |
+| `T > 80` | `max(0.01, 1 − 0.025 × (T − 80))` **(s)**: 0.50 at 100 °F |
+
+**Thermal duty (D79).** Above 80 °F the rack's systems duty-cycle: every watt they draw is multiplied by `duty(T) = max(0, 1 − 0.025 × (T − 80))`, the same line as `e` with no floor, 0 at 120 °F. PDU usage, the bill and heat all use the reduced draw. The 0.01 floor on `e` only keeps task clocks moving.
 
 `e` multiplies every compute and GPU rate in the rack, together with each system's `η_cfg` (§6.2). RAM, storage and network rates are not affected.
 
@@ -1138,13 +1140,13 @@ An unpowered cooler has `d = 0`.
 
 Fan sprites spin at `d`. The rack cooler shows `Track` in °F.
 
-### 10.6 Thermal runaway
+### 10.6 Under-cooled racks (D79)
 
-`H` grows as `e` falls, so a rack whose heat outruns its cooler heats faster and faster. The cooler plate shows the margin: `H / Qc` and the current `Teq`. `thermalThrottle` (§9.3) is the researched safety net.
+Heat falls with speed, so an under-cooled rack settles where its cooler balances its reduced draw: about 84 °F at twice the cooler's rating, 99 °F at five times, and below 120 °F at any ratio. The cooler plate shows the margin: `H / Qc` and the current `Teq`.
 
 ### 10.7 Cooling is a soft limit (D67)
 
-Rack and zone heat never causes a crash, task failure, reboot or building lock. Above 80 degrees F, the existing e(T) curve reduces compute and GPU performance, reaching 25% at 110 degrees F. Better cooling restores performance. The researched thermal-throttle switch keeps its 95/90 degree F hysteresis. Obsolete heat-crash counters stay zero.
+Rack and zone heat never causes a crash, task failure, reboot or building lock. Above 80 degrees F, the existing e(T) curve reduces compute and GPU performance, and the rack's draw on the same line, reaching 25% at 110 degrees F and stopping near 120 degrees F (D79). Better cooling restores performance. The researched thermal-throttle switch keeps its 95/90 degree F hysteresis. Obsolete heat-crash counters stay zero.
 
 ## 11. Research mechanics
 
@@ -1166,7 +1168,7 @@ Repeatable purchases (D45) are an exception to processor projects: C-state, Memo
 Starting a project, or the next queued project starting, puts the **research task** at the front of the market queue.
 
 - **In line.** It is the head. It has no clock, and it can't time out, be dismissed or fail on the queue. Nothing behind it is taken while it waits, and the first task behind it has no clock either. Auto-skip leaves the line alone.
-- **Taken.** At the route step (§14, step 4), before routing, every system with room takes it: a free slot by the usual rule (§6.4, one take per slot per tick). During a round no free thread is needed (QA-03): it cut the line, so it also cuts the system's queue, and it researches on the next thread a running task frees, before any queued task starts. Between rounds a holder needs a free thread. Each holder keeps **one slot and one thread** during a round (a fine-grain divisible task, D25: one shard per system with room) until the project completes. It has no payload and no transfer, and it pays no Credits or Data. When it is taken, the next task becomes the head with a fresh 10 s.
+- **Taken.** At the route step (§14, step 4), before routing, every system with room takes it: a free slot by the usual rule (§6.4, one take per slot per tick). During a round no free thread is needed (QA-03): it cut the line, so it also cuts the system's queue, and it researches on the next thread a running task frees, before any queued task starts. Between rounds it is taken only on the player's request (§11.3), and a holder then needs a free thread. Each holder keeps **one slot and one thread** during a round (a fine-grain divisible task, D25: one shard per system with room) until the project completes. It has no payload and no transfer, and it pays no Credits or Data. When it is taken, the next task becomes the head with a fresh 10 s.
 - **Running.** A holder researches at `threadRate × clockFactor × η_cfg × threads held`, times its rack's e(T). Its threads count as busy for tasks and for power (§9.1), and a holder never sleeps.
 - **Lost.** A holder that leaves `onMarket` or `paused` (dark, crashed, cold, offline, draining) lets go. When no holder is left, the task is back at the queue front with its progress kept.
 - **Done.** When the project completes, every holder lets go, and the next queued project, if any and paid, enters the line.
@@ -1176,7 +1178,7 @@ The trade-off is the point. Research during a round holds slots and threads, and
 
 ### 11.3 Between rounds
 
-The market is paused, but research still runs. If a project is active and not stopped, every server in `paused` mode with a link takes it on all its threads, and holders spread over any threads that free up. Their infrastructure is powered (§9.1), heat and overload rules apply, and the energy is billed. Systems that are offline, or hold no research, draw nothing. At Return to market the holders keep their slot and threads, and tasks take the rest.
+The market is paused (D79). A project carried over from the round waits at the head of the line for Return to market and costs nothing. If the player starts, switches to or resumes a project during the break, every server in `paused` mode with a link takes it on all its threads until it completes, is paused, stops for insolvency, or the round starts. A queued project that becomes active between rounds waits for Return. Their infrastructure is powered (§9.1), heat and overload rules apply, and the energy is billed. Systems that are offline, or hold no research, draw nothing. At Return to market the holders keep their slot and threads, and tasks take the rest.
 
 ### 11.4 Insolvency
 
@@ -1427,11 +1429,12 @@ All randomness goes through `src/game/core/rng.ts` with its state threaded expli
 ## 15. Offline progress
 
 - When the player returns after an absence, the platform worker runs the real `advanceGame` for the elapsed time, capped at `offlineCapHours`: 8 h, raised by research to 12 h (`offline12`, before Rack), 24 h (`offline24`, Rack) and 48 h (`offline48`, Room) (program D1.10, D19.3). The 48 h cap needs the offline-catch-up budget re-measured at Room-era fleets.
-- Offline time plays out as foreground time would with no player input: the current round runs to its end; auto-return, if researched and on, starts new rounds; between rounds the active project runs, is billed, and stops on insolvency.
+- Offline time plays out as foreground time would with no player input: the current round runs to its end; auto-return, if researched and on, starts new rounds; between rounds nothing runs and nothing is billed, unless the player started a project in that break before leaving; that project runs, is billed, and stops on insolvency or completion (D79).
 - No purchases or setting changes happen offline.
 - At the largest fleet a 24 h catch-up may take about 100 s in the worker, behind a progress display (program D4.8). The binding budget stays a 2 h round in 10 s or less.
 
 - The return report shows credited time, rounds completed, met, failed by cause, gross payouts, Data earned, energy cost, net, and research completed.
+- D78: a catch-up of 10 minutes or more of simulated time sits behind a modal progress plate (percent, simulated of credited time, and the full absence when capped). The report shows once after catch-up, omits zero rows, waits while a sheet is open, and is not shown for under 1 minute credited or when nothing was earned or spent. A capped absence adds one line naming the absence and the cap. Completed research lists three names, then "+N". Consecutive catch-ups merge into one report until dismissed.
 - Saves store the full state including `pendingMs`. A save made mid-absence resumes the same catch-up without renewing the cap.
 
 ## 16. Interface contract
@@ -1718,7 +1721,7 @@ const upgradePrice = (r: PartRow, g: number, L: number, lanes = 1) =>
 | `crashTempF`, `crashSeconds`, `recoverTempF` | 100, 10, 90 |
 | `floorTempF` | 50 |
 | `homeToutF` | 70 |
-| `eff` curve | flat 70–80 °F; +0.005/°F below 70 to 1.10 at 50; −0.025/°F above 80, floor 0.25 **(s)** |
+| `eff` curve | flat 70–80 °F; +0.005/°F below 70 to 1.10 at 50; −0.025/°F above 80, floor 0.01 **(s)**; thermal duty on the same line with no floor, 0 at 120 °F (D79) |
 | `coolerDeltaF` (ΔT) | 20 **(s)** |
 | `rackLeak`, `zoneLeak` | 0.1, 0.1 **(s)** |
 | `liftPerF` | 0.03 **(s)** |
@@ -1872,8 +1875,50 @@ Where the spec differs from the model's assumptions (`scripts/market-model.ts`),
 
 ### Compact operating menus and hardware maintenance (D73)
 
-No dropdowns or accordion sections. Short menus fit their contents at phone and desktop sizes; only long lists scroll locally. Visible button groups, toggles and sliders expose operating choices. Save sits beside Close. Generation text actions show resulting specs only. CPU queue modes include every researched scheduling strategy, separately from loading policy and loader count. Queue handoffs identify the departing task and shard in its visible well, shrink the icon into bits, then carry only bits through the die gutters to the assigned cores. Preloading alone is not a pickup. Do not invent a source well for tasks that arrive and start between snapshots. Reduced motion marks the destination without travel. Every prepared queue entry shows its own measured cache progress. Completed preload work is reused at dispatch; later cache reads are labeled separately from loads.
+No dropdowns or accordion sections. Short menus fit their contents at phone and desktop sizes; only long lists scroll locally. Visible button groups, toggles and sliders expose operating choices. Save sits beside Close. Generation keys show resulting specs only (D78 replaces the text action with a key). CPU queue modes include every researched scheduling strategy, separately from loading policy and loader count. Queue handoffs identify the departing task and shard in its visible well, shrink the icon into bits, then carry only bits through the die gutters to the assigned cores. Preloading alone is not a pickup. Do not invent a source well for tasks that arrive and start between snapshots. Reduced motion marks the destination without travel. Every prepared queue entry shows its own measured cache progress. Completed preload work is reused at dispatch; later cache reads are labeled separately from loads.
 
-CPU and System inbound pipes show only their speed, with no Pipe purchase box or popup. Empty core sites and CPU sockets show a centered add label directly above the quoted price, including when unaffordable. They have no plus glyph or extra status row. Narrow CPU sockets shorten the label to CPU 2, CPU 3 or CPU 4 and omit the coin to keep the full price readable. Other board slots that cannot fit a source control retain their native add icon and direct action rather than clipping a text overlay over them.
+CPU and System inbound pipes show only their speed, with no Pipe purchase box or popup. Empty core sites and CPU sockets show a centered add label directly above the quoted price, including when unaffordable. They have no plus glyph or extra status row. Narrow CPU sockets shorten the label to CPU 2, CPU 3 or CPU 4 and omit the coin to keep the full price readable. Other board slots that cannot fit a source control retain their native add icon and direct action rather than clipping a text overlay over them. D78 amends this paragraph: every empty site is drawn large enough to hold its name and price, so no site relies on the icon alone.
 
 Installed hardware can be downgraded or removed without a refund. Inventory reductions discard affected work. Core removal reduces count; the final CPU may be removed and subsequently installed. RAM and drive space/speed remain independent. Removed built-ins have level zero (ladder rung ?1); removed switches have no ports or uplinks. They provide zero capacity and component power draw until installed again. Supply downgrades and removals obey the same hard power-reservation limit as other purchases. Start controls expose initial awake count, task-wait wake threshold, researched busy wake threshold, and wake order.
+
+### Interface pass (D78)
+
+D78 amends §4.7, §12.4, §13, §15 and §16. Where an earlier paragraph disagrees, this section wins.
+
+**Frame.** The desktop deck is one 64px row under a 16px notice gutter, and the band and ladder rungs are 48px at both scales. Landscape phones stack the HUD, market, head card and menu keys in a 352px left column; the world takes the rest. The portrait phone bar (D58, D62) is unchanged, and its drawer rows are Pays, Needs and Status. Every level picks the first floorplan that rests whole in its rectangle and pans only when none fits: the CPU has dense plans, the System board has portrait, landscape and compact plans, the Rack has tower, twin-bay and half-width plans, and World is a 4×2 grid. Rack and Room values are body-text labels; nothing truncates.
+
+**Empty sites.** Every empty site shows its name and quoted price. A site with several builds shows "from" and the cheapest quote, and a tap opens the choices without spending. A single-choice site buys on its priced control, as Add core does. A desktop plate docks beside its target or top-right, not over it.
+
+**HUD.** Data and Credits form one key that opens the history. While Credits are negative the key is red and labelled Debt. The next reward milestone carries the cup glyph also shown on the Rewards key. The SLA reading is a key with a lamp: off when no unit is faulty, amber while a rack is above 80 °F. Ladder icons carry the same lamp for their level.
+
+**Health.** The SLA key opens Health: round totals, failures this round by cause (`telemetry`), and up to 12 problem units, most severe first (hot rack, then off market). There is one row per unit with its path and live reading, servers switched off in one rack are grouped, and a tap jumps to the unit.
+
+**Round report.** The main report is the ruler, Net and Data, a Details key, Auto return and Return to market. Details opens in place and holds earnings, energy, failed and dismissed counts, causes and spill. The report waits under any open sheet and under the offline report. The bankruptcy panel shows `Credits → 0 · Data −fee`.
+
+**Plates.** The next generation is a 44px secondary key directly under the level upgrade, and becomes the primary key once the level ladder ends. Research-locked purchase keys, builds included, open their research. The GPU plate reads card facts, next tier, next generation, then Switch type; the empty bay prices both GPU and NPU. Routers and the CPU queue show one reserved effect line for the selected strategy and a requirement under each filter, offer only options that act at that scope, and show researched options plus the next locked one. Router status is routes per second and misroutes this round. Strategy names are never abbreviated. An empty queue shows one line. Each build in a New unit plate is its own priced key. Controls are 40px with a 44px hit area on phones and coarse pointers, 32px with a mouse.
+
+**Research.** Rows are ordered ready-first when the list opens and do not reorder while open. Tabs show ready counts. The row shows compact costs with unaffordable currencies marked; the open row adds the exact cost only when the compact figure rounds. Each state has a tag: Ready, Running with measured progress, In line, Line busy, Paused, No Credits, Queued, Locked, Done. The dialog sizes to its content and leaves the bottom bar visible.
+
+**Settings.** Besides music (§16.5): Effects on/off and volume, stored locally (default on, 40%); a Keys list on desktop (R Research, + − Zoom, Esc Close); Export, which downloads the stored save envelope; Import, which validates the file through the save parser, changes nothing and states one reason if rejected, and otherwise needs a second tap, then replaces the save and reloads with no time away; and Reset game, which needs two taps. Armed keys disarm after 5 s, and Escape or Back cancels them first.
+
+**Effects.** Synthesized tones, no assets: a task met (at most 4 per second, pitch by payout size), a task failed (at most 2 per second), round end, a reward milestone reached, a payment and research completed. Silent before the first gesture, while hidden and during catch-up.
+
+**Phones (D78, mobile-first).** Phone sizes are the primary quality bar. Room has three halls (wide, short and narrow) and Rack three plans, so both rest whole at every size. On a phone, World is a list: built sites first as full tiles, then open regions as compact cards showing name, climate, power, and their price or the research they need; a site's payout shows in its header. A level that must pan shows an edge fade and chevron, and every site stays reachable by drag. Exactly one label draws per add site: the DOM control claims the site and the canvas label yields in the same frame. The empty Power control bay is an add site. Where the world is under 480px tall, task details open as a sheet below the band; the task drawer frame is 224px. A blocked head prices its fix on the part. Research opens its first project with the missing amounts when nothing can start. Plate controls on phones are 44px targets; switch ports are always listed at a fixed height; the Power filter reads "Under 90% load".
+
+**Offline and Health follow-ups (D78).** An interrupted catch-up resumes under the same cap: the stored envelope carries the pending absence. Health lists only faults legal play can reach: hot or throttled racks and off-market units at server, rack, zone and site scope. Supply overload, failure and crash rows are removed (D79); purchases are refused at the PDU, UPS and grid limits before a supply can overload.
+
+### Second interface pass (D79)
+
+D79 amends D78 and §4.7. Where an earlier paragraph disagrees, this section wins.
+
+**HUD.** The Data and Credits figures stand on the band with no box. They remain one key, at least 44px tall and in a fixed slot, that opens the history. Debt shows as the red negative Credits figure. On a 320px phone the Tasks count sits over the next milestone as a two-row block beside Rewards.
+
+**Landscape.** The left column's four groups (band, market, task card, menu keys) sit one 16px gutter apart. The band has no backing or rules, market cards are 72px and the task card is 104px. The notice line shows in the gutter above the menu keys.
+
+**Round report.** The title carries the end reason: "Round over · SLA", "· by you" or "· stalled". The first-taken list is removed from the report.
+
+**Plates.** The title line reads title, generation tag and usage, with Close at the right; usage wraps inside the title block when it cannot fit. The last row is one fixed 44px line: Downgrade and Remove at the left, each with its refund, and the next-generation key filling the rest. A narrow key drops "Upgrade to" and then the target specs; the target name and price always show whole. The row keeps its place when a key is absent. The Generation plate follows the same layout.
+
+**World on a phone.** Locked regions are one dim plate headed "Research Regions" once, with one line per region (name, climate, power). The plate is one target that opens Research. Buyable regions remain cards with Add site and the price.
+
+**System on a 320px phone.** The compact board has two GPU bays. An add plate starts under its installed part, and drops "from" when the price would touch the plate edge.

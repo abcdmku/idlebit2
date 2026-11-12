@@ -19,6 +19,7 @@ export { selectResearchTree, selectContextualResearchTree, selectSavedConfigs, s
 export { queueWindow as selectMarketQueue } from './view/feed';
 export { selectSystemQueue } from './view/systemQueue';
 export { selectRoundRewards } from './view/roundRewards';
+export { selectFleetHealth, HEALTH_LIMIT } from './view/health';
 export { serializeSave, deserializeSave, SAVE_SCHEMA } from './save/serialize';
 export { offlineCapMs } from './build/research/effects';
 export { netPerMinute } from './core/ledger';
@@ -32,7 +33,7 @@ export { selectTaskBreakdown } from './view/taskBreakdown';
 export type { WorkBreakdownRow } from './view/taskBreakdown';
 export { formatClock, formatEnergy, formatHertz, formatOps, formatSize, formatWatts } from './format';
 
-export { TICK_MS, HEAD_TICKS, QUEUE_VISIBLE, RECENT_OUTCOMES, REGIONS, LEVEL_NAMES, MAX_CORES_PER_CPU, MAX_CPUS, SERVERS_PER_RACK, RACK_SLOTS_PER_ROW, MAX_ROWS, MAX_ZONES_PER_SITE, MAX_SITES } from './core/constants';
+export { TICK_MS, HEAD_TICKS, QUEUE_VISIBLE, RECENT_OUTCOMES, REGIONS, LEVEL_NAMES, MAX_CORES_PER_CPU, MAX_CPUS, SERVERS_PER_RACK, RACK_SLOTS_PER_ROW, MAX_ROWS, MAX_ZONES_PER_SITE, MAX_SITES, SAVED_CONFIGS_PER_KIND } from './core/constants';
 export { FAIL_CAUSES, FAIL_DETAILS } from './types/events';
 export { UNIT_MODES } from './types/views';
 export {

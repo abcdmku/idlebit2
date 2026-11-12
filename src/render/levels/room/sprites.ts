@@ -4,7 +4,7 @@
 // The mockup's free-running shimmer, blinking breakers and pump flicker are gone (v2 §7).
 import { P, R, frame, mix, prism, px, silk } from '../../core';
 import { disc } from '../rack/art';
-import { BOH, CRAC, RACK } from './layout';
+import { BOH, CRAC, RACK_PITCH } from './layout';
 import type { PrismStyle, Rect } from '../../core';
 
 type G = CanvasRenderingContext2D;
@@ -84,8 +84,8 @@ export function drawTrayRun(g: G, x0: number, x1: number, y: number, lit: boolea
   for (let x = x0 + 2; x < x1; x += 6) px(g, x, y + 1, P.steel);
 }
 /** Trunk tray from the network rack down the west gap, with posts in each cold aisle. */
-export function drawTrunk(g: G, x: number, y0: number, y1: number, rows: number, rowGround: (r: number) => number, lit: boolean): void {
-  for (let r = 0; r < rows; r++) { const gy = rowGround(r) + 7; R(g, x + 1, gy - 34, 1, 34, mix(P.steelLo, P.ink, 0.3)); px(g, x + 1, gy, P.steel); }
+export function drawTrunk(g: G, x: number, y0: number, y1: number, rows: number, rowGround: (r: number) => number, post: number, lit: boolean): void {
+  for (let r = 0; r < rows; r++) { const gy = rowGround(r) + 7; R(g, x + 1, gy - post, 1, post, mix(P.steelLo, P.ink, 0.3)); px(g, x + 1, gy, P.steel); }
   R(g, x - 1, y0 - 1, 5, y1 - y0 + 2, P.ink);
   R(g, x, y0, 1, y1 - y0, P.steel); R(g, x + 2, y0, 1, y1 - y0, P.steelLo);
   R(g, x + 1, y0, 1, y1 - y0, lit ? FIBRE : FIBRE_LO);
@@ -117,7 +117,7 @@ export function drawExhaust(g: G, x0: number, x1: number, y: number, glow: numbe
   for (let x = x0 + 1; x < x1 - 1; x += 2) px(g, x, y + 1, lo);
 }
 /** Perforated cold-aisle tile in front of one rack. */
-export function drawPerf(g: G, x: number, y: number): void {
-  R(g, x, y, RACK.pitch, 11, PERF); R(g, x, y + 10, RACK.pitch, 1, mix(PERF, P.ink, 0.25)); R(g, x, y, 1, 11, mix(PERF, P.ink, 0.25));
-  for (let j = 2; j < 10; j += 2) for (let i = 2 + ((j >> 1) & 1); i < RACK.pitch - 1; i += 2) px(g, x + i, y + j, PERF_HOLE);
+export function drawPerf(g: G, x: number, y: number, h: number): void {
+  R(g, x, y, RACK_PITCH, h, PERF); R(g, x, y + h - 1, RACK_PITCH, 1, mix(PERF, P.ink, 0.25)); R(g, x, y, 1, h, mix(PERF, P.ink, 0.25));
+  for (let j = 2; j < h - 1; j += 2) for (let i = 2 + ((j >> 1) & 1); i < RACK_PITCH - 1; i += 2) px(g, x + i, y + j, PERF_HOLE);
 }

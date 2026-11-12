@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react';
 import type { PartRef, Quote, SystemSnapshot } from '../../game';
 import { hertz } from './format';
-import { PartKeys, partMain } from './PartKeys';
+import { PartKeys, generationKey, partLevel } from './PartKeys';
 import { PlateFrame } from './PlateFrame';
 import type { PartFacts } from './partFacts';
 import type { PlateCommon } from './types';
@@ -16,7 +16,10 @@ export interface BoardPartPlateProps extends PlateCommon {
   slot: BoardSlot; part: PartRef; focus: SystemSnapshot; facts: PartFacts;
   onOpenCpu?: () => void; unblocks?: number; unblock?: Quote | null;
 }
-export interface BoardPartView { readonly title: string; readonly sub: string; readonly head: ReactNode; readonly footer: ReactNode; readonly body: ReactNode }
+export interface BoardPartView {
+  readonly title: string; readonly sub: string; readonly usage?: string; readonly head: ReactNode;
+  readonly footer: ReactNode; readonly generation: ReactNode; readonly body: ReactNode;
+}
 export function useBoardPart({ active, slot, part, focus, facts, onOpenCpu, quotes, onAction, onResearch, researchName }:
   Omit<BoardPartPlateProps, 'part' | 'facts' | 'onClose' | 'bounds'> & { part?: PartRef; active: boolean; facts: PartFacts | null; wide: boolean }): BoardPartView | null {
   if (!active || !facts) return null;
@@ -30,11 +33,11 @@ export function useBoardPart({ active, slot, part, focus, facts, onOpenCpu, quot
   const keys = { quotes: own, level: facts.level, onAction, onResearch, researchName };
   return { title: facts.title, sub: hertz(focus.chip.clock.hz) + ' · ' + focus.chip.cores.length + ' cores',
     head: onOpenCpu && <button type="button" className="key ghost open-cpu" onClick={onOpenCpu}>Open CPU</button>,
-    footer: partMain(own?.quotes ?? [], facts.level) && <PartKeys {...keys} part="primary" />,
-    body: <PartKeys {...keys} part="rest" /> };
+    footer: partLevel(own?.quotes ?? [], facts.level) && <PartKeys {...keys} />,
+    generation: generationKey(keys), body: null };
 }
 export function BoardPartPlate(props: BoardPartPlateProps) {
   const { slot: _s, part: _p, focus: _f, facts: _x, onOpenCpu: _o, quotes: _q, unblock: _u, unblocks: _n, onAction: _a, onResearch: _r, researchName: _rn, ...frame } = props;
   const v = useBoardPart({ ...props, active: true, wide: !!props.bounds })!;
-  return <PlateFrame {...frame} title={v.title} sub={v.sub} head={v.head} className="part board-part" footer={v.footer}>{v.body}</PlateFrame>;
+  return <PlateFrame {...frame} title={v.title} sub={v.sub} usage={v.usage} head={v.head} className="part board-part" footer={v.footer} generation={v.generation}>{v.body}</PlateFrame>;
 }

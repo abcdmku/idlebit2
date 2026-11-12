@@ -1,0 +1,48 @@
+/* Offline return (spec §15): the catch-up progress plate and the return report, over one veil.
+   Above the sheets (30) and the round report (12), below the leave dialog (40). */
+.offline-veil { position: absolute; inset: 0; z-index: 38; background: #0e0b1cc9; pointer-events: auto; display: grid; place-items: center; }
+.offline-veil .v3-plate.offline-plate { position: relative; left: auto; top: auto; width: 304px; max-width: calc(100% - 16px);
+  max-height: calc(100% - 16px); display: flex; flex-direction: column; overflow: hidden; }
+.offline-plate .p-head { position: static; flex: none; align-items: center; flex-wrap: nowrap; }
+.offline-plate .off-time { margin-left: auto; color: var(--muted); font-variant-numeric: tabular-nums; white-space: nowrap; }
+
+/* progress: a well that fills with the simulated share of the absence */
+.offline-plate .off-bar { height: 16px; margin-top: 8px; background: var(--well); box-shadow: inset 0 0 0 2px var(--panel-hi); padding: 4px; box-sizing: border-box; }
+.offline-plate .off-bar i { display: block; height: 100%; background: var(--cyan); }
+.offline-plate .off-span { display: flex; justify-content: space-between; gap: 8px; min-height: var(--lh); margin: 8px 0 0; color: var(--muted);
+  font-variant-numeric: tabular-nums; white-space: nowrap; }
+
+/* report */
+.offline-report .off-capped { flex: none; margin: 4px 0 0; color: var(--muted); }
+.offline-report .off-body { flex: 1 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain; scrollbar-width: thin; scrollbar-color: #74679f #1b1437; }
+.offline-report .off-heads { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 4px; }
+.offline-report .off-fig { min-width: 0; padding: 4px 8px 6px; background: var(--well); box-shadow: inset 0 0 0 1px var(--panel-hi); }
+.offline-report .off-fig .k { display: block; color: var(--muted); }
+.offline-report .off-fig .v { display: flex; align-items: center; gap: 6px; min-height: 24px; color: var(--gold); font-size: var(--head); font-weight: 700;
+  font-variant-numeric: tabular-nums; white-space: nowrap; }
+.offline-report .off-fig.data .v { color: var(--data); }
+.offline-report .off-fig.loss .v { color: var(--fault-text); }
+.offline-report .off-rows { display: grid; list-style: none; margin: 8px 0 0; padding: 0; row-gap: 4px; }
+.offline-report .off-rows li { display: flex; align-items: center; gap: 8px; min-height: 18px; }
+.offline-report .off-rows .v { margin-left: auto; display: inline-flex; align-items: center; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.offline-report .off-rows .v.ok { color: var(--ok); } .offline-report .off-rows .v.bad { color: var(--fault-text); }
+.offline-report .off-rows .v.gold { color: var(--gold); } .offline-report .off-rows .v.mute { color: var(--muted); }
+.offline-report .off-rows .v .px-ic { margin-right: 4px; }
+.offline-report .off-rows .sub { padding-left: 12px; color: var(--muted); }
+.offline-report .off-rows .res { align-items: baseline; }
+.offline-report .off-rows .res .v { display: block; min-width: 0; color: var(--cyan); text-align: right; white-space: normal; overflow-wrap: anywhere; }
+.offline-report .keys { flex: none; margin-top: 8px; }
+.offline-report .keys .key.go { min-height: 48px; }
+
+/* short, wide screens: the figures and Continue stand in a left column beside the rows, so the whole report shows without scrolling */
+@media (max-height: 420px) and (min-width: 560px) {
+  .offline-veil .v3-plate.offline-report { width: 464px; display: grid; grid-template-columns: 160px minmax(0, 1fr); column-gap: 16px;
+    grid-template-rows: auto auto minmax(0, 1fr) auto; grid-template-areas: "head head" "cap cap" "figs rows" "keys rows"; }
+  .offline-report .p-head { grid-area: head; }
+  .offline-report .off-capped { grid-area: cap; }
+  .offline-report .off-body { display: contents; }
+  .offline-report .off-heads { grid-area: figs; grid-template-columns: 1fr; align-content: start; }
+  .offline-report .off-rows { grid-area: rows; align-content: start; min-height: 0; margin-top: 4px; overflow-y: auto; overscroll-behavior: contain;
+    scrollbar-width: thin; scrollbar-color: #74679f #1b1437; }
+  .offline-report .keys { grid-area: keys; align-self: end; }
+}

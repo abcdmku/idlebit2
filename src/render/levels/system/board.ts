@@ -1,8 +1,7 @@
 // The motherboard itself (mockup v3 levels/system/board.js): PCB slab, texture, silkscreen,
 // traces and set dressing. Low contrast so parts and tasks read first. Cached per board.
-import type { BoardKind } from '../../../game';
 import { P, R, cached, frame, hash, mix, prism, px, silk } from '../../core';
-import { BOARD, CABLE_X, SAVE, WORLD, boardOf, siteCentre } from './layout';
+import { CABLE_X, SILK, siteCentre } from './layout';
 import type { BoardLayout, SiteType } from './layout';
 
 type G = CanvasRenderingContext2D;
@@ -35,9 +34,9 @@ function nearestSocket(b: BoardLayout, x: number, y: number): void {
   }
 }
 
-export function boardStatic(kind: BoardKind): HTMLCanvasElement {
-  const b = boardOf(kind);
-  return cached(`v3-board-orig:${kind}`, WORLD.w, WORLD.h, g => {
+export function boardStatic(b: BoardLayout): HTMLCanvasElement {
+  const BOARD = b.board, SAVE = b.save;
+  return cached(`v3-board:${b.key}`, b.world.w, b.world.h, g => {
     const top = prism(g, BOARD.x, BOARD.y, BOARD.w, BOARD.h, BOARD.z, { top: P.mask, hi: P.maskHi, lo: P.maskLo, front: '#1f1848', sx: 4, sy: 4 });
     const dark = mix(P.mask, P.maskLo, 0.7), light = mix(P.mask, P.maskHi, 0.6);
     const tx = top.x, ty = top.y, tw = top.w, th = top.h;
@@ -56,10 +55,11 @@ export function boardStatic(kind: BoardKind): HTMLCanvasElement {
         bundle(g, a.x, a.y, t.x, t.y, type === 'ram' ? 1 : 2);
       }
     }
-    for (let i = 0; i < 3; i++) choke(g, 108 + i * 9, 56);
-    for (const [x, y] of b.dimm === 'h' ? [[155, 166], [155, 194]] : [[155, 120], [155, 166]]) cap(g, x!, y!);
-    for (const [hx, hy] of [[14, 34], [154, 34], [14, BOARD.y + BOARD.h - 11], [154, BOARD.y + BOARD.h - 11]] as const) { R(g, hx - 2, hy - 2, 5, 5, P.padLo); R(g, hx - 1, hy - 1, 3, 3, P.ink); }
-    silk(g, 58, 31, b.silk, mix(P.mask, P.silk, 0.45));
+    if (b.chokes) for (let i = 0; i < 3; i++) choke(g, b.chokes.x + i * 9, b.chokes.y);
+    for (const at of b.caps) cap(g, at.x, at.y);
+    const hx1 = BOARD.x + BOARD.w - 6;
+    for (const [hx, hy] of [[14, 34], [hx1, 34], [14, BOARD.y + BOARD.h - 11], [hx1, BOARD.y + BOARD.h - 11]] as const) { R(g, hx - 2, hy - 2, 5, 5, P.padLo); R(g, hx - 1, hy - 1, 3, 3, P.ink); }
+    silk(g, SILK.x, SILK.y, b.silk, mix(P.mask, P.silk, 0.45));
     frame(g, SAVE.x - 2, SAVE.y - 2, 11, 11, mix(P.mask, P.silk, 0.3));
     if (b.dimm === 'v') {
       // baseboard outline: the GPU modules sit on their own tray

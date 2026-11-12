@@ -7,19 +7,32 @@ import { drawFlow, drawFork, drawWaiting, flowColor, flowsOf } from '../../core'
 import type { FlowView, PixelPath, WorldFrame } from '../../core';
 import type { RoomSnapshot } from '../../../game';
 import { firstOfTask, shardsOf } from '../rack/flowkit';
-import { COLS, GATEWAY, IY, RACK_RECTS, hallOf, trayY } from './layout';
+import { COLS, G, trayY } from './layout';
+import type { Geom } from './layout';
 
 type G = CanvasRenderingContext2D;
-const H0 = hallOf(1), TX = H0.trunk + 1, GW_FOOT = GATEWAY.y + GATEWAY.h;
-/** The zone link: the gateway fibre from the top of the world into the gateway. */
-export const ZONE_PATH: PixelPath = [[H0.gwx, 0], [H0.gwx, GATEWAY.y + (GATEWAY.h >> 1)]];
-/** Rack slot s's uplink: from the gateway down to the trunk, down the trunk, along the row tray, into the rack. */
-export const UPLINK_PATHS: readonly PixelPath[] = RACK_RECTS.map((r, s) => {
-  const ty = trayY(Math.floor(s / COLS)), cx = r.x + 8;
-  return [[H0.gwx, GW_FOOT], [H0.gwx, IY - 14], [TX, IY - 14], [TX, ty], [cx, ty], [cx, ty + 4]] as const;
-});
-/** Waiting shards stack beside the fibre where it meets the gateway, between it and the thermostat (inside the rest focus). */
-export const WAIT_AT = { x: GATEWAY.x + GATEWAY.w + 4, y: GATEWAY.y - 9 } as const, WAIT_MAX = 6;
+/** A hall's flow paths, built once per hall geometry. */
+interface Paths { readonly zone: PixelPath; readonly uplinks: readonly PixelPath[] }
+const built = new Map<Geom, Paths>();
+function pathsOf(g: Geom): Paths {
+  let p = built.get(g);
+  if (!p) {
+    const foot = g.gateway.y + g.gateway.h;
+    p = {
+      // the zone link: the gateway fibre from the top of the world into the gateway
+      zone: [[g.gwx, 0], [g.gwx, g.gateway.y + (g.gateway.h >> 1)]],
+      // rack slot s's uplink: the job path from the gateway's foot (down the trunk, along the row tray, into the rack)
+      uplinks: g.jobPaths.map(j => [[g.gwx, foot], j[1]!, j[2]!, j[3]!, j[4]!, j[5]!] as const),
+    };
+    built.set(g, p);
+  }
+  return p;
+}
+/** The zone link and rack slot `slot`'s uplink in the live hall. */
+export const zonePath = (): PixelPath => pathsOf(G).zone;
+export const uplinkPath = (slot: number): PixelPath => pathsOf(G).uplinks[slot]!;
+/** At most this many waiting shards stack beside the fibre where it meets the gateway (`G.wait`). */
+export const WAIT_MAX = 6;
 /** A rack uplink flow ('rack'; 'uplink' is accepted for a rack's own links). */
 export const isRackLink = (f: FlowView): boolean => f.link === 'rack' || f.link === 'uplink';
 const xs: number[] = [];
@@ -39,13 +52,13 @@ export function forkXs(s: RoomSnapshot, flows: readonly FlowView[], i: number, r
   out.length = 0;
   if (shardsOf(flows[i]!) < 2) return 0;
   const id = flows[i]!.taskId;
-  out.push(TX);
+  out.push(G.trunk + 1);
   for (let j = i; j < flows.length; j++) {
     const f = flows[j]!;
     if (f.taskId !== id || !isRackLink(f)) continue;
     const slot = slotOfFlow(s, f);
     if (slot < 0 || Math.floor(slot / COLS) !== row) continue;
-    const x = RACK_RECTS[slot].x + 8;
+    const x = G.racks[slot]!.x + 8;
     if (!out.includes(x)) out.push(x);
   }
   if (out.length < 2) out.length = 0;
@@ -64,12 +77,12 @@ export function drawRoomFlows(g: G, s: RoomSnapshot, frame: WorldFrame): boolean
   for (let i = 0; i < flows.length; i++) {
     const f = flows[i]!;
     if (f.link === 'zone') {
-      if (drawFlow(g, f, ZONE_PATH, frame.snapshot, frame.timeMs) === 'waiting' && waiting < WAIT_MAX) {
-        drawWaiting(g, WAIT_AT.x, WAIT_AT.y + waiting * 3, 1, flowColor(f)); waiting++;
+      if (drawFlow(g, f, zonePath(), frame.snapshot, frame.timeMs) === 'waiting' && waiting < WAIT_MAX) {
+        drawWaiting(g, G.wait.x, G.wait.y + waiting * 3, 1, flowColor(f)); waiting++;
       }
     } else if (isRackLink(f)) {
       const slot = slotOfFlow(s, f);
-      if (slot >= 0) drawFlow(g, f, UPLINK_PATHS[slot], frame.snapshot, frame.timeMs);
+      if (slot >= 0) drawFlow(g, f, uplinkPath(slot), frame.snapshot, frame.timeMs);
     }
   }
   return true;

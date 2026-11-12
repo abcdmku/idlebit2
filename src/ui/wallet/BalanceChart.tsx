@@ -42,8 +42,8 @@ export function BalanceChart({ samples, tick, current }: {
         <circle className="balance-point data" cx={graph.x(point.tick)} cy={graph.data.y(point.data)} r="2" vectorEffect="non-scaling-stroke" />
       </svg>
       <div className="balance-chart-y data" aria-label="Data axis">{graph.data.ticks.map(label => <span key={label} title={label}>{axisText(label)}</span>)}</div>
+      <div className="balance-chart-times"><span>{clockText(graph.start * TICK_MS)}</span><span>{clockText(graph.end * TICK_MS)}</span></div>
     </div>
-    <div className="balance-chart-times"><span>{clockText(graph.start * TICK_MS)}</span><span>{clockText(graph.end * TICK_MS)}</span></div>
     <figcaption>{selectedIndex !== null ? clockText(point.tick * TICK_MS) : samples.length > 1 ? 'Simulation time' : 'History starts when your balance changes'}</figcaption>
   </figure>;
 }

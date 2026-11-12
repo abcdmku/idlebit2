@@ -33,12 +33,14 @@ function emptyReport(): AdvanceReport {
 }
 
 /**
- * A tick changes nothing but the tick index when the round is not running, research does not
- * run, no transition is pending, no record exists and phys is settled (architecture §1.1).
+ * A tick changes nothing but the tick index when the round is not running, research neither
+ * runs nor is about to be taken, no transition is pending, no record exists and phys is settled (architecture §1.1).
  */
 export function isQuiescent(w: World): boolean {
   if (w.round.phase === 'running') return false;
-  if (w.research.active !== null && !w.research.stoppedInsolvent) return false;
+  // Research holds systems, or the player started a project this break and it is still to be taken.
+  if (w.hot.g[G.researchHolders]! > 0) return false;
+  if (w.hot.g[G.researchBreak] === 1 && w.research.active !== null && !w.research.stoppedInsolvent) return false;
   // QA-04: a stopped project with Credits back resumes at the next ledger step.
   if (w.research.stoppedInsolvent && w.ledger.credits >= 0n) return false;
   if (w.hot.g[G.recUsed] !== 0 || w.hot.g[G.parentUsed] !== 0 || w.hot.g[G.rqTotal] !== 0) return false;

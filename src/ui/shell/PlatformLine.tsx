@@ -3,7 +3,8 @@
 import { useEffect, useRef, useState } from 'react';
 import type { FailCause, FailDetail, FamilyId, RenderSnapshot } from '../../game';
 import { causeLine, familyName } from '../hooks/feedModel';
-import { useGameSelector, usePlatformStatus, useShell } from '../storeHooks';
+import { useGameSelector, useOfflineStatus, usePlatformStatus, useShell, useViewState } from '../storeHooks';
+import { showsCatchUpPlate } from '../offline/OfflineLayer';
 import { restartKey, restartOf, restartText } from '../queue/restart';
 import { useLayout } from './geometry';
 import { hasTaskDock, nowRows } from '../layout';
@@ -86,7 +87,9 @@ export function PlatformLine({ saveNow }: { saveNow?: () => void } = {}) {
   const p = usePlatformStatus(), L = useLayout(), flash = useFlash(), notice = useNotice(p.notice), newer = useNewVersion();
   // The focused system restarting (a cold change, a boot) is said plainly in the world itself.
   const restart = useGameSelector(restartOf, (a, b) => restartKey(a) === restartKey(b), 250);
-  const status = p.catchingUp ? `Catching up${p.progress === null ? '' : ` · ${p.progress}%`}` : notice ?? (restart.on ? restartText(restart) : null);
+  // A long catch-up sits behind the progress plate (spec §15); this line says it only for a short one, or under an open sheet.
+  const plate = showsCatchUpPlate(useOfflineStatus(), useViewState().sheet !== null);
+  const status = p.catchingUp ? (plate ? null : `Catching up${p.progress === null ? '' : ` · ${p.progress}%`}`) : notice ?? (restart.on ? restartText(restart) : null);
   const text = status ?? flash?.text ?? (IS_SANDBOX ? 'Sandbox · wallet refills' : null);
   const world = L.view;
   // A newer build is deployed: a quiet, stable banner in the same place, with a 48 px Reload that saves first.

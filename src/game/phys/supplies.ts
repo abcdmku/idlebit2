@@ -113,7 +113,7 @@ export function failGrid(w: World, site: number): void {
  */
 export function tickReboots(w: World): void {
   const { sys, rack, room, site } = w.hot;
-  // Hoisted: tables are dictionary-mode objects (built by computed keys), so a per-row column lookup is a hash probe.
+  // Columns hoisted: one load each for the whole loop.
   const psuReboot = sys.psuRebootTicks, pduReboot = rack.pduRebootTicks;
   for (let s = 0; s < sys.len; s += 1) {
     const t = psuReboot[s]!;

@@ -80,7 +80,7 @@ export function researchOpsPerSec(state: GameState): number {
 /**
  * D27: ops/s the research task would get if taken now (ResearchTreeView.holdOpsPerSec). Mirrors
  * exec/researchTask: during a round, each system with a free slot and free threads holds those
- * threads; between rounds every paused, linked server holds all of its threads.
+ * threads; a project started between rounds takes all the threads of every paused, linked server.
  */
 export function holdOpsPerSec(state: GameState): number {
   return heldOpsPerSec(state, true);
@@ -122,6 +122,8 @@ const researchClock = (state: GameState, s: number) => state.hot.sys.clockFactor
 function heldOpsPerSec(state: GameState, roomNow: boolean): number {
   if ((state.hot.g[G.researchHolders] ?? 0) > 0) return researchOpsPerSec(state);
   const c = state.compiled.sys, h = state.hot.sys, running = state.round.phase === 'running';
+  // A project carried over from the round waits for Return to market (spec §11.3): it will run at the round's rate.
+  const waits = !running && state.research.active !== null && state.hot.g[G.researchBreak] !== 1;
   let ops = 0;
   for (let s = 0; s < c.len; s += 1) {
     if (c.alive[s] !== 1 || c.kind[s] !== 0 || c.intent[s] !== 1) continue;
@@ -137,6 +139,7 @@ function heldOpsPerSec(state: GameState, roomNow: boolean): number {
         take = Math.min(take, threads - h.busyThreads[s]!);
       }
     } else if (mode !== MODE.paused) continue;
+    else if (waits) take = Math.min(ROUND_THREADS, threads);
     if (take > 0) ops += c.threadRate[s]! * researchClock(state, s) * c.etaCfg[s]! * take;
   }
   return ops;

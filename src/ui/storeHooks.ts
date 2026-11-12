@@ -2,7 +2,7 @@
 // React re-renders only on selected values; per-frame work goes through `surface.frameListeners`.
 import { createContext, useCallback, useContext, useMemo, useRef, useSyncExternalStore } from 'react';
 import { quote } from '../game';
-import type { ActionOutcome, GameAction, QuoteRequest, QuoteResult, RenderSnapshot } from '../game';
+import type { ActionOutcome, AdvanceReport, GameAction, QuoteRequest, QuoteResult, RenderSnapshot } from '../game';
 import type { GameStore } from '../platform';
 import type { CanvasRenderer, HitTarget, LevelRegistry, Rect } from '../render/core';
 import type { ShellLayout } from './layout';
@@ -111,6 +111,29 @@ export function useQuote(request: QuoteRequest | null): QuoteResult | null {
   return useMemo(() => (request ? shell.quote(request) : null),
     // eslint-disable-next-line react-hooks/exhaustive-deps -- `key` is the request's value identity
     [shell, key, wallet, revision]);
+}
+
+/** Offline catch-up and its return report (spec §15). `percent` is whole, so a long catch-up renders 100 times at most. */
+export interface OfflineStatus {
+  readonly report: AdvanceReport | null;
+  readonly catchingUp: boolean;
+  readonly percent: number;
+  /** Sim time this catch-up covers, and the full absence before the offline cap. */
+  readonly totalMs: number;
+  readonly awayMs: number;
+}
+export function useOfflineStatus(): OfflineStatus {
+  const { store } = useShell();
+  const cache = useRef<OfflineStatus>({ report: null, catchingUp: false, percent: 0, totalMs: 0, awayMs: 0 });
+  const read = useCallback(() => {
+    const c = store.getCatchUp(), catchingUp = store.getLifecycle().catchingUp;
+    const next: OfflineStatus = { report: store.getOfflineReport(), catchingUp,
+      percent: catchingUp && c && c.totalMs > 0 ? Math.min(100, Math.floor(c.simulatedMs / c.totalMs * 100)) : 0,
+      totalMs: catchingUp && c ? c.totalMs : 0, awayMs: catchingUp && c ? c.awayMs : 0 };
+    if (!shallowEqual(cache.current, next)) cache.current = next;
+    return cache.current;
+  }, [store]);
+  return useSyncExternalStore(store.subscribe, read, read);
 }
 
 export interface PlatformStatus { readonly notice: string | null; readonly catchingUp: boolean; readonly progress: number | null }

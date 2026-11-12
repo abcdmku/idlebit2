@@ -56,6 +56,7 @@ export function startRound(w: World): void {
   r.peakIntensity = 0;
   r.grace = graceOf(w.market.window);
   r.researchOps = 0;
+  w.hot.g[G.researchBreak] = 0;
   w.market.headTick = w.tick;
   resetRoundTotals(w);
   resetCounters(w);

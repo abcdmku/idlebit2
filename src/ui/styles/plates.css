@@ -60,6 +60,9 @@
 .v3-plate .key:active:not(:disabled) { transform: translateY(2px); box-shadow: inset 0 -2px 0 #c4861c, 0 0 0 2px #0e0b1c; }
 .v3-plate .key:disabled { background: #342c55; color: #b9b0df; box-shadow: inset 0 -4px 0 #231d40, 0 0 0 2px #0e0b1c; cursor: not-allowed; }
 .v3-plate .key:disabled .pz { color: #b9b0df; }
+/* A secondary key that cannot be bought stays an outline, so the filled key above it still reads as the main one. */
+.v3-plate .key.replace:disabled { background: #1f1838; color: #8c82ac; box-shadow: inset 0 0 0 1px #44385f; }
+.v3-plate .key.replace:disabled .pz { color: #8c82ac; }
 .v3-plate .key.replace:not(:disabled) { background: #29234b; color: #efeaff; box-shadow: inset 0 0 0 1px #74679f, inset 0 -3px #171127; }
 .v3-plate .key.replace:not(:disabled) .pz { color: #ffcc3d; }
 .part-option { display: flex; flex-direction: column; gap: var(--s1); }
@@ -133,6 +136,10 @@
 .v3-plate .setpoint .step { height: 44px; padding: 0; text-align: center; border: 0; background: #29234b; color: #efeaff; font-weight: 700; cursor: pointer;
   box-shadow: inset 0 -3px 0 #15122a, inset 0 2px 0 #5d5296, 0 0 0 2px #0e0b1c; }
 .v3-plate .setpoint .step:disabled { color: var(--dim); cursor: default; }
+/* Minus and plus are drawn from the same 2px bars, so they weigh the same. */
+.v3-plate .step-glyph { display: block; position: relative; width: 10px; height: 10px; margin: auto; }
+.v3-plate .step-glyph::before { content: ''; position: absolute; left: 0; right: 0; top: 4px; height: 2px; background: currentColor; }
+.v3-plate .step-glyph.plus::after { content: ''; position: absolute; top: 0; bottom: 0; left: 4px; width: 2px; background: currentColor; }
 
 /* market row: what the unit is doing, the switch pips, and the "On market" toggle key (fixed place) */
 .v3-plate .p-online { display: grid; gap: var(--s1) 8px; margin-top: var(--s2); }
@@ -287,10 +294,11 @@
   background: linear-gradient(#1b143700, #1b1437); pointer-events: none; }
 
 /* The Cores plate: each core's state, two to a row */
-.v3-plate .core-list { list-style: none; margin: 8px 0 0; padding: 0; display: grid; grid-template-columns: 1fr 1fr; gap: 2px 12px; }
-.v3-plate .core-list li { display: flex; gap: 8px; min-width: 0; color: #a99be6; }
-.v3-plate .core-list li b { width: 24px; flex: none; text-align: right; color: #efeaff; }
-.v3-plate .core-list li span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+/* A column holds the longest task name whole ("Deduplicated Backup 100%"): one column on a phone, two on a wide plate. */
+.v3-plate .core-list { list-style: none; margin: 8px 0 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 192px), 1fr)); gap: 2px 12px; }
+.v3-plate .core-list li { display: flex; gap: 6px; min-width: 0; color: #a99be6; }
+.v3-plate .core-list li b { width: 20px; flex: none; text-align: right; color: #efeaff; }
+.v3-plate .core-list li span { min-width: 0; overflow-wrap: anywhere; }
 .v3-plate .core-list li.busy span { color: #8ef5ff; }
 
 /* D35: the switch's ports, one row each when Match ports is off */
@@ -357,6 +365,9 @@
 .v3-plate[data-measure="true"] > .plate-footer:has(> .reserve-stack > .plate-reserve:only-child) { display: block; }
 
 .v3-plate .key:has(> .pz) { justify-content: space-between; }
+/* A main purchase that cannot be bought keeps its filled, raised key and a gold label: still the main one. */
+.v3-plate .key:not(.replace):not(.ghost):not(.go):not(.row):not(.quiet):not(.locked-action):disabled { color: #e3cf96; box-shadow: inset 0 -4px 0 #231d40, inset 0 2px 0 #4b4175, 0 0 0 2px #0e0b1c; }
+.v3-plate .key:not(.replace):not(.ghost):not(.go):not(.row):not(.quiet):not(.locked-action):disabled .pz { color: #c9a94a; }
 .v3-plate .key:is(.row, .ghost, .quiet) .pz { color: #ffcc3d; }
 .v3-plate .key:is(.row, .ghost, .quiet) .pz.d { color: #27d9a0; }
 .v3-plate .key:disabled .pz { color: #b9b0df; }

@@ -31,6 +31,9 @@ export interface PlatePosition {
 export interface PlateFrameProps extends PlatePosition {
   title: string;
   sub?: ReactNode;
+  /** The live usage figure ("0 b used"), inline on the title line. It wraps inside the title block when it cannot fit. */
+  usage?: ReactNode;
+  usageTone?: string;
   /** [filled, max] level pips in the header. */
   pips?: readonly [number, number];
   /** Extra header content after the subtitle (a total price). */
@@ -38,6 +41,8 @@ export interface PlateFrameProps extends PlatePosition {
   actions?: ReactNode;
   /** Primary actions that remain visible while a long body scrolls. */
   footer?: ReactNode;
+  /** The next-generation key. It sits in the bottom action row, right of Downgrade and Remove. */
+  generation?: ReactNode;
   className?: string;
   /** The 48 px close key in the header (A21: one close everywhere); on by default. Plates also close on Escape or a world tap. */
   closeKey?: boolean;
@@ -48,8 +53,11 @@ export interface PlateFrameProps extends PlatePosition {
   children: ReactNode;
 }
 
+/** The narrowest a plate is laid out: its width on a 320px phone. Squeezed further, keys start to truncate. */
+const NARROWEST = 288;
+
 /** Runtime values retain geometry. Explicit menus can resize without rearranging the controls. */
-export function PlateFrame({ title, sub, pips, head, actions, footer, className = '', closeKey = true, as = 'section', onSubmit, initialFocus,
+export function PlateFrame({ title, sub, usage, usageTone = '', pips, head, actions, footer, generation, className = '', closeKey = true, as = 'section', onSubmit, initialFocus,
   onClose, children, readAnchor, bounds, subscribeFrame, pinTop, beside, tip, spill }: PlateFrameProps) {
   const ref = useRef<HTMLElement>(null);
   const contentRef = useRef<HTMLDivElement>(null);
@@ -72,8 +80,16 @@ export function PlateFrame({ title, sub, pips, head, actions, footer, className 
       root.dataset.scrolls = String(!cramped && content.scrollHeight > content.clientHeight + reclaimed + 1);
       // (A whole-plate scroll counts only real content below, not its few px of padding.)
       root.dataset.more = String(box.scrollHeight - box.scrollTop - box.clientHeight > (box === root ? 8 : 2));
+      // A local list marks the edges it can still scroll past (its cut edge). Written only on change: the body's
+      // mutation observer calls this again.
+      for (const list of content.querySelectorAll<HTMLElement>('.scroll-list')) {
+        const above = String(list.scrollTop > 1), below = String(list.scrollHeight - list.scrollTop - list.clientHeight > 1);
+        if (list.dataset.above !== above) list.dataset.above = above;
+        if (list.dataset.below !== below) list.dataset.below = below;
+      }
     };
-    content.addEventListener('scroll', more, { passive: true });
+    // Scroll events do not bubble: the capture listener also hears the lists inside the body.
+    content.addEventListener('scroll', more, { passive: true, capture: true });
     root.addEventListener('scroll', more, { passive: true });
     // Hold placement for runtime changes. Menu toggles change height within the current area.
     let held = false, stable = 0, lastAnchor = '';
@@ -100,10 +116,14 @@ export function PlateFrame({ title, sub, pips, head, actions, footer, className 
       search: for (const covers of placements) for (const area of areas) {
         root.style.setProperty('--plate-safe-width', `${Math.max(0, area.w)}px`);
         root.style.width = '';
+        // The plate's own width in this area (an area narrower than the plate caps it).
+        natural = root.offsetWidth;
         let full = naturalHeight();
         let at = placePlate(covers ? null : a, natural, full, area, { beside, pinTop });
         // Wide control grids need their measured width. Try centering before squeezing their columns.
         if (!covers && natural >= 560 && at.w < natural * 0.9) continue;
+        // Beside its part a plate is never squeezed under the narrowest width its layout is built for (a 320px phone).
+        if (!covers && at.w < Math.min(natural, NARROWEST)) continue;
         if (at.w < natural) { root.style.width = `${at.w}px`; full = naturalHeight(); at = placePlate(covers ? null : a, natural, full, area, { beside, pinTop }); }
         const candidate = { safe: area, full, at, width: root.style.width, covers };
         if (!best || Math.min(full, at.room) > Math.min(best.full, best.at.room)) best = candidate;
@@ -153,10 +173,12 @@ export function PlateFrame({ title, sub, pips, head, actions, footer, className 
       toggleFrame = requestAnimationFrame(() => {
         if (!placedArea) return;
         const full = naturalHeight(), height = Math.min(full, Math.max(0, placedArea.h - 8));
+        // A click that changed no height (a setting, a choice) leaves the frame exactly where it is.
+        if (Math.abs(height - root.offsetHeight) < 1) { more(); return; }
         if (full > placedArea.h - 8) { resize(); return; }
         const previousTop = parseFloat(root.style.top) || placedArea.y;
         // Grow down from the same top; move up only by the amount needed to stay in the current area.
-        const top = Math.max(placedArea.y, Math.min(previousTop, placedArea.y + placedArea.h - height - 4));
+        const top = Math.max(placedArea.y, Math.min(previousTop, placedArea.y + placedArea.h - height));
         root.style.height = `${height}px`;
         root.style.top = `${Math.round(top)}px`;
         root.dataset.tip = 'none';
@@ -168,13 +190,16 @@ export function PlateFrame({ title, sub, pips, head, actions, footer, className 
     root.addEventListener('click', toggle);
     const stop = subscribeFrame?.(position);
     observer?.observe(content);
-    return () => { cancelAnimationFrame(toggleFrame); stop?.(); observer?.disconnect(); changes.disconnect(); window.removeEventListener('resize', resize); content.removeEventListener('plate-layout', toggle, true); root.removeEventListener('click', toggle); content.removeEventListener('scroll', more); root.removeEventListener('scroll', more); };
+    return () => { cancelAnimationFrame(toggleFrame); stop?.(); observer?.disconnect(); changes.disconnect(); window.removeEventListener('resize', resize); content.removeEventListener('plate-layout', toggle, true); root.removeEventListener('click', toggle); content.removeEventListener('scroll', more, { capture: true }); root.removeEventListener('scroll', more); };
   }, [bounds, readAnchor, subscribeFrame, pinTop, beside, tip, spill]);
 
   const body = <>
     <header className="p-head">
-      <span className="p-title">{title}</span>
-      {sub != null && <span className="p-sub">{sub}</span>}
+      <span className="p-head-text">
+        <span className="p-title">{title}</span>
+        {sub != null && sub !== '' && <span className="p-sub">{sub}</span>}
+        {usage != null && usage !== '' && <span className={`p-usage ${usageTone}`}>{usage}</span>}
+      </span>
       {head}
       {pips && <Pips filled={pips[0]} max={pips[1]} />}
       <span className="p-head-actions">{actions}{closeKey && <button type="button" className="p-x" aria-label="Close" onClick={onClose}>
@@ -182,7 +207,11 @@ export function PlateFrame({ title, sub, pips, head, actions, footer, className 
     </header>
     <div ref={contentRef} className="plate-content">{children}</div>
     <div className="plate-more" aria-hidden="true">More ↓</div>
-    {(footer || maintenance) && <footer className="plate-footer">{footer}{maintenance}</footer>}
+    {(footer || maintenance || generation) && <footer className="plate-footer">
+      {footer}
+      {/* One row of fixed height: Downgrade and Remove at the left, the next generation at the right. */}
+      {(maintenance || generation) && <div className="plate-actions">{maintenance}{generation}</div>}
+    </footer>}
   </>;
   const common = {
     className: `v3-plate ${closeKey ? 'has-x ' : ''}${className}`, 'aria-label': title, tabIndex: -1,

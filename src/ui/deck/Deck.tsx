@@ -37,27 +37,29 @@ function ResearchKey() {
     aria-label={r.active ? `Research ${r.active} ${pct}` : 'Research'} onClick={() => view.dispatch({ type: 'toggleSheet', sheet: 'research' })}>
     <ArtCanvas w={16} h={16} n={n} artKey="flask" draw={drawFlask} />
     <i className="research-dock-progress" data-free="art" aria-hidden="true"><i style={{ width: `${r.progress * 100}%` }} /></i>
-    {ready > 0 && !r.active && <b className="research-dock-ready gold">{ready}</b>}
+    {ready > 0 && !r.active && <b className="research-dock-ready ok">{ready}</b>}
   </button>;
-  const idle = !r.active && ready ? <span className="gold">{ready} ready</span>
+  const idle = !r.active && ready ? <span className="ok">{ready} ready</span>
     : r.needsData ? <span className="dim">Needs Data</span> : <span className="dim">Idle</span>;
-  // Icon at the top left, the title beside it, then one state line (and, on desktop, the project).
-  const stacked = d && k.w < 128;
-  const compact = stacked || !d && k.w < 112, flat = !d && k.h === 48;
+  // The icon, the title beside it, then one state line.
+  const compact = !d && k.w < 112, flat = !d && k.h === 48;
   const textOnly = flat && k.w < 112;
-  const pad = d ? L.lat : 8, icon = 16 * n, tx = compact || textOnly ? pad : pad + icon + 8;
-  const line2 = d ? stacked ? pad + icon + 8 + L.lh : pad + L.lh : flat ? 24 : compact ? 56 : 48;
+  const pad = 8, icon = 16 * n, tx = compact || textOnly ? pad : pad + icon + 8;
+  // Desktop: the icon and two lines, centred in the deck row.
+  const y1 = Math.floor((k.h - 2 * L.lh) / 16) * 8;
+  const line2 = d ? y1 + L.lh : flat ? 24 : compact ? 56 : 48;
+  // The state line never truncates: it drops to the bare figure when the key is narrow.
+  const fits = (text: string) => text.length * L.body * 0.6 <= k.w - (d || flat ? tx : pad) - pad;
   return <button type="button" className={`panel research${open ? ' open' : ''}`} style={box(k)} data-k="research" data-testid="research-key" data-qa-target
     aria-expanded={open} aria-label={r.active ? `Research ${r.active} ${pct}` : ready ? `Research, ${ready} ready` : 'Research'}
     onClick={() => view.dispatch({ type: 'toggleSheet', sheet: 'research' })}>
     <i className="rim-track" data-free="art" style={{ left: n, top: n, width: k.w - 2 * n, height: 2 * n }}>
       <b className="rim-fill" data-tone="rnd" style={{ height: 2 * n, width: Math.round((k.w / n - 2) * r.progress) * n }} /></i>
-    {!textOnly && <span className="aic" style={{ left: compact ? Math.floor((k.w - icon) / 16) * 8 : pad, top: pad }}><ArtCanvas w={16} h={16} n={n} artKey="flask" draw={drawFlask} /></span>}
-    <T x={tx} y={stacked ? pad + icon + 8 : d || flat ? pad : compact ? 40 : 16} w={k.w - tx - 4}>{r.stopped ? <b className="warn">Stopped</b> : <b>Research</b>}</T>
+    {!textOnly && <span className="aic" style={{ left: compact ? Math.floor((k.w - icon) / 16) * 8 : pad, top: d ? (k.h - icon) / 2 : pad }}><ArtCanvas w={16} h={16} n={n} artKey="flask" draw={drawFlask} /></span>}
+    <T x={tx} y={d ? y1 : flat ? pad : compact ? 40 : 16} w={k.w - tx - 4}>{r.stopped ? <b className="warn">Stopped</b> : <b>Research</b>}</T>
     <T x={d || flat ? tx : pad} y={line2} w={k.w - (d || flat ? tx : pad) - pad}>{r.stopped ? <span className="warn">no Credits</span>
-      : r.active ? <span className="rnd">{r.waiting ? compact ? 'Next' : 'Next in line' : compact ? pct : `Running ${pct}`}</span>
-      : r.paused ? <span className="mute">Paused</span> : idle}</T>
-    {d && r.active && <T x={tx} y={line2 + L.lh} w={k.w - tx - pad} className="mute">{r.active}</T>}
+      : r.active ? <span className="rnd">{r.waiting ? fits('In line') ? 'In line' : 'Next' : fits(`Running ${pct}`) ? `Running ${pct}` : fits(`${pct} done`) ? `${pct} done` : pct}</span>
+      : r.paused && !ready ? <span className="mute">Paused</span> : idle}</T>
   </button>;
 }
 

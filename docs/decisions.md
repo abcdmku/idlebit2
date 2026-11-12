@@ -1995,3 +1995,34 @@ Downgrading or removing hardware returns 50% of the actual Credit investment rel
 Refunds appear inline on existing Downgrade and Remove controls. Small memory minus buttons retain their size and include the exact refund in their accessible name and tooltip. Remove remains a text button. No new popup rows are added.
 
 Save version 37 stores paid hardware histories. Older pre-live saves reset; no migration is provided.
+
+## D78, 12 Nov: interface pass to 9/10 and missing features
+
+The user asked for every screen at 9/10 and for the features found missing in the 12 Nov review. `docs/game-spec.md` "Interface pass (D78)" holds the contract. New: the offline return report and catch-up progress plate (spec §15), Health behind the SLA key, save Export, Import and Reset in Settings, a Keys list, and synthesized sound effects. No simulation rule, state shape or `SAVE_VERSION` changed; Health is a read-only selector.
+
+D78 supersedes parts of earlier decisions, pending the user's review of the result:
+
+- D69 and D73: the next-generation text action is a 44px secondary key.
+- D77: Remove is a boxed key matching Downgrade, not a text button.
+- D74 and D75: every empty site shows a name and price. Add queue carries a "+2 slots" line, an empty CPU socket carries "Like CPU 1", and board RAM, drive and GPU sites are plates with "from" prices in place of the native icon. Core sites keep D75's label-over-price form with no plus.
+- D76: first-taken families move from the main report into Details.
+- D58: the landscape phone layout is a left column; the portrait bar is unchanged.
+
+Evidence is in `artifacts/qa/nine/` (`final/`, `r3/` and the per-area folders). Known gaps: World and Room still pan on the smallest screens, sound was verified by scheduled-tone counts and not by ear, and a true cold-boot offline return was exercised through the runtime's catch-up path, not by backdating a stored save.
+
+D78 follow-up, 12 Nov: the user stated the game is mobile-first and asked for 9/10 on phones. Room, Rack, World, CPU and System gained phone floorplans; World on a phone is a list. The add-site label race between canvas and DOM is closed with a renderer claim. The offline catch-up hot paths were optimised with byte-identical results (route scoring, record reset, blocked-entry rescans); `npm run bench` passes with the 2 h fleetMax offline round at 8.7 s against 10 s, so the D24 fallback is no longer needed. `scripts/qa/capture.mjs` fails on stale stage saves and takes `awayMs` for cold-boot returns; `scripts/qa/fixtures/build.mjs` builds current stages into `artifacts/qa/stages/`, and the default manifest lists phones first. Sound effects render to WAV through `scripts/qa/sfx-render.mjs` for listening.
+
+## D79, 12 Nov: owner review of D78
+
+The owner reviewed D78 with screenshots and ruled on each open point.
+
+1. **Heat follows draw.** Rack heat is the watts drawn, no longer divided by `e(T)`. Above 80 °F a rack's systems duty-cycle on the `e(T)` line with no floor (0 at 120 °F), so an under-cooled rack settles below 120 °F instead of running away (measured: 5,168 °F to 118 °F with a level-1 cooler on the Room stage). The `e` floor drops from 0.25 to 0.01. Owner: "the slower processing should limit heat and should stabilize at a reasonable over temp". Amends §10.3, §10.4, §10.6, §10.7.
+2. **Research does not run unattended between rounds.** A project carried over from a round waits for Return to market; paused hardware draws nothing. It runs between rounds only when the player starts or resumes it in that break. Thirty minutes away on the 2 h stage cost 2.41M Credits before and 19k after; the Room stage went from −8.08B to 0. Amends D27.4, §9.7, §11.2, §11.3, §15. No save change.
+3. **Grid feed is an installation limit** like the PDU and UPS (§9.2). With all three enforced, supply overload and failure cannot occur in legal play, and heat never crashes a unit (D67), so Health drops the failed, overloaded, crashed and no-power rows.
+4. **Plates.** Usage sits on the title line. Remove and Downgrade sit at the left of the last row with the next-generation key to their right. The Generation plate matches. Supersedes the D78 placement of the generation key under the level key.
+5. **Round report.** The first-taken list is removed (owner: "look horrible and useless info"); this supersedes D76 and the D40 first-taken display. The title carries the end reason.
+6. **HUD.** The currency box is removed in every view. The landscape column is kept and loosened.
+7. **World.** Locked regions collapse into one plate on phones. The desktop grid is unchanged.
+8. Empty-site names and prices (D78) are kept.
+
+Pacing note: the seed-42 bot reaches Rack at 2:38 instead of 3:06 because it no longer pays for research in every gap. Evidence is in `artifacts/qa/nine/p2-*`.

@@ -1,26 +1,10 @@
 // Shared in-world art for the rack, room and global levels (mockup levels/rack/sprites.js):
-// Chakra Petch LCD labels, discs, fans whose angle is real duty, bezel ears and blanking plates.
+// discs, fans whose angle is real duty, bezel ears and blanking plates.
 // Static art only; motion comes in as arguments (fan angle, lit flags) from real state.
-import { silk, silkWidth, P, R, fanAngle, fanAnimation, createFanAnimation, mix, px } from '../../core';
-import type { FanAnimation, TaskType } from '../../core';
-import type { RouteStrategyId } from '../../../game';
-import { ROUTE_NAMES } from '../../../game';
+import { P, R, fanAngle, fanAnimation, createFanAnimation, mix, px } from '../../core';
+import type { FanAnimation } from '../../core';
 
 type G = CanvasRenderingContext2D;
-
-/** Load balancer LCD names by strategy (rack LB and the room network rack). */
-export const LB_SHORT = Object.fromEntries(Object.entries(ROUTE_NAMES).map(([id, copy]) => [id, copy.short])) as Readonly<Record<RouteStrategyId, string>>;
-
-/** In-art LCD text, clipped to columns [x0, x1). Keeps existing window dimensions. */
-export function lcdText(g: G, x: number, y: number, text: string, c: string, x0 = -1e9, x1 = 1e9): number {
-  g.save(); g.beginPath(); g.rect(x0, y | 0, x1 - x0, 5); g.clip();
-  const width = silk(g, x, y, text, c);
-  g.restore();
-  return width;
-}
-export const lcdWidth = silkWidth;
-/** Characters that fit an LCD window `lw` px wide with a 1 px margin each side. */
-export const lcdChars = (lw: number): number => Math.floor((lw - 2) / 4);
 
 export function disc(g: G, cx: number, cy: number, r: number, c: string): void {
   g.fillStyle = c;
@@ -79,9 +63,6 @@ export function drawBlank(g: G, r: RectLike): void {
 export const cableOf = (hz: number): string => (hz >= 1e9 ? P.coolLo : hz >= 1e6 ? mix(P.net, P.ink, 0.45) : mix(P.copper, P.ink, 0.35));
 /** Port jack colour by speed unit. */
 export const unitCol = (hz: number): string => (hz >= 1e9 ? P.cool : hz >= 1e6 ? P.net : P.pad);
-/** °F readout colour: crash red at 100, amber above 80, icy below 70, green in the band. */
-export const tempCol = (f: number): string => (f >= 100 ? P.fault : f > 80 ? P.amber : f < 70 ? P.coolHi : P.led);
-
 // ---------- static layers ----------
 // A cached static layer, or null where Canvas2D is unavailable (tests); callers then draw directly.
 const layers = new Map<string, HTMLCanvasElement | null>();
@@ -105,26 +86,8 @@ export function drawLayer(g: G, key: string, w: number, h: number, draw: (g: G) 
 }
 
 // ---------- labels ----------
-// LCD copy per task type (A19): the LCD shows the running task's type, never a squeezed task
-// name. Whole words, longest first; the renderer picks the first that fits. 4 characters always fit.
-const TYPE_LCD: Readonly<Record<TaskType, readonly string[]>> = {
-  compute: ['COMPUTE', 'COMP'], parallel: ['PARALLEL', 'PARAL', 'PARL'], memory: ['MEMORY', 'MEM'], accel: ['ACCEL', 'GPU'],
-  storage: ['STORAGE', 'STOR'], cluster: ['DISTRIB', 'DIST'], zones: ['ZONES', 'ZONE'], region: ['REGION', 'REGN'],
-};
-const typeCache = new Map<string, string>();
-/** Fixed LCD text for a task type that fits `max` characters. Cached: no per-frame strings. */
-export function typeText(type: TaskType, max: number): string {
-  const id = `${type}|${max}`;
-  let text = typeCache.get(id);
-  if (text === undefined) {
-    const names = TYPE_LCD[type];
-    text = names.find(n => n.length <= max) ?? names[names.length - 1]!.slice(0, Math.max(0, max));
-    typeCache.set(id, text);
-  }
-  return text;
-}
 const numCache = new Map<string, Map<string, Map<number, string>>>();
-/** Cached strings for LCD numbers such as '72°F' or '100%'. `n` should be an integer. No per-frame strings once warm. */
+/** Cached strings for label numbers such as '72°F' or '100%'. `n` should be an integer. No per-frame strings once warm. */
 export function label(prefix: string, n: number, suffix = ''): string {
   let bySuffix = numCache.get(prefix);
   if (!bySuffix) { bySuffix = new Map(); numCache.set(prefix, bySuffix); }
@@ -133,4 +96,9 @@ export function label(prefix: string, n: number, suffix = ''): string {
   let text = byN.get(n);
   if (text === undefined) { text = `${prefix}${n}${suffix}`; if (byN.size < 2048) byN.set(n, text); }
   return text;
+}
+/** A temperature where four digits don't fit (a room's rack tile, its thermostat): "72°F", then "2.5k°F" from 1,000. */
+export function degrees(f: number, unit: '' | '°' | '°F'): string {
+  const n = Math.round(f);
+  return n < 1000 ? label('', n, unit) : label('', n < 9950 ? Math.round(n / 100) / 10 : Math.round(n / 1000), unit === '°F' ? 'k°F' : unit === '°' ? 'k°' : 'k');
 }

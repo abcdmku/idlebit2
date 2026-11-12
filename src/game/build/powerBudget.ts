@@ -62,3 +62,18 @@ export function roomPowerBudget(build: BuildState, room: number, u: Unlocks): { 
   }
   return { reserved, capacity: m.ups.length ? m.ups.length * Math.min(...m.ups.map(x => capacity(PARTS.ups, x.gen, x.level))) : 0 };
 }
+
+/** A site's grid feed carries every open zone's allocation and its UPS losses (spec §9.2). */
+export function sitePowerBudget(build: BuildState, site: number, u: Unlocks): { reserved: number; capacity: number } {
+  const s = build.sites[site];
+  if (!s) return { reserved: 0, capacity: 0 };
+  let reserved = 0;
+  for (const id of s.zones) {
+    const m = id === null ? undefined : build.rooms[id];
+    if (!m?.opened) continue;
+    const b = roomPowerBudget(build, m.id, u), share = m.ups.length ? b.reserved / m.ups.length : 0;
+    reserved += b.reserved;
+    for (const x of m.ups) reserved += supplyLossW(share, capacity(PARTS.ups, x.gen, x.level), lossFraction(PARTS.ups, x.gen, x.level));
+  }
+  return { reserved, capacity: capacity(PARTS.grid, s.grid.gen, s.grid.level) };
+}

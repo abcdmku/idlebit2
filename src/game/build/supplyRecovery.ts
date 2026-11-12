@@ -2,7 +2,7 @@ import { POWER_SCALE } from '../core/constants';
 import { quote } from './quotes';
 import type { GameState } from '../types/state';
 import type { Quote, QuoteRequest } from '../types/quotes';
-import { rackId, roomId, systemId, type PartRef, type ResearchId } from '../types/ids';
+import { rackId, roomId, siteId, systemId, type PartRef, type ResearchId } from '../types/ids';
 
 /** Locate each upstream supply, including the PDU blocking a PSU upgrade. */
 function request(state: GameState, q: Quote): QuoteRequest | null {
@@ -17,15 +17,16 @@ function request(state: GameState, q: Quote): QuoteRequest | null {
   const room = os.room ?? (unit.kind === 'room' ? unit.id : rack !== undefined ? state.build.racks[rack]?.room : undefined);
   const part: PartRef | null = os.part === 'psu' && system !== null ? { unit: { kind: 'system', id: systemId(system) }, slot: { kind: 'psu' } }
     : os.part === 'pdu' && rack !== undefined ? { unit: { kind: 'rack', id: rackId(rack) }, slot: { kind: 'pdu' } }
-    : os.part === 'ups' && room !== undefined ? { unit: { kind: 'room', id: roomId(room) }, slot: { kind: 'ups', index: 0 } } : null;
+    : os.part === 'ups' && room !== undefined ? { unit: { kind: 'room', id: roomId(room) }, slot: { kind: 'ups', index: 0 } }
+    : os.part === 'grid' && os.site !== undefined ? { unit: { kind: 'site', id: siteId(os.site) }, slot: { kind: 'grid' } } : null;
   return part ? { kind: 'part', part, minimumCapacity: os.afterW / POWER_SCALE } : null;
 }
 
 const costOrder = (a: Quote, b: Quote) => BigInt(a.cost) < BigInt(b.cost) ? -1 : BigInt(a.cost) > BigInt(b.cost) ? 1 : 0;
 
-/** First affordable dependency in a finite PSU → PDU → UPS chain. */
+/** First affordable dependency in a finite PSU → PDU → UPS → grid chain. */
 export function supplyPreparation(state: GameState, purchase: Quote, affordableOnly = true, depth = 0): Quote | null {
-  if (depth > 2) return null;
+  if (depth > 3) return null;
   const r = request(state, purchase);
   if (!r) return null;
   const options = quote(state, r).quotes.filter(q => !q.locked && (!affordableOnly || q.affordable) && q.effect

@@ -23,12 +23,15 @@ import { QueueStrip } from './QueueStrip';
 import { ResearchScreen } from './research';
 import { RoundPlate } from './RoundPlate';
 import { RoundRewardsScreen } from './rewards/RoundRewardsScreen';
+import { HealthScreen } from './health/HealthScreen';
+import { OfflineLayer } from './offline/OfflineLayer';
 import { box, LayoutContext } from './shell/geometry';
 import { ShellContext, createShellValue, type ShellContextValue, type ShellSurface } from './storeHooks';
 import { PlatformLine } from './shell/PlatformLine';
 import { createViewStore, initialView, type ViewStore } from './viewState';
 import { openingLevel, writeLastLevel } from './prefs';
 import { SettingsScreen } from './settings/SettingsScreen';
+import { useSfx } from './settings/useSfx';
 import { CurrencyScreen } from './wallet/CurrencyScreen';
 import './styles/tokens.css';
 import './styles/shell.css';
@@ -79,6 +82,7 @@ function useShellLayout(size?: { width: number; height: number }) {
 export function GameShell({ store, registry, level, view, size, saveNow, children }: GameShellProps) {
   const reducedMotion = useMediaQuery('(prefers-reduced-motion: reduce)');
   const { ref, layout } = useShellLayout(size);
+  useSfx(store);
   const shell = useMemo<ShellContextValue>(() => {
     const views = view ?? createViewStore(store.getSnapshot, initialView(store.getSnapshot(), level));
     const first = shellLayout(390, 780);
@@ -141,7 +145,7 @@ export function GameShell({ store, registry, level, view, size, saveNow, childre
   });
 
   const vars = { '--body': `${layout.body}px`, '--lh': `${layout.lh}px`, '--big': `${layout.big}px`, '--mid': `${layout.mid}px`,
-    '--head': `${layout.body + 2}px`, '--n': `${layout.N}px` } as CSSProperties;
+    '--head': `${layout.body + 2}px`, '--n': `${layout.N}px`, '--sheet-h': `${layout.h - 8 - layout.band.y - layout.band.h}px` } as CSSProperties;
   return <ShellContext.Provider value={shell}>
     <LayoutContext.Provider value={layout}>
       <main ref={ref} className={`br-shell scr l-${layout.kind}${IS_SANDBOX ? ' sandbox' : ''}`} aria-label="idlebit2" data-reduced-motion={reducedMotion}>
@@ -163,6 +167,8 @@ export function GameShell({ store, registry, level, view, size, saveNow, childre
           <SettingsScreen />
           <CurrencyScreen />
           <RoundRewardsScreen />
+          <HealthScreen />
+          <OfflineLayer />
           <LeaveDialog guard={guard} />
           {children}
         </div>

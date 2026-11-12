@@ -3,12 +3,12 @@ import type { BuildState } from '../types/build';
 import type { LockReason, OverSupply } from '../types/quotes';
 import type { GameState } from '../types/state';
 import { researchId } from '../types/ids';
-import { rackPowerBudget, roomPowerBudget } from './powerBudget';
+import { rackPowerBudget, roomPowerBudget, sitePowerBudget } from './powerBudget';
 
-/** Hard installation limits. Reducing an excessive reservation remains possible. */
+/** Hard installation limits at every supply: rack PDU, zone UPS and site grid. Reducing an excessive reservation remains possible. */
 export function overSupply(state: GameState, after: BuildState): OverSupply | null {
   const before = state.build, u = state.research.unlocks;
-  const racks = new Set<number>(), rooms = new Set<number>();
+  const racks = new Set<number>(), rooms = new Set<number>(), sites = new Set<number>();
   for (let s = 0; s < after.systems.length; s += 1) {
     const a = after.systems[s];
     if (a && a !== before.systems[s]) racks.add(a.rack);
@@ -23,7 +23,9 @@ export function overSupply(state: GameState, after: BuildState): OverSupply | nu
   }
   for (let s = 0; s < after.sites.length; s += 1) {
     const site = after.sites[s];
-    if (site && site !== before.sites[s]) for (const m of site.zones) if (m !== null) rooms.add(m);
+    if (!site || site === before.sites[s]) continue;
+    sites.add(s);
+    for (const m of site.zones) if (m !== null) rooms.add(m);
   }
   for (const r of racks) {
     const rack = after.racks[r];
@@ -37,9 +39,18 @@ export function overSupply(state: GameState, after: BuildState): OverSupply | nu
   for (const m of rooms) {
     const room = after.rooms[m];
     if (!room?.opened) continue;
+    sites.add(room.site);
     const a = roomPowerBudget(after, m, u), b = roomPowerBudget(before, m, u);
     if (a.reserved > a.capacity && (a.reserved > b.reserved + 1e-6 || a.capacity < b.capacity)) {
       return { part: 'ups', room: room.id, capW: viewW(a.capacity), afterW: viewW(a.reserved) };
+    }
+  }
+  for (const s of sites) {
+    const site = after.sites[s];
+    if (!site?.opened) continue;
+    const a = sitePowerBudget(after, s, u), b = sitePowerBudget(before, s, u);
+    if (a.reserved > a.capacity && (a.reserved > b.reserved + 1e-6 || a.capacity < b.capacity)) {
+      return { part: 'grid', site: site.id, capW: viewW(a.capacity), afterW: viewW(a.reserved) };
     }
   }
   return null;
@@ -48,5 +59,5 @@ export function overSupply(state: GameState, after: BuildState): OverSupply | nu
 export function powerLock(state: GameState, over: OverSupply): LockReason {
   const starter = over.part === 'pdu' && !state.research.unlocks.levels.rack;
   return { code: 'power', node: starter ? researchId('rack') : null,
-    text: starter ? 'Power limit · unlock Rack' : 'Power limit · upgrade ' + (over.part === 'ups' ? 'UPS' : 'Rack PDU') };
+    text: starter ? 'Power limit · unlock Rack' : 'Power limit · upgrade ' + (over.part === 'grid' ? 'Grid' : over.part === 'ups' ? 'UPS' : 'Rack PDU') };
 }

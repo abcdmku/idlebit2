@@ -40,9 +40,9 @@ export function completionMs(c: Completion, snapshotTick: number): number {
   return ((c.tick ?? snapshotTick - 1) + Math.max(0, Math.min(1, c.tau))) * TICK_MS;
 }
 
-interface Pending { key: number; at: number; credits: number; data: number; anchor: Rect; merge: number }
+interface Pending { key: number; at: number; credits: number; data: number; anchor: Rect; merge: number; inside: boolean }
 interface Pop {
-  key: number; born: number; credits: number; data: number; anchor: Rect; merge: number;
+  key: number; born: number; credits: number; data: number; anchor: Rect; merge: number; inside: boolean;
   credText: string; dataText: string; credW: number; dataW: number;
 }
 const rect = (): Rect => ({ x: 0, y: 0, w: 0, h: 0 });
@@ -51,10 +51,10 @@ const at = { x: 0, y: 0 }, plate = rect(), other = rect(), motion = { rise: 0, a
 const ICON = 8, GAP = 4, INK = '#0e0b1c';
 
 export class PayoutPops {
-  private readonly pending: Pending[] = Array.from({ length: MAX_PENDING }, () => ({ key: -1, at: 0, credits: 0, data: 0, anchor: rect(), merge: POP_MERGE_MS }));
+  private readonly pending: Pending[] = Array.from({ length: MAX_PENDING }, () => ({ key: -1, at: 0, credits: 0, data: 0, anchor: rect(), merge: POP_MERGE_MS, inside: false }));
   private pendingCount = 0;
   private readonly pops: Pop[] = Array.from({ length: MAX_POPS }, () => ({
-    key: -1, born: 0, credits: 0, data: 0, anchor: rect(), merge: POP_MERGE_MS, credText: '', dataText: '', credW: 0, dataW: 0,
+    key: -1, born: 0, credits: 0, data: 0, anchor: rect(), merge: POP_MERGE_MS, inside: false, credText: '', dataText: '', credW: 0, dataW: 0,
   }));
   private popCount = 0;
   get live(): number { return this.popCount; }
@@ -62,9 +62,10 @@ export class PayoutPops {
   clear(): void { this.pendingCount = 0; this.popCount = 0; }
   /**
    * One completion on component `key` at `anchor` (world art px), at sim time `atMs`. Completions within
-   * `mergeMs` of the component's live pop join it (Room: 1 s, one pop per rack per second).
+   * `mergeMs` of the component's live pop join it (Room: 1 s, one pop per rack per second). `inside`: the pop
+   * stays in the anchor, from its foot up to its top at most (`LevelRenderer.popInside`).
    */
-  add(key: number, anchor: Rect, atMs: number, credits: number, data: number, mergeMs = POP_MERGE_MS): void {
+  add(key: number, anchor: Rect, atMs: number, credits: number, data: number, mergeMs = POP_MERGE_MS, inside = false): void {
     let p: Pending | null = null;
     for (let i = 0; i < this.pendingCount; i++) if (this.pending[i]!.key === key) { p = this.pending[i]!; break; }
     if (!p) {
@@ -72,7 +73,7 @@ export class PayoutPops {
       p = this.pending[this.pendingCount++]!;
       p.key = key; p.at = atMs; p.credits = 0; p.data = 0;
     }
-    p.at = Math.min(p.at, atMs); p.credits += credits; p.data += data; p.merge = mergeMs;
+    p.at = Math.min(p.at, atMs); p.credits += credits; p.data += data; p.merge = mergeMs; p.inside = inside;
     p.anchor.x = anchor.x; p.anchor.y = anchor.y; p.anchor.w = anchor.w; p.anchor.h = anchor.h;
   }
   /**
@@ -105,7 +106,7 @@ export class PayoutPops {
       if (this.blocked(g, p, now, cam, vp, ratio, type, n)) continue;
       const pop = own ?? (this.popCount < MAX_POPS ? this.pops[this.popCount++]! : null);
       if (!pop) continue;
-      pop.key = p.key; pop.born = Math.min(now, Math.max(p.at, now - 150)); pop.credits = p.credits; pop.data = p.data; pop.merge = p.merge;
+      pop.key = p.key; pop.born = Math.min(now, Math.max(p.at, now - 150)); pop.credits = p.credits; pop.data = p.data; pop.merge = p.merge; pop.inside = p.inside;
       pop.anchor.x = p.anchor.x; pop.anchor.y = p.anchor.y; pop.anchor.w = p.anchor.w; pop.anchor.h = p.anchor.h;
       this.texts(g, pop); this.dropPending(i);
     }
@@ -116,11 +117,11 @@ export class PayoutPops {
    */
   private blocked(g: CanvasRenderingContext2D, p: Pending, now: number, cam: Camera, vp: Rect, ratio: PixelRatio, type: Typography, n: number): boolean {
     const cw = p.credits >= 1 ? g.measureText(`+${payoutCount(p.credits)}`).width : 0, dw = p.data >= 1 ? g.measureText(`+${payoutCount(p.data)}`).width : 0;
-    pathRect(p.anchor, cw, dw, cam, vp, ratio, type, n, plate);
+    pathRect(p.anchor, cw, dw, cam, vp, ratio, type, n, plate, p.inside);
     for (let i = 0; i < this.popCount; i++) {
       const o = this.pops[i]!;
       if (o.key === p.key || now - o.born >= POP_LIFE_MS) continue;
-      pathRect(o.anchor, o.credW, o.dataW, cam, vp, ratio, type, n, other);
+      pathRect(o.anchor, o.credW, o.dataW, cam, vp, ratio, type, n, other, o.inside);
       if (plate.x < other.x + other.w && other.x < plate.x + plate.w && plate.y < other.y + other.h && other.y < plate.y + plate.h) return true;
     }
     return false;
@@ -134,7 +135,7 @@ export class PayoutPops {
   private drawPop(g: CanvasRenderingContext2D, pop: Pop, now: number, cam: Camera, vp: Rect, ratio: PixelRatio, type: Typography,
     n: number, reduced: boolean): void {
     popMotion(Math.max(0, now - pop.born), motion);
-    blockRect(pop.anchor, pop.credW, pop.dataW, reduced ? 0 : motion.rise, cam, vp, ratio, type, n, plate);
+    blockRect(pop.anchor, pop.credW, pop.dataW, reduced ? 0 : motion.rise, cam, vp, ratio, type, n, plate, pop.inside);
     g.globalAlpha = reduced ? 1 : motion.alpha;
     // No backing plate (user): each line is its icon, then the amount with a 1·N ink outline.
     const icon = ICON * n, line = Math.max(type.line, icon);
@@ -167,20 +168,26 @@ export class PayoutPops {
 /**
  * The pop's block in CSS px: the credits line over the data line (only the non-zero ones), left-aligned
  * on the icons, centred on the anchor and `rise` art px up. Every edge sits on the art grid (N CSS px
- * from the viewport origin) so the icons stay crisp.
+ * from the viewport origin) so the icons stay crisp. `inside`: the block starts on the anchor's foot and
+ * rises to its top at most, so it never leaves the anchor.
  */
 function blockRect(anchor: Rect, credW: number, dataW: number, rise: number, cam: Camera, vp: Rect, ratio: PixelRatio,
-  type: Typography, n: number, out: Rect): Rect {
+  type: Typography, n: number, out: Rect, inside = false): Rect {
   toScreen(cam, vp, ratio, anchor.x + anchor.w / 2, anchor.y + anchor.h / 2, at);
   const icon = ICON * n, line = Math.max(type.line, icon), lines = (credW > 0 ? 1 : 0) + (dataW > 0 ? 1 : 0);
   out.w = Math.ceil((icon + GAP + Math.ceil(Math.max(credW, dataW))) / n) * n; out.h = Math.max(1, lines) * line;
   out.x = vp.x + Math.round((at.x - out.w / 2 - vp.x) / n) * n;
-  out.y = vp.y + Math.round((at.y - out.h / 2 - vp.y) / n) * n - rise * n;
+  if (inside) {
+    const travel = Math.max(0, Math.min(POP_RISE_ART, Math.floor(anchor.h - out.h / n)));
+    out.y = vp.y + Math.round((at.y + anchor.h * n / 2 - out.h - vp.y) / n) * n - Math.min(rise, travel) * n;
+  } else out.y = vp.y + Math.round((at.y - out.h / 2 - vp.y) / n) * n - rise * n;
   return out;
 }
 /** The block's whole path: from rest up to its full rise. */
-function pathRect(anchor: Rect, credW: number, dataW: number, cam: Camera, vp: Rect, ratio: PixelRatio, type: Typography, n: number, out: Rect): Rect {
-  blockRect(anchor, credW, dataW, 0, cam, vp, ratio, type, n, out);
-  out.y -= POP_RISE_ART * n; out.h += POP_RISE_ART * n;
+function pathRect(anchor: Rect, credW: number, dataW: number, cam: Camera, vp: Rect, ratio: PixelRatio, type: Typography, n: number, out: Rect,
+  inside = false): Rect {
+  const top = blockRect(anchor, credW, dataW, POP_RISE_ART, cam, vp, ratio, type, n, out, inside).y;
+  blockRect(anchor, credW, dataW, 0, cam, vp, ratio, type, n, out, inside);
+  out.h += out.y - top; out.y = top;
   return out;
 }

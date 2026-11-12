@@ -66,12 +66,30 @@ export function canAdmit(w: World, s: number): boolean {
   return h.running[s]! + h.queueLen[s]! + h.reserved[s]! + (h.researchThreads[s]! > 0 ? 1 : 0) < slots && slots - (h.takeTick[s] === w.tick ? h.takes[s]! : 0) > 0;
 }
 
+/**
+ * Change counters for routing memos (derived, never state). `releases` counts every flip to "can
+ * admit" and every reservation given back, on any system; `takes[rack]` counts every reservation
+ * and take on the rack's systems. While both stand, the rack's systems that can admit and their
+ * reservations are what they were (net/finish.ts rackShared).
+ */
+export const routeChanges = { releases: 0, takes: new Uint32Array(0) };
+function noteRackTake(rack: number): void {
+  if (rack >= routeChanges.takes.length) {
+    const grown = new Uint32Array(Math.max(64, (rack + 1) * 2));
+    grown.set(routeChanges.takes);
+    routeChanges.takes = grown;
+  }
+  routeChanges.takes[rack] = routeChanges.takes[rack]! + 1;
+}
+/** A reservation was given back outside releaseReservation (admission, round end). */
+export const noteRelease = (): void => { routeChanges.releases += 1; };
+
 /** Applies a system's can-admit flip to the rack, room and site summaries. */
 export function noteAdmit(w: World, s: number, before: boolean): void {
   const after = canAdmit(w, s);
   if (after === before) return;
   noteAdmitChange(w, w.compiled.sys.rack[s]!);
-  if (after) wakeRouters(w, 0, w.compiled.sys.rack[s]!);
+  if (after) { routeChanges.releases += 1; wakeRouters(w, 0, w.compiled.sys.rack[s]!); }
   const d = after ? 1 : -1;
   const c = w.compiled.sys, h = w.hot;
   const rack = c.rack[s]!, room = c.room[s]!, site = c.site[s]!;
@@ -208,6 +226,7 @@ export function noteTake(w: World, s: number): void {
   const before = canAdmit(w, s);
   if (h.takeTick[s] !== w.tick) { h.takeTick[s] = w.tick; h.takes[s] = 0; }
   h.takes[s] = h.takes[s]! + 1;
+  noteRackTake(w.compiled.sys.rack[s]!);
   noteAdmit(w, s, before);
   // The take limit resets next tick, which can flip canAdmit with no write: recount the rack then,
   // and try its routers' blocked entries again.
@@ -218,6 +237,7 @@ export function noteTake(w: World, s: number): void {
 /** Reserves k slots on system s for taken tasks in transfer (reserved counts as admitted for every room check). */
 export function reserve(w: World, s: number, k: number, r: number): void {
   const before = canAdmit(w, s);
+  noteRackTake(w.compiled.sys.rack[s]!);
   w.hot.sys.reserved[s] = w.hot.sys.reserved[s]! + k;
   noteAdmitted(w, s, k, r);
   noteAdmit(w, s, before);

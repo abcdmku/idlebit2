@@ -60,9 +60,8 @@ function OpenCurrency() {
       <div className="wallet-body">
         <BalanceChart samples={wallet.samples} tick={wallet.tick} current={wallet} />
         <div className="bankruptcy">
-          <div className="bankruptcy-head"><h2>{confirming ? 'Declare bankruptcy?' : 'Bankruptcy'}</h2>
-            <span className="data" title={bankruptcy.dataCost}>{balanceText(bankruptcy.dataCost)} Data</span></div>
-          <p>Credits → 0 · Data −10%</p>
+          <h2>{confirming ? 'Declare bankruptcy?' : 'Bankruptcy'}</h2>
+          <p>Credits → 0 · <span className="data" title={bankruptcy.dataCost}>Data −{balanceText(bankruptcy.dataCost)}</span></p>
           <div className="bankruptcy-actions">
             {confirming ? <>
               <button type="button" className="skey off" data-qa-target onClick={() => setConfirming(false)}>Cancel</button>

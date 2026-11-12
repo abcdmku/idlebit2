@@ -92,7 +92,7 @@ export function SitePlate({ target, focus, quotes, onAction, onResearch, researc
   const buy = (x: Quote) => purchase(x.action);
   const row = { onAction: buy, onResearch, researchName };
   // The same frame throughout (a purchase never re-places it): the part this site now holds, else its add.
-  if (part) return <PlateFrame key={part.title} {...frame} title={part.title} sub={part.sub} head={part.head} className="part site" footer={part.footer}>{part.body}</PlateFrame>;
+  if (part) return <PlateFrame key={part.title} {...frame} title={part.title} sub={part.sub} usage={part.usage} head={part.head} className="part site" footer={part.footer} generation={part.generation}>{part.body}</PlateFrame>;
   if (focus.level === 'system' && kind && adds.length) return <PlateFrame key={`add-${kind}`} {...frame} title={`Add ${kind === 'ram' ? 'RAM' : 'drive'}`} className="part memory-site">
     <MemoryAdd quotes={adds} preferred={lead?.quote} onAction={purchase} onResearch={onResearch} researchName={researchName} />
   </PlateFrame>;

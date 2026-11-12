@@ -5,6 +5,7 @@
 //   &scene=boot|landing|mid|max|paused  swap the CPU snapshot for a renderer QA scene
 //   &hover=<target id>  the hover/press bracket on that target (QA)
 //   &pops=<age ms>  payout pops on the level's first components, held at that age (QA only)
+//   &case=zones|regions|flows|max|dark|sitout|power|crash  swap the World snapshot for a renderer case
 import { fixtureSnapshot, fixtureState } from '../../game/fixtures';
 import { deriveRenderSnapshot } from '../../game';
 import type { FixtureName } from '../../game/fixtures';
@@ -15,6 +16,7 @@ import { rect } from './geom';
 import { createLevelRegistry, depth } from './registry';
 import { registerLevels } from '../levels';
 import { chipScene } from '../levels/chip/scenes';
+import { CASES as WORLD_CASES } from '../levels/global/fixtures';
 import { systemScene } from '../levels/system/scenes';
 import type { SystemStage } from '../levels/system/scenes';
 import type { CpuScene } from '../levels/chip/scenes';
@@ -88,7 +90,13 @@ function withPops(s: RenderSnapshot, age: number): RenderSnapshot {
   return { ...s, completions: list };
 }
 const popAge = q.has('pops') ? Number(q.get('pops')) : null;
-const pair = withScene(from ? zoomPair(depth(from) > depth(level) ? from : level) : fixtureSnapshot(NAME[level]));
+// `level=global&case=<name>` swaps the World for one of its renderer cases (levels/global/fixtures.ts).
+const worldCase = q.get('case');
+function withCase(s: RenderSnapshot): RenderSnapshot {
+  const make = worldCase ? WORLD_CASES[worldCase] : undefined;
+  return make && s.focus.level === 'global' ? { ...s, focus: make(s.simTimeMs) } : s;
+}
+const pair = withCase(withScene(from ? zoomPair(depth(from) > depth(level) ? from : level) : fixtureSnapshot(NAME[level])));
 const target: RenderSnapshot = !from ? (popAge !== null ? withPops(pair, popAge) : pair) : deeper === level ? pair : { ...pair, focus: pair.partner!, partner: pair.focus };
 const start: RenderSnapshot = { ...target, focus: target.partner ?? target.focus, partner: null };
 
@@ -110,6 +118,7 @@ function frame(now: number): void {
 renderer.draw(popAge !== null ? { ...current, completions: [] } : current, view, { nowS: 0, sincePublishMs: 0 });
 if (from) { if (hold !== null) renderer.hold(hold); current = target; }
 requestAnimationFrame(frame);
-const api = { bootStatus: 'ready', bootError: null, ready: () => Promise.resolve(true), renderer, hold: (p: number | null) => renderer.hold(p) };
-// The capture script's bridge (scripts/qa/capture.mjs): boot status and ready().
-Object.assign(window, { __br: api });
+const api = { bootStatus: 'ready', bootError: null, ready: () => Promise.resolve(true), renderer, hold: (p: number | null) => renderer.hold(p),
+  isPaused: () => true, pause: () => {}, resume: () => {} };
+// The capture script's bridge (scripts/qa/capture.mjs): boot status, ready(), the pause switch and the drawn targets.
+Object.assign(window, { __br: api, __brShell: { surface: { renderer } } });

@@ -42,9 +42,9 @@ function Stepper({ label, name, value, lower, raise, disabled, onLower, onRaise 
 }) {
   return <div className={`setpoint start-step${disabled ? ' off' : ''}`} role="group" aria-label={label}>
     <span>{name}</span>
-    <button type="button" className="step" aria-label={lower} disabled={disabled || !onLower} onClick={() => onLower?.()}>−</button>
+    <button type="button" className="step" aria-label={lower} disabled={disabled || !onLower} onClick={() => onLower?.()}><i className="step-glyph" aria-hidden="true" /></button>
     <b aria-live="polite">{value}</b>
-    <button type="button" className="step" aria-label={raise} disabled={disabled || !onRaise} onClick={() => onRaise?.()}>+</button>
+    <button type="button" className="step" aria-label={raise} disabled={disabled || !onRaise} onClick={() => onRaise?.()}><i className="step-glyph plus" aria-hidden="true" /></button>
   </div>;
 }
 

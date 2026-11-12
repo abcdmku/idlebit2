@@ -4,7 +4,7 @@
 // once the camera has landed (user: text must not shuffle). The inbound pipe stays drawn from the
 // head slot to the entry as it moves between the two worlds.
 import { camFromTop, camera, toScreen } from './camera';
-import type { PixelRatio, RestFraming, WorldForm } from './camera';
+import type { Camera, PixelRatio, RestFraming, WorldForm } from './camera';
 import type { Point, Rect } from './geom';
 import { DESKTOP_TYPE, PHONE_TYPE, drawLabels } from './labels';
 import type { FrozenLabels } from './labels';
@@ -44,4 +44,31 @@ export function drawZoomLayer(c: ZoomLayer, s: RenderSnapshot, snaps: readonly L
   if (found !== 3) { drawPipe(c.g, s, frame.timeMs, frame.paused, c.framing, c.vp, c.ratio, null, type); return; }
   at.x = ends[0]!.x + (ends[1]!.x - ends[0]!.x) * e; at.y = ends[0]!.y + (ends[1]!.y - ends[0]!.y) * e;
   drawPipe(c.g, s, frame.timeMs, frame.paused, c.framing, c.vp, c.ratio, at, type, false);
+}
+
+/** How the view fills the viewport with a level's colour and blits a level's world through a camera. */
+export interface ZoomWorlds {
+  readonly zoom: ZoomTransition; readonly ratio: PixelRatio;
+  fill(level: LevelSnapshot['level'], alpha: number): void;
+  blit(s: LevelSnapshot, cam: Camera, alpha: number, focusWorld: boolean): void;
+}
+const worldCam = camera();
+/** The two worlds of a zoom (`snaps[i]` is path node i): a cross-fade under reduced motion, else the parent with the child fading in over its mini. */
+export function drawZoomWorlds(c: ZoomWorlds, snaps: readonly LevelSnapshot[], frame: MutableFrame, reduced: boolean): void {
+  const zoom = c.zoom, ratio = c.ratio;
+  if (reduced) {
+    const a = zoom.fromIndex, b = zoom.toIndex, u = zoom.state.progress;
+    frame.scale = Math.round(zoom.rests[a].s / ratio.x); c.fill(snaps[a]!.level, 1); c.blit(snaps[a]!, zoom.rests[a], 1, false);
+    frame.scale = Math.round(zoom.rests[b].s / ratio.x); c.fill(snaps[b]!.level, u); c.blit(snaps[b]!, zoom.rests[b], u, false);
+    return;
+  }
+  const start = zoom.fills[1] >= 0.999 ? 1 : 0;
+  c.fill(snaps[start]!.level, 1);
+  for (let i = start; i < 2; i++) {
+    if (i > start && zoom.alphas[i] <= 0.001) break;
+    if (i > start && zoom.fills[i] > 0.001) c.fill(snaps[i]!.level, zoom.fills[i]);
+    camFromTop(zoom.camera, zoom.maps[i], worldCam);
+    frame.scale = Math.round(zoom.rests[i].s / ratio.x);
+    c.blit(snaps[i]!, worldCam, i === start ? 1 : zoom.alphas[i], false);
+  }
 }

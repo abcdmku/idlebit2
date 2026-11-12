@@ -45,4 +45,5 @@ export const EFF_FLAT_HIGH_F = 80;
 export const EFF_GAIN_PER_F = 0.005;
 export const EFF_LOSS_PER_F = 0.025;
 export const EFF_MAX = 1.1;
-export const EFF_MIN = 0.25;
+/** Rate floor only: keeps task clocks moving. The draw (thermalDuty) has no floor. */
+export const EFF_MIN = 0.01;

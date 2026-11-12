@@ -4,9 +4,9 @@
 // uplink entering from the top, real transfers, the next-slot ghost, the save icon and lamp,
 // and the sled that slides out on a drill into a server.
 import { BG, P, R, createZoomLink, drawGhost, drawSaveIcon, drawUnitLamp, glowBit, keyOf, lampState, pathAt, sledOut, zoomLink } from '../../core';
-import type { GhostState, LevelRegistry, Point, ViewPresentation, WorldFrame } from '../../core';
+import type { GhostState, LevelRegistry, Point, Rect, ViewPresentation, WorldFrame } from '../../core';
 import type { RackSnapshot, SystemId } from '../../../game';
-import { createRoute, patchRoute, CHILD, LAMP, NU, OPEN, ROW_COLS, ROW_W, SAVE_AT, SLED, U, U0, UPLINK_ROUTE, WORLD, CAB, colX, liftOf, serverRect, slotY, serverRow } from './layout';
+import { createRoute, patchRoute, BAY_H, CHILD, LAMP, OPEN, ROW_COLS, ROW_W, SAVE_AT, SERVER_SLOTS, SLED, SLED_H, TWIN_SPLIT, U0, UPLINK_ROUTE, WORLD, CAB, colX, liftOf, plan, serverRect, sledDx } from './layout';
 import { fanAt } from './art';
 import type { FanBank } from './art';
 import { drawClips, drawPatch, drawUplink, shell, sledInterior } from './cabinet';
@@ -25,6 +25,20 @@ const route = createRoute(), point: Point = { x: 0, y: 0 }, sledRect = { x: 0, y
 export function nextFreeServer(s: RackSnapshot): number {
   for (let i = 0; i < s.servers.length; i++) if (s.servers[i].systemId === null) return i;
   return -1;
+}
+const emptyAt = (s: RackSnapshot, i: number): boolean => i < s.servers.length && i < SERVER_SLOTS && s.servers[i]!.systemId === null;
+/**
+ * The add site on the next free slot `free`: its ghost, its tap rect and where its name and price sit. It takes the free
+ * unit under it too (two text lines), and a half row's whole width while both its sleds are free.
+ */
+export function addRect(s: RackSnapshot, free: number, out: Rect): Rect {
+  serverRect(free, out);
+  if (plan.id === 'half') {
+    const row = (free & 1) === 0 && emptyAt(s, free + 1);
+    if (row) out.w *= 2;
+    if (emptyAt(s, free + 2) && (!row || emptyAt(s, free + 3))) out.h *= 2;
+  } else if (free + 1 !== (plan.id === 'twin' ? TWIN_SPLIT : SERVER_SLOTS) && emptyAt(s, free + 1)) out.h *= 2;
+  return out;
 }
 /** Server slot running system `id`, or -1. */
 export function slotOfSystem(s: RackSnapshot, id: number): number {
@@ -58,7 +72,7 @@ function ghostState(view: ViewPresentation): GhostState {
   return 'open';
 }
 
-/** The whole row: neighbours at their columns at 30% alpha, then the active rack on top. */
+/** The whole row: neighbours at their columns, dimmed, then the active rack on top. */
 export function drawRow(g: G, s: RackSnapshot, view: ViewPresentation, frame: WorldFrame, ctx: RackContext): void {
   R(g, 0, 0, ROW_W, WORLD.h, BG.rack);
   const col = rackCol(s), row = rowViews(s);
@@ -76,16 +90,16 @@ function drawActive(g: G, s: RackSnapshot, view: ViewPresentation, frame: WorldF
   shell(g);
   const off = rackDark(s), quiet = off || frame.paused, heat = Math.max(0, Math.min(1, (s.tempF - 70) / 30));
   drawCooler(g, s, ctx.fans, frame.timeMs, quiet, frame.reducedMotion);
-  drawPowerCtl(g, s, off, frame.paused);
+  drawPowerCtl(g, s, off, frame.paused, 'open', !view.sourceActions?.includes('powerCtl'));
   drawSwitch(g, s, quiet);
   drawLB(g, s, quiet);
   const d = drillOf(s, frame);
   for (let i = 0; i < s.servers.length; i++) {
     const v = s.servers[i];
     if (v.systemId === null) continue;
-    const y = slotY(serverRow(i));
-    if (i === d.slot && d.out > 0) { R(g, OPEN.x, y, OPEN.w, U, P.ink); R(g, OPEN.x + 2, y + 1, OPEN.w - 4, U - 2, P.void); continue; }
-    drawServer(g, OPEN.x, y, OPEN.w, U, v, serverLook(s, v, frame.paused), heat, frame.paused);
+    const r = serverRect(i, sledRect);
+    if (i === d.slot && d.out > 0) { R(g, r.x, r.y, r.w, r.h, P.ink); R(g, r.x + 2, r.y + 1, r.w - 4, r.h - 2, P.void); continue; }
+    drawServer(g, r.x, r.y, r.w, r.h, v, serverLook(s, v, frame.paused), heat, frame.paused);
   }
   const up = s.switch.uplinks[0];
   drawUplink(g, up ? up.speedHz : 1e3, !quiet && !!up && up.active);
@@ -99,12 +113,12 @@ function drawActive(g: G, s: RackSnapshot, view: ViewPresentation, frame: WorldF
   drawClips(g);
   drawPdu(g, s, quiet);
 
-  // the next free slot: one quiet affordance; the price lives on the configuration plate
+  // the next free slot: a bracketed bay with the add mark; "Add server" and its price are the label (labels.ts)
   const free = nextFreeServer(s);
   if (free >= 0 && d.slot < 0) {
-    const r = serverRect(free, sledRect), cx = r.x + (r.w >> 1), cy = r.y + (r.h >> 1);
+    const r = addRect(s, free, sledRect), cx = r.x + 10, cy = r.y + (r.h >> 1);
     drawGhost(g, r.x + 1, r.y + 1, r.w - 2, r.h - 2, ghostState(view));
-    R(g, cx - 3, cy - 1, 7, 3, P.ink); R(g, cx - 1, cy - 3, 3, 7, P.ink); R(g, cx - 2, cy, 5, 1, P.paper); R(g, cx, cy - 2, 1, 5, P.paper);
+    if (!view.sourceActions?.includes('add:server')) { R(g, cx - 3, cy - 1, 7, 3, P.ink); R(g, cx - 1, cy - 3, 3, 7, P.ink); R(g, cx - 2, cy, 5, 1, P.paper); R(g, cx, cy - 2, 1, 5, P.paper); }
   }
   // real transfers: the D25 shard flows; before the sim sends them, each link's own transfer
   // progress down the uplink, then along a patch cable to the server's NIC
@@ -119,7 +133,7 @@ function drawActive(g: G, s: RackSnapshot, view: ViewPresentation, frame: WorldF
   // dark rack: the supply failed, so nothing below it has power
   if (off) {
     const a = g.globalAlpha; g.globalAlpha = a * 0.5;
-    R(g, OPEN.x, U0, OPEN.w, NU * U, P.ink); R(g, CAB.x + 1, CAB.roofY + 1, CAB.w - 32, CAB.roofH - 2, P.ink); g.globalAlpha = a;
+    R(g, OPEN.x, U0, CAB.w - 18, BAY_H, P.ink); R(g, CAB.x + 1, CAB.roofY + 1, CAB.w - 32, CAB.roofH - 2, P.ink); g.globalAlpha = a;
   }
   if (s.saveable) drawSaveIcon(g, SAVE_AT.x, SAVE_AT.y);
   drawUnitLamp(g, LAMP.x, LAMP.y, LAMP.w, lampState(s.online), (s.timerS ?? 0) * 1000, 10_000, frame.paused);
@@ -128,9 +142,10 @@ function drawActive(g: G, s: RackSnapshot, view: ViewPresentation, frame: WorldF
 
 /** Rack ↔ System: the server's sled slides out on its rails; the board on it is the system's mini. */
 function drawSled(g: G, s: RackSnapshot, slot: number, out: number, frame: WorldFrame, ctx: RackContext): void {
-  const v = s.servers[slot], y = slotY(serverRow(slot)), lift = liftOf(y), d = SLED.d;
+  const v = s.servers[slot], y = serverRect(slot, sledRect).y, lift = liftOf(y), d = SLED.d;
+  g.save(); g.translate(sledDx(slot), 0);
   const top = Math.round(y - lift * out), front = Math.round(top + d * out), alpha = g.globalAlpha;
-  g.globalAlpha = alpha * 0.4; R(g, SLED.x + 3, top + 3, SLED.w, front - top + U, P.ink); g.globalAlpha = alpha;
+  g.globalAlpha = alpha * 0.4; R(g, SLED.x + 3, top + 3, SLED.w, front - top + SLED_H, P.ink); g.globalAlpha = alpha;
   R(g, SLED.x - 1, top, 1, front - top + 2, P.steel); R(g, SLED.x + SLED.w, top, 1, front - top + 2, P.steelLo);
   const look = serverLook(s, v, frame.paused);
   if (front > top) {
@@ -143,5 +158,6 @@ function drawSled(g: G, s: RackSnapshot, slot: number, out: number, frame: World
     }
     g.restore();
   }
-  drawServer(g, OPEN.x, front, OPEN.w, U, v, look, 0, frame.paused);
+  drawServer(g, OPEN.x, front, OPEN.w, SLED_H, v, look, 0, frame.paused);
+  g.restore();
 }

@@ -73,6 +73,7 @@ export function settleLedger(w: World, gross = 0n, data = 0n): void {
   const research = w.research;
   if (l.credits < 0n && research.active !== null && !research.stoppedInsolvent) {
     research.stoppedInsolvent = true;
+    w.hot.g[G.researchBreak] = 0;
     pushEvent(w, { kind: 'researchStopped', project: research.active });
   } else if (l.credits >= 0n && research.stoppedInsolvent) {
     // QA-04: a project stopped for insolvency resumes by itself once Credits are back at 0 or above.

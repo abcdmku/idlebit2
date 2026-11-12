@@ -18,7 +18,7 @@ export interface Placed extends Rect {
 /**
  * The plate's rect for a part at `a` (or none), `w` wide with `content` px of content, inside `safe`.
  * Beside (desktop): the right gutter dock when the part stays clear of it, else right of the part, else
- * left of it. Otherwise (phone, or no side room): below the part if it fits, else above, else beside it
+ * left of it; with no part, the same dock from the top. Otherwise (phone, or no side room): below the part if it fits, else above, else beside it
  * (narrower, at least SIDE_MIN wide; its tabs wrap) when that holds more, else the roomier of below and above with the height
  * cut to that room (the plate scrolls), so it never covers the part.
  */
@@ -30,6 +30,11 @@ export const SHORT_ROOM = 240;
 export function placePlate(a: Rect | null, w: number, content: number, safe: Rect, o: PlaceOptions = {}): Placed {
   const room0 = Math.max(0, safe.h - 8), full = Math.min(content, room0);
   if (o.pinTop || !a) {
+    // Desktop with no part to stand beside (a unit's own plate, a task, a plate too big for the side room): the
+    // right gutter dock from the top, where the renderer keeps the focus clear, so the hardware stays in view.
+    // A dialog with no part at all (Health, Round rewards) docks the same way wherever it leaves at least its own
+    // width of world beside it; on a phone it fills the width and stays centred.
+    if ((o.beside || safe.w - w >= w) && !o.pinTop) return { x: Math.max(safe.x, safe.x + safe.w - w), y: safe.y, w, h: full, room: room0 };
     const x = clamp(safe.x + (safe.w - w) / 2, safe.x, safe.x + safe.w - w);
     return { x, y: o.pinTop ? safe.y + 4 : safe.y + (safe.h - full) / 2, w, h: full, room: room0 };
   }

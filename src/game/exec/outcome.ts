@@ -16,7 +16,7 @@ import { removeArrival } from '../net/links';
 import { returnToFront } from '../market/queue';
 import { queueUnlink } from './lists';
 import { hasRule } from './rules';
-import { canAdmit, noteAdmit, noteAdmitted } from './slots';
+import { canAdmit, noteAdmit, noteAdmitted, noteRelease } from './slots';
 import { leaveStage, releaseRunning } from './stages';
 import { releaseQueuedPreload } from './preload';
 
@@ -89,6 +89,7 @@ export function completeRecord(w: World, s: number, r: number, tau: number, doma
 /** Releases a reservation of k tasks of record r on system s (a transfer cancelled or delivered). */
 export function releaseReservation(w: World, s: number, k: number, r: number): void {
   const before = canAdmit(w, s);
+  noteRelease();
   w.hot.sys.reserved[s] = w.hot.sys.reserved[s]! - k;
   noteAdmitted(w, s, -k, r);
   noteAdmit(w, s, before);

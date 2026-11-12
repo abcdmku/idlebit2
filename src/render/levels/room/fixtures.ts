@@ -22,6 +22,8 @@ export interface RoomCase {
   between?: boolean; off?: readonly number[]; out?: Readonly<Record<number, readonly number[]>>;
   /** D31: the room start controller: racks in `standby` are unpowered, `waking` powers on, `sleepy` racks keep 3 systems awake. */
   start?: { standby: readonly number[]; waking?: number; sleepy?: readonly number[] };
+  /** Per rack slot: overrides of its slot view (a crashed, dark, hot or overloaded rack among running ones). */
+  racks?: Readonly<Record<number, Partial<RackSlotView>>>;
 }
 const supply = (u: SupplyView, o: RoomCase): SupplyView => ({
   ...u, generation: o.upsGen ?? 1, level: 2, usage: o.upsUsage ?? 0.27, deliveredW: u.capacityW * (o.upsUsage ?? 0.27),
@@ -45,6 +47,7 @@ export function roomCase(o: RoomCase, timeMs: number): RoomSnapshot {
       rackId: on ? rackId(i) : null, state: !on ? 'empty' : o.dark ? 'dark' : crashed ? 'crashed' : off ? 'offline' : standby ? 'standby' : o.between ? 'paused' : 'onMarket',
       load: on && !o.between && !standby ? Math.max(0.1, 0.9 - (i % 8) * 0.12) * (sleepy ? 0.3 : 1) : 0,
       powered: on && !standby, wakeMs: o.start?.waking === i ? 1200 : null, tempF: on ? (o.rackTempF ?? (o.tempF ?? 75) + 4) : 70, pduUsage: on ? 0.5 : 0, servers, serversOnMarket,
+      ...(on ? o.racks?.[i] : null),
     };
   });
   const active = new Set(o.active ?? [0, 2]), t = timeMs / 1000;
@@ -94,6 +97,15 @@ export const CASES: Readonly<Record<string, (timeMs: number) => RoomSnapshot>> =
     zone: 1, zones: [0, 1, 2], upsGen: 2, uplink: true }, t),
   azB: t => roomCase({ zone: 1, zones: [0, 1, null], built: [0, 1, 2] }, t),
   empty: t => roomCase({ built: [] }, t),
+  one: t => roomCase({ built: [0], active: [0] }, t),
+  two: t => roomCase({ built: [0, 1] }, t),
+  row: t => roomCase({ built: [0, 1, 2, 3, 4, 5, 6, 7], uplink: true }, t),
+  /** A full two-row floor that can still grow: the next row's build site shows under the front wall. */
+  floor: t => roomCase({ built: ALL24.slice(0, 16), uplink: true }, t),
+  /** Trouble among running racks: one crashed, one dark, one hot, one over its PDU, one off market, one booting. */
+  mixed: t => roomCase({ built: ALL24.slice(0, 14), uplink: true, racks: {
+    3: { state: 'crashed', load: 0, tempF: 104 }, 5: { state: 'dark', load: 0, powered: false, pduUsage: 0 }, 9: { tempF: 96 }, 11: { pduUsage: 1.05 },
+    12: { state: 'offline', load: 0 }, 13: { state: 'boot', load: 0 } } }, t),
   paused: t => roomCase({}, t),
   /** QA-20: the network rack's LCD with a four-letter strategy (FIFO). */
   fifo: t => roomCase({ strategy: 'firstFit' }, t),

@@ -5,7 +5,8 @@ import { formatHertz, formatSize, formatWatts } from '../../../game';
 import type { SystemSnapshot } from '../../../game';
 import { P, R, whole } from '../../core';
 import type { LabelWriter, Rect, WorldForm, WorldFrame } from '../../core';
-import { BOARD, siteRect } from './layout';
+import { siteRect } from './layout';
+import type { BoardLayout } from './layout';
 import { boardModel } from './model';
 import { tierOf } from './memory';
 import type { Site } from './model';
@@ -89,7 +90,7 @@ function values(s: SystemSnapshot): Omit<PartLabel, 'top' | 'mid' | 'lx' | 'end'
     for (const q of gpu) spill += q.part?.unifiedSpillBits ?? 0;
     out.push({ key: 'gpu', name: stats.length === 0 ? 'NPU' : stats.length === cards.length ? 'GPU' : 'Accelerators', value,
       phoneValue: stats.length === 0 ? phoneValue.replaceAll('NPU ', '') : phoneValue,
-      side: 'L', r: union(gpu, b), ...(spill > 0 ? { spilled: formatSize(spill) } : {}) });
+      side: b.gpuSide, r: union(gpu, b), ...(spill > 0 ? { spilled: formatSize(spill) } : {}) });
   }
   return out;
 }
@@ -100,7 +101,8 @@ export function firstRow(frame: WorldFrame): number {
   return v ? Math.max(FIRST, Math.ceil(v.y / LAT) * LAT) : FIRST;
 }
 
-function place(list: PartLabel[], form: WorldForm | undefined, first: number): void {
+function place(list: PartLabel[], form: WorldForm | undefined, first: number, b: BoardLayout): void {
+  const BOARD = b.board;
   if (form === 'phone') {
     for (const it of list) {
       const r = it.r;
@@ -126,15 +128,16 @@ function place(list: PartLabel[], form: WorldForm | undefined, first: number): v
   }
 }
 
-interface Placed { first: number; list: PartLabel[] }
+interface Placed { first: number; list: PartLabel[]; b: BoardLayout }
 const cache = { desktop: new WeakMap<SystemSnapshot, Placed>(), phone: new WeakMap<SystemSnapshot, Placed>() };
 /** Labels for a snapshot and form, placed from row `first` down. Cached per published snapshot. */
 export function partLabels(s: SystemSnapshot, form: WorldForm | undefined, first = FIRST): readonly PartLabel[] {
   const map = cache[form === 'phone' ? 'phone' : 'desktop'];
   let entry = map.get(s);
-  if (!entry || entry.first !== first) {
+  const b = boardModel(s).b;
+  if (!entry || entry.first !== first || entry.b !== b) {
     const list = values(s).map(v => ({ ...v, top: 0, mid: 0, lx: 0, end: 0, tagX: 0, tagY: 0, right: false }));
-    place(list, form, first); entry = { first, list }; map.set(s, entry);
+    place(list, form, first, b); entry = { first, list, b }; map.set(s, entry);
   }
   return entry.list;
 }
@@ -150,9 +153,12 @@ export function drawLeaders(g: CanvasRenderingContext2D, s: SystemSnapshot, firs
 
 /** Desktop hardware labels stay outside the board. Memory has its own reserved rows. */
 export function writeLabels(s: SystemSnapshot, frame: WorldFrame, out: LabelWriter): void {
-  writeMemoryRows(s, frame, out);
+  const b = boardModel(s).b, BOARD = b.board;
+  writeMemoryRows(s, frame, out, b);
+  // Above the board where the view has room for the line; else on the board's rear strip, left of the save icon.
   const powerY = BOARD.y - BOARD.z - Math.ceil(24 / (frame.scale ?? 2));
-  out.label('power-use', BOARD.x + 50, powerY).text('Power', 'name', true).text(formatWatts(s.drawW), 'power');
+  if (!frame.visible || frame.visible.y <= powerY) out.label('power-use', BOARD.x + 50, powerY).text('Power', 'name', true).text(formatWatts(s.drawW), 'power');
+  else out.label('power-use', b.save.x - 4, BOARD.y - 2, 'right').text(formatWatts(s.drawW), 'power');
   const form = frame.form;
   if (form === 'phone') return;
   for (const it of partLabels(s, form, firstRow(frame))) {

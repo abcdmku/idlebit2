@@ -1,15 +1,17 @@
 // Room level (v3; was the data center): one AZ hall at a time. Racks are bought only at the
 // next free slot; the network rack in the top-left corner is the room switch with its built-in
-// load balancer; the door in the back wall walks to the site's next zone.
+// load balancer; the door in the back wall walks to the site's next zone. The hall is planned for
+// the free world it rests in (layout.ts): every method lays the live hall out for its snapshot first.
 import { P, R, copyRect, px, setRect } from '../../core';
 import type { LevelRegistry, LevelRenderer, Rect } from '../../core';
 import { createFanBank } from '../rack/art';
 import { MINI_SIZE, drawRoomMini } from './mini';
 import { roomChildren, roomTargets } from './targets';
-import { drawWorld } from './world';
+import { canAddRow, drawWorld } from './world';
 import { roomPowered } from './state';
 import { roomLabels } from './labels';
-import { COLS, GATEWAY, IY, RACK_RECTS, ROW_PITCH, UPS_HITS, WORLD_W, WORLD_X, focusRect, hallOf, worldH } from './layout';
+import { BOH, COLS, G, WORLD_X, planFor, useRows } from './layout';
+import { upsCabinets, upsFoot } from './infra';
 
 
 function icon(g: CanvasRenderingContext2D): void {
@@ -24,41 +26,55 @@ export function createRoomRenderer(registry: LevelRegistry): LevelRenderer<'room
   const ctx = { registry, fans: createFanBank(1) };
   return {
     id: 'room', name: 'Room',
-    size: (s, out) => setRect(out, WORLD_X, 0, WORLD_W, worldH(s.rows)),
-    focus: (s, _vp, out) => focusRect(s.rows, out),
+    size: (s, out) => { const g = useRows(s.rows); return setRect(out, WORLD_X, 0, g.worldW, g.worldH); },
+    /** The hall is planned for the free world (layout.ts): the core frames it before any other geometry of a rest frame. */
+    plansAtRest: true,
+    focus(s, _vp, out, _form, area) {
+      const site = canAddRow(s), g = area ? planFor(s.rows, site, area) : useRows(s.rows);
+      return copyRect(site ? g.focusSite : g.focus, out);
+    },
     /** The pipe enters at the gateway fibre, top-left, above the network rack (Control deck D17). */
-    entry(_s, out) { out.x = GATEWAY.x + (GATEWAY.w >> 1); out.y = 0; return out; },
-    draw: (g, s, view, frame) => drawWorld(g, s, view, frame, ctx),
+    entry(s, out) { out.x = useRows(s.rows).gwx; out.y = 0; return out; },
+    draw: (g, s, view, frame) => { useRows(s.rows); drawWorld(g, s, view, frame, ctx); },
     drawMini: (g, z, rect) => drawRoomMini(g, z, rect),
     /** The World's tile shows the two-row hall, so World ↔ Room lands the hall on it. */
     miniRect: (_s, out) => copyRect(MINI_SIZE, out),
-    children: roomChildren,
-    labels: (s, _view, frame, out) => roomLabels(s, frame, out),
-    /** A payout pops just above the rack that ran it (A20); the key is its room slot. */
+    children: (s, out) => { useRows(s.rows); return roomChildren(s, out); },
+    labels: (s, view, frame, out) => { useRows(s.rows); roomLabels(s, view, frame, out); },
+    /**
+     * A payout pops on the roof of the rack that ran it (A20); the key is its room slot. The block rests and rises
+     * between the °F on the tile of the rack behind it and its own: it covers lights, never a word.
+     */
     payoutAnchor(s, c, out) {
       if (c.rack === null || c.rack === undefined) return -1;
+      const RACK_RECTS = useRows(s.rows).racks;
       for (let i = 0; i < Math.min(s.racks.length, s.rows * COLS); i++) if (s.racks[i].rackId === c.rack) {
         const r = RACK_RECTS[i];
-        setRect(out, r.x, r.y - 6, r.w, 0); return i;
+        setRect(out, r.x, r.y + 5, r.w, 0); return i;
       }
       return -1;
     },
     /** One pop per rack per second (A20). */
     popWindowMs: () => 1000,
-    /** A hall too tall for the view rests on the row of the rack the player came from (or the home rack), and pans by rows. */
+    /**
+     * A hall too big for the view rests on its west end, where the fibre enters and racks fill from, and on
+     * the row of the rack the player came from (or the home rack), else the back wall. It pans by rows.
+     */
     restCentre(s, out, hint) {
+      out.x = 0; out.y = 0;
       if (hint?.level !== 'rack') return;
+      const RACK_RECTS = useRows(s.rows).racks;
       for (let i = 0; i < Math.min(s.racks.length, s.rows * COLS); i++) if (s.racks[i].rackId === hint.id) {
         const r = RACK_RECTS[i]; out.y = r.y + (r.h >> 1); return;
       }
     },
-    panSnap: () => ({ x: 0, y: ROW_PITCH }),
-    targets: (s, _view, out, from) => roomTargets(s, out, from),
+    panSnap: () => ({ x: 0, y: G.pitch }),
+    targets: (s, _view, out, from) => { useRows(s.rows); return roomTargets(s, out, from); },
     faults(s, out: Rect[]) {
       let n = 0;
-      const G0 = hallOf(s.rows);
-      if (s.crashed && n < out.length) setRect(out[n++], G0.ix + 8, IY + 8, G0.iw - 16, 4);
-      if (!roomPowered(s) && n < out.length) copyRect(UPS_HITS[UPS_HITS.length - 1], out[n++]);
+      const G0 = useRows(s.rows), RACK_RECTS = G0.racks, bank = upsCabinets(s.ups);
+      if (s.crashed && n < out.length) setRect(out[n++], G0.ix + 8, G0.iy + 8, G0.iw - 16, 4);
+      if (!roomPowered(s) && bank > 0 && n < out.length) { const f = upsFoot(bank - 1, bank); setRect(out[n++], f.x, f.y - BOH.z, f.w, f.h + BOH.z); }
       for (let i = 0; i < Math.min(s.racks.length, s.rows * COLS) && n < out.length; i++) {
         const k = s.racks[i];
         if (k.rackId !== null && k.state === 'crashed') copyRect(RACK_RECTS[i], out[n++]);

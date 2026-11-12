@@ -1,6 +1,7 @@
 import type { CompiledBuffers } from '../core/buffers';
 import { accelGate, accelNeed } from '../core/accelerators';
 import { MAX_ACCELS, MAX_SHARDS } from '../core/constants';
+import { isEligibleMode } from '../core/modes';
 import { MODE } from '../core/timers';
 import type { World } from '../core/world';
 type FleetContext = Pick<World, 'compiled' | 'hot'>;
@@ -34,10 +35,7 @@ export const detailIndex = (code: number): number => {
   return word ? FAIL_DETAILS.indexOf(word) : NO_DETAIL;
 };
 
-/** The static capability set: modes that accept work within one boot time (spec §4.3). */
-const ELIGIBLE = new Uint8Array(32);
-ELIGIBLE[MODE.onMarket] = 1; ELIGIBLE[MODE.asleep] = 1; ELIGIBLE[MODE.standby] = 1; ELIGIBLE[MODE.boot] = 1; ELIGIBLE[MODE.cold] = 1;
-export const isEligibleMode = (mode: number): boolean => ELIGIBLE[mode] === 1;
+export { isEligibleMode };
 
 /**
  * Per-system gate check (spec §6.3) for one shard of `size` units (size 0: the size-free gates). Returns 0 or the first
@@ -133,7 +131,7 @@ export function canRunFleet(w: FleetContext, f: FamilyDef, size: number): number
   let best = 0, capable = 0;
   for (const cls of classesOf(c)) {
     let eligible = false;
-    for (const m of cls.members) if (ELIGIBLE[mode[m]!] === 1) { eligible = true; break; }
+    for (const m of cls.members) if (isEligibleMode(mode[m]!)) { eligible = true; break; }
     if (!eligible) continue;
     const gate = gateOn(c, cls.rep, f, 0);
     if (gate === 0) capable += 1; else if (gate > best) best = gate;
@@ -154,7 +152,7 @@ export function canRunFleet(w: FleetContext, f: FamilyDef, size: number): number
     if (gateOn(c, cls.rep, f, 0) !== 0) continue;
     for (const m of cls.members) {
       if (cum >= kCap) break;
-      if (ELIGIBLE[mode[m]!] !== 1) continue;
+      if (!isEligibleMode(mode[m]!)) continue;
       if (members > 1 && c.rack.opened[c.sys.rack[m]!] !== 1) continue;
       cum += 1;
       const room = c.sys.room[m]!;
@@ -177,7 +175,10 @@ export function canRunFleet(w: FleetContext, f: FamilyDef, size: number): number
  */
 interface GateMemo { readonly cls: Int32Array; readonly family: (FamilyDef | null)[]; readonly size: Float64Array; readonly gate: Int32Array }
 const gateMemo = new WeakMap<CompiledBuffers, GateMemo>();
+/** The last compiled buffers asked about and their memo. */
+let lastCompiled: CompiledBuffers | null = null, lastMemo: GateMemo | null = null;
 function memoFor(c: CompiledBuffers): GateMemo {
+  if (c === lastCompiled && lastMemo !== null) return lastMemo;
   let m = gateMemo.get(c);
   if (!m) {
     const classes = classesOf(c), cls = new Int32Array(c.sys.len).fill(-1);
@@ -185,6 +186,7 @@ function memoFor(c: CompiledBuffers): GateMemo {
     m = { cls, family: classes.map(() => null), size: new Float64Array(classes.length), gate: new Int32Array(classes.length) };
     gateMemo.set(c, m);
   }
+  lastCompiled = c; lastMemo = m;
   return m;
 }
 

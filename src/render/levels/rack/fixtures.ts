@@ -21,6 +21,8 @@ export interface RackCase {
   between?: boolean; out?: readonly number[];
   /** D31: Power control installed (battery charge share, seconds left, awake systems); the rest of the sleds sleep. */
   power?: { gen?: number; charge: number; secondsLeft: number | null; awake: number };
+  /** Per row column: overrides of that neighbour's slot view (a crashed, dark or hot neighbour). */
+  row?: Readonly<Record<number, Partial<RackSlotView>>>;
 }
 /** D31: a start controller view (rack, room or global). */
 export function startView(awake: number, total: number, generation = 0, order: StartCtlView['order'] = 'slot'): StartCtlView {
@@ -60,7 +62,7 @@ export function rackCase(o: RackCase, timeMs: number): RackRowSnapshot {
   const built = new Set(o.built ?? [0, 1, col, 3, 4, 6].map(c => c)); built.add(col);
   const row = Array.from({ length: 8 }, (_, c) =>
     c === col ? neighbour(id, n, 0.6, o.tempF ?? 72, between, out)
-      : built.has(c) ? neighbour(100 + rowBase + c, 4 + ((c * 5) % 9), (c % 3) * 0.4, 68 + c * 3, between, between && c % 2 ? new Set([1, 2]) : new Set()) : EMPTY_SLOT);
+      : built.has(c) ? { ...neighbour(100 + rowBase + c, 4 + ((c * 5) % 9), (c % 3) * 0.4, 68 + c * 3, between, between && c % 2 ? new Set([1, 2]) : new Set()), ...o.row?.[c] } : EMPTY_SLOT);
   const s: Mutable<RackRowSnapshot> = {
     ...BASE, rackId: rackId(id), online: dark ? 'dark' : crashed ? 'crashed' : between ? 'paused' : 'onMarket',
     tempF: o.tempF ?? 72, eff: (o.tempF ?? 72) > 80 ? 0.86 : 1, crashed, crashS: o.crashS ?? 0,
@@ -100,6 +102,9 @@ export const CASES: Readonly<Record<string, (timeMs: number) => RackRowSnapshot>
   alone: t => rackCase({ slot: 0, built: [0], servers: 3, ports: 4 }, t),
   full: t => rackCase({ servers: 12, built: [0, 1, 2, 3, 4, 5, 6, 7], active: [0, 1, 2, 5, 9, 11], uplink: true }, t),
   hot: t => rackCase({ tempF: 94, crashS: 4, usage: 0.95, overloadS: 3 }, t),
+  /** Trouble among running sleds and neighbours: a crashed, a booting, an offline and an asleep sled; a crashed, a dark and a hot neighbour. */
+  mixed: t => rackCase({ servers: 11, tempF: 86, usage: 0.93, uplink: true, modes: { 1: 'crashed', 2: 'boot', 4: 'offline', 7: 'asleep' },
+    built: [0, 1, 2, 3, 4], row: { 1: { state: 'crashed' }, 3: { state: 'dark', powered: false }, 4: { tempF: 97, pduUsage: 1.04 } } }, t),
   crash: t => rackCase({ tempF: 103, crashed: true }, t),
   dark: t => rackCase({ dark: true }, t),
   water: t => rackCase({ tech: 'water', gen: 2, tempF: 66 }, t),

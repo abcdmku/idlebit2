@@ -26,7 +26,7 @@ export * from './px';
 export * from './activity';
 export * from './decoration';
 export { createEffectPool, EFFECT_LIMITS } from './fx';
-export { PayoutPops, completionMs, POP_LIFE_MS, POP_MERGE_MS, MAX_POPS } from './pops';
+export { PayoutPops, completionMs, POP_LIFE_MS, POP_MERGE_MS, POP_RISE_ART, MAX_POPS } from './pops';
 export type { Completion } from './pops';
 export { partVersionOf, sumVersions } from './versions';
 export { restPan, RestPan, frameRest } from './restPan';

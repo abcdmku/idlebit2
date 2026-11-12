@@ -21,6 +21,8 @@ export interface PathNode {
   readonly mini?: Rect;
   /** The level's link entry (`LevelRenderer.entry`); the framed rest puts it on the lattice. */
   readonly entry?: Point;
+  /** The framing this level rests under when it is not the zoom's own (a level that spans the dock). */
+  readonly framing?: RestFraming | null;
 }
 /**
  * A slice of a chained zoom. A jump of n levels plays as n one-level steps over one eased curve
@@ -75,7 +77,7 @@ export class ZoomTransition {
       this.maps[i] ??= contain(); this.rests[i] ??= camera();
       if (i === 0) { this.maps[i].ox = 0; this.maps[i].oy = 0; this.maps[i].k = 1; }
       else { containMap(node.rect, node.mini ?? node.size, this.scratch); compose(this.maps[i - 1], this.scratch, this.maps[i]); }
-      restFor(node.focus, viewport, ratio, framing, this.rests[i], node.scaleStep, node.entry ?? null);
+      restFor(node.focus, viewport, ratio, node.framing ?? framing, this.rests[i], node.scaleStep, node.entry ?? null);
       this.entryScale[i] = i ? this.rests[i - 1].s * this.scratch.k : 1;
       if (node.key === from) fromIndex = i;
       if (node.key === to) toIndex = i;

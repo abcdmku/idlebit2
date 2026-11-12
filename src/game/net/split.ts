@@ -200,13 +200,15 @@ function splitAt(w: World, kind: number, id: number, u: number, exact: number, d
   let n = 0, connectedN = 0;
   // A rack's systems share their first link when it is the rack uplink or above (rackLinkRoom).
   const rackLink = kind === RACK ? rackLinkRoom(w, id) : 2;
+  // A full shared first link leaves no system of the rack with room.
+  if (rackLink === 0) { if (depth === 0) splitMiss.room = true; return false; }
   for (let k = 0; k < FANOUT[kind]!; k += 1) {
     const child = childAt(w, kind, id, k);
     if (child < 0 || !connected(w, kind, child)) continue;
     if (kind === RACK && w.compiled.sys.kind[child] !== 0) continue;
     connectedN += 1;
     let room: boolean;
-    if (kind === RACK) room = rackLink === 0 ? false : rackLink === 1 ? canAdmit(w, child) : canTake(w, child);
+    if (kind === RACK) room = rackLink === 1 ? canAdmit(w, child) : canTake(w, child);
     else if (exact > 0) room = takers(w, kind, child, 1) > 0;
     else room = (queueEmpty(w, kind - 1, child) && takers(w, kind, child, 1) > 0) || queueFree(w, kind - 1, child) > 0;
     if (!room) continue;
@@ -233,7 +235,11 @@ function splitAt(w: World, kind: number, id: number, u: number, exact: number, d
   beginDecision();
   const strategy = routeStrategy(cols.strategy);
   const capability = (cols.filters & FILTER_BIT.capability) !== 0;
-  n = strategy.plan(w, kind, id, probe, C, S, Wt, n);
+  // The split floor (D25.11): no shard under 1 s of work at the fastest nominal rate below.
+  const cut = exact > 0 ? 0 : Math.min(Math.floor(u / gHat), floorShards(w.compiled, kind, id, rec.family[probe]!, u));
+  // One shard: the strategy may name its taker without ordering every candidate.
+  const single = exact === 0 && cut <= 1 && strategy.single ? strategy.single(w, kind, id, probe, C, Wt, n) : -1;
+  if (single < 0) n = strategy.plan(w, kind, id, probe, C, S, Wt, n);
   if (kind === GLOBAL && exact === 0 && SINGLE_SITE.has(strategy.id)) n = Math.min(n, 1);
 
   if (exact > 0) {
@@ -261,11 +267,14 @@ function splitAt(w: World, kind: number, id: number, u: number, exact: number, d
   }
 
   // Shard count and choice (spec §7.7 steps 3 and 4).
-  // The split floor (D25.11): no shard under 1 s of work at the fastest nominal rate below.
-  const shards = Math.max(1, Math.min(n, Math.floor(u / gHat), floorShards(w.compiled, kind, id, rec.family[probe]!, u)));
-  let pick: number[] = Array.from({ length: n }, (_, i) => i);
-  if (strategy.weighted) pick.sort((a, b) => Wt[b]! - Wt[a]! || a - b);
-  pick = pick.slice(0, shards).sort((a, b) => a - b);
+  const shards = Math.max(1, Math.min(n, cut));
+  let pick: number[];
+  if (single >= 0) pick = [single];
+  else {
+    pick = Array.from({ length: n }, (_, i) => i);
+    if (strategy.weighted) pick.sort((a, b) => Wt[b]! - Wt[a]! || a - b);
+    pick = pick.slice(0, shards).sort((a, b) => a - b);
+  }
   let share = new Float64Array(0);
   for (;;) {
     let sum = 0;

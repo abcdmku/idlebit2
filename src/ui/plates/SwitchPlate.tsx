@@ -22,7 +22,8 @@ const after = (q: Quote | undefined) => (q?.effect ? q.effect.capacityAfter : nu
 /**
  * D35 (user, 26 Oct): systems have no port; the switch does. "All ports" upgrades every port at once, and
  * Match ports (on by default) keeps them, and every new port, at one speed. With Match off each port is its
- * own row ("Port 3 · System 3 · 100 kHz → 200 kHz"). Then the uplink and the replace.
+ * own key ("Port 3 / Server 3 · 100 kHz → 200 kHz"). The port list is always there, so the toggle never resizes
+ * the plate. Then the uplink. The next generation is in the plate's bottom row.
  */
 export function SwitchBody({ sw, view, lead, selected = null, quotes, onAction, onResearch, researchName }: SwitchBodyProps) {
   const qs = quotes?.quotes ?? [], room = sw.kind === 'room';
@@ -31,7 +32,6 @@ export function SwitchBody({ sw, view, lead, selected = null, quotes, onAction, 
   const all = portQuote('all') ?? (view.sameSpeed ? qs.find((q) => q.action.type === 'upgradePort') : undefined);
   const uplinks = qs.filter((q) => q.action.type === 'upgradeUplink' || q.action.type === 'addUplink');
   const addPorts = qs.find((q) => q.action.type === 'addPorts');
-  const replace = nextGeneration(qs);
   const list = useRef<HTMLOListElement>(null);
   // A port tapped on the switch art opens the plate at its row.
   useEffect(() => { if (selected !== null) list.current?.querySelector(`[data-port="${selected}"]`)?.scrollIntoView?.({ block: 'nearest' }); }, [selected]);
@@ -45,25 +45,31 @@ export function SwitchBody({ sw, view, lead, selected = null, quotes, onAction, 
     </div>
     <section className="switch-controls"><Toggle label="Match port speeds" on={view.sameSpeed}
       onToggle={() => onAction({ type: 'setSameSpeed', sw, on: !view.sameSpeed })} />
-    {!view.sameSpeed && <ol ref={list} className="port-list scroll-list" aria-label="Ports">
+    {/* Every port, always: matched ports are one line each, unmatched ones their own key. Same rows, same height. */}
+    <ol ref={list} className="port-list scroll-list" aria-label="Ports">
       {view.ports.map((p, i) => {
-        const q = portQuote(i), to = after(q);
+        const q = view.sameSpeed ? undefined : portQuote(i), to = after(q);
         return <li key={i} data-port={i} className={i === selected ? 'sel' : ''}>
           {q ? <><QuoteKey quote={q} tone="row" label={'Port ' + (i + 1) + ' / ' + peer(p.peer)}
             ariaLabel={`Port ${i + 1}, ${peer(p.peer)}, ${hertz(p.speedHz)}${to != null ? ` to ${hertz(to)}` : ''}`} onAction={fire} onResearch={onResearch} researchName={researchName} /></>
-            : <p className="key-slot">Port {i + 1} · {peer(p.peer)} · {hertz(p.speedHz)} · top speed</p>}
+            : <p className="key-slot">Port {i + 1} · {peer(p.peer)} · {hertz(p.speedHz)}{view.sameSpeed ? '' : ' · top speed'}</p>}
         </li>;
       })}
-    </ol>}
+    </ol>
     <div className="keys">
-      {addPorts && addPorts.locked?.code !== 'ceiling' && addPorts.locked?.code !== 'cap' && <QuoteKey quote={addPorts} label="Ports"
+      {addPorts && addPorts.locked?.code !== 'ceiling' && addPorts.locked?.code !== 'cap' && <QuoteKey quote={addPorts} tone="row" label="Ports"
         onAction={fire} onResearch={onResearch} researchName={researchName} />}
-      {routine(uplinks.filter(q => q.locked?.code !== 'ceiling' && q.locked?.code !== 'cap').map(quote => ({ quote }))).map(({ quote: q }, i) => <QuoteKey key={i} quote={q} label={q.action.type === 'addUplink' ? 'Add uplink' : `Uplink ${q.action.type === 'upgradeUplink' ? q.action.uplink + 1 : ''}`}
+      {routine(uplinks.filter(q => q.locked?.code !== 'ceiling' && q.locked?.code !== 'cap').map(quote => ({ quote }))).map(({ quote: q }, i) => <QuoteKey key={i} quote={q} tone="row" label={q.action.type === 'addUplink' ? 'Add uplink' : `Uplink ${q.action.type === 'upgradeUplink' ? q.action.uplink + 1 : ''}`}
         detail={q.action.type === 'addUplink' && q.effect ? `${q.effect.capacityBefore} → ${q.effect.capacityAfter} uplinks` : undefined}
         onAction={fire} onResearch={onResearch} researchName={researchName} />)}
     </div></section>
-    <GenerationAction quote={replace} onAction={fire} onResearch={onResearch} researchName={researchName} />
   </>;
+}
+
+/** The switch's next generation for PlateFrame's bottom row, or null. */
+export function switchGeneration({ quotes, onAction, onResearch, researchName }: Pick<SwitchBodyProps, 'quotes' | 'onAction' | 'onResearch' | 'researchName'>): ReactNode {
+  const replace = nextGeneration(quotes?.quotes ?? []);
+  return replace ? <GenerationAction quote={replace} onAction={q => onAction(q.action)} onResearch={onResearch} researchName={researchName} /> : null;
 }
 
 /** The switch's one speed: what its links run at (the slowest, while any still lag). */
@@ -74,7 +80,8 @@ export interface SwitchPlateProps extends PlateCommon { sw: SwitchRef; view: Swi
 /** The rack switch plate. */
 export function SwitchPlate({ sw, view, units: _units, initialPort = null, quotes, onAction, onResearch, researchName, ...frame }: SwitchPlateProps) {
   const up = view.uplinks[0];
-  return <PlateFrame {...frame} title="Switch" sub={genName(sw.kind === 'room' ? 'roomSwitch' : 'switch', view.generation).replace(/ switch$/, '')} className="switch">
+  return <PlateFrame {...frame} title="Switch" sub={genName(sw.kind === 'room' ? 'roomSwitch' : 'switch', view.generation).replace(/ switch$/, '')} className="switch"
+    generation={switchGeneration({ quotes, onAction, onResearch, researchName })}>
     <Status text={`${hertz(speedOf(view))} to every port${up ? ` · uplink ${hertz(up.speedHz)}` : ''}`} />
     <SwitchBody sw={sw} view={view} selected={initialPort} quotes={quotes} onAction={onAction} onResearch={onResearch} researchName={researchName} />
   </PlateFrame>;

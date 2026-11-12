@@ -7,12 +7,12 @@ import type { Camera, PixelRatio } from './camera';
 import type { Point, Rect } from './geom';
 import { SPR } from './sprites';
 
-export type LabelTone = 'name' | 'silk' | 'value' | 'mute' | 'dim' | 'net' | 'cyan' | 'gold' | 'data' | 'warn' | 'ok' | 'rnd' | 'power' | 'preload';
+export type LabelTone = 'name' | 'silk' | 'value' | 'mute' | 'dim' | 'net' | 'cyan' | 'gold' | 'data' | 'warn' | 'ok' | 'rnd' | 'power' | 'preload' | 'fault';
 export type LabelAlign = 'left' | 'right' | 'center';
 export const TONE: Readonly<Record<LabelTone, string>> = {
   name: '#efeaff', silk: '#a99be6', value: '#e6dcff', mute: '#a99be6', dim: '#a49cd2', net: '#7be38f',
   cyan: '#a6f6ff', gold: '#ffcc3d', data: '#27d9a0', warn: '#ffb03b', ok: '#7dff9a', rnd: '#ff6bd6', power: '#ffcf9a',
-  preload: '#a8c6ff',
+  preload: '#a8c6ff', fault: '#ff6b6b',
 };
 export const TAG_FILL = 'rgba(14, 11, 28, 0.85)';
 /** CSS px. One body size and one line height per layout (Control deck: 16/24 desktop, 13/16 phone). */
@@ -144,26 +144,27 @@ export class FrozenLabels {
 }
 /**
  * Draw every label, projected through `cam`. `g` has an identity transform; text is drawn in CSS px.
- * `alpha` fades them through a zoom (A27).
+ * `alpha` fades them through a zoom (A27). `top` (CSS px) cuts them above that line of the viewport: a panned rest's
+ * labels end with its window, under the band and the strip.
  */
-export function drawLabels(g: CanvasRenderingContext2D, b: LabelBuffer, cam: Camera, vp: Rect, ratio: PixelRatio, t: Typography, alpha = 1, frozen: FrozenLabels | null = null): void {
+export function drawLabels(g: CanvasRenderingContext2D, b: LabelBuffer, cam: Camera, vp: Rect, ratio: PixelRatio, t: Typography, alpha = 1, frozen: FrozenLabels | null = null, top = 0): void {
   if (!b.count || alpha <= 0) return;
   g.save();
   g.setTransform(ratio.x, 0, 0, ratio.y, 0, 0);
-  g.beginPath(); g.rect(vp.x, vp.y, vp.w, vp.h); g.clip();
+  g.beginPath(); g.rect(vp.x, vp.y + top, vp.w, vp.h - top); g.clip();
   g.textBaseline = 'middle'; g.globalAlpha = alpha;
   const n = Math.max(1, Math.round(cam.s / ratio.x));
   for (let i = 0; i < b.count; i++) {
     const l = b.labels[i];
     toScreen(cam, vp, ratio, l.x, l.y, at);
     // At rest: on the type lattice. Frozen (a zoom): the rest snap as a fixed offset, at whole pixels.
-    const top = frozen ? Math.round(at.y + frozen.dy[i]!) : snap(at.y, vp.y, t.grid);
+    const y0 = frozen ? Math.round(at.y + frozen.dy[i]!) : snap(at.y, vp.y, t.grid);
     for (let line = 0; line < l.lines; line++) {
       const w = lineWidth(g, b, l, line, t);
       if (w <= 0) continue;
       const left = frozen ? Math.round(l.align === 'left' ? at.x + frozen.dx[i]! : l.align === 'right' ? at.x + frozen.dx[i]! - w : at.x - w / 2)
         : l.align === 'left' ? snap(at.x, vp.x, t.grid) : l.align === 'right' ? snap(at.x, vp.x, t.grid) - w : snap(at.x - w / 2, vp.x, t.grid);
-      const y = top + line * t.line;
+      const y = y0 + line * t.line;
       if (line === 0 && l.lead) leader(g, l, left, w, y, t.line, cam, vp, ratio, n);
       if (l.tag) { g.fillStyle = TAG_FILL; g.fillRect(left - 6, y, Math.ceil(w) + 12, t.line); }
       let x = left, any = false;
@@ -185,6 +186,22 @@ export function drawLabels(g: CanvasRenderingContext2D, b: LabelBuffer, cam: Cam
     }
   }
   g.restore();
+}
+/** QA: every label line's text and CSS rect, where `drawLabels` puts it at rest (the DOM/canvas overlap probe reads it). */
+export function labelRects(g: CanvasRenderingContext2D, b: LabelBuffer, cam: Camera, vp: Rect, ratio: PixelRatio, t: Typography): { id: string; text: string; x: number; y: number; w: number; h: number }[] {
+  const out = [];
+  for (let i = 0; i < b.count; i++) {
+    const l = b.labels[i]!;
+    toScreen(cam, vp, ratio, l.x, l.y, at);
+    for (let line = 0; line < l.lines; line++) {
+      const w = lineWidth(g, b, l, line, t);
+      if (w <= 0) continue;
+      const x = l.align === 'left' ? snap(at.x, vp.x, t.grid) : l.align === 'right' ? snap(at.x, vp.x, t.grid) - w : snap(at.x - w / 2, vp.x, t.grid);
+      const text = b.runs.slice(l.first, l.end).filter(r => r.line === line).map(r => r.icon ?? r.text).join(' ');
+      out.push({ id: l.id, text, x, y: snap(at.y, vp.y, t.grid) + line * t.line, w, h: t.line });
+    }
+  }
+  return out;
 }
 /**
  * The leader: from the label's side facing the point, across to the point's x, then to its y; or,

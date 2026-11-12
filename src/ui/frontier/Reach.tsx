@@ -4,7 +4,6 @@ import { tierOf, tierValue, type Amount, type ResearchId, type RoundReport, type
 import { CoinIcon, GemIcon } from '../plates/icons';
 import { amountText, wholeText } from '../hooks/format';
 import { shortCount } from '../plates/format';
-import { familyName } from '../hooks/feedModel';
 import { useShell } from '../storeHooks';
 
 /** Shorter labels for some milestones; every other milestone shows its research tree name. */
@@ -69,16 +68,13 @@ export function changeText(now: number, before: number | null): { text: string; 
   return { text: d === 0 ? 'same' : `${arrow} ${size}`, tone };
 }
 
-/** Round details: Net and Data against the last round (tasks and peak intensity show elsewhere), and first-taken families. */
-export function ReachDetails({ report, prev }: { report: RoundReport; prev: RoundReport | null }) {
-  const num = (a: Amount) => Number(a), firsts = report.frontier.firstTaken;
+/** Net and Data against the last round: the two figures under the ruler. The change column keeps its width. */
+export function RoundTotals({ report, prev }: { report: RoundReport; prev: RoundReport | null }) {
+  const num = (a: Amount) => Number(a);
   const row = (label: string, value: ReactNode, c: ReturnType<typeof changeText>) =>
-    <li><span>{label}</span><span className="v">{value}{c.text && <span className={`rp-chg ${c.tone}`}>{c.text}</span>}</span></li>;
-  return <>
-    <ul className="p-list rp-vs" data-testid="rp-vs">
-      {row('Net', <><CoinIcon />{amountText(report.net)}</>, changeText(num(report.net), prev ? num(prev.net) : null))}
-      {row('Data', <><GemIcon />{amountText(report.data)}</>, changeText(num(report.data), prev ? num(prev.data) : null))}
-    </ul>
-    {firsts.length > 0 && <p className="mute" data-testid="rp-firsts">First taken: {firsts.map(familyName).join(', ')}</p>}
-  </>;
+    <li><span>{label}</span><span className="v">{value}{prev && <span className={`rp-chg ${c.tone}`}>{c.text}</span>}</span></li>;
+  return <ul className="p-list rp-vs" data-testid="rp-vs">
+    {row('Net', <><CoinIcon />{amountText(report.net)}</>, changeText(num(report.net), prev ? num(prev.net) : null))}
+    {row('Data', <><GemIcon />{amountText(report.data)}</>, changeText(num(report.data), prev ? num(prev.data) : null))}
+  </ul>;
 }

@@ -3,12 +3,17 @@ import { selectRoundRewards } from '../../game';
 import { slaText } from '../hooks/format';
 import { shortCount } from '../plates/format';
 import { box, useLayout } from '../shell/geometry';
-import { shallowEqual, useGameSelector, useShell } from '../storeHooks';
+import { shallowEqual, useGameSelector, useShell, useViewState } from '../storeHooks';
+import { useFleetFaults } from '../health/useFleetHealth';
 import '../styles/hud.css';
+import '../styles/health.css';
 
-/** The rolling SLA, round completions and next unearned reward use simulation selectors. */
+/**
+ * The rolling SLA, round completions and next unearned reward use simulation selectors. The SLA reading is the
+ * Health key: its lamp is lit amber while a rack runs hot and it opens the list.
+ */
 export function Sla() {
-  const L = useLayout(), shell = useShell();
+  const L = useLayout(), shell = useShell(), health = useFleetFaults(), open = useViewState().sheet === 'health';
   const g = useGameSelector(s => {
     const rewards = selectRoundRewards(shell.store.getState());
     return { percent: s.hud.sla.percent, met: s.hud.sla.met, failed: s.hud.sla.failed,
@@ -20,14 +25,18 @@ export function Sla() {
   const tone = !g.checking ? 'mute' : g.percent >= 90 ? 'ok' : g.percent >= 80 ? 'warn' : 'bad';
   const ratio = `${g.met} / ${g.met + g.failed}`;
   const taskLabel = `${g.tasks.toLocaleString('en-US')} completed tasks this round. Next reward at ${g.next.toLocaleString('en-US')} tasks.`;
+  const faultLabel = health.faults === 0 ? 'No faults' : `${health.faults} unit${health.faults === 1 ? '' : 's'} with a fault`;
   const readyLabel = `${g.ready} reward${g.ready === 1 ? '' : 's'} ready. Open round rewards.`;
   const style = { ...box(L.sla), '--sla-reading': `${readingWidth}px`, '--reward-width': `${rewardWidth}px` } as CSSProperties;
   return <div className={`sla-gauge${compact ? ' compact' : ''}`} style={style} data-testid="sla-gauge">
-    <div className="sla-reading" role="status" aria-label={`SLA ${slaText(g.percent)}, ${ratio} completed${g.checking ? '' : ', warming up'}`}
-      title="Completed tasks out of the last 50 resolved. Below 80% ends the round after 10 tasks. Dismissals do not count.">
-      <span className="sla-title mute"><span>SLA</span><span data-testid="sla-counts">{ratio}</span></span>
+    <button type="button" className="sla-reading sla-key" data-testid="sla-key" aria-haspopup="dialog" aria-expanded={open}
+      aria-label={`SLA ${slaText(g.percent)}, ${ratio} completed${g.checking ? '' : ', warming up'}. ${faultLabel}. Open health.`}
+      title="Completed tasks out of the last 50 resolved. Below 80% ends the round after 10 tasks. Dismissals do not count."
+      onPointerDown={e => e.stopPropagation()} onClick={() => shell.view.dispatch({ type: 'toggleSheet', sheet: 'health' })}>
+      <span className="sla-title mute" data-qa-label><i className={`sla-lamp ${health.fault ?? ''}`} data-testid="sla-lamp" data-fault={health.fault ?? 'none'} aria-hidden="true" />
+        <span>SLA</span><span data-testid="sla-counts">{ratio}</span></span>
       <b className={`fig big ${tone}`} data-testid="sla">{slaText(g.percent)}</b>
-    </div>
+    </button>
     <span className="hud-tasks" data-testid="hud-tasks" role="group" title={taskLabel} aria-label={taskLabel}>
       <span className="mute">Tasks</span><b data-testid="hud-task-count">{shortCount(g.tasks)}</b>
       <span className="dim" aria-hidden="true">·</span><span className="mute" data-testid="hud-next-milestone">{shortCount(g.next)}</span>

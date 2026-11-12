@@ -1,101 +1,142 @@
-// World geometry (mockup levels/global/look-c.js "Continents", cleaned for the game's regions):
-// the eight regions as cells of blocky continents laid out roughly as they sit on the globe,
-// Americas west, Europe and Africa centre, Asia-Pacific east, north up. A cell's ground is its
-// outside air. Built cells carry their site's AZ halls; the backbone runs through the oceans
-// from the scheduler hub beside the gateway. Everything here is computed once at import.
-import { REGIONS, REGION_IDS } from '../../../game';
-import type { RegionId } from '../../../game';
-import { P, hash, mix, rect } from '../../core';
-import type { Rect } from '../../core';
+// World geometry: a plan of the eight regions sized to the free world it is given (the rest area
+// in art px). On desktop the map is a grid laid out as the regions sit on the globe, west to east and
+// north up: four columns of two (a wide, short world: no empty cell) or three of three (Americas,
+// Europe and Africa, Asia-Pacific); narrower views fold it to two columns or one. A cell is a region: a
+// header (name, outside air, power price), its site's AZ halls, and a footer for the site's state. On a
+// phone the map is a list with the built sites first (list.ts). The scheduler hub sits at the top of the
+// west channel, where the pipe enters; backbone cables leave it along the header lane and run down
+// the channel west of each column to the site's landing station.
+// Every text anchor sits on the 8 art px lattice from the entry, so labels land on the text grid
+// at 2 and at 3.
+import { REGION_IDS } from '../../../game';
+import type { GlobalSnapshot, RegionId, SiteView } from '../../../game';
+import { rect } from '../../core';
+import type { Rect, RestArea, WorldForm } from '../../core';
 import { MINI_SIZE } from '../room/mini';
+import { listPlan } from './list';
+import { CHANNEL, EAST, HEAD, HUB, HUB_FOOT, LANE_Y, ROW_GAP, SEA_BOTTOM, SEA_TOP, SEA_X, SIGN_H, SOUTH, TRUNK_X, WEST } from './plan';
+import type { Cols, Lines, Path, Plan } from './plan';
+export { HEAD, SIGN_H } from './plan';
+export type { Cols, Path, Plan } from './plan';
 
-export const SIZE = rect(0, 0, 288, 156);
-export const FOCUS = rect(0, 0, 288, 156);
-const PW = 84, PH = 46, COLX = [6, 102, 198], ROWY = [6, 55, 104];
-/** Region → [column, row]. */
-const CELL: Readonly<Record<RegionId, readonly [number, number]>> = {
-  'us-west': [0, 0], 'us-east': [0, 1], 'sa-east': [0, 2],
-  'eu-north': [1, 0], 'eu-west': [1, 1], 'af-south': [1, 2],
-  'ap-northeast': [2, 0], 'ap-southeast': [2, 2],
+/** Region → [column, row] per column count. */
+type Grid = Readonly<Record<RegionId, readonly [number, number]>>;
+const GRIDS: Readonly<Record<Cols, Grid>> = {
+  // both rows run west to east; each column's north region sits over its south one
+  4: { 'us-west': [0, 0], 'us-east': [0, 1], 'eu-west': [1, 0], 'sa-east': [1, 1], 'eu-north': [2, 0], 'af-south': [2, 1], 'ap-northeast': [3, 0], 'ap-southeast': [3, 1] },
+  3: { 'us-west': [0, 0], 'us-east': [0, 1], 'sa-east': [0, 2], 'eu-north': [1, 0], 'eu-west': [1, 1], 'af-south': [1, 2], 'ap-northeast': [2, 0], 'ap-southeast': [2, 2] },
+  2: { 'us-west': [0, 0], 'us-east': [0, 1], 'sa-east': [0, 2], 'af-south': [0, 3], 'eu-north': [1, 0], 'eu-west': [1, 1], 'ap-northeast': [1, 2], 'ap-southeast': [1, 3] },
+  1: { 'us-west': [0, 0], 'us-east': [0, 1], 'sa-east': [0, 2], 'eu-north': [0, 3], 'eu-west': [0, 4], 'af-south': [0, 5], 'ap-northeast': [0, 6], 'ap-southeast': [0, 7] },
 };
-/** Continents as runs of rows in a column: N America, S America, Europe, Africa, Asia, South-East Asia. */
-const LANDS: readonly (readonly [number, number, number])[] = [[0, 0, 1], [0, 2, 2], [1, 0, 1], [1, 2, 2], [2, 0, 0], [2, 2, 2]];
-/** Sign names: silkscreen markings on the map. */
-export const REGION_SIGNS: Readonly<Record<RegionId, string>> = {
-  'us-east': 'US EAST', 'us-west': 'US WEST', 'eu-west': 'EU WEST', 'eu-north': 'EU NORTH',
-  'sa-east': 'SA EAST', 'af-south': 'AF SOUTH', 'ap-southeast': 'AP SOUTH', 'ap-northeast': 'AP NORTH',
+const ROWS = { 1: 8, 2: 4, 3: 3, 4: 2 } as const;
+const COLS = [4, 3, 2, 1] as const;
+/** Regions on one landmass: neighbours in a column share their ground. */
+const LANDMASS: Readonly<Record<RegionId, number>> = {
+  'us-west': 0, 'us-east': 0, 'sa-east': 1, 'eu-north': 2, 'eu-west': 2, 'af-south': 3, 'ap-northeast': 4, 'ap-southeast': 5,
 };
-export const CLIMATE = {
-  cold: { top: '#7d87a6', hi: '#9aa3bf', lo: '#68718f', mark: P.coolHi },
-  cool: { top: '#335a48', hi: '#40705a', lo: '#2a4a3c', mark: P.cool },
-  mild: { top: '#3f6340', hi: '#4f7a4e', lo: '#335235', mark: P.led },
-  hot: { top: '#7e6a45', hi: '#988257', lo: '#685739', mark: P.heatHi },
-} as const;
-export const climateOf = (f: number): keyof typeof CLIMATE => (f <= 46 ? 'cold' : f <= 60 ? 'cool' : f <= 79 ? 'mild' : 'hot');
-export const SEA = mix(P.seaDeep, P.ink, 0.35), SEA_LO = mix(P.seaDeep, P.ink, 0.55);
+const CELL_MIN = 72, CELL_MAX = 112, TILE_MAX = 32;
+/** CSS px the UI's two-line name and price takes across a zone add pad (desktop, phone type), and the narrowest hall beside it. */
+const ADD_W = { desktop: 114, phone: 80 } as const, HALL_MIN = 10;
 
-/** Region cell i (REGION_IDS order). */
-export const CELLS: readonly Rect[] = REGION_IDS.map(id => { const [c, j] = CELL[id]; return rect(COLX[c], ROWY[j], PW, PH); });
-export const SIGN_H = 14;
-/** Zone tile z of the site in cell i: the room's whole world contained, so a room zoom lands on it. */
-export const TILE = { w: 24, h: Math.round(24 * MINI_SIZE.h / MINI_SIZE.w), gap: 3 } as const;
-export const TILES: readonly (readonly Rect[])[] = CELLS.map(b =>
-  [0, 1, 2].map(z => rect(b.x + 3 + z * (TILE.w + TILE.gap), b.y + PH - 3 - TILE.h, TILE.w, TILE.h)));
-/** Where the backbone comes ashore: the cell's ocean-side edge, low. */
-export function landing(i: number): { x: number; y: number } {
-  const b = CELLS[i], c = CELL[REGION_IDS[i]][0];
-  return { x: c === 0 ? b.x + b.w - 2 : b.x + 1, y: b.y + SIGN_H + 6 };
+const snap8 = (v: number): number => Math.floor(v / 8) * 8;
+function build(cols: Cols, cellW: number, lines: Lines, tileMax: number, addW: number): Plan {
+  const rows = ROWS[cols], grid = GRIDS[cols];
+  const tileW = Math.min(tileMax, Math.floor((cellW - 10) / 3)), tileH = Math.round(tileW * MINI_SIZE.h / MINI_SIZE.w);
+  // header plate, halls and data plane, then the footer on the next text line
+  const footY = 2 + 8 * Math.ceil((SIGN_H + 1 + tileH + 4) / 8), cellH = footY + 8 * lines + 2;
+  const pitchX = cellW + CHANNEL, pitchY = cellH + ROW_GAP;
+  const w = WEST + cols * pitchX - CHANNEL + EAST, h = HEAD + rows * pitchY - ROW_GAP + SOUTH;
+  const gap = Math.floor((cellW - 6 - 3 * tileW) / 2);
+  const trunkX = Array.from({ length: cols }, (_, c) => (c === 0 ? TRUNK_X : WEST + c * pitchX - CHANNEL / 2));
+  const cells = REGION_IDS.map(id => rect(WEST + grid[id][0] * pitchX, HEAD + grid[id][1] * pitchY, cellW, cellH));
+  const planeY = cells.map(b => b.y + SIGN_H + 2 + tileH + 2);
+  const routes = REGION_IDS.map((id, i): Path => {
+    const c = grid[id][0], x = trunkX[c]!, y = planeY[i]!, b = cells[i]!;
+    return c === 0 ? [[TRUNK_X, HUB_FOOT], [TRUNK_X, y], [b.x, y]] : [[TRUNK_X, HUB_FOOT], [TRUNK_X, LANE_Y], [x, LANE_Y], [x, y], [b.x, y]];
+  });
+  const top = SIGN_H + 2, tiles = cells.map(b => [0, 1, 2].map(z => rect(b.x + 3 + z * (tileW + gap), b.y + top, tileW, tileH)));
+  // (the pad runs from 1 px after the second hall to 1 px inside the cell's east edge)
+  const hallW = Math.max(HALL_MIN, Math.floor((cellW - 6 - addW) / 2)), hallH = Math.round(hallW * MINI_SIZE.h / MINI_SIZE.w);
+  const tight = cellW - 5 - 2 * tileW - gap >= addW || hallW >= tileW ? tiles : cells.map(b => [
+    rect(b.x + 3, b.y + top + tileH - hallH, hallW, hallH), rect(b.x + 4 + hallW, b.y + top + tileH - hallH, hallW, hallH),
+    rect(b.x + 5 + 2 * hallW, b.y + top, cellW - 6 - 2 * hallW, tileH),
+  ]);
+  return {
+    key: `${cols}:${cellW}:${lines}:${tileMax}:${addW}`, list: false, lines, pitchX, pitchY,
+    size: rect(-SEA_X, -SEA_TOP, w + 2 * SEA_X, h + SEA_TOP + SEA_BOTTOM), focus: rect(0, 0, w, h),
+    cells, land: REGION_IDS.map(id => LANDMASS[id]), col: REGION_IDS.map(id => grid[id][0]),
+    tiles, tight, lock: null,
+    pads: cells.map(b => rect(b.x + 3, b.y + SIGN_H + 2, cellW - 6, cellH - SIGN_H - 5)), padMax: Infinity,
+    footY, hub: rect(HUB.x, HUB.y, HUB.w, HUB.h), laneY: LANE_Y,
+    trunkX, planeY, routes,
+  };
 }
-/** The global scheduler hub, in the ocean east of the gateway's cell. The pipe enters at its top. */
-export function hubRect(gateway: number, out: Rect): Rect {
-  const b = CELLS[gateway], x = b.x + b.w + 2;
-  out.x = x; out.y = b.y + SIGN_H + 2; out.w = 10; out.h = 10;
-  return out;
+const plans = new Map<string, Plan>();
+function planOf(cols: Cols, cellW: number, lines: Lines, addW: number, tileMax = TILE_MAX): Plan {
+  const key = `${cols}:${cellW}:${lines}:${tileMax}:${addW}`;
+  let p = plans.get(key);
+  if (!p) { p = build(cols, cellW, lines, tileMax, addW); plans.set(key, p); }
+  return p;
 }
-
-const climateOfRegion = REGIONS.map(r => CLIMATE[climateOf(r.outsideF)]);
-/** Nearest region cell to a land pixel. */
-function cellAt(x: number, y: number): number {
-  let best = 0, bd = 1e9;
-  for (let r = 0; r < CELLS.length; r++) {
-    const b = CELLS[r], dx = Math.max(b.x - x, 0, x - (b.x + b.w - 1)), dy = Math.max(b.y - y, 0, y - (b.y + b.h - 1));
-    if (dx + dy < bd) { bd = dx + dy; best = r; }
+/** The cell width `cols` columns get in `w` art px (under CELL_MIN: they don't fit). */
+const cellWidth = (cols: Cols, w: number): number => Math.min(CELL_MAX + (cols === 1 ? 8 : 0), snap8((w - WEST - EAST - (cols - 1) * CHANNEL) / cols));
+const LINES3 = [3, 2, 1] as const, LINES2 = [2, 1] as const;
+/** Bit i: region i has a site (`closed`: it has none and is not open yet). */
+function regionMask(s: GlobalSnapshot | undefined, closed = false): number {
+  let mask = 0;
+  if (s) for (let i = 0; i < s.sites.length && i < REGION_IDS.length; i++) {
+    const site = s.sites[i]!;
+    if (closed ? site.siteId === null && !site.open : site.siteId !== null) mask |= 1 << i;
   }
-  return best;
+  return mask;
 }
-/** Land mask (1 = land), with a ragged coast a pixel or two deep, never under a cell's content. */
-export const LAND: Uint8Array = (() => {
-  const W = SIZE.w, H = SIZE.h, land = new Uint8Array(W * H);
-  for (const [c, j0, j1] of LANDS) {
-    const x0 = COLX[c], x1 = x0 + PW, y0 = ROWY[j0], y1 = ROWY[j1] + PH;
-    for (let y = y0; y < y1; y++) for (let x = x0; x < x1; x++) land[y * W + x] = 1;
-    for (let y = y0 + 2; y < y1 - 2; y++) {
-      for (const [edge, dir] of [[x0 - 1, -1], [x1, 1]] as const) {
-        const n = hash(y * 0.37 + c * 11 + dir), d = n > 0.8 ? 2 : n > 0.55 ? 1 : 0;
-        for (let k = 0; k < d; k++) { const x = edge + dir * k; if (x >= 0 && x < W) land[y * W + x] = 1; }
+/**
+ * The plan for a free world of `area` (CSS px at the shell's N). Phone: the list of `s`'s built sites
+ * and open regions (list.ts), at 2. Desktop: the whole map at the largest scale that shows it, on the
+ * grid with the widest cells, with as many footer lines as its rows leave room for (three only at the
+ * desktop type). Where no grid shows it whole at 2, it rests at 2 on the most columns that fit, with
+ * one footer line, and pans by rows; its halls are then sized so the window ends part-way down a row,
+ * the next region's name in view: there is more below.
+ */
+export function planFor(area: RestArea | undefined, form: WorldForm | undefined, s?: GlobalSnapshot): Plan {
+  const addCss = ADD_W[form === 'phone' ? 'phone' : 'desktop'];
+  if (form === 'phone') {
+    const n = area ? Math.min(2, area.scale) : 2;
+    const built = regionMask(s), closed = regionMask(s, true);
+    return area ? listPlan(Math.floor(area.w / n), Math.floor(area.h / n), built, closed) : listPlan(176, 268, built, closed);
+  }
+  if (!area) return planOf(3, 96, 2, Math.ceil(addCss / 3));
+  for (let n = area.scale; n >= 2; n--) {
+    const w = Math.floor(area.w / n), h = Math.floor(area.h / n);
+    let best: Plan | null = null, bestW = 0;
+    for (const cols of COLS) {
+      const cellW = cellWidth(cols, w);
+      if (cellW < CELL_MIN) continue;
+      for (const lines of n >= 3 ? LINES3 : LINES2) {
+        const p = planOf(cols, cellW, lines, Math.ceil(addCss / n));
+        if (p.focus.h > h) continue;
+        if (!best || cellW > bestW) { best = p; bestW = cellW; }
+        break;
       }
     }
-    for (let x = x0 + 3; x < x1 - 3; x++) {
-      const n = hash(x * 0.53 + j0 * 7 + c), d = n > 0.82 ? 2 : n > 0.6 ? 1 : 0;
-      for (let k = 1; k <= d; k++) if (y0 - k >= 0) land[(y0 - k) * W + x] = 1;
-    }
+    if (best) return best;
   }
-  return land;
-})();
-const at = (x: number, y: number): boolean => x >= 0 && y >= 0 && x < SIZE.w && y < SIZE.h && LAND[y * SIZE.w + x] === 1;
+  const n = Math.min(2, area.scale), w = Math.floor(area.w / n), h = Math.floor(area.h / n), addW = Math.ceil(addCss / n);
+  let cols: Cols = 1, cellW = Math.max(CELL_MIN, cellWidth(1, w));
+  for (const c of COLS) if (cellWidth(c, w) >= CELL_MIN) { cols = c; cellW = cellWidth(c, w); break; }
+  for (let t = TILE_MAX; t >= 24; t -= 2) {
+    const p = planOf(cols, cellW, 1, addW, t), peek = (h - HEAD) % p.pitchY;
+    if (peek >= 10 && peek <= p.pitchY - 16) return p;
+  }
+  return planOf(cols, cellW, 1, addW);
+}
 
-/** The static map, one colour per pixel: ocean, coast, cliffs, region ground by climate. */
-export function mapPixel(x: number, y: number): string {
-  if (at(x, y)) {
-    const r = cellAt(x, y), C = climateOfRegion[r], n = hash(x * 12.99 + y * 78.23), b = CELLS[r];
-    if ((y === b.y - 2 || y === b.y + b.h + 1) && (x >> 1) % 2 === 0 && at(x, y - 3) && at(x, y + 3)) return mix(C.lo, P.ink, 0.35);
-    if (!at(x, y - 1) || !at(x - 1, y)) return C.hi;
-    if (!at(x + 1, y) || n < 0.06) return C.lo;
-    return n > 0.975 ? C.hi : C.top;
-  }
-  if (at(x, y - 1)) return P.cliff;
-  if (at(x, y - 2)) return mix(P.cliff, P.ink, 0.4);
-  if (at(x - 1, y) || at(x + 1, y) || at(x, y + 1) || at(x, y - 3)) return P.coast;
-  if (at(x - 2, y) || at(x + 2, y) || at(x, y + 2) || at(x, y - 4)) return mix(P.seaShelf, P.ink, 0.35);
-  return y % 3 === 0 && (x * 7 + y) % 11 < 2 && hash(x * 3.1 + y * 0.7) > 0.5 ? SEA_LO : SEA;
+let current: Plan = planFor(undefined, 'desktop');
+/** The plan in use: set by the level's `focus()` each rest frame, read by every other method. */
+export const plan = (): Plan => current;
+export function usePlan(p: Plan): Plan { current = p; return p; }
+/** The tiles of the site in cell i: its halls stand closer while its third zone alone is empty (`Plan.tight`). */
+export function tilesOf(p: Plan, i: number, site: SiteView): readonly Rect[] {
+  const z = site.zones;
+  return z.length >= 3 && z[0]!.roomId !== null && z[1]!.roomId !== null && z[2]!.roomId === null ? p.tight[i]! : p.tiles[i]!;
 }

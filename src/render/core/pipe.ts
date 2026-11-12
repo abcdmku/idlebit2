@@ -7,7 +7,7 @@ import type { LevelSnapshot, RenderSnapshot, TransferView } from '../../game';
 import type { Camera, PixelRatio, RestFraming } from './camera';
 import { secondsText } from './format';
 import type { Point, Rect } from './geom';
-import { LabelBuffer, drawLabels } from './labels';
+import { LabelBuffer, drawLabels, labelTextWidth } from './labels';
 import type { Typography } from './labels';
 import { P } from './palette';
 import { bandColor } from './familyIcons';
@@ -123,7 +123,14 @@ export function drawPipe(g: CanvasRenderingContext2D, s: RenderSnapshot, timeMs:
   const moving = !plain && !!t && live && seconds >= MIN_VISIBLE_TRANSFER_S;
   const secs = moving && t ? secondsText((1 - transferProgress(t, s.simTimeMs, timeMs)) * seconds) : '';
   const spot = pipeTagSpot(p, vp, f, art, type, name, speed, secs, tagAt);
-  const x = spot.x, y = spot.y;
+  let x = spot.x;
+  const y = spot.y;
+  // A one-line tag that would sit on the drop into the entry moves west of it, when it fits between the pipe's two legs.
+  if (!spot.stacked && count === 4) {
+    const ex = route[2][0] * n, w = Math.ceil(labelTextWidth(title, type)) + 8;
+    const left = vp.x + Math.ceil((p.x + 3 * n - vp.x) / f.lattice) * f.lattice;
+    if (x < ex + 2 * n && x + w > ex - 2 * n && left + w <= ex - 2 * n) x = left;
+  }
   // A short phone can have no gutter at all. Keep the physical pipe, but omit its
   // redundant tag instead of printing it over the queue. The pipe plate retains its speed.
   const tagW = spot.stacked ? Math.max(tagWidth(name, type), tagWidth(speed, type), moving && spot.packet ? tagWidth(secs, type) : 0)

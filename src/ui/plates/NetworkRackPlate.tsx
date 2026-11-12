@@ -1,8 +1,8 @@
 import type { LbView, Quote, QuoteResult, RoomId, SwitchView } from '../../game';
 import { zoneLetter } from './copy';
 import { PlateFrame } from './PlateFrame';
-import { LbBody, lbStatus } from './LbPlate';
-import { SwitchBody, speedOf } from './SwitchPlate';
+import { LbBody } from './LbPlate';
+import { SwitchBody, speedOf, switchGeneration } from './SwitchPlate';
 import { hertz } from './format';
 import { Status } from './widgets';
 import type { PlateCommon } from './types';
@@ -26,15 +26,12 @@ export function NetworkRackPlate({ room, zone, network, racks, lbQuotes, queueQu
   quotes, onAction, onResearch, researchName, ...frame }: NetworkRackPlateProps) {
   const view = initialView;
   const sw = { kind: 'room', id: room } as const, az = `Zone ${zoneLetter(zone)}`;
-  if (view === 'lb') {
-    const st = lbStatus(network.lb);
-    return <PlateFrame {...frame} title="Room load balancer" sub={az} className="lb netrack">
-      <Status text={st.text} tone={st.tone} progress={st.progress} />
+  if (view === 'lb') return <PlateFrame {...frame} title="Room load balancer" sub={az} className="lb netrack">
       <LbBody unit={{ kind: 'room', id: room }} view={network.lb} child="rack" quotes={lbQuotes} queueQuote={queueQuote}
         onAction={onAction} onResearch={onResearch} researchName={researchName} />
     </PlateFrame>;
-  }
-  return <PlateFrame {...frame} title="Room switch" sub={az} className="switch netrack">
+  return <PlateFrame {...frame} title="Room switch" sub={az} className="switch netrack"
+    generation={switchGeneration({ quotes, onAction, onResearch, researchName })}>
     <Status text={`${hertz(speedOf(network.switch))} to every rack port · ${racks} ${racks === 1 ? 'rack' : 'racks'}`} />
     <SwitchBody sw={sw} view={network.switch} selected={initialPort}
       quotes={quotes} onAction={onAction} onResearch={onResearch} researchName={researchName} />

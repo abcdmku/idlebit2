@@ -8,7 +8,7 @@ import type { SystemSnapshot, TaskView, TransferView } from '../../../game';
 import { drawFlow, flowColor } from '../../core';
 import type { FlowPhase, WorldFrame } from '../../core';
 import { drawPiece } from '../chip/shards';
-import { BOARD, CABLE_X, CONNECTOR } from './layout';
+import { BOARD_Y, CABLE_X, CONNECTOR } from './layout';
 import type { BoardLayout } from './layout';
 import type { BoardModel, Site } from './model';
 
@@ -17,7 +17,7 @@ type G = CanvasRenderingContext2D;
 /** The system's inbound shard on the pipe: its own transfer, else (before Rack) the pipe's. */
 export const inboundOf = (s: SystemSnapshot): TransferView | null => s.inbound ?? s.chip.pipe?.transfer ?? null;
 
-const link: [number, number][] = [[CABLE_X, CONNECTOR.y], [CABLE_X, BOARD.y], [CABLE_X, 0]];
+const link: [number, number][] = [[CABLE_X, CONNECTOR.y], [CABLE_X, BOARD_Y], [CABLE_X, 0]];
 /** Draw the inbound shard on from the edge connector (the core's pipe carries it to the pad) into CPU 1 (a short one is a landing flash). */
 export function drawInbound(g: G, t: TransferView, b: BoardLayout, frame: WorldFrame): FlowPhase {
   link[2][1] = b.sites.cpu[0]!.y + 4;

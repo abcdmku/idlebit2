@@ -3,8 +3,8 @@ import { MODE } from '../core/timers';
 import { dirtySystem } from '../core/touch';
 import type { World } from '../core/world';
 import {
-  CAP_STEPS_MAX, CSTATES, DVFS_CLOCK, DVFS_LOAD, PACKAGE_IDLE_FACTOR, S3_FACTOR, THROTTLE_CLOCK, THROTTLE_LOAD,
-  TURBO_CLOCK, TURBO_LOAD, TURBO_MAX_F, TURBO_MAX_USAGE,
+  CAP_STEPS_MAX, CSTATES, DVFS_CLOCK, DVFS_LOAD, EFF_FLAT_HIGH_F, EFF_LOSS_PER_F, PACKAGE_IDLE_FACTOR, S3_FACTOR, THROTTLE_CLOCK,
+  THROTTLE_LOAD, TURBO_CLOCK, TURBO_LOAD, TURBO_MAX_F, TURBO_MAX_USAGE,
 } from './constants';
 import { SYS_DVFS, SYS_TURBO, type PhysSettings } from './settings';
 
@@ -35,6 +35,16 @@ export interface SystemDraw {
 const out: SystemDraw = { deliveredW: 0, idleW: 0, capLoadW: 0 };
 /** D38: the CPU's fixed draw before System (W, internal units), billed as energy; the real model takes over at System. */
 export const PRE_SYSTEM_CPU_W = 10;
+
+/**
+ * Thermal duty (spec §10.4): above 80 °F a rack's systems duty-cycle. Every watt they draw is
+ * multiplied by 1 − 0.025 × (T − 80), down to 0 at 120 °F, so a hot rack makes less heat the
+ * hotter it gets and settles below 120 °F whatever its cooler. Compute rates follow e(T), the
+ * same line. The power phase applies it per rack, to its systems' summed draw (systemDraw is
+ * the draw at duty 1), so a moving temperature re-runs no system step.
+ */
+export const thermalDuty = (tempF: number): number =>
+  tempF <= EFF_FLAT_HIGH_F ? 1 : Math.max(0, 1 - EFF_LOSS_PER_F * (tempF - EFF_FLAT_HIGH_F));
 
 const cstateFactor = (w: World, depth: number): number => depth > 0 ? w.research.unlocks.ruleParams.coreIdle?.factor ?? 1 : 1;
 

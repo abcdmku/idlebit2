@@ -5,9 +5,9 @@ import type { GhostState, LevelRegistry, Point, Rect, ViewPresentation, WorldFra
 import { boardStatic } from './board';
 import { drawChipMini } from '../chip/mini';
 import { drawLeaders, firstRow } from './labels';
-import { CONNECTOR, LAMP, POWERED, SAVE, packageRect, siteRect, worldRect } from './layout';
+import { CONNECTOR, LAMP, packageRect, siteRect, worldRect } from './layout';
 import type { SiteType } from './layout';
-import { boardModel, pickedType, slotOf } from './model';
+import { boardModel, openGroup, pickedType, slotOf } from './model';
 import { drawReadLights } from './memory';
 import { drawMemoryRows } from './memoryRows';
 import type { BoardModel, Site } from './model';
@@ -48,14 +48,14 @@ function upgradeFraction(quotes: QuoteResult | null, site: Site, credits: number
 
 export function drawBoard(g: G, s: SystemSnapshot, view: ViewPresentation, frame: WorldFrame, registry: LevelRegistry): void {
   const m = boardModel(s), b = m.b, live = !frame.paused && powered(s), pick = pickedType(view.picked);
-  worldRect(frame.form, world);
+  worldRect(b, frame.form, world);
   R(g, world.x, world.y, world.w, world.h, BG.system);
-  g.drawImage(boardStatic(s.board), 0, 0);
+  g.drawImage(boardStatic(b), 0, 0);
   const transfer = live ? inboundOf(s) : null;
   const stageOn = activeStages(s, live);
   for (const site of m.sites) {
     if (site.state === 'locked') { drawSiteLocked(g, siteRect(b, site.type, site.index, hit)); continue; }
-    if (site.state === 'open') { drawEmptySite(g, b, site.type, site.f); continue; }
+    if (site.state === 'open') { if (!plated(s, m, site)) drawEmptySite(g, b, site.type, site.f); continue; }
     const p = site.part!, on = live && (p.active || p.resourceBusy > 0 || stageOn.has(site.type));
     if (site.type === 'cpu') drawCpu(g, s, site, live, frame, registry);
     else if (site.type === 'ram') drawRamPart(g, b, site.f, p.level, live && p.active);
@@ -82,31 +82,48 @@ export function drawBoard(g: G, s: SystemSnapshot, view: ViewPresentation, frame
       if (f >= 1) upArrow(g, hit.x + hit.w - 4, hit.y + 1); else if (f >= 0.5) upArrowFill(g, hit.x + hit.w - 4, hit.y + 1, f);
     }
   }
-  if (s.saveable) drawSaveIcon(g, SAVE.x, SAVE.y);
+  if (s.saveable) drawSaveIcon(g, b.save.x, b.save.y);
   drawUnitLamp(g, LAMP.x, LAMP.y, LAMP.w, lampState(s.online), (s.timerS ?? 0) * 1000, Math.max(BOOT_MS, (s.timerS ?? 0) * 1000), frame.paused);
-  if (s.online === 'offline' || s.online === 'dark' || s.online === 'crashed') darkFx(g, POWERED.x, POWERED.y, POWERED.w, POWERED.h);
+  if (s.online === 'offline' || s.online === 'dark' || s.online === 'crashed') darkFx(g, b.powered.x, b.powered.y, b.powered.w, b.powered.h);
   drawTiles(g, s, m, view);
-  drawMemoryRows(g, s, frame);
+  drawMemoryRows(g, s, frame, b);
   // Leaders belong to the labels: desktop only, and like the labels never during a zoom.
   if (frame.form !== 'phone' && !frame.zoom) drawLeaders(g, s, firstRow(frame));
 }
 
+/** An open site drawn as an add plate (drawTiles) instead of its bare slot: a GPU slot, or a member of its type's shared add. */
+function plated(s: SystemSnapshot, m: BoardModel, site: Site): boolean {
+  if (site.type === 'cpu' || !slotOf(s, site)) return false;
+  if (site.type === 'gpu') return true;
+  const shared = openGroup(m, site.type);
+  return !!shared && shared.members.has(site) && !!slotOf(s, shared.site);
+}
 /**
- * Every tappable part reads as its own component (user): a 1 art px outline on exactly its hit rect
- * (the CPU package, each slot's part, each open slot, the power supply). Empty CPU sockets carry
- * centered add text and a price; other open slots keep their "+". A locked slot is a tile too (its callout says what
- * unlocks it), with no "+". The tiles are the same set and rects as the level's hit targets (index.ts).
+ * Every site the player can add to reads as one (user): a tile on exactly its hit rect (index.ts). An empty
+ * CPU socket is its pad field in an outline. An open GPU slot, and the open RAM or drive slots as one shared
+ * add, are a plain dark plate like that field, clear for the UI's name and price; where the UI prints
+ * none on the tile (too small for it), the plate carries a "+". A locked slot keeps its silk corners.
  */
-const TILE_EDGE = 'rgba(191, 178, 255, 0.55)';
+const TILE_EDGE = 'rgba(191, 178, 255, 0.55)', PLATE = '#1b1830', PLATE_RIM = '#2e2a45';
 function drawTiles(g: G, s: SystemSnapshot, m: BoardModel, view: ViewPresentation): void {
   const b = m.b;
   for (const site of m.sites) {
-    if (site.state !== 'part' && !slotOf(s, site)) continue;
-    if (site.type === 'cpu' && site.state === 'part') packageRect(b, site.index, hit); else siteRect(b, site.type, site.index, hit);
-    if (site.state === 'open') outline(g, hit, TILE_EDGE);
-    if (site.state === 'open' && site.type !== 'cpu') plus(g, hit, quoteState(view.quotes, site.type) === 'picked');
+    if (site.state !== 'open' || site.type === 'ram' || site.type === 'drive' || !slotOf(s, site)) continue;
+    siteRect(b, site.type, site.index, hit);
+    if (site.type === 'cpu') outline(g, hit, TILE_EDGE);
+    else addPlate(g, hit, !!view.sourceActions?.includes(`add:${site.type}${site.index}`), quoteState(view.quotes, site.type) === 'picked');
   }
-
+  for (const type of ['ram', 'drive'] as const) {
+    const shared = openGroup(m, type);
+    if (!shared || !slotOf(s, shared.site)) continue;
+    addPlate(g, shared.rect, !!view.sourceActions?.includes(`add:${type}${shared.site.index}`), quoteState(view.quotes, type) === 'picked');
+  }
+}
+function addPlate(g: G, r: Rect, labelled: boolean, bright: boolean): void {
+  R(g, r.x, r.y, r.w, r.h, PLATE_RIM); R(g, r.x + 1, r.y + 1, r.w - 2, r.h - 2, PLATE);
+  R(g, r.x + 2, r.y + 2, 3, 1, P.goldLo); R(g, r.x + 2, r.y + 2, 1, 3, P.goldLo);
+  outline(g, r, TILE_EDGE);
+  if (!labelled) plus(g, r, bright);
 }
 function outline(g: G, r: Rect, c: string): void {
   R(g, r.x, r.y, r.w, 1, c); R(g, r.x, r.y + r.h - 1, r.w, 1, c); R(g, r.x, r.y + 1, 1, r.h - 2, c); R(g, r.x + r.w - 1, r.y + 1, 1, r.h - 2, c);

@@ -1,47 +1,46 @@
-import { useState } from 'react';
 import type { Amount, ConfigSource, Quote, UnitRef } from '../../game';
 import { UNIT_NOUN } from './copy';
 import type { ConfigKind } from './configArt';
-import { wholeText } from './format';
 import { PlateFrame } from './PlateFrame';
 import { QuoteKey } from './widgets';
-import { ChoiceStrip } from './ChoiceStrip';
 import type { PlateCommon } from './types';
 
 type AddQuote = Quote & { action: { type: 'addUnit'; source: ConfigSource } };
 const isAdd = (q: Quote): q is AddQuote => q.action.type === 'addUnit';
-export interface ConfigOptions { barebones: AddQuote[]; copies: AddQuote[]; saved: AddQuote[] }
-export function configOptions(quotes: readonly Quote[]): ConfigOptions {
-  const adds = quotes.filter(isAdd);
-  return { barebones: adds.filter(q => q.action.source.kind === 'barebones'), copies: adds.filter(q => q.action.source.kind === 'copy'), saved: adds.filter(q => q.action.source.kind === 'saved') };
-}
-export function barebonesText(kind: ConfigKind, q: AddQuote): string {
-  const source = q.action.source;
-  if (kind === 'system' && source.kind === 'barebones') return source.storageNode ? '1 drive' : '1 core \u00b7 1 cache cell';
+
+/** What a barebones build holds (spec §13.2). */
+function barebonesText(kind: ConfigKind, source: ConfigSource & { kind: 'barebones' }): string {
+  if (kind === 'system') return source.storageNode ? '1 drive' : '1 core · 1 cache cell';
   return kind === 'rack' ? '12 server slots' : kind === 'room' ? '16 rack slots' : '1 zone';
 }
-export function shortfall(price: Amount, credits: Amount | undefined): string | null {
-  if (credits === undefined) return null;
-  try { const d = BigInt(price) - BigInt(credits); return d > 0n ? wholeText(d) : null; } catch { return null; }
-}
+
+/** A build over a ceiling (spec §13.3): the sim's lock says only "Max", which on a build reads as nothing. */
+const fits = (q: AddQuote): AddQuote => q.locked?.code === 'ceiling' && q.locked.text === 'Max'
+  ? { ...q, locked: { ...q.locked, text: 'A part is over its max level' } } : q;
+
 export interface ConfigPlateProps extends PlateCommon {
   kind: ConfigKind; title?: string; sub?: string; credits?: Amount; landscape?: boolean;
   nameOf?: ((from: UnitRef) => string) | null;
   drawCopy?: ((from: UnitRef, g: CanvasRenderingContext2D, w: number, h: number) => void) | null;
 }
-/** One selected build, one component-local purchase. */
+
+/**
+ * The add-new plate (spec §13.2): every barebones, copy and saved build as its own priced key. Opening the plate
+ * never spends; one tap on a build buys it and closes. A build that cannot be bought says why on its key.
+ */
 export function ConfigPlate({ kind, title, sub, credits: _credits, landscape: _land, drawCopy: _draw, nameOf, quotes, onAction, onClose, onResearch, researchName, bootS: _boot, ...frame }: ConfigPlateProps) {
-  const [choice, setChoice] = useState(0), options = quotes?.quotes.filter(isAdd) ?? [];
-  const q = options[choice] ?? options[0], noun = UNIT_NOUN[kind];
-  const name = (q: AddQuote) => {
+  const options = quotes?.quotes.filter(isAdd) ?? [], noun = UNIT_NOUN[kind];
+  const row = (q: AddQuote): { label: string; detail: string } => {
     const source = q.action.source;
-    return source.kind === 'copy' ? 'Copy ' + (nameOf?.(source.from) ?? q.label) : source.kind === 'saved' ? 'Saved ' + source.name : q.label;
+    if (source.kind === 'copy') return { label: `Copy of ${nameOf?.(source.from) ?? q.label}`, detail: '' };
+    if (source.kind === 'saved') return { label: source.name, detail: 'Saved build' };
+    const plainSystem = kind === 'system' && !source.storageNode && (source.board ?? 'general') === 'general';
+    return { label: plainSystem ? `${q.label} CPU` : q.label.replace(/^Barebones .*/, 'Barebones'), detail: barebonesText(kind, source) };
   };
-  const gain = q ? '+1 ' + noun.toLowerCase() + (q.action.source.kind === 'barebones' ? ' \u00b7 ' + barebonesText(kind, q) : '') : '';
-  return <PlateFrame {...frame} onClose={onClose} title={title ?? 'New ' + noun} sub={sub} className="part config-picker"
-    footer={q && <QuoteKey quote={q} label={'Buy ' + noun} detail={gain} onAction={value => { onAction(value.action); onClose(); }} onResearch={onResearch} researchName={researchName} />}>
-    <div className="build-options scroll-list"><ChoiceStrip label="Build" value={String(choice)} onPick={value => setChoice(Number(value))}
-      choices={options.map((q, i) => ({ id: String(i), label: name(q) }))} /></div>
-    {!options.length && <p className="p-line muted">No build available</p>}
+  return <PlateFrame {...frame} onClose={onClose} title={title ?? 'New ' + noun} sub={sub} className="part config-picker">
+    {options.length ? <div className="build-options" role="group" aria-label={`Builds for a new ${noun}`}>
+      {options.map((q, i) => <QuoteKey key={i} quote={fits(q)} tone="replace" {...row(q)} onAction={value => { onAction(value.action); onClose(); }}
+        onResearch={onResearch} researchName={researchName} />)}
+    </div> : <p className="p-line muted">No build available</p>}
   </PlateFrame>;
 }

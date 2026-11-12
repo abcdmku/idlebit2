@@ -27,6 +27,6 @@ export interface SupplyPlateProps extends PlateCommon { supply: SupplyView; titl
 export function SupplyPlate({ supply: s, title, maxLevel, children, ...common }: SupplyPlateProps) {
   return <PartPlate {...common} beforeKeys className="supply" title={title ?? TITLE[s.kind]} sub={`${genName(s.kind, s.generation).replace(/ power supply$/, '')} · L${s.level}`}
     level={s.level} pips={maxLevel ? [s.level, maxLevel] : undefined}
-    status={s.capacityW===0?watts(s.deliveredW):`${watts(s.deliveredW)} / ${watts(s.capacityW)} · ${percent(s.usage)}`}
+    status={s.capacityW===0?watts(s.deliveredW):`${watts(s.deliveredW)} / ${watts(s.capacityW)}`}
     statusTone={s.failed || s.usage > 1 ? 'warn' : ''} progress={Math.min(1, s.usage)} lines={supplyLines(s)} lineSlots={2}>{children}</PartPlate>;
 }

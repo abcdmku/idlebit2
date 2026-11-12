@@ -34,12 +34,12 @@ export function NowCard() {
     .sort((a, b) => BigInt(a.cost) < BigInt(b.cost) ? -1 : BigInt(a.cost) > BigInt(b.cost) ? 1 : 0)[0] ?? null;
   const risk = running && !!head && !head.committed && headRisk(q.met, q.failed, q.checking, q.slaWindow);
   const open = () => { if (head) shell.view.dispatch({ type: 'openTask', task: taskKey(head.task) }); };
-  const status = !running ? 'Next round' : head ? blocked ? blockedText(head) ?? waitingText(head)
+  const status = !running ? 'After Return' : head ? blocked ? blockedText(head) ?? waitingText(head)
     : head.waitingFor === 'restart' && restart.on && !head.committed ? restartText(restart) : waitingText(head) : 'Waiting for tasks';
   if (hasTaskDock(L)) return <TaskDock head={head} research={research} running={running} blocked={blocked} status={status} round={round}
-    primaryLabel={blocked ? buy ? meetLabel(buy) : 'View fix' : 'Task details'}
+    primaryLabel={blocked ? buy ? meetLabel(buy) : 'View fix' : 'Task details'} primaryCost={blocked && buy ? buy.cost : null}
     onPrimary={() => { if (blocked && buy) shell.dispatch(buy.action); else open(); }} />;
-  return <section className={`panel now task-now${blocked ? ' blocked' : ''}`} data-k="now" aria-label={research ? 'Research next in line' : 'Next task'} data-testid="now"
+  return <section className={`panel now task-now${blocked ? ' blocked' : ''}${head ? ' has-head' : ''}`} data-k="now" aria-label={research ? 'Research next in line' : 'Next task'} data-testid="now"
     style={{ ...box(L.now), ...taskTypeStyle(head?.family), ...(risk ? { '--rim': 'var(--fault)' } : {}) } as CSSProperties}>
     <RimClock w={L.now.w} n={L.N} blocked={blocked} />
     {head && <TaskAccent n={L.N} />}

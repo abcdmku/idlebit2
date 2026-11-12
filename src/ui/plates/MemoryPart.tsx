@@ -33,11 +33,11 @@ function MemoryAction({ quote: q, label, add: _add = false, primary = false, ...
   </div>;
 }
 
-/** One module's usage, independent Space and Speed controls, and next generation. */
+/** One module: its usage on the title line, independent Space and Speed controls, and the next generation in the bottom row. */
 export function memoryPartView({ module: part, slot, facts, own, ...actions }: Actions & {
   module: PartView; slot: 'ram' | 'drive'; facts: PartFacts; own: readonly Quote[];
 }): BoardPartView {
-  const { replaces } = partQuotes(own);
+  const next = nextGeneration(partQuotes(own).replaces);
   const capacityUpgrade = own.find(q => q.action.type === 'upgradePart' && q.action.axis !== 'speed');
   const speedUpgrade = own.find(q => q.action.type === 'upgradePart' && q.action.axis === 'speed');
   const capacityDown = own.find(q => q.action.type === 'downgradePart' && q.action.axis !== 'speed');
@@ -45,17 +45,16 @@ export function memoryPartView({ module: part, slot, facts, own, ...actions }: A
   const capacity = part.capacityBits ?? 0, used = part.usedBits ?? 0;
   const name = slot === 'ram' ? 'RAM' : 'Drive';
   return {
-    title: facts.title, sub: facts.sub, head: null,
+    title: facts.title, sub: facts.sub, usage: `${bits(used)} used`, head: null,
     footer: <div className="memory-upgrades memory-tracks">
       <MemoryTrack label="Space" current={bits(capacity)} upgrade={capacityUpgrade} downgrade={capacityDown} {...actions} />
       <MemoryTrack label="Speed" current={bitRate(part.rateBits ?? 0)} upgrade={speedUpgrade} downgrade={speedDown} {...actions} />
     </div>,
+    generation: next ? <GenerationAction quote={next} onAction={q => actions.onAction(q.action)} onResearch={actions.onResearch} researchName={actions.researchName} /> : null,
     body: <div className="memory-part">
-      <div className="memory-current"><b>{bits(used)} used</b></div>
       <div className="memory-meter" role="meter" aria-label={`${name} used`} aria-valuemin={0} aria-valuemax={capacity} aria-valuenow={used}>
         <i style={{ width: `${Math.min(100, used / Math.max(1, capacity) * 100)}%` }} />
       </div>
-      <GenerationAction quote={nextGeneration(replaces)} onAction={q => actions.onAction(q.action)} onResearch={actions.onResearch} researchName={actions.researchName} />
     </div>,
   };
 }
