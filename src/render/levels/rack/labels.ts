@@ -21,7 +21,7 @@ import { rackDark, serverLook } from './sprites';
 import type { ServerLook } from './sprites';
 import { addRect, nextFreeServer } from './world';
 
-/** Set by the level's `focus()`: the rest keeps room left of the cabinet for name tags (always on desktop; a wide enough phone). */
+/** Set by the level's `focus()`: name tags use the cabinet's available side margin (always on desktop; a wide enough phone). */
 export const gutter = { on: true };
 
 const sp = { lo: 0, hi: 0 }, slot = { x: 0, y: 0, w: 0, h: 0 };
@@ -122,7 +122,7 @@ export function rackLabels(s: RackSnapshot, view: ViewPresentation, frame: World
   if (plan.id === 'twin') panelTags(s, ax, dark, out);
   // a tower's name tags only where the view really shows the gutter left of the cabinet (a scrolled row can cover it)
   // (the widest tag with its leader is about 200 CSS px at 2, the PDU's watts, and 180 at 3)
-  else if (gutter.on && (!vis || ax + CAB.x - (phone ? 44 : scale >= 3 ? 60 : 100) >= vis.x)) tags(s, ax, phone, isNeighbour(s, rackCol(s) - 1), out);
+  else if (gutter.on && (!vis || ax + CAB.x - (phone ? 30 : scale >= 3 ? 60 : 100) >= vis.x)) tags(s, ax, phone, isNeighbour(s, rackCol(s) - 1), out);
   neighbours(s, frame.paused, out);
 }
 
@@ -150,7 +150,7 @@ function addLine(s: RackSnapshot, view: ViewPresentation, ax: number, out: Label
 }
 /** Name tags left of the cabinet, each with a leader to its unit. The phone stacks name over value. */
 function tags(s: RackSnapshot, ax: number, phone: boolean, beside: boolean, out: LabelWriter): void {
-  const x = ax + CAB.x - (phone ? 9 : 5), lx = ax + OPEN.x;
+  const x = ax + CAB.x - (phone ? 3 : 5), lx = ax + OPEN.x;
   // Cooling is the roof: its tag names it and carries the heat it can move, the figure an upgrade raises
   out.label('cool', x, CAB.roofY + (phone ? 0 : 6), 'right', true).text('Cooling', 'name', true);
   (phone ? out.br() : out).text(coolOf(s.cooler.capacityW), 'cyan').leader(ax + CAB.x, CAB.roofY + 10);

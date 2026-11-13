@@ -1136,7 +1136,7 @@ Rack and zone heat never causes a crash, task failure, reboot or building lock. 
 
 D56 blueprint claims are required for their three projects, alongside ordinary prerequisites, costs and work. New processor research gets claimed Data discounts of 10% at 1,000 or 20% total at 7,500, and a 10% Credit discount at 3,000. Round each discounted cost up once; positive prices stay at least 1. Paid projects receive no refund. Purchase-series prices are excluded.
 
-Repeatable purchases (D45) are an exception to processor projects: C-state, Memory voltage and Boot loader each have 36 levels. Buying level 1 unlocks and applies it for 100,000 Credits; each later price is the previous whole-Credit price x 1.8, rounded up. They cost 0 Data and 0 ops, apply immediately, and leave any active processor research untouched. Their initial prerequisite is System; Memory voltage is only listed when RAM is installed. These replace the separate C1/C3/C6, low-voltage RAM and fast/warm-boot nodes. CSV `manual` fields are ignored test data.
+Repeatable purchases (D45) are an exception to processor projects: C-state, Memory voltage and Boot loader each have 36 levels. Buying level 1 unlocks and applies it for 100,000 Credits; each later price is the previous whole-Credit price x 1.8, rounded up. They cost 0 Data and 0 ops, apply immediately, and leave any active processor research untouched. Their initial prerequisite is System; Memory voltage is only listed when RAM is installed. Package C-states requires C-state level 1 (D92). These replace the separate C1/C3/C6, low-voltage RAM and fast/warm-boot nodes. CSV `manual` fields are ignored test data.
 
 ### 11.2 Research is a task that cuts the line (D27)
 

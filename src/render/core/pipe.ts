@@ -119,10 +119,13 @@ export function drawPipe(g: CanvasRenderingContext2D, s: RenderSnapshot, timeMs:
   // the focus art (`art`, CSS px): where one line would, each value takes its own line in the gutter.
   tags.clear();
   const speed = formatHertz(link.speed), plain = s.focus.level === 'chip' || s.focus.level === 'system';
-  const name = plain ? '' : link.name, title = name ? `${name} ${speed}` : speed;
+  // The phone rack reserves one row above its roof for the link, speed and live transfer timer.
+  const name = plain ? '' : link.name, inlinePacket = s.focus.level === 'rack' && f.form === 'phone';
   const moving = !plain && !!t && live && seconds >= MIN_VISIBLE_TRANSFER_S;
   const secs = moving && t ? secondsText((1 - transferProgress(t, s.simTimeMs, timeMs)) * seconds) : '';
-  const spot = pipeTagSpot(p, vp, f, art, type, name, speed, secs, tagAt);
+  const shownSpeed = inlinePacket && secs ? `${speed} ${secs}` : speed, packetLine = moving && !inlinePacket;
+  const title = name ? `${name} ${shownSpeed}` : shownSpeed;
+  const spot = pipeTagSpot(p, vp, f, art, type, name, shownSpeed, inlinePacket ? '' : secs, tagAt);
   let x = spot.x;
   const y = spot.y;
   // A one-line tag that would sit on the drop into the entry moves west of it, when it fits between the pipe's two legs.
@@ -133,17 +136,17 @@ export function drawPipe(g: CanvasRenderingContext2D, s: RenderSnapshot, timeMs:
   }
   // A short phone can have no gutter at all. Keep the physical pipe, but omit its
   // redundant tag instead of printing it over the queue. The pipe plate retains its speed.
-  const tagW = spot.stacked ? Math.max(tagWidth(name, type), tagWidth(speed, type), moving && spot.packet ? tagWidth(secs, type) : 0)
-    : Math.max(tagWidth(title, type), moving ? tagWidth(secs, type) : 0);
-  const lines = spot.stacked ? 2 + (moving && spot.packet ? 1 : 0) : moving ? 2 : 1;
+  const tagW = spot.stacked ? Math.max(tagWidth(name, type), tagWidth(shownSpeed, type), packetLine && spot.packet ? tagWidth(secs, type) : 0)
+    : Math.max(tagWidth(title, type), packetLine ? tagWidth(secs, type) : 0);
+  const lines = spot.stacked ? 2 + (packetLine && spot.packet ? 1 : 0) : packetLine ? 2 : 1;
   if (art && overlaps(x, y, tagW, type.line * lines, art)) return;
   if (!spot.stacked) {
     tags.label('pipe', x, y, 'left', true).text(title, 'net');
-    if (moving) tags.label('packet', x, y + type.line, 'left', true).text(secs, 'net');
+    if (packetLine) tags.label('packet', x, y + type.line, 'left', true).text(secs, 'net');
   } else {
     tags.label('pipe', x, y, 'left', true).text(name, 'net');
-    tags.label('pipe2', x, y + type.line, 'left', true).text(speed, 'net');
-    if (moving && spot.packet) {
+    tags.label('pipe2', x, y + type.line, 'left', true).text(shownSpeed, 'net');
+    if (packetLine && spot.packet) {
       tags.label('packet', x, y + 2 * type.line, 'left', true).text(secs, 'net');
     }
   }

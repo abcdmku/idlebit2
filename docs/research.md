@@ -154,7 +154,7 @@ C-state, Memory voltage and Boot loader each use one visible entry and 36 levels
 | Memory voltage | RAM idle and load x (74 - 2L) / 100: 0.72 to 0.02; same capacity and bandwidth. | RAM CSV, mem_voltage |
 | Boot loader | Shared boot latency (946 - 26L) / 100 seconds: 9.20 to 0.10, rounded to the nearest 100 ms simulation tick. | CPU CSV, boot_loader |
 
-These prices replace the CSV unlock and level prices. CPU CSV manual/manualcost columns are unused test data. The runtime appends generated level definitions from src/game/build/research/levels.ts to the ordinary tree in section 9; they replace the old separate sleep, voltage and boot nodes. DVFS requires C-state level 1; Package C-states requires level 36. Earlier campaign timing examples below predate D45 and are not validation of these prices.
+These prices replace the CSV unlock and level prices. CPU CSV manual/manualcost columns are unused test data. The runtime appends generated level definitions from src/game/build/research/levels.ts to the ordinary tree in section 9; they replace the old separate sleep, voltage and boot nodes. DVFS and Package C-states require C-state level 1 (D92). Earlier campaign timing examples below predate D45 and are not validation of these prices.
 
 ### 3.5 Round-reward blueprints and funding, D56
 
@@ -351,7 +351,7 @@ Network scopes (rack load balancer, then room, site and backbone):
 
 | id | Name | Requires | Level | Era / tier | Effect | Short | Answers |
 |---|---|---|---|---|---|---|---|
-| `packageC` | Package C-states | cstate36 | System | kHz W7 | When every core is idle, cache, clock and scheduler draw 0.2× idle watts. | Cuts idle CPU support power. | `energy` |
+| `packageC` | Package C-states | cstate1 | System | kHz W7 | When every core is idle, cache, clock and scheduler draw 0.2× idle watts. | Cuts idle CPU support power. | `energy` |
 | `s3Sleep` | Suspend (S3) | packageC, rack | Rack | kHz W8 | A server with no admitted task for 10 s sleeps at 0.03× its idle watts. Routing a task to it wakes it in 2 s, which counts against pickup. | Idle servers sleep after 10 s. | `energy` |
 | `dvfs` | P-states (DVFS) | cstate1, systemBoard | System | Hz W5 | With no queued tasks or held research, cores use 0.5× clock and 0.3× load watts. Tasks and research restore full clock. | Downclock without tasks or research. | `energy`, `overload` |
 | `turbo` | Turbo boost | dvfs, fabKhz | System | kHz W7 | Cores run at 1.25× clock for 1.8× load watts while not under DVFS and (from Rack on) the rack is under 80 °F. They drop to 1× otherwise. | Boosts cores while the rack is cool. | `pickup` |
@@ -734,7 +734,7 @@ export const RESEARCH_V3: readonly ResearchNode[] = [
   n("bbSubsea", "Subsea cable", "network", ["bbDwdm"], "global", "ghz", 15, 1e10, [gen("backbone", 3), rule("subseaLatency", { factor: 0.5 })], ["region"]),
 
   // Power
-  n("packageC", "Package C-states", "power", ["cstate36"], "system", "khz", 7, 1_000_000, [rule("packageIdle", { factor: 0.2 })], ["energy"]),
+  n("packageC", "Package C-states", "power", ["cstate1"], "system", "khz", 7, 1_000_000, [rule("packageIdle", { factor: 0.2 })], ["energy"]),
   n("s3Sleep", "Suspend (S3)", "power", ["packageC", "rack"], "rack", "khz", 8, 2.7e6, [rule("s3Sleep", { afterS: 10, factor: 0.03, wakeS: 2 })], ["energy"]),
   n("dvfs", "P-states (DVFS)", "power", ["cstate1", "systemBoard"], "system", "hz", 5, 8_000, [rule("dvfs", { clock: 0.5, loadWatts: 0.3 })], ["energy", "overload"]),
   n("turbo", "Turbo boost", "power", ["dvfs", "fabKhz"], "system", "khz", 7, 1_000_000, [rule("turbo", { clock: 1.25, loadWatts: 1.8, maxUsage: 0.9, maxF: 80 })], ["pickup"]),

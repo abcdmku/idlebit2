@@ -35,8 +35,8 @@ export const HEADER_Y = U0 - 1, PATCH_Y = HEADER_Y;
 export const PDU_LCD = { dx: 3, w: 50 } as const, PDU_BAR = { dx: 55, n: 11, pitch: 4 } as const;
 export const SAVE_AT = { x: 9, y: 9 } as const;
 export const LAMP = { x: 9, y: 20, w: 7 } as const;
-/** Art px the phone rest adds left of the cabinet for the pipe tags (core/pipe.ts stacks them there). */
-export const PHONE_TAG_GUTTER = 48;
+/** Phone: space above the roof for the one-line uplink readout, and beside each edge for unit tags, in art px. */
+export const PHONE_HEADER_H = 16, PHONE_TAG_SPACE = 24;
 export const ROW_COLS = RACK_SLOTS_PER_ROW;
 
 // ---------- the live plan ----------

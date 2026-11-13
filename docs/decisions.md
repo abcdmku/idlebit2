@@ -2138,8 +2138,16 @@ Not changed, open in `docs/backlog.md`: work dropped at round end, research that
 Owner feedback from the phone: power printed "0 W" on several parts, the half cabinet read badly, and cooling did not look like something to upgrade or tune.
 
 1. **One watts string.** Every power figure prints through the game's `formatWatts` (pW to GW). The plates' `watts`, an effect's `W` capacity (`measureUnit`), the canvas `wattsText` and the PDU tag all call it. The PDU tag had rounded to whole watts before formatting and the effect line had no sub-unit prefixes, so a µW or mW rack read "0 W". Battery charge on the Power control plate prints through `formatEnergy` the same way.
-2. **Full-width 1U units.** The `half` plan (two half-width sleds a row, 20 px Switch and Balancer) is removed. A portrait phone rests on the tower; a view too short for it pans by whole units, as before. The twin stays for wide views.
+2. **Full-width 1U units.** The `half` plan (two half-width sleds a row, 20 px Switch and Balancer) is removed. A portrait phone rests on the tower; a view too short for it pans by whole units, as before. The twin stays for wide views. The phone centres the cabinet itself, with unit tags in the available side margin. Uplink, speed and the live transfer timer share one line above the roof, including in a panned view.
 3. **Unit order.** Cooling is the roof. The Switch takes the first U and is the load balancer too: its west end carries the router's queue wells and routing light and opens the Load balancer plate, its jacks open the Switch plate, and a port's light shows the balancer's route to its server. The sim keeps `switch` and `lb` as two parts with their own prices and research. Then twelve servers, then Power control in the last U, directly above the PDU head. The tower is 14 U (was 15).
 4. **Cooling.** The roof display is a thermostat: the rack's °F over the setpoint, with two keys that light once the setpoint is researched, and it is its own tap target for the Cooling plate. A "Cooling" name tag beside the cabinet (a plate on a twin's roof) carries the cooler's capacity, the figure an upgrade raises. On the plate the setpoint is a slider over 60–120 °F in 1 °F steps, and the status line adds the cooler's duty. Before `rackVarSpeed` (Fan control) or `roomVarSpeed` it is a locked row that opens that project. The setpoint rule and research gate are unchanged. The range is 60–120 °F (was 55–80): above 80 °F the rack trades speed and thermal duty for cooler power, up to the 120 °F point where duty reaches 0.
+
+No save change.
+
+## D92, 13 Nov: Package C-states follows the first C-state purchase
+
+Owner direction: level 36 research is end game. Package C-states must not require completing all 36 C-state purchases.
+
+`packageC` requires `cstate1` instead of `cstate36`. Its processor work, price and idle-power effect stay as defined. The first C-state purchase opens the package project; later C-state purchases keep improving the idle cores independently.
 
 No save change.

@@ -95,7 +95,7 @@ export const TREE_ROWS: readonly TreeRow[] = [
   n("bbDarkFiber", "Dark fiber", "network", ["regions"], "global", "ghz", 14, 3e9, [gen("backbone", 1)], ["region"]),
   n("bbDwdm", "DWDM backbone", "network", ["bbDarkFiber"], "global", "ghz", 15, 1e10, [gen("backbone", 2)], ["region"]),
   n("bbSubsea", "Subsea cable", "network", ["bbDwdm"], "global", "ghz", 15, 1e10, [gen("backbone", 3), rule("subseaLatency", { factor: 0.5 })], ["region"]),
-  n("packageC", "Package C-states", "power", ["cstate36"], "system", "khz", 7, 1_000_000, [rule("packageIdle", { factor: 0.2 })], ["energy"]),
+  n("packageC", "Package C-states", "power", ["cstate1"], "system", "khz", 7, 1_000_000, [rule("packageIdle", { factor: 0.2 })], ["energy"]),
   n("s3Sleep", "Suspend (S3)", "power", ["packageC", "rack"], "rack", "khz", 8, 2.7e6, [rule("s3Sleep", { afterS: 10, factor: 0.03, wakeS: 2 })], ["energy"]),
   n("dvfs", "P-states (DVFS)", "power", ["cstate1", "systemBoard"], "system", "hz", 5, 8_000, [rule("dvfs", { clock: 0.5, loadWatts: 0.3 })], ["energy", "overload"]),
   n("turbo", "Turbo boost", "power", ["dvfs", "fabKhz"], "system", "khz", 7, 1_000_000, [rule("turbo", { clock: 1.25, loadWatts: 1.8, maxUsage: 0.9, maxF: 80 })], ["pickup"]),

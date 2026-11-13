@@ -7,7 +7,7 @@
 import { P, R, copyRect, partVersionOf, px, setRect } from '../../core';
 import type { LevelRegistry, LevelRenderer } from '../../core';
 import { createFanBank } from './art';
-import { FOCUS, PHONE_TAG_GUTTER, ROW_W, U, UP_X, WORLD, colX, plan, planFor, setPlan } from './layout';
+import { FOCUS, PHONE_HEADER_H, PHONE_TAG_SPACE, ROW_W, U, UP_X, WORLD, colX, plan, planFor, setPlan } from './layout';
 import { drawRackMini } from './mini';
 import { gutter, rackLabels } from './labels';
 import { rackCol, rackRowScroll } from './row';
@@ -38,14 +38,13 @@ export function createRackRenderer(registry: LevelRegistry): LevelRenderer<'rack
     /** The active rack, shifted by the row scroll (clamped to the row's built racks). */
     focus(s, _vp, out, form, area) {
       if (area) setPlan(planFor(area));
+      const header = form === 'phone' && (plan.id === 'twin' || !area || area.h < (FOCUS.h + PHONE_HEADER_H) * 2) ? PHONE_HEADER_H : 0;
       // the tag gutter is the tower's: a twin names its units on its own panels (labels.ts)
-      const wide = plan.id === 'tower' && (!area || area.w >= (FOCUS.w + PHONE_TAG_GUTTER) * 2);
-      copyRect(FOCUS, out); out.x += colX(rackCol(s)) + rackRowScroll.apply(s, area, form === 'phone' && wide ? PHONE_TAG_GUTTER : 0);
-      // Phone: the rest also frames a gutter left of the cabinet, so the pipe tags beside the first
-      // drop never touch it (the cabinet rests right of centre; 174 art px fits at 2 from a 348 px view).
-      // A narrower view (320 px) keeps the whole cabinet instead: the gutter would crop its PDU strip.
+      const wide = plan.id === 'tower' && (!area || area.w >= (FOCUS.w + 2 * PHONE_TAG_SPACE) * 2);
+      copyRect(FOCUS, out); out.x += colX(rackCol(s)) + rackRowScroll.apply(s, area);
+      // Centre the cabinet itself. The uplink gets a row above its roof, including when the view pans.
+      out.y -= header; out.h += header;
       if (area) gutter.on = form !== 'phone' || wide;
-      if (form === 'phone' && wide) { out.x -= PHONE_TAG_GUTTER; out.w += PHONE_TAG_GUTTER; }
       return out;
     },
     /**
@@ -57,7 +56,7 @@ export function createRackRenderer(registry: LevelRegistry): LevelRenderer<'rack
       const col = rackCol(s), w = Math.round(WORLD.h * SPAN.w / SPAN.h);
       return setRect(out, Math.round(colX(col) + WORLD.w / 2 - w * (col * SPAN.pitch + SPAN.rack / 2) / SPAN.w), 0, w, WORLD.h);
     },
-    /** The pipe tags keep clear of the active cabinet itself, not the phone gutter beside it. */
+    /** The pipe tags clear the cabinet itself, leaving the reserved row above it available. */
     tagClear(s, out) { copyRect(FOCUS, out); out.x += colX(rackCol(s)) + rackRowScroll.offset; return out; },
     /** The row snaps, and a tapped neighbour settles, in 0.15 s (A06). */
     restEaseS: () => 0.15,
