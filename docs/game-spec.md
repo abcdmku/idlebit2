@@ -1438,7 +1438,7 @@ D62 removes the phone bar's inner start/end padding: Settings and Dismiss align 
 |---|---|
 | Credits | wallet, whole Credits, larger than body text |
 | Data | data balance, whole Data, larger than body text |
-| Net per minute | Desktop: (payouts − energy debits) over the trailing 60 s (or since load, if shorter), scaled to a minute, whole Credits |
+| Live rates (D90) | Net Credits per second, Data per second and efficiency. While a round runs they cover the last 2 s of simulation and count work done, not payouts: paid work plus each running shard's payout × the share of its work done, plus bits a queued task has preloaded. Net is that work value minus energy debits; efficiency is net ÷ work value, "—" without work, negative at a loss. Work on a task that later fails or is dropped is lost, so the figure can dip. Out of a round they are the last round's averages. Desktop: the two rates follow the Data and Credits figures and efficiency sits under the level name. Phones: one line at the top of the Queue plate and of the currency history. Whole units; no forecast. |
 | SLA | §4.2, one decimal, left-aligned below the SLA title and rolling task ratio. The stack is vertically centered in the existing band. |
 | Tasks | Completed logical tasks this round, inline with a dot and the next unearned reward milestone. Counts compact from 1,000, such as `1k` and `1.5k`, without rounding a not-yet-reached milestone upward. Exact counts are available in the accessible label and tooltip. |
 | Round state | End round / Return actions reflect `running` / `ended` / `between`; the report heading is "Round over" without the round number or duration. No elapsed clock in the HUD. |

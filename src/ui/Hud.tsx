@@ -17,6 +17,7 @@ import { CoinIcon } from './plates/icons';
 import { Sla } from './hud/Sla';
 import { useNewLevels } from './hud/useNewLevels';
 import { useFleetFaults } from './health/useFleetHealth';
+import { efficiencyText, rateText, ratesWords, useRates } from './hud/rates';
 
 /** The ladder lists the deepest level first: CPU, System, Rack, Room, Global. */
 const LADDER: readonly LevelId[] = [...ORDER];
@@ -52,20 +53,15 @@ function Ladder() {
   </div>;
 }
 
-function NetIncome() {
-  const L = useLayout();
-  const { net, live } = useGameSelector(s => {
-    const report = s.round.lastReport, live = s.round.state === 'running';
-    const net = !live && report && report.durationMs > 0
-      ? (BigInt(report.net) * 60000n / BigInt(report.durationMs)).toString() as typeof s.hud.netPerMinute : s.hud.netPerMinute;
-    return { net, live };
-  }, shallowEqual, 500);
-  const text = `${BigInt(net) > 0n ? '+' : ''}${amountText(net)}/min`;
-  if (L.kind !== 'desktop') return null;
+/** D90: the share of work value kept after energy, under the level name. Out of a round it is the last round's. */
+function Efficiency() {
+  const L = useLayout(), r = useRates();
+  if (L.kind !== 'desktop' || !r) return null;
   const at = { x: L.rungLabel.x, y: L.rungLabel.y + L.lh, w: L.rungLabel.w, h: L.lh };
-  return <span className={`t clip ${BigInt(net) < 0n ? 'bad' : 'ok'}`} style={box(at)} data-testid="net-income"
-    title={live ? 'Net Credits after energy over the last 60 seconds' : 'Last round average net Credits after energy'}
-    aria-label={`${live ? 'Net income' : 'Last round net income'} ${text} after energy`}>{live ? 'Net' : 'Last'} <CoinIcon />{text}</span>;
+  const text = efficiencyText(r.efficiency);
+  return <span className={`t clip${r.efficiency !== null && r.efficiency < 0 ? ' bad' : ''}`} style={box(at)} data-testid="efficiency"
+    title={r.live ? 'Share of work value kept after energy, over the last 2 seconds' : 'Share of work value kept after energy, last round'}
+    aria-label={`${r.live ? 'Efficiency' : 'Last round efficiency'} ${text}`}><span className="mute">{r.live ? 'Efficiency' : 'Last round'}</span> {text}</span>;
 }
 
 /** A10: what the last purchase spent, shown for 600 ms after the Credits, where nothing else sits. */
@@ -87,7 +83,7 @@ function useSpent(): number | null {
  */
 function Wallet() {
   const L = useLayout(), spent = useSpent(), d = L.kind === 'desktop';
-  const { view } = useShell();
+  const { view } = useShell(), rates = useRates();
   const w = useGameSelector(s => ({ credits: s.hud.credits, data: s.hud.data }), shallowEqual, 100);
   // The slot's width picks the dress, never the game state: header-size figures under 88 px, and under 64 px the
   // figures alone, in their colours.
@@ -95,15 +91,15 @@ function Wallet() {
   const credits = amountText(w.credits), data = amountText(w.data);
   return <button type="button" className={`wallet-key${debt ? ' debt' : ''}${bare ? ' bare' : snug ? ' snug' : ''}`} data-qa-target
     style={{ right: L.w - (box0.x + box0.w), top: box0.y + (d ? Math.max(0, (box0.h - 48) / 2) : 0), height: Math.min(48, box0.h), width: box0.w }}
-    aria-label={`${data} Data, ${credits} Credits${debt ? ', in debt' : ''}. View history${debt ? ' and bankruptcy' : ''}`} aria-haspopup="dialog"
+    aria-label={`${data} Data, ${credits} Credits${debt ? ', in debt' : ''}. ${d && rates ? ratesWords(rates) + '. ' : ''}View history${debt ? ' and bankruptcy' : ''}`} aria-haspopup="dialog"
     onClick={() => view.dispatch({ type: 'toggleSheet', sheet: 'creditsHistory' })}>
     <span className="wallet-row">
-      {!bare && <CurrencyIcon kind="data" n={L.N} />}<b className="fig mid data" data-testid="data">{data}</b>{d && <span className="wallet-label mute">Data</span>}
+      {!bare && <CurrencyIcon kind="data" n={L.N} />}<b className="fig mid data" data-testid="data">{data}</b>{d && <span className="wallet-label data" data-testid="data-rate">{rates ? rateText(rates.dataPerSec) : ''}</span>}
     </span>
     <span className="wallet-row">
       {debt && !d && box0.w >= 128 && <span className="wallet-debt">Debt</span>}
       {!bare && <CurrencyIcon kind="credits" n={L.N} />}<b className="fig mid gold" data-testid="credits">{credits}</b>
-      {d && <span className={`wallet-label ${debt ? 'wallet-debt' : 'mute'}`}>{debt ? 'Debt' : 'Credits'}</span>}
+      {d && <span className={`wallet-label ${rates && rates.creditsPerSec < 0 ? 'bad' : 'gold'}`} data-testid="credits-rate">{rates ? rateText(rates.creditsPerSec) : ''}</span>}
     </span>
     {spent !== null && <span className="wallet-spent dim" data-testid="spent">−<CoinIcon />{wholeText(spent)}</span>}
   </button>;
@@ -144,6 +140,6 @@ export function Hud() {
     <Sla />
     <EndRound />
     <Wallet />
-    <NetIncome />
+    <Efficiency />
   </header>;
 }

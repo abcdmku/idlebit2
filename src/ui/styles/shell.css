@@ -13,7 +13,6 @@ html, body, #root { margin: 0; width: 100%; height: 100%; overflow: hidden; back
 .br-shell [hidden] { display: none !important; }
 :where(.br-shell) :where(ol, ul) { list-style: none; margin: 0; padding: 0; }
 .world { position: absolute; left: 0; top: 0; touch-action: none; cursor: pointer; }
-[data-testid="net-income"] .coin { margin-right: 3px; vertical-align: 0; }
 .world:focus-visible { outline: none; }
 .world-controls { position: absolute; inset: 0; pointer-events: none; z-index: 2; --currency-short: var(--component-short); }
 .world-key { position: absolute; pointer-events: none; opacity: 0; }
@@ -254,3 +253,9 @@ b, .b { font-weight: 700; }
 .first-buy .pz { gap: 3px; }
 .first-buy .px-ic { width: 10px; height: 10px; }
 .first-buy.short { color: var(--currency-short); }
+
+/* D90 live rates: one body-size line; each figure keeps its cell so the line never shifts as values change. */
+.rates-line { display: flex; flex-wrap: wrap; align-items: center; gap: 0 8px; margin: 0; min-height: var(--lh); white-space: nowrap; }
+.rates-line > span { display: inline-flex; align-items: center; gap: 3px; }
+.rates-line > .gold, .rates-line > .bad, .rates-line > .data { min-width: 64px; }
+.wallet-body > .rates-line { grid-column: 1 / -1; margin-bottom: 8px; }

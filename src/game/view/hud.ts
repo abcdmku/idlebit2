@@ -7,6 +7,7 @@ import type { HudSnapshot, RoundSnapshot } from '../types/snapshot';
 import { recentIncome, roundIncome } from './research';
 import type { GameState } from '../types/state';
 import { frontierView } from './frontier';
+import { hudRates } from './workRate';
 
 
 const autoReturnInMs = (state: GameState): number | null => {
@@ -25,7 +26,7 @@ export function hudSnapshot(state: GameState, prev: HudSnapshot | null): HudSnap
   const elapsed = Math.max(0, end - round.startTick) * TICK_MS;
   const credits = state.wallet.credits, data = state.wallet.data, net = netPerMinute(state);
   const auto = autoReturnInMs(state);
-  const income = roundIncome(state), recent = recentIncome(state);
+  const income = roundIncome(state), recent = recentIncome(state), rates = hudRates(state, prev?.rates);
   const same = (a: { dataPerSec: number; creditsPerSec: number } | undefined, b: { dataPerSec: number; creditsPerSec: number }) =>
     a !== undefined && a.dataPerSec === b.dataPerSec && a.creditsPerSec === b.creditsPerSec;
   const sameIncome = same(prev?.income, income), sameRecent = same(prev?.incomeRecent, recent);
@@ -34,9 +35,9 @@ export function hudSnapshot(state: GameState, prev: HudSnapshot | null): HudSnap
     && prev.sla.failedWork === failedWork && prev.sla.grace === grace;
   if (prev && sameSla && prev.credits === credits && prev.data === data && prev.netPerMinute === net
     && prev.roundState === round.phase && prev.roundIndex === round.index
-    && prev.roundElapsedMs === elapsed && prev.autoReturnInMs === auto && sameIncome && sameRecent) return prev;
+    && prev.roundElapsedMs === elapsed && prev.autoReturnInMs === auto && sameIncome && sameRecent && prev.rates === rates) return prev;
   return {
-    credits, data, netPerMinute: net,
+    credits, data, netPerMinute: net, rates,
     sla: prev && sameSla ? prev.sla
       : { met, failed, percent: slaPercent(met, failed), checking: slaChecking(roundMet + roundFailed), window: SLA_WINDOW,
         roundMet, roundFailed, deliveredWork: delivered, failedWork, grace },

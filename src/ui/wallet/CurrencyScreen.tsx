@@ -7,6 +7,7 @@ import { box, useLayout } from '../shell/geometry';
 import { shallowEqual, useGameSelector, usePlatformStatus, useShell, useViewState } from '../storeHooks';
 import { BalanceChart } from './BalanceChart';
 import { balanceText } from './graph';
+import { RatesLine } from '../hud/rates';
 import '../styles/wallet.css';
 
 export function CurrencyScreen() {
@@ -58,6 +59,7 @@ function OpenCurrency() {
         <CloseKey L={L} w={w} onClose={close} label="Close currency history" />
       </header>
       <div className="wallet-body">
+        <RatesLine />
         <BalanceChart samples={wallet.samples} tick={wallet.tick} current={wallet} />
         <div className="bankruptcy">
           <h2>{confirming ? 'Declare bankruptcy?' : 'Bankruptcy'}</h2>

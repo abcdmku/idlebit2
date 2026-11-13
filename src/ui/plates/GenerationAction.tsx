@@ -1,6 +1,7 @@
 import type { Quote, ResearchId } from '../../game';
 import { costWords, overloadWarning, resultingSpecs, purchaseGain, purchaseReason } from './purchaseText';
 import { LockIcon } from './icons';
+import { measureUnit } from './format';
 import { Price, quotePrice } from './widgets';
 
 /** Catalog order is generation order. Prefer the capacity-preserving quote for the next one. */
@@ -33,21 +34,24 @@ export function GenerationAction({ quote, primary = false, onAction, onResearch,
     .replace(/^GPU /, '').replace('Rear-door water', 'Rear-door');
   const after = quote.gpu?.after;
   const name = `${target}${after ? ` · ${after.cores} ${after.cores === 1 ? 'core' : 'cores'}` : ''}`;
-  const label = node ? `Research ${researchName?.(node) ?? target}` : `Upgrade to ${name}`;
+  // A new generation starts at level 1, so it can be slower or smaller than the levelled part it replaces: say so.
+  const e = after ? null : quote.effect, drop = !!e && e.capacityAfter < e.capacityBefore;
+  const verb = drop ? 'Replace with' : 'Upgrade to';
+  const label = node ? `Research ${researchName?.(node) ?? target}` : `${verb} ${name}`;
   const reason = purchaseReason(quote, researchName);
   const disabled = node ? !onResearch : !!reason;
   const cold = quote.cold && quote.downtimeMs > 0 ? `${Math.ceil(quote.downtimeMs / 1000)}s offline` : '';
-  const spec = [after ? purchaseGain(quote) : resultingSpecs(quote), cold].filter(Boolean).join(' · ');
-  const announcedLabel = node ? label : `Upgrade to ${fullTarget}`;
+  const spec = [drop ? `from ${measureUnit(e!.capacityBefore, e!.unit)}` : after ? purchaseGain(quote) : resultingSpecs(quote), cold].filter(Boolean).join(' · ');
+  const announcedLabel = node ? label : `${verb} ${fullTarget}${drop ? `, ${measureUnit(e!.capacityAfter, e!.unit)}` : ''}`;
   // A lock's reason stays; resulting specs give way to the price in a narrow key.
   const why = !!quote.locked, detail = why ? reason : overloadWarning(quote) || spec;
   const price = !(quote.locked && quote.cost === '0') && <Price {...quotePrice(quote)} affordable={quote.affordable} />;
-  return <button type="button" className={`key generation-action${primary && !node ? '' : ' replace'}`} disabled={disabled}
+  return <button type="button" className={`key generation-action${primary && !node && !drop ? '' : ' replace'}`} disabled={disabled}
     data-research-target={node ?? undefined} data-purchase-action={!node ? JSON.stringify(quote.action) : undefined}
     aria-label={[announcedLabel, !node && spec, !node && reason, !node && costWords(quote)].filter(Boolean).join('. ')}
     onClick={event => { event.stopPropagation(); if (!disabled) { if (node) onResearch?.(node); else onAction(quote); } }}>
     {node ? <><span className="kl">{label}</span><span className="pz"><LockIcon /></span></> : <>
-      <span className="gen-name"><span className="gen-target">{name}</span><span className="gen-verb">Upgrade to</span></span>
+      <span className="gen-name"><span className="gen-target">{drop ? <>{target.replace(/ package$/, '')} · <span className="warn">{measureUnit(e!.capacityAfter, e!.unit)}</span></> : name}</span><span className="gen-verb">{verb}</span></span>
       {why ? <span className="gen-foot">{detail && <span className="gen-detail">{detail}</span>}{price}</span>
         : <span className="gen-foot drop">{price}{detail && <span className="gen-detail">{detail}</span>}</span>}
     </>}

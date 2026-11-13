@@ -44,7 +44,25 @@ export interface RenderSnapshot {
   readonly lastSeq: number;
 }
 
+/** Lifetime paid totals plus the value of work in flight, at one tick (D90). */
+export interface WorkSample { readonly tick: number; readonly round: number; readonly credits: number; readonly data: number; readonly energy: number }
+/**
+ * D90 live rates. Running (live): per second over the last two seconds of simulation, counted from work
+ * done, not payouts. Otherwise the last round's averages. creditsPerSec is work value minus energy;
+ * efficiency is the share of work value kept after energy (null without work, negative at a loss).
+ */
+export interface HudRates {
+  readonly live: boolean;
+  readonly creditsPerSec: number;
+  readonly dataPerSec: number;
+  readonly workPerSec: number;
+  readonly efficiency: number | null;
+  /** The view's own one-per-second samples; not for display. */
+  readonly samples: readonly WorkSample[];
+}
 export interface HudSnapshot {
+  /** Always set by the view; optional only for hand-built fixtures. */
+  readonly rates?: HudRates;
   readonly credits: Amount;
   readonly data: Amount;
   /** Whole Credits per minute over the trailing 60 s. */
