@@ -8,7 +8,7 @@ import { UNIT_MODES } from '../../../game';
 import type { PortView, RackSlotView, ServerSlotView, UnitMode } from '../../../game';
 import { fan } from './art';
 import { drawClips, drawPatch, shell } from './cabinet';
-import { drawLB, drawSwitch } from './infra';
+import { drawSwitch } from './infra';
 import { CAB, PDU_BAR, PDU_LCD, PLINTH, READOUT, SERVER_SLOTS, UP_X, WORLD, createRoute, patchRoute, serverRect } from './layout';
 import { drawServer } from './sprites';
 import type { ServerLook } from './sprites';
@@ -33,7 +33,7 @@ const lookOf = (mode: UnitMode, rack: RackSlotView, paused: boolean, market: boo
 
 /** Plates with no lights: a neighbour's switch and LB faces at their real positions. */
 const plates = {
-  lb: { generation: 0, strategy: 'firstFit', lastTarget: null },
+  lb: { generation: 0, strategy: 'firstFit', lastTarget: null, queue: null },
   switch: { generation: 0, ports: [] as PortView[], uplinks: [] as PortView[] }, servers: [] as ServerSlotView[],
 } as unknown as RackSnapshot;
 
@@ -70,10 +70,9 @@ export function drawNeighbour(g: G, v: RackSlotView, x: number, paused: boolean)
 function drawBody(g: G, v: RackSlotView, paused: boolean): void {
   const on = v.state !== 'empty' && v.state !== 'standby' && v.powered !== false && !paused;
   shell(g);
-  for (let i = 0; i < 3; i++) fan(g, 27 + i * 24, CAB.roofY + 11, 6, 0, false);
+  for (let i = 0; i < 3; i++) fan(g, 27 + i * 21, CAB.roofY + 11, 6, 0, false);
   R(g, READOUT.x, READOUT.y, READOUT.w, READOUT.h, P.ink);
   drawSwitch(g, plates, true);
-  drawLB(g, plates, true);
   for (let i = 0; i < SERVER_SLOTS; i++) {
     const mode = v.servers[i] ?? 0;
     if (!mode) continue;

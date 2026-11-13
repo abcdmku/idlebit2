@@ -1,6 +1,6 @@
 // Rack world (mockup levels/rack/world.js), now the whole room row (D17.2): every rack of the
 // row at its true column, the neighbours darkened, the active rack drawn in full on top.
-// The active rack: cabinet, the five infrastructure slots (D31 Power control under the cooler), servers, patch cables and the
+// The active rack: cabinet, the infrastructure (the Switch that is its load balancer, D31 Power control above the PDU), servers, patch cables and the
 // uplink entering from the top, real transfers, the next-slot ghost, the save icon and lamp,
 // and the sled that slides out on a drill into a server.
 import { BG, P, R, createZoomLink, drawGhost, drawSaveIcon, drawUnitLamp, glowBit, keyOf, lampState, pathAt, sledOut, zoomLink } from '../../core';
@@ -10,7 +10,7 @@ import { createRoute, patchRoute, BAY_H, CHILD, LAMP, OPEN, ROW_COLS, ROW_W, SAV
 import { fanAt } from './art';
 import type { FanBank } from './art';
 import { drawClips, drawPatch, drawUplink, shell, sledInterior } from './cabinet';
-import { drawCooler, drawLB, drawPdu, drawSwitch } from './infra';
+import { drawCooler, drawPdu, drawSwitch } from './infra';
 import { drawPowerCtl } from './powerCtl';
 import { drawNeighbour } from './neighbour';
 import { drawRackFlows } from './flows';
@@ -29,15 +29,11 @@ export function nextFreeServer(s: RackSnapshot): number {
 const emptyAt = (s: RackSnapshot, i: number): boolean => i < s.servers.length && i < SERVER_SLOTS && s.servers[i]!.systemId === null;
 /**
  * The add site on the next free slot `free`: its ghost, its tap rect and where its name and price sit. It takes the free
- * unit under it too (two text lines), and a half row's whole width while both its sleds are free.
+ * unit under it too (two text lines).
  */
 export function addRect(s: RackSnapshot, free: number, out: Rect): Rect {
   serverRect(free, out);
-  if (plan.id === 'half') {
-    const row = (free & 1) === 0 && emptyAt(s, free + 1);
-    if (row) out.w *= 2;
-    if (emptyAt(s, free + 2) && (!row || emptyAt(s, free + 3))) out.h *= 2;
-  } else if (free + 1 !== (plan.id === 'twin' ? TWIN_SPLIT : SERVER_SLOTS) && emptyAt(s, free + 1)) out.h *= 2;
+  if (free + 1 !== (plan.id === 'twin' ? TWIN_SPLIT : SERVER_SLOTS) && emptyAt(s, free + 1)) out.h *= 2;
   return out;
 }
 /** Server slot running system `id`, or -1. */
@@ -92,7 +88,6 @@ function drawActive(g: G, s: RackSnapshot, view: ViewPresentation, frame: WorldF
   drawCooler(g, s, ctx.fans, frame.timeMs, quiet, frame.reducedMotion);
   drawPowerCtl(g, s, off, frame.paused, 'open', !view.sourceActions?.includes('powerCtl'));
   drawSwitch(g, s, quiet);
-  drawLB(g, s, quiet);
   const d = drillOf(s, frame);
   for (let i = 0; i < s.servers.length; i++) {
     const v = s.servers[i];

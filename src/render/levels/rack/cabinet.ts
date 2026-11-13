@@ -3,7 +3,7 @@
 import { BG, P, R, frame, mix, prism, px, trace } from '../../core';
 import type { PrismStyle } from '../../core';
 import { cableOf, disc, drawBlank, drawLayer, fan } from './art';
-import { BAY_H, BAY_PITCH, CAB, CHAN, CHAN2, HEADER_Y, LB_RECT, NAME_PANEL, OPEN, PLINTH, POWER_CTL_RECT, SERVER_SLOTS, SLED, SRV_Y, SWITCH_FACE, SWITCH_RECT, U0, UPLINK_X, UP_X, WORLD, bayX, bays, plan, serverRect } from './layout';
+import { BAY_H, BAY_PITCH, CAB, CHAN, CHAN2, HEADER_Y, NAME_PANEL, OPEN, PLINTH, POWER_CTL_RECT, POWER_PANEL, SERVER_SLOTS, SLED, SWITCH_RECT, U0, UPLINK_X, UP_X, WORLD, bayX, bays, plan, serverRect } from './layout';
 import type { Route } from './layout';
 
 type G = CanvasRenderingContext2D;
@@ -40,11 +40,12 @@ function drawShell(g: G): void {
     R(g, rx, U0, 2, h, P.steelLo);
     for (let y = U0 + 2; y < U0 + h; y += 4) px(g, rx + (rx === bayX(b) ? 1 : 0), y, P.ink);
   }
-  // a blanking plate in every unit and sled site; a twin's panel beside its infrastructure; the seam over a twin's sleds
-  drawBlank(g, POWER_CTL_RECT); drawBlank(g, SWITCH_RECT); drawBlank(g, LB_RECT);
-  if (n > 1) drawBlank(g, NAME_PANEL);
+  // the seams a twin keeps over and under its sleds, then a blanking plate in every unit and sled site, and a twin's
+  // panels beside the Switch and Power control
+  for (let b = 0; b < n; b++) R(g, bayX(b), U0, OPEN.w, h, P.ink);
+  drawBlank(g, POWER_CTL_RECT); drawBlank(g, SWITCH_RECT);
+  if (n > 1) { drawBlank(g, NAME_PANEL); drawBlank(g, POWER_PANEL); }
   for (let i = 0; i < SERVER_SLOTS; i++) drawBlank(g, serverRect(i, scratch));
-  if (SRV_Y > LB_RECT.y + LB_RECT.h) for (let b = 0; b < n; b++) R(g, bayX(b), LB_RECT.y + LB_RECT.h, OPEN.w, SRV_Y - LB_RECT.y - LB_RECT.h, P.ink);
   const py = U0 + BAY_H;
   R(g, CAB.x + 1, py, CAB.w - 2, ground - py - 1, mix(POST, P.ink, 0.3));
   R(g, PLINTH.x, PLINTH.y, PLINTH.w, PLINTH.h, P.ink);
@@ -52,7 +53,7 @@ function drawShell(g: G): void {
 }
 /** Floor tile, cabinet prism, posts, rails and a blanking plate in every U, on a clear ground so
  * row neighbours stand beside it. One cached blit at column offset x. */
-const SHELL_KEY = { tower: 'rack4:shell', twin: 'rack4:shell:twin', half: 'rack4:shell:half' } as const;
+const SHELL_KEY = { tower: 'rack5:shell', twin: 'rack5:shell:twin' } as const;
 export function shell(g: G, x = 0): void { drawLayer(g, SHELL_KEY[plan.id], WORLD.w, WORLD.h, drawShell, x); }
 
 /** One patch cable, brightened while its port carries a real transfer. */
@@ -73,7 +74,7 @@ export function drawUplink(g: G, hz: number, lit: boolean): void {
   for (let y = 0; y < HEADER_Y; y++) { g.globalAlpha = alpha * Math.min(1, (y + 1) / 10); R(g, UP_X - 1, y, 3, 1, P.ink); px(g, UP_X, y, col); }
   g.globalAlpha = alpha;
   R(g, UPLINK_X - 1, HEADER_Y - 1, UP_X - UPLINK_X + 2, 3, P.ink); R(g, UPLINK_X, HEADER_Y, UP_X - UPLINK_X + 1, 1, col);
-  const jy = SWITCH_FACE.y + 3;
+  const jy = SWITCH_RECT.y + 3;
   R(g, UPLINK_X - 1, HEADER_Y, 3, jy - HEADER_Y, P.ink); R(g, UPLINK_X, HEADER_Y, 1, jy - HEADER_Y, col);
 }
 

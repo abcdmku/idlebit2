@@ -11,8 +11,8 @@ import { fail, locked, planned, type Plan } from './plan';
 
 /* Strategy, filter, setpoint and switch changes are hot and free (program D1.6, spec §4.5). */
 
-export const SETPOINT_MIN_F = 55;
-export const SETPOINT_MAX_F = 80;
+export const SETPOINT_MIN_F = 60;
+export const SETPOINT_MAX_F = 120;
 
 export function planQueueLoaderLimit(state: GameState, system: SystemId, limit: 1 | 2 | 4): Plan {
   const spec = state.build.systems[system]?.spec;
@@ -92,7 +92,7 @@ export function planRouterQueue(state: GameState, unit: ScopeRef): Plan {
   return planned({ build: withRouter(state.build, unit, { ...lb, queueLevel: level + 1 }), price }, label);
 }
 
-/** Cooler setpoint, 55–80 °F, with rackSetpoint / roomSetpoint (spec §10.5). */
+/** Cooler setpoint, 60–120 °F, with rackSetpoint / roomSetpoint (spec §10.5). */
 export function planSetpoint(state: GameState, unit: { kind: 'rack'; id: RackId } | { kind: 'room'; id: RoomId }, setpointF: number): Plan {
   const lock = ruleLock(state.research.unlocks, unit.kind === 'rack' ? 'rackSetpoint' : 'roomSetpoint');
   if (lock) return locked(lock, 'Setpoint', 0n);

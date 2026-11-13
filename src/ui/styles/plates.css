@@ -116,7 +116,13 @@
 .v3-plate .cx-tog small { display: block; font-weight: 400; color: #a99be6; }
 .system-power { scroll-margin-top: var(--s2); }
 
-/* cooler setpoint */
+/* cooler thermostat: a slider over the setpoint range, its two ends named under it */
+.v3-plate .thermostat { margin-top: var(--s2); }
+.v3-plate .thermostat .range-setting { grid-template-columns: auto minmax(96px, 1fr) 3.2em; }
+.v3-plate .thermostat output { color: #8ef5ff; font-weight: 700; }
+.v3-plate .thermostat-lock { margin-top: var(--s2); width: 100%; }
+
+/* stepper rows (start controller) */
 .v3-plate .setpoint { display: grid; grid-template-columns: minmax(0, 1fr) 44px 56px 44px; align-items: center; gap: var(--s2); margin-top: var(--s2); min-height: 44px; }
 .v3-plate .setpoint.lock { grid-template-columns: auto 1fr; gap: var(--s2); color: #8d84b3; }
 .v3-plate .setpoint.lock small { color: #ffab98; }

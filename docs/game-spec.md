@@ -132,7 +132,7 @@ The saved tree is `World → Site → Zone → Rack → System → Socket`.
 
 - A **system** is one server: a board (`general` or `accelerator`) with 1–4 CPU sockets, RAM modules, GPUs and drives. Power capacity belongs to the rack.
 - A **socket** holds one CPU: a package, cores, a clock, one cache. Every CPU in a system is identical. A system's single scheduler serves all of them.
-- A **rack** has 5 infrastructure slots, top to bottom: cooler, **power control** (D31: battery and smart start, under the cooler), PDU, load balancer, switch. It also has 12 server slots. A server slot holds a system or a storage node (§6.10).
+- A **rack** has 5 infrastructure slots, top to bottom: cooler, **power control** (D31: battery and smart start), PDU, load balancer, switch. D91: the cabinet draws them as cooler roof, the Switch in the first U (the load balancer is its west end), the servers, then Power control in the last U above the PDU. It also has 12 server slots. A server slot holds a system or a storage node (§6.10).
 - A **zone** is one room, one data hall and one availability zone. It has a network rack in the top-left slot (room switch and room load balancer), rows of rack slots, room cooling, one UPS (two with `dualFeed`).
 - A **site** is one data center in one region. It has zones, a data plane that links them, and a grid feed.
 - The **world** has sites, backbone links and, from Regions on, one global scheduler. Site 0 is the **gateway**: the market enters the world there (§7.2).
@@ -280,7 +280,7 @@ While a round runs, every online/offline change takes `bootSeconds` (10 s at bas
 
 | Scope | Part | Lives in | Stages | Research |
 |---|---|---|---|---|
-| Rack | **Power control** (`powerCtl`): battery and smart start in one unit | its own rack slot, under the cooler | systems: awake or `asleep` | `powerCtl` (kHz W8); gen 1 `powerCtlLiIon`, gen 2 `powerCtlLfp` |
+| Rack | **Power control** (`powerCtl`): battery and smart start in one unit | its own rack slot, above the PDU (D91) | systems: awake or `asleep` | `powerCtl` (kHz W8); gen 1 `powerCtlLiIon`, gen 2 `powerCtlLfp` |
 | Zone | `roomStart` | the room's UPS | racks: powered or `standby` | `roomStart` (MHz W11); gen 1 `startPredict` |
 | Global | `globalStart` | the global scheduler | sites and their zones: online or `standby` | `globalStart` (GHz W14); gen 1 `startPredict` |
 
@@ -1011,7 +1011,7 @@ D56 applies the claimed market Data dividend after base whole Data is calculated
 
 ### 9.9 Rack batteries (D31)
 
-A rack's **Power control** unit (its fifth infrastructure slot, under the cooler) holds the rack's battery and its smart start (§4.4) as one part. Its generations are Lead-acid (gen 0, basic start), Li-ion (gen 1, adds the `busy` trigger and batch wake) and LFP (gen 2). Levels follow the flow curve: battery capacity ×2 per level and wake latency by level (§4.4). The empty slot is locked until `powerCtl` is researched; then it is bought from its add plate like any infrastructure part.
+A rack's **Power control** unit (its fifth infrastructure slot, above the PDU, D91) holds the rack's battery and its smart start (§4.4) as one part. Its generations are Lead-acid (gen 0, basic start), Li-ion (gen 1, adds the `busy` trigger and batch wake) and LFP (gen 2). Levels follow the flow curve: battery capacity ×2 per level and wake latency by level (§4.4). The empty slot is locked until `powerCtl` is researched; then it is bought from its add plate like any infrastructure part.
 - **Discharge.** While the round runs and the rack is powered, the rack PDU's input for the tick (servers in any mode, cooler, switch, LB and losses) is drawn from the battery first: `fromBattery = min(batteryJ, pduInput × dt)`, `batteryJ −= fromBattery`. Only the rest is billed (§9.8). A battery adds no capacity: PDU usage, losses and heat are unchanged.
 - **Battery time** shown on the rack plate and LCD: `batteryJ / pduInput` seconds at current draw, while discharging.
 - **Recharge.** At Return to market (and auto-return) every battery refills to capacity, billed immediately at `refillJ × 0.25 × the site's marginal price` (§9.10). Whole Credits settle before the action returns, leaving the fractional energy meter in `[0, 1)` so an immediate save is valid. The next tick does not charge the refill again.
@@ -1097,7 +1097,7 @@ moved = Gc × (T − Tsup) + Gp × (T − Tsurround)          // W leaving the l
 - When the rack is colder than its room, heat leaks in through `Gp` and the cooler must work harder.
 - `τ` comes from the cooler's technology (Appendix A): rack air 60 s, rack water 6 s; room air 300 s, water 30 s, closed loop 30 s **(s)**. Water is 10× faster than air. An air-cooled rack keeps cooling down for minutes after its load stops.
 
-**Duty.** A powered cooler runs at `d = 1` (program: full duty, no setpoint). With `rackSetpoint` (rack coolers, setpoint 55–80 °F) or `roomSetpoint` (room cooling, 55–80 °F), the player sets a setpoint `S` (default 70 °F) and the cooler runs at:
+**Duty.** A powered cooler runs at `d = 1` (program: full duty, no setpoint). With `rackSetpoint` (rack coolers, setpoint 60–120 °F) or `roomSetpoint` (room cooling, 60–120 °F), the player sets a setpoint `S` (default 70 °F) and the cooler runs at:
 
 ```text
 d = clamp((H − Gp × (S − Tsurround)) / ((Qc / ΔT) × (S − Tsup)), 0, 1)
@@ -1485,7 +1485,7 @@ The core tray offers physical `Add core`. The Cores popup also offers the CPU's 
 |---|---|
 | CPU | Exactly four parts (program D7.1): clock, cache (one block, total bits; cache on its plate), scheduler, cores. Per core: busy fraction, current activity (Cache load, Cache read or Compute), the shard on each thread (task ID, shard index, family, progress fraction, and how many threads that shard holds, so cores running one shard draw as one group), research share, C-state. Effective clock. Cache reserved bits, loaded bits and capacity; its lights fill from actual loading progress, including fractional bits, and remain lit until release. CPU miniatures use the same loaded count. Cache bits used / capacity per level, and the running shards' bits that spilled past cache (D26.7). Scheduler: queue entries, reserved count, running count, `K`, `Q`, strategy. Empty core sites up to `coreSites`. The inbound pipe (D10.4) is the incoming connector, not a fifth part: its speed, the task in transfer with bits sent / total, and whether the core is waiting on it. Tapping it opens the port plate (§16.3): before Rack the fixed 1 kHz and "Upgrade at the Rack switch"; from Rack on, the next step as "x → x". |
 | System | Board type, CPU count, `η_cfg`. The memory tiers filling (D26.7): cache, RAM and disk capacity, used bits, spilled bits (bits that didn't fit a faster tier) and rate. The shard arriving on the system's port and each running shard (task ID, shard index of count, units, threads held, GPU domain), so a shard is drawn splitting between the CPU and the GPU card. Actual system power and full-load rack allocation/capacity. RAM used / capacity and bandwidth use per module. Per-card GPU/NPU duty, VRAM holds and assigned tasks; GPU model ID, upgrades, cores, clock and effective rate. Drive IO use and holds. Mode. |
-| Rack | Power control (under the cooler): battery charge, battery time at current draw, awake count of total, next wake. Per server slot: mode, busy fraction, admitted and reserved shard counts. Every shard transfer on the uplinks and ports (task ID, shard index of count, target slot, bits sent of total), so a task is drawn arriving on the uplink and fanning out to the servers. LB queue entries.
+| Rack | Power control (above the PDU, D91): battery charge, battery time at current draw, awake count of total, next wake. Per server slot: mode, busy fraction, admitted and reserved shard counts. Every shard transfer on the uplinks and ports (task ID, shard index of count, target slot, bits sent of total), so a task is drawn arriving on the uplink and fanning out to the servers. LB queue entries.
  Per port and uplink: busy flag and speed. Load balancer routes per second. Cooler `T` and duty. PDU usage. |
 | Room | Per rack: `T`, mode, PDU usage. Shard transfers on the zone link and rack uplinks, as for Rack. Room LB queue entries. Network rack ports busy. Room cooling duty; zone `T`. UPS usage. |
 | Global | Per site: region, zones, modes, hottest `T`, grid usage. Shard transfers on the data planes and backbone. Data plane and global scheduler queue entries. Backbone links busy and speed. Global scheduler routes per second. |
@@ -1571,7 +1571,7 @@ The `psu` part, its slot, plate and five research nodes are removed (D80). A sys
 | ID | Generations (tech) | Gates | Curve | `base` by g | Watts | `price` by g | `upgrade` by g |
 |---|---|---|---|---|---|---|---|
 | `rackCooler` | Fan tray (air), High-flow air (air), Rear-door water (water), Direct-to-chip water (water) | `rack`, `rackAir2`†, `rackWater`, `rackWater2`† | flow | `Qc` W 5e5, 5e6, 5e9, 5e12 | `wpw` 0.01, 0.008, 0.004, 0.003 (D19) | 2.4e6, 1.2e7, 4.3e11, 3.7e14 | 1.5e6, 1.5e6, 1.8e10, 9e13 |
-| `powerCtl` (D31, rack slot under the cooler) | Lead-acid, Li-ion, LFP | `powerCtl`, `powerCtlLiIon`, `powerCtlLfp` | flow | battery J: 60 s of a fresh era rack at full draw **(s)**; wake latency 2 → 0.25 s by L1–5 | idle 0.01 × a PDU's | `≈ 40 × capacityJ × home price` **(s)** | flow |
+| `powerCtl` (D31, rack slot above the PDU, D91) | Lead-acid, Li-ion, LFP | `powerCtl`, `powerCtlLiIon`, `powerCtlLfp` | flow | battery J: 60 s of a fresh era rack at full draw **(s)**; wake latency 2 → 0.25 s by L1–5 | idle 0.01 × a PDU's | `≈ 40 × capacityJ × home price` **(s)** | flow |
 | `pdu` | Basic, Metered, Switched | `rack`, `meteredPdu`, `switchedPdu` | flow | W 7.15e6, 2e9, 5e15 | supply | 2.4e6, 1.2e7, 1.4e11 | 1.5e6, 1.5e6, 1.8e10 |
 | `lb` (rack) | Basic (one generation, D18.3) | `rack` | fixed; queue level 1–8 (§12.7) | no routing capacity (D12.5) | idle 160 | 2.4e6 | — |
 | `lb` (room) | Room basic (one generation, D18.3) | `room` | fixed; queue level 1–8 (§12.7) | no routing capacity (D12.5) | idle 2560 | 9.5e10 | — |
@@ -1704,7 +1704,7 @@ const upgradePrice = (r: PartRow, g: number, L: number, lanes = 1) =>
 | `liftPerF` | 0.03 **(s)** |
 | `tau` rack air / water | 60 / 6 s **(s)** |
 | `tau` room air / water / closed loop | 300 / 30 / 30 s **(s)** |
-| `setpointRangeF`, `setpointDefaultF` | 55–80, 70 |
+| `setpointRangeF`, `setpointDefaultF` | 60–120, 70 |
 | `economizerMarginF`, `economizerWattsFactor` | 5, 0.1 |
 | `energyPrice` | per region (§3.3); home 0.010 Credits/J **(s)**, float64 |
 | `creditsPerWorkUnit` | 1 (program D2) |

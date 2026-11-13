@@ -117,7 +117,7 @@ export const TREE_ROWS: readonly TreeRow[] = [
   n("fuelCell", "Fuel cell", "power", ["solarFarm", "substation"], "global", "ghz", 13, 4e8, [gen("generation", 2)], ["energy"]),
   n("ownPlant", "Own plant", "power", ["fuelCell", "hvIntake"], "global", "ghz", 14, 3e9, [gen("generation", 3)], ["energy"]),
   n("thermalThrottle", "Thermal throttle", "cooling", ["rack"], "rack", "khz", 8, 2.7e6, [rule("thermalThrottle", { atF: 95, untilF: 90, clock: 0.5 })], ["heat"]),
-  n("rackVarSpeed", "Fan control", "cooling", ["rack", "telemetry"], "rack", "khz", 8, 2.7e6, [rule("rackSetpoint", { minF: 55, maxF: 80 })], ["energy"]),
+  n("rackVarSpeed", "Fan control", "cooling", ["rack", "telemetry"], "rack", "khz", 8, 2.7e6, [rule("rackSetpoint", { minF: 60, maxF: 120 })], ["energy"]),
   n("rackAir2", "High-flow air", "cooling", ["rack"], "rack", "khz", 8, 2.7e6, [gen("rackCooler", 1)], ["heat"]),
   n("rackWater", "Rear-door water", "cooling", ["rackVarSpeed", "fabMhz"], "rack", "mhz", 10, 4e7, [gen("rackCooler", 2)], ["heat", "energy"]),
   n("rackWater2", "Direct-to-chip", "cooling", ["rackWater", "fabGhz"], "rack", "ghz", 12, 2e8, [gen("rackCooler", 3)], ["heat", "energy", "density"]),

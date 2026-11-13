@@ -3,7 +3,7 @@
 // Installed: the battery row, the Start row, then upgrade and replace as on every part plate.
 import type { GameAction, PowerCtlView, RackId, ResearchId } from '../../game';
 import { genName } from './copy';
-import { quantity } from './format';
+import { measureUnit } from './format';
 import { PlateFrame } from './PlateFrame';
 import { PowerKeys, powerGeneration } from './PowerKeys';
 import { StartRow } from './StartRow';
@@ -24,7 +24,7 @@ export function PowerCtlPlate({ rack, view, research: _research, ...common }: Po
       <PowerKeys quotes={quotes} installed={false} level={0} noun="Power control" onAction={onAction} onResearch={onResearch} researchName={researchName} />
     </PlateFrame>;
   }
-  const b = view.battery, charge = quantity(b.chargeJ, 'J') + ' / ' + quantity(b.capacityJ, 'J') + (b.discharging ? ' · Battery' : ' · Grid');
+  const b = view.battery, charge = measureUnit(b.chargeJ, 'J') + ' / ' + measureUnit(b.capacityJ, 'J') + (b.discharging ? ' · Battery' : ' · Grid');
   return <PlateFrame {...frame} title="Power control" sub={`${genName('powerCtl', view.generation).replace(/ power control$/i, '')} · L${view.level}`} usage={charge} className="part power-ctl"
     generation={powerGeneration({ quotes, installed: true, onAction, onResearch, researchName })}>
     <Bar progress={b.capacityJ > 0 ? b.chargeJ / b.capacityJ : 0} label={charge} />

@@ -10,10 +10,10 @@ import { UNIT_MODES } from '../../../game';
 import type { RackSlotView } from '../../../game';
 import { SERVER_ONLINE as ONLINE } from './neighbour';
 
-import { SERVER_SLOTS, SRV_U0, U, U0 } from './layout';
+import { SERVER_SLOTS, SRV_U0, TOWER_U, U, U0 } from './layout';
 
-/** The room's rack is always the tower (128 x 240 at 1/8), whatever plan the Rack level rests in. */
-const WORLD = { w: 128, h: 240 } as const, CAB = { x: 5, w: 118, roofY: 6, frontY: 28, ground: U0 + 15 * U + 14 } as const;
+/** The room's rack is always the tower (128 x 228, near 1/8), whatever plan the Rack level rests in. */
+const WORLD = { w: 128, h: U0 + TOWER_U * U + 30 } as const, CAB = { x: 5, w: 118, roofY: 6, frontY: 28, ground: U0 + TOWER_U * U + 14 } as const;
 
 type G = CanvasRenderingContext2D;
 const ROOF = mix(P.wafer, P.steelLo, 0.28), ROOF_HI = mix(ROOF, '#ffffff', 0.18);

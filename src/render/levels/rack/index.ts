@@ -1,8 +1,8 @@
 // Rack level (v3, D17.2): the whole room row of racks, each at its true column. The active
 // rack (the focus) is drawn in full; its neighbours are darkened and a tap makes one active.
 // The view scrolls along the row (row.ts, rackRowScroll); the camera rests on the active rack.
-// Inside the active rack: five infrastructure slots (cooling roof, Power control under it, switch,
-// load balancer, PDU)
+// Inside the active rack: the cooling roof with its thermostat, the Switch (the load balancer too), Power control
+// above the PDU,
 // and up to twelve servers; tap a server and its sled slides out into the System board.
 import { P, R, copyRect, partVersionOf, px, setRect } from '../../core';
 import type { LevelRegistry, LevelRenderer } from '../../core';
@@ -38,7 +38,7 @@ export function createRackRenderer(registry: LevelRegistry): LevelRenderer<'rack
     /** The active rack, shifted by the row scroll (clamped to the row's built racks). */
     focus(s, _vp, out, form, area) {
       if (area) setPlan(planFor(area));
-      // the tag gutter is the tower's: a twin names its units on its own panel, a half cabinet on their faceplates (labels.ts)
+      // the tag gutter is the tower's: a twin names its units on its own panels (labels.ts)
       const wide = plan.id === 'tower' && (!area || area.w >= (FOCUS.w + PHONE_TAG_GUTTER) * 2);
       copyRect(FOCUS, out); out.x += colX(rackCol(s)) + rackRowScroll.apply(s, area, form === 'phone' && wide ? PHONE_TAG_GUTTER : 0);
       // Phone: the rest also frames a gutter left of the cabinet, so the pipe tags beside the first
@@ -49,7 +49,7 @@ export function createRackRenderer(registry: LevelRegistry): LevelRenderer<'rack
       return out;
     },
     /**
-     * What the Room's row span shows (Room ↔ Rack). A tower row is that span at 8:1, whole. A twin or half row is not, so
+     * What the Room's row span shows (Room ↔ Rack). A tower row is that span at 8:1, whole. A twin row is not, so
      * the zoom takes a window of the span's shape whose centre puts the active cabinet on its own slot.
      */
     miniRect(s, out) {

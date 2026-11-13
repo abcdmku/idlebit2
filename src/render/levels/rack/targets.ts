@@ -5,7 +5,7 @@ import type { ChildView, Completion, HitTarget, NodeRef, Rect } from '../../core
 import type { PartRef, RackId, RackSnapshot, SwitchRef, SystemId, UnitRef } from '../../../game';
 import {
   CAB_RECT, LAMP, LB_RECT, PLINTH, POWER_CTL_RECT, ROOF_RECT, ROW_COLS, SAVE_AT, SERVER_SLOTS, STRIP_RECT, SWITCH_RECT, UPLINK_JACK,
-  BAY_H, U0, childRect, colX, plan, portX, serverRect,
+  BAY_H, PORT_PITCH, READOUT, U0, childRect, colX, portX, serverRect,
 } from './layout';
 import { isNeighbour, rackCol, rowViews } from './row';
 import { addRect, nextFreeServer } from './world';
@@ -55,7 +55,7 @@ export function rackChildren(s: RackSnapshot, out: ChildView[]): number {
 }
 
 /** The widest payout pop block and its two lines (art px); where it centres from a full sled's x, and in a half cabinet. */
-const POP_MAX = 36, POP_H = 16, POP_CX = 93, HALF_POP_CX = 122;
+const POP_MAX = 36, POP_H = 16, POP_CX = 93;
 const PORT_IDS = Array.from({ length: SERVER_SLOTS }, (_, i) => `port${i}`), NEIGHBOUR_IDS = Array.from({ length: ROW_COLS }, (_, c) => `rack${c}`);
 const save: Rect = saveIconRect(SAVE_AT.x, SAVE_AT.y, { x: 0, y: 0, w: 0, h: 0 });
 const lamp: Rect = { x: LAMP.x - 1, y: LAMP.y - 2, w: LAMP.w + 2, h: 6 }, scratch: Rect = { x: 0, y: 0, w: 0, h: 0 };
@@ -80,16 +80,19 @@ export function rackTargets(s: RackSnapshot, out: HitTarget[], from: number): nu
   }
   sink.ax = colX(rackCol(s));
   let t = put('cooler', 'part', ROOF_RECT); if (t) t.part = refs.cooler;
-  // D31: the fifth slot, Power control under the cooler. Installed, it opens its plate; empty, it is an add site
+  // D31: Power control, the last U above the PDU head. Installed, it opens its plate; empty, it is an add site
   // (the UI prints its name and price, or the research it needs, on it).
   t = put('powerCtl', 'part', POWER_CTL_RECT); if (t) { t.part = refs.powerCtl; t.unit = refs.unit; }
   t = put('pdu', 'part', STRIP_RECT); if (t) t.part = refs.pdu;
   t = put('plinth', 'part', PLINTH); if (t) t.part = refs.pdu;
-  t = put('lb', 'part', LB_RECT); if (t) t.part = refs.lb;
+  // the thermostat on the roof: in front of the roof, the same part (the plate holds the setpoint)
+  t = put('thermostat', 'part', READOUT); if (t) t.part = refs.cooler;
   t = put('switch', 'part', SWITCH_RECT); if (t) { t.part = refs.swPart; t.sw = refs.sw; }
+  // the Switch's west end is the load balancer: its own plate
+  t = put('lb', 'part', LB_RECT); if (t) t.part = refs.lb;
   // D35: each switch port is a target (it upgrades on its own), in front of the switch as a whole.
   for (let i = 0; i < Math.min(SERVER_SLOTS, s.switch.ports.length); i++) {
-    setRect(scratch, portX(i) - 1, SWITCH_RECT.y, 6, SWITCH_RECT.h);
+    setRect(scratch, portX(i), SWITCH_RECT.y, PORT_PITCH, SWITCH_RECT.h);
     t = put(PORT_IDS[i]!, 'port', scratch); if (t) { t.sw = refs.sw; t.port = i; t.part = refs.swPart; }
   }
   if (s.switch.uplinks.length > 0) {
@@ -119,7 +122,7 @@ export function rackPayoutAnchor(s: RackSnapshot, c: Completion, out: Rect): num
     // stands. The widest pop starts where the display ends and stops at the cabinet's edge. A half row's two sleds
     // share the strip east of the row, clear of the right sled's display. The pop stays in this rect (popInside):
     // the sled's row and, where a row is 12 px, 4 px of the next one, or of the one above on the last row.
-    out.x = colX(rackCol(s)) + (plan.id === 'half' ? HALF_POP_CX : out.x + POP_CX) - POP_MAX / 2; out.w = POP_MAX;
+    out.x = colX(rackCol(s)) + out.x + POP_CX - POP_MAX / 2; out.w = POP_MAX;
     if (out.y + POP_H > U0 + BAY_H) out.y = U0 + BAY_H - POP_H;
     out.h = POP_H; return i;
   }

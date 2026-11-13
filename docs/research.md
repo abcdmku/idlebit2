@@ -378,7 +378,7 @@ Network scopes (rack load balancer, then room, site and backbone):
 | id | Name | Requires | Level | Era / tier | Effect | Short | Answers |
 |---|---|---|---|---|---|---|---|
 | `thermalThrottle` | Thermal throttle | rack | Rack | kHz W8 | At ≥95 °F a rack's servers run at 0.5× clock and core load watts until it falls below 90 °F, on top of the thermal duty line. Measured: it lowers a hot rack by 2–4 °F; net Credits rose 10% in one case and fell by up to 19% in others. It has no off switch. | Hot racks lower CPU clock to reduce heat. | `heat` |
-| `rackVarSpeed` | Fan control | rack, telemetry | Rack | kHz W8 | Rack coolers hold a player setpoint (55–80 °F) instead of full duty. Watts follow delivered duty; fans show the real duty. | Rack coolers hold a set temperature. | `energy` |
+| `rackVarSpeed` | Fan control | rack, telemetry | Rack | kHz W8 | Rack coolers hold a player setpoint (60–120 °F) instead of full duty. Watts follow delivered duty; fans show the real duty. | Rack coolers hold a set temperature. | `energy` |
 | `rackAir2` | High-flow air | rack | Rack | kHz W8 | Rack cooler gen 1, still air: more capacity per Credit and fewer watts per watt removed (spec A.2). Air τ unchanged. | Opens high-flow rack air coolers. | `heat` |
 | `rackWater` | Rear-door water | rackVarSpeed, fabMhz | Rack | MHz W10 | Rack cooler gen 2, the first water generation: τ ×0.1 and fewer watts per watt removed (spec A.2). | Opens rack water cooling. | `heat`, `energy` |
 | `rackWater2` | Direct-to-chip | rackWater, fabGhz | Rack | GHz W12 | Rack cooler gen 3 (water): direct-to-chip water, the top rack cooler. Keeps rack cooling improving after the Room era. | Opens direct-to-chip water cooling. | `heat`, `energy`, `density` |

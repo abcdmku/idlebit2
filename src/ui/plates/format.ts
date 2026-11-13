@@ -1,4 +1,4 @@
-import { formatEnergy, formatHertz, formatOps, formatSize } from '../../game';
+import { formatEnergy, formatHertz, formatOps, formatSize, formatWatts } from '../../game';
 import type { Amount, EffectPreview } from '../../game';
 
 /**
@@ -95,15 +95,8 @@ export function quantity(n: number, unit: string): string {
   return `${num} ${prefix}${unit}`;
 }
 
-/** Watts, down to the early game's milli-, micro-, nano- and picowatts ("300 µW"), never "0 W" for a real draw. */
-export function watts(w: number): string {
-  const a = Math.abs(w);
-  if (a > 0 && a < 1) {
-    const [scale, prefix] = a >= 1e-3 ? [1e3, 'm'] : a >= 1e-6 ? [1e6, 'µ'] : a >= 1e-9 ? [1e9, 'n'] : [1e12, 'p'];
-    return quantity(w * scale, `${prefix}W`);
-  }
-  return quantity(w, 'W');
-}
+/** Watts: the one shared power string (game `formatWatts`), pW to GW, never "0 W" for a real draw. */
+export const watts = (w: number): string => (Number.isFinite(w) ? formatWatts(w) : '—');
 /** Speeds, sizes and work print through the shared formatters, so one quantity reads the same everywhere. */
 export const hertz = (hz: number) => formatHertz(hz);
 export const bits = (b: number) => formatSize(b);
@@ -118,6 +111,7 @@ export function measureUnit(n: number, unit: EffectPreview['unit']): string {
     case 'bit/s': return bitRate(n);
     case 'Hz': return formatHertz(n);
     case 'J': return formatEnergy(n);
+    case 'W': return watts(n);
     case 'ops': return formatOps(n);
     case 'ops/s': return `${formatOps(n)}/s`;
     default: return COUNTS.has(unit) ? `${Math.round(n)} ${Math.round(n) === 1 ? unit.replace(/s$/, "") : unit}` : quantity(n, unit);
