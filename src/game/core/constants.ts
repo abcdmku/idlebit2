@@ -114,11 +114,11 @@ export const REGIONS: readonly RegionDef[] = [
 ];
 export const DEFAULT_SEED = 0x1d1eb17;
 /**
- * D36: real watts per sim watt. The sim's power, energy and price-per-joule numbers keep their scale (so Credits,
- * heat and every rule are untouched); every view converts at the boundary, so a boot CPU reads microwatts and
- * a late fleet MW to GW. View W = sim W × POWER_SCALE; view J likewise; view Credits/J = sim Credits/J ÷ POWER_SCALE.
+ * D36, D84: real watts per sim watt. The sim's power, energy and price-per-joule numbers keep their scale (so Credits,
+ * heat and every rule are untouched); every view converts at the boundary. D84 anchors a pushed GHz box with a
+ * card near 1 kW, so a typical system reads µW in the Hz era, mW in kHz, W in MHz and about a kW in GHz. View W = sim W × POWER_SCALE; view J likewise; view Credits/J = sim Credits/J ÷ POWER_SCALE.
  */
-export const POWER_SCALE = 1e-6;
+export const POWER_SCALE = 1.4e-10;
 export const viewW = (simW: number): number => simW * POWER_SCALE;
 export const viewPricePerJ = (simPrice: number): number => simPrice / POWER_SCALE;
 

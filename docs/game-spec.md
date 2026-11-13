@@ -145,7 +145,7 @@ Fleet caps are set in `docs/architecture.md` §1.9: 12 servers per rack, 2 then 
 
 | Zoom level | Opened by (research effect) | What the player gets for free |
 |---|---|---|
-| CPU (formerly Chip) | start | One system: socket 1 with package gen 0, one core gen 0 L1 (1 lane), clock gen 0 L1 (1 Hz), CPU cache gen 0 L1 (1 bit). Fixed starter power allocation of 1 view W, raised by the Rack PDU after Rack unlock (D67). No scheduler, RAM, GPU or storage. |
+| CPU (formerly Chip) | start | One system: socket 1 with package gen 0, one core gen 0 L1 (1 lane), clock gen 0 L1 (1 Hz), CPU cache gen 0 L1 (1 bit). Fixed starter power allocation of 1e6 sim W (140 µW shown), raised by the Rack PDU after Rack unlock (D67). No scheduler, RAM, GPU or storage. |
 | System | `view: system` | The same system, now shown as a board. |
 | Rack | `view: rack` | A barebones rack (§13.2) holding the existing system in server slot 1. |
 | Room | `view: room` | A barebones zone holding the existing rack in its first rack slot. |
@@ -463,7 +463,7 @@ A system has no power supply part (D67, D80). Its power is allocated from the ra
 | Capability | Formula |
 |---|---|
 | hardware threads | `Σ cores` (one thread per core; D39 removes SMT) |
-| core rate | `clockHz × clockFactor × η_cfg × e(T)` ops/s (D34: no lanes; a core runs one task thread at a time). Before System the CPU draws a fixed 10 W of sim power (D38); every view shows watts × `POWER_SCALE` (1e-6, D36). `e(T)` is §10.4 (1 before Rack). `clockFactor` is §9.3's product of DVFS, turbo and thermal throttle factors (1 by default). |
+| core rate | `clockHz × clockFactor × η_cfg × e(T)` ops/s (D34: no lanes; a core runs one task thread at a time). Before System the CPU draws a fixed 10 W of sim power (D38); every view shows watts × `POWER_SCALE` (1.4e-10, D36, D84). `e(T)` is §10.4 (1 before Rack). `clockFactor` is §9.3's product of DVFS, turbo and thermal throttle factors (1 by default). |
 | `η_cfg` | `socketFactor(sockets) × dimmFactor(RAM modules)` (program D7.5). `socketFactor` 1, 2, 3, 4 CPUs → 1.00, 0.92, 0.85, 0.78 **(s)**. `dimmFactor` 0–2 modules → 1.00, 3 → 0.95, 4 → 0.90 **(s)**; an `accelerator` board has `dimmFactor = 1` up to 8. The system plate shows `η_cfg`. |
 | `K` (concurrency) | scheduler `K`; 1 with no scheduler |
 | `Q` (queue) | scheduler `Q`; 0 with no scheduler |
@@ -874,7 +874,7 @@ idleW = 0.1 × min(nativeFullW × push^0.25, fullW)
 loadW = fullW - idleW
 ```
 
-CPU `nativeRatio = [10, 6, 3, 2]`, `decay = [0.92, 0.93, 0.95, 0.9625]`. RAM `nativeRatio = [10, 10, 6, 3, 3, 2]`, `decay = [0.92, 0.92, 0.93, 0.95, 0.95, 0.9625]` for SDRAM through DDR5. These are **(s)**. `E` is potential gross per electrical Credit at the fixed home reference tariff, separate from `η_cfg` and `e(T)`. Regions still bill actual watts at their own tariff. The core's installed generation owns its ratio, including with a newer oscillator. Apply no additional generic `push^0.3` penalty and no additional heat division by `E`. `E < 1` warns of normalized operating loss; it never blocks a purchase or automatically shuts down the part.
+CPU `nativeRatio = [10, 6, 6, 6]`, `decay = [0.92, 0.85, 0.92, 0.908]`. RAM `nativeRatio = [10, 10, 6, 6, 6, 6]`, `decay = [0.92, 0.92, 0.93, 0.92, 0.92, 0.908]` for SDRAM through DDR5. These are **(s)**. `E` is potential gross per electrical Credit at the fixed home reference tariff, separate from `η_cfg` and `e(T)`. Regions still bill actual watts at their own tariff. The core's installed generation owns its ratio, including with a newer oscillator. Apply no additional generic `push^0.3` penalty and no additional heat division by `E`. `E < 1` warns of normalized operating loss; it never blocks a purchase or automatically shuts down the part.
 
 Other parts keep their catalog power rule:
 
@@ -890,7 +890,7 @@ actualW = idleW × idleFactor + loadW × u × loadFactor
 ```
 
 - A core's `rate` is its socket's `clockHz` (D34). Its clock's levels therefore raise the core's watts, not the clock's.
-- Generic `wPerUnit` (W per unit/s) **(s)**: GPU 0.5; NPU 0.125; drive IO 1; links 0.01 at 1 kHz under the D18.5 rule (A.3), subject to GPU catalog overrides. CPU/RAM use `E` above. A native core's full-use electrical share is 10%, 16.67%, 33.33% or 50% of potential gross by era, before supply loss and cooling (§9.2, §10.5). Pushed levels increase that share. Actual net income depends on completed tasks, utilization and all supporting hardware.
+- Generic `wPerUnit` (W per unit/s) **(s)**: GPU 0.5; NPU 0.125; drive IO 1; links 0.01 at 1 kHz under the D18.5 rule (A.3), subject to GPU catalog overrides. CPU/RAM use `E` above. A native core's full-use electrical share is 10% of potential gross in the Hz era and 16.67% from kHz on (D84), before supply loss and cooling (§9.2, §10.5). Pushed levels increase that share. Actual net income depends on completed tasks, utilization and all supporting hardware.
 - Watts are game watts and span W to TW; the HUD uses SI prefixes.
 - `x` is the level factor of the part's curve (§12.1).
 - `u` is the part's utilization this tick, in `[0, 1]`.
@@ -935,13 +935,13 @@ lossFraction = loss[g] + lossPerLevel × (L − 1)   // Appendix A; pushing an o
 
 Loss is real power: it is billed and becomes heat in the lump that holds the supply (§10.3). Usage never exceeds 100% (D80), so the former ×3 band above 100% and the red supply tones are removed.
 
-D67: there is no board power-supply component, purchase or loss. The starter system has a fixed 1 view W allocation supplied by its hidden rack's basic PDU. Actual component power is shown on the board. Rack unlock exposes PDU upgrades, which raise that same allocation.
+D67: there is no board power-supply component, purchase or loss. The starter system has a fixed 1e6 sim W allocation (140 µW shown) supplied by its hidden rack's basic PDU. Actual component power is shown on the board. Rack unlock exposes PDU upgrades, which raise that same allocation.
 
-Every installed part allocates its full load against its rack PDU, including offline hardware, peak pipe/network traffic, enabled turbo and rack infrastructure. The starter allocation counts the existing rack parts before the Rack view opens. Cooling allocates its full draw at maximum supported lift. Open rooms carry their racks' allocations on the shared UPS, and open sites on the grid feed: the sum of their zones' allocations plus UPS losses (D79). The allocation is a warning, never a refusal (D82): a purchase whose full load would exceed a PDU, UPS or grid goes through, and its buy key shows Full load X / Y in place of the stat change. The system summary shows Power limit as full-load watts allocated of the supply capacity. Before Rack the system Power label shows the live draw of the power available (528 mW / 1 W); it also shows the whole Credits a minute the draw is billed (site price less the claimed energy discount), or the overload countdown while one runs. Cooling capacity never locks a build.
+Every installed part allocates its full load against its rack PDU, including offline hardware, peak pipe/network traffic, enabled turbo and rack infrastructure. The starter allocation counts the existing rack parts before the Rack view opens. Cooling allocates its full draw at maximum supported lift. Open rooms carry their racks' allocations on the shared UPS, and open sites on the grid feed: the sum of their zones' allocations plus UPS losses (D79). The allocation is a warning, never a refusal (D82): a purchase whose full load would exceed a PDU, UPS or grid goes through, and its buy key shows Full load X / Y in place of the stat change. The system summary shows Power limit as full-load watts allocated of the supply capacity. Before Rack the system Power label shows the live draw of the power available (74 µW / 140 µW); it also shows the whole Credits a minute the draw is billed (site price less the claimed energy discount), or the overload countdown while one runs. Cooling capacity never locks a build.
 
 **Starter supplies (D80).** The UPS and grid limits are checked only from the moment their level opens, and a Rack-era PDU can hold far more than a level 1 UPS: opening Room with a Metered PDU could put a legal build 61× over it. So a zone or site opens with its starter UPS or grid feed raised, free, to the lowest level that carries the allocation it inherits.
 
-Basic PDU capacity starts at 1 view W and doubles per level. Rack research costs 270k Data and 2.7M Credits, with 27M CPU ops of work (D80; 18M before). The seed-42 campaign unlocks Rack at 3:48. No timer grants this access.
+Basic PDU capacity starts at 1e6 sim W (140 µW shown) and doubles per level. Rack research costs 270k Data and 2.7M Credits, with 27M CPU ops of work (D80; 18M before). The seed-42 campaign unlocks Rack at 3:48. No timer grants this access.
 
 **`dualFeed`.** A zone may hold a second UPS. The zone's load splits equally between the two, and the zone's limit is twice the smaller UPS's capacity.
 
@@ -1551,10 +1551,10 @@ Rate parts draw by §9.1 with the `wPerUnit` listed; "idle" is for non-rate part
 | ID | Generations | Gates | Curve | `base` by g | Secondary by g | Watts | `price` by g | `upgrade` by g |
 |---|---|---|---|---|---|---|---|---|
 | `cpu` | Hz, kHz, MHz, GHz package | start, `fabKhz`, `fabMhz`, `fabGhz` | fixed | — | — | idle 0.1, 100, 1e5, 1e8 | 500, 5e4, 2.1e8, 9.3e10 | — |
-| `core` | Hz, kHz, MHz, GHz core | start, `fabKhz`, `fabMhz`, `fabGhz` | fixed, count growth | one thread at the CPU clock | — | hardware energy ratio §9.1; native 10, 6, 3, 2 | 1000, 20834, 71666667, 31666666667 (D51) | no core level upgrades |
+| `core` | Hz, kHz, MHz, GHz core | start, `fabKhz`, `fabMhz`, `fabGhz` | fixed, count growth | one thread at the CPU clock | — | hardware energy ratio §9.1; native 10, 6, 6, 6 | 1000, 20834, 71666667, 31666666667 (D51) | no core level upgrades |
 | `clock` | Hz, kHz, MHz, GHz oscillator | start, `fabKhz`, `fabMhz`, `fabGhz` | clock, 1.5×; L1–36 every generation | Hz 1, 1e3, 1e6, 1e9 | — | idle 0.1, 100, 1e5, 1e8 (core carries the load) | 20, 2e5, 8.6e8, 3.7e11 | 3, 1.5e4, 9e7, 2.4e11 per lane driven; 1.7× per level |
 | `scheduler` | Run queue, Multilevel, Work queue, Cluster runtime | start (D39), `fabKhz`, `fabMhz`, `fabGhz` | linear; max L 4, 2, 2, 1 (D57) | `K` 1, 2, 3, 4 (≤ 32) | `Q` 2, 4, 6, 8 times L, capped at 8 | idle 0.1, 100, 1e5, 1e8 | 1000, 3e5, 4.3e8, 1.9e11 | 100, 1.2e5, 1.5e9, 7.7e12 |
-| `ram` | SDRAM, DDR, DDR2, DDR3, DDR4, DDR5 (per module) | `systemBoard`, `ddr`, `ddr2`, `ddr3`, `ddr4`, `ddr5` | RAM ladder §12.1; bandwidth 1.5×; L1–36, registered ECC capacity ×2 | bits 256, 512, 2^20, 2^30, 2^32, 2^38 | bit/s 16, 32, 3.2e4, 6.4e7, 2.56e8, 1.28e11 | hardware energy ratio §9.1; native 10, 10, 6, 3, 3, 2 | 3e5, 4.5e5, 5e6, 3e10, 5e10, 5e13 | 3e4, 4.5e4, 5e5, 3e9, 5e9, 7.7e12; 1.7× per level |
+| `ram` | SDRAM, DDR, DDR2, DDR3, DDR4, DDR5 (per module) | `systemBoard`, `ddr`, `ddr2`, `ddr3`, `ddr4`, `ddr5` | RAM ladder §12.1; bandwidth 1.5×; L1–36, registered ECC capacity ×2 | bits 256, 512, 2^20, 2^30, 2^32, 2^38 | bit/s 16, 32, 3.2e4, 6.4e7, 2.56e8, 1.28e11 | hardware energy ratio §9.1; native 10, 10, 6, 6, 6, 6 | 3e5, 4.5e5, 5e6, 3e10, 5e10, 5e13 | 3e4, 4.5e4, 5e5, 3e9, 5e9, 7.7e12; 1.7× per level |
 | `gpu` | GSMT generation/type/tier, generations 1..9 | `systemBoard`, then `gpuGen2` through `gpuGen9` | tiers 30→50→60→70→80→90 | cores × tier clock | model VRAM × `vramMult` | tier/model coefficient, §12.6 | exact card value, §12.6 | difference of rounded card values |
 | `npu` | Four explicit legacy rows, g0..3 | `systemBoard`; plus `gpuGen2` / `tensorCores` / `matrixGpu` for g1/2/3 | flow, L1..11+g | ops/s 32, 64000, 128000000, 256000000000 | VRAM bits 64, 524288, 1073741824, 549755813888, × `vramMult` | 0.125 W per op/s, legacy curve | 3000000, 7500000, 45000000000, 75000000000000 | 300000, 750000, 4500000000, 7700000000000 |
 | `storage` | HDD, SSD, NVMe, SCM (per drive): the disk tier (D26) | `systemBoard`, `ssd`, `nvme`, `scm` | flow; capacity and IO 2× per level | bits 2048, 2^24, 2^34, 2^44 | IO bit/s 512, 2,000, 1.6e7, 6.4e10 | drive 1 W per bit/s | 3e5, 5e6, 3e10, 5e13 | 3e4, 5e5, 3e9, 7.7e12 |

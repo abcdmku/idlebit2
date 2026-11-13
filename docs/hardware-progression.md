@@ -55,13 +55,13 @@ rate   = installedLanes × installedRatedClock
 push   = max(1, rate / native)
 a[g]   = -ln(decay[g]) / ln(1.5)
 E      = nativeRatio[g_core] / push^a[g_core]
-nativeRatio = [10, 6, 3, 2]
-decay       = [0.92, 0.93, 0.95, 0.9625]
+nativeRatio = [10, 6, 6, 6]
+decay       = [0.92, 0.85, 0.92, 0.908]
 ```
 
 With native lanes and a matching-generation oscillator, `E = nativeRatio[g] × decay[g]^(L_clock - 1)`. Extra lane levels also increase `push`. Extra cores add their own watts. The oscillator does not carry the cores' load a second time.
 
-Hz cores and RAM retain the source's decay. **Departure (lead ruling, 25 Oct, D29):** the kHz **core** decays 0.85 per pushed level instead of the source's 0.93. It keeps kHz compute climbing across the System era so the 100 kHz pipe wall lands near Rack (D29): with 0.93 a single kHz core stays economic to about 266k ops/s and the clock (15–60 s per level at the CSV prices) races to the pipe within 20 min of the kHz package; with 0.85 a kHz core turns uneconomic near 18k ops/s, so compute grows with the Data-gated core count (2, 4, 8). The CSV's prices and clocks are unchanged, and kHz-era RAM (DDR2) keeps 0.93. MHz/GHz use 0.95/0.9625 **(s)** instead of the source's 0.94/0.96 to place operating loss near L23/L20 under the user's latest roughly-30-to-20 target. These are adopted balance values, not claims about the source cells.
+Hz cores and RAM retain the source's decay. **Departure (lead ruling, 25 Oct, D29):** the kHz **core** decays 0.85 per pushed level instead of the source's 0.93. It keeps kHz compute climbing across the System era so the 100 kHz pipe wall lands near Rack (D29): with 0.93 a single kHz core stays economic to about 266k ops/s and the clock (15–60 s per level at the CSV prices) races to the pipe within 20 min of the kHz package; with 0.85 a kHz core turns uneconomic near 18k ops/s, so compute grows with the Data-gated core count (2, 4, 8). The CSV's prices and clocks are unchanged, and kHz-era RAM (DDR2) keeps 0.93. **D84 (owner, 13 Nov):** watts per op no longer worsen after kHz, so MHz and GHz keep the kHz native ratio 6 (was 3 and 2) and decay 0.92/0.908 per pushed level (was 0.95/0.9625). That keeps operating loss at L23/L20, the user's roughly-30-to-20 target, while a native MHz or GHz part bills a third to half of what it did. These are adopted balance values, not claims about the source cells.
 
 **The core generation owns this ratio.** Putting a new clock on old cores does not grant the new cores' native ratio. `push` still compares against those old cores' native lanes and clock. Research completion alone never changes installed parts' generation.
 
@@ -90,8 +90,8 @@ The following is an isolated, fully used core with native lanes, at the home pri
 |---|---:|---:|---:|
 | Hz | 10.00% | L26 → L27 | L29 |
 | kHz | 16.67% | L23 → L24 | L26 |
-| MHz | 33.33% | L20 → L21 | L23 |
-| GHz | 50.00% | L17 → L18 | L20 |
+| MHz | 16.67% | L20 → L21 | L23 |
+| GHz | 16.67% | L17 → L18 | L20 |
 
 An upgrade loses marginal payback before the hardware's entire operation becomes loss-making. These are separate warnings. In this reference case, operational break-even is `E = 1`, and `E < 1` means the electrical bill alone exceeds gross potential. By L36 every era is loss-making, but L35 → L36 is still a valid purchase. Supply losses, cooling, configuration, tariffs and utilization can move the actual loss earlier. Efficiency research can delay it. These thresholds are balance checks, not action gates.
 
@@ -122,9 +122,9 @@ capacityFactor = [1, 2, 4, 6, 8, 12, 16, 20, 24, 28, 32, 40,
 | SDRAM | Hz | 10 | 0.92 |
 | DDR | Hz | 10 | 0.92 |
 | DDR2 | kHz | 6 | 0.93 |
-| DDR3 | MHz | 3 | 0.95 |
-| DDR4 | MHz | 3 | 0.95 |
-| DDR5 | GHz | 2 | 0.9625 |
+| DDR3 | MHz | 6 | 0.92 |
+| DDR4 | MHz | 6 | 0.92 |
+| DDR5 | GHz | 6 | 0.908 |
 
 Mapping SDRAM/DDR and DDR3/DDR4 to a shared era preserves existing technology research while applying the four energy eras. These mappings are **(s)**. At L36 a module has 3,072× native capacity and 1,456,109.606050× native bandwidth. Registered ECC has 6,144× native capacity at the same level and bandwidth. ECC's existing 1.1× watts and low-voltage RAM's 0.7× watts remain separate modifiers. Without them or supporting costs, RAM's normalized first operating-loss levels follow the era table above.
 

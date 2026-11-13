@@ -54,9 +54,10 @@ export function rateWatts(wPerUnit: number, native: number, rate: number): Watts
   return { idle: IDLE_SHARE * wPerUnit * native * push ** 0.25, load: wPerUnit * rate * push ** 0.3 };
 }
 
-/** Energy eras (hardware-progression.md §3): native ratio and per-level retention, Hz, kHz, MHz, GHz. */
-export const NATIVE_RATIO: readonly number[] = [10, 6, 3, 2];
-export const RATIO_DECAY: readonly number[] = [0.92, 0.93, 0.95, 0.9625];
+/** Energy eras (hardware-progression.md §3): native ratio and per-level retention, Hz, kHz, MHz, GHz. D84: flat from kHz on. */
+export const NATIVE_RATIO: readonly number[] = [10, 6, 6, 6];
+// D84: MHz and GHz decay faster from the flat ratio 6, so a pushed part still turns uneconomic at L23 and L20.
+export const RATIO_DECAY: readonly number[] = [0.92, 0.93, 0.92, 0.908];
 /** The fixed normalization price of the energy ratio, Credits per joule. */
 export const RATIO_REFERENCE_PRICE = 0.01;
 

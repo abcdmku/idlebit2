@@ -20,7 +20,7 @@ export const CORE: CatalogRow = {
   id: 'core', scope: 'chip', names: TIERS.map((t) => `${t} core`), gates: FAB, curve: 'fixed', levelMax: 1,
   // hardware-progression.md §3: the core generation owns the energy ratio. Departure (§3, D29): the kHz core decays
   // 0.85 per pushed level (CSV 0.93), so kHz compute climbs across the System era and meets the 100 kHz pipe near Rack.
-  base: [1, 1, 1, 1], watts: { kind: 'ratio', era: [0, 1, 2, 3], decay: [0.92, 0.85, 0.95, 0.9625] },
+  base: [1, 1, 1, 1], watts: { kind: 'ratio', era: [0, 1, 2, 3], decay: [0.92, 0.85, 0.92, 0.908] },
   // User, 27 Oct: shift the whole core curve down sixfold; retain count growth and round up Credits.
   price: [1000, 20_834, 71_666_667, 31_666_666_667], upgrade: [0, 0, 0, 0], };
 export const CLOCK: CatalogRow = {

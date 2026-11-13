@@ -14,7 +14,8 @@ export interface GpuEnergyCalibration {
 }
 export const GPU_ENERGY: GpuEnergyCalibration = Object.freeze({
   baseW: 18,
-  eraScale: [1, 2, 3] as const,
+  // D84: watts per op stay flat across eras (was 1, 2, 3).
+  eraScale: [1, 1, 1] as const,
 });
 
 /** Technology is supplied by the caller, including generation-specific tensor eligibility. */

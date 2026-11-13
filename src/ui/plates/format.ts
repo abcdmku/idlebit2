@@ -95,11 +95,11 @@ export function quantity(n: number, unit: string): string {
   return `${num} ${prefix}${unit}`;
 }
 
-/** Watts, down to the early game's milli-, micro- and nanowatts ("300 µW"), never "0 W" for a real draw. */
+/** Watts, down to the early game's milli-, micro-, nano- and picowatts ("300 µW"), never "0 W" for a real draw. */
 export function watts(w: number): string {
   const a = Math.abs(w);
   if (a > 0 && a < 1) {
-    const [scale, prefix] = a >= 1e-3 ? [1e3, 'm'] : a >= 1e-6 ? [1e6, 'µ'] : [1e9, 'n'];
+    const [scale, prefix] = a >= 1e-3 ? [1e3, 'm'] : a >= 1e-6 ? [1e6, 'µ'] : a >= 1e-9 ? [1e9, 'n'] : [1e12, 'p'];
     return quantity(w * scale, `${prefix}W`);
   }
   return quantity(w, 'W');

@@ -55,7 +55,8 @@ Subtract the already-rounded whole card values. Rounding each incremental differ
 There is no push exponent. Let `era = floor((g-1)/3)` and type energy factor be `0.88` for type 9, `0.96` for type 7, otherwise `1`:
 
 ```text
-coefficient = 18 × [1,2,3][era] × typeEnergy × 100/(100+k)
+coefficient = 18 × [1,1,1][era] × typeEnergy   // D84: was [1,2,3]
+            × 100/(100+k)
 loadW       = coefficient × ops/s
 idleHalf    = 0.05 × coefficient × ops/s
 idleW       = idleHalf × (1 + hbmIdleFactor)
