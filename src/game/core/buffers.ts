@@ -148,18 +148,20 @@ const START_HOT = { powered: { t: 'u8', fill: 1 }, wakeTicks: i32, ctlBusy: f64,
 export const RACK_HOT = {
   ...LUMP, eff: { t: 'f64', fill: 1 }, effClock: f64, throttled: u8,
   pduUsage: f64,
+  /** Consecutive ticks the supply delivered more than its capacity; past OVERLOAD_TRIP_TICKS it trips (phys/power.ts). */
+  overTicks: i32,
   nextDue: { t: 'f64', fill: Infinity }, dirty: u8, freeSlots: u16, admitted: u32, estS: f64, researchRate: f64,
   ...ROUTER_HOT, wrr: { t: 'f64', stride: SERVERS_PER_RACK },
   /** D31.3: Power control battery charge (J), unbilled draw left this round. */
   ...START_HOT, batteryJ: f64,
 } as const satisfies Layout;
 export const ROOM_HOT = {
-  ...LUMP, upsUsage: { t: 'f64', stride: MAX_UPS },
+  ...LUMP, upsUsage: { t: 'f64', stride: MAX_UPS }, overTicks: i32,
   freeSlots: u32, admitted: u32, estS: f64, ...ROUTER_HOT, wrr: { t: 'f64', stride: RACKS_PER_ROOM },
   ...START_HOT,
 } as const satisfies Layout;
 export const SITE_HOT = {
-  drawW: f64, gridUsage: f64,
+  drawW: f64, gridUsage: f64, overTicks: i32,
   freeSlots: u32, admitted: u32, estS: f64, ...ROUTER_HOT, wrr: { t: 'f64', stride: MAX_ZONES_PER_SITE },
   /** D31.4: generation output used this tick (W). */
   ...START_HOT, genUsedW: f64,
@@ -259,8 +261,8 @@ export const RING_HOT = {
 export const G = {
   /** The queue front: taken work returned to the market (spec §5.2), a record list. */
   frontHead: 0, frontTail: 1, frontLen: 2, transitCount: 3, nextTaskId: 4, rngDraws: 5, met: 6, failed: 7,
-  /** failByCause: G.fail + FAIL_CAUSES index (5 slots, 8..12). */
-  fail: 8, running: 13, researchOps: 14, recFree: 15, parentFree: 16,
+  /** Slots 8..12 are free (failByCause moved to the end when `power` returned, D82). */
+  running: 13, researchOps: 14, recFree: 15, parentFree: 16,
   /** Round SLA sums in ops (spec §4.2). */
   deliveredWork: 17, globalCursor: 18, globalRouted: 19, utilityW: 20, onlineThreads: 21, busyThreads: 22,
   /** Live rows in rec / parent (core/pool). */
@@ -299,8 +301,10 @@ export const G = {
   roundFromBattery: 48, roundBatteryRefill: 49, roundFromGeneration: 50, roundFuel: 51,
   /** D33: the last tick a task was met this round (-1 none; the round start counts as one). */
   lastMetTick: 52,
+  /** failByCause: G.fail + FAIL_CAUSES index (the last FAIL_CAUSES.length slots). */
+  fail: 53,
 } as const;
-export const G_SIZE = 53;
+export const G_SIZE = 53 + FAIL_CAUSES.length;
 
 export interface CompiledBuffers {
   readonly sys: Table<typeof SYS_COMPILED>;

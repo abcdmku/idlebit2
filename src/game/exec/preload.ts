@@ -46,7 +46,11 @@ export function takePreload(w: World, s: number, r: number, tau: number, span: S
   syncPreload(w, s);
 }
 
-/** Bounded preparation. Every loader pays one CPU op per cache bit on its own physical core. */
+/**
+ * Bounded preparation. Every loader pays one CPU op per cache bit on its own physical core.
+ * Cache goes to prepared tasks in queue order: while one holds less than its goal, no later task is given any. Two
+ * part-loaded tasks could otherwise fill the cache between them, and with nothing running neither could ever start.
+ */
 export function prepareQueued(w: World, s: number, tau: number, span: Span): boolean {
   const c = w.compiled.sys, h = w.hot.sys, rec = w.hot.rec;
   if (c.Q[s] === 0) return false;
@@ -56,9 +60,10 @@ export function prepareQueued(w: World, s: number, tau: number, span: Span): boo
   let active = activeLoaders(w, s), prepared = 0, changed = false;
   for (let r = h.queueHead[s]!; r >= 0; r = rec.next[r]!) if (rec.preloadBits[r]! > 0) prepared++;
   for (let r = h.queueHead[s]!; r >= 0 && active < limit; r = rec.next[r]!) {
-    if (rec.count[r] !== 1 || rec.loaderThread[r]! >= 0) continue;
-    if (rec.preloadBits[r] === 0 && prepared >= c.preloadTargets[s]!) continue;
+    if (rec.count[r] !== 1) continue;
     const goal = Math.min(c.cacheBits[s]!, workingSetOf(shapeOf(rec.family[r]!), rec.units[r]!));
+    if (rec.loaderThread[r]! >= 0) { if (rec.preloadBits[r]! < goal) break; continue; }
+    if (rec.preloadBits[r] === 0 && prepared >= c.preloadTargets[s]!) continue;
     if (goal <= rec.preloadDone[r]!) continue;
     const thread = freeThread(w, s);
     if (thread < 0) break;
@@ -66,7 +71,11 @@ export function prepareQueued(w: World, s: number, tau: number, span: Span): boo
     useWorkspace(w, s, r);
     if (goal - rec.preloadBits[r]! > c.cacheBits[s]! - h.usedCache[s]!) evictWorkspace(w, s);
     const extra = Math.min(Math.max(0, goal - rec.preloadBits[r]!), Math.max(0, c.cacheBits[s]! - h.usedCache[s]!));
-    if (rec.preloadBits[r]! + extra <= rec.preloadDone[r]!) { if (wasEmpty && rec.preloadBits[r]! > 0) prepared++; continue; }
+    if (rec.preloadBits[r]! + extra <= rec.preloadDone[r]!) {
+      if (wasEmpty && rec.preloadBits[r]! > 0) prepared++;
+      if (rec.preloadBits[r]! > 0) break;
+      continue;
+    }
     rec.preloadBits[r] = rec.preloadBits[r]! + extra;
     h.usedCache[s] = h.usedCache[s]! + extra;
     rec.loaderThread[r] = thread;
@@ -75,6 +84,7 @@ export function prepareQueued(w: World, s: number, tau: number, span: Span): boo
     h.busyThreads[s] = h.busyThreads[s]! + 1;
     w.hot.g[G.busyThreads] = w.hot.g[G.busyThreads]! + 1;
     active++; if (wasEmpty) prepared++; changed = true;
+    if (rec.preloadBits[r]! < goal) break;
   }
   syncPreload(w, s);
   return changed;

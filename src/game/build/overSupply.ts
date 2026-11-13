@@ -1,11 +1,14 @@
 import { viewW } from '../core/constants';
 import type { BuildState } from '../types/build';
-import type { LockReason, OverSupply } from '../types/quotes';
+import type { OverSupply } from '../types/quotes';
 import type { GameState } from '../types/state';
-import { researchId } from '../types/ids';
 import { rackPowerBudget, roomPowerBudget, sitePowerBudget } from './powerBudget';
 
-/** Hard installation limits at every supply: rack PDU, zone UPS and site grid. Reducing an excessive reservation remains possible. */
+/**
+ * The supply a build could overload: its full-load watts would exceed a rack PDU, zone UPS or site grid.
+ * A warning on the quote, never a refusal: the purchase goes through, and the supply trips if the real draw
+ * stays over its capacity for more than 10 s (phys/power.ts).
+ */
 export function overSupply(state: GameState, after: BuildState): OverSupply | null {
   const before = state.build, u = state.research.unlocks;
   const racks = new Set<number>(), rooms = new Set<number>(), sites = new Set<number>();
@@ -54,10 +57,4 @@ export function overSupply(state: GameState, after: BuildState): OverSupply | nu
     }
   }
   return null;
-}
-
-export function powerLock(state: GameState, over: OverSupply): LockReason {
-  const starter = over.part === 'pdu' && !state.research.unlocks.levels.rack;
-  return { code: 'power', node: starter ? researchId('rack') : null,
-    text: starter ? 'Power limit · unlock Rack' : 'Power limit · upgrade ' + (over.part === 'grid' ? 'Grid' : over.part === 'ups' ? 'UPS' : 'Rack PDU') };
 }

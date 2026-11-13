@@ -2,7 +2,7 @@ import type { ReactNode } from 'react';
 import { type Amount, type Currency, type Quote, type ResearchId } from '../../game';
 import { CoinIcon, GemIcon, LockIcon } from './icons';
 import { wholeText } from './format';
-import { purchaseGain, purchaseReason } from './purchaseText';
+import { overloadWarning, purchaseGain, purchaseReason } from './purchaseText';
 
 /* The plate language (mockup core/plate.js): head, status and bar, lines, list, keys, port grid, toggle, choices. */
 
@@ -94,10 +94,9 @@ export function QuoteKey({ quote, label, detail, tone = '', researchName, onActi
     </button>;
   }
   const gain = detail ?? purchaseGain(quote);
-  const noPower = !!quote.overSupply || quote.locked?.code === 'power';
-  const shownLabel = noPower ? "Can't upgrade" : quote.gpu && typeof label === 'string' ? `${label} · ${quote.gpu.after.cores} ${quote.gpu.after.cores === 1 ? 'core' : 'cores'}` : label;
+  const shownLabel = quote.gpu && typeof label === 'string' ? `${label} · ${quote.gpu.after.cores} ${quote.gpu.after.cores === 1 ? 'core' : 'cores'}` : label;
   const cold = quote.cold && quote.downtimeMs > 0 ? Math.ceil(quote.downtimeMs / 1000) + 's offline' : '';
-  const shown = (quote.locked || quote.overSupply) ? why : [gain, cold].filter(Boolean).join(' · ') || why;
+  const shown = quote.locked ? why : overloadWarning(quote) || [gain, cold].filter(Boolean).join(' · ') || why;
   return <Key tone={tone} label={shownLabel} price={quote.locked && quote.cost === '0' ? null : { cost: quote.cost, currency: quote.currency }} detail={shown || undefined}
     ariaLabel={[ariaLabel ?? (typeof shownLabel === 'string' ? shownLabel : quote.label), purchaseGain(quote), why, cold].filter(Boolean).join('. ')}
     disabled={!!why} purchase={quote} onPress={() => onAction(quote)} />;

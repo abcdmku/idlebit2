@@ -3,7 +3,7 @@
 // part. Phone: one-line tags on the board beside each part. Values are snapshot fields, formatted.
 import { formatHertz, formatSize, formatWatts } from '../../../game';
 import type { SystemSnapshot } from '../../../game';
-import { P, R, whole } from '../../core';
+import { P, R, payoutCount, whole } from '../../core';
 import type { LabelWriter, Rect, WorldForm, WorldFrame } from '../../core';
 import { siteRect } from './layout';
 import type { BoardLayout } from './layout';
@@ -159,6 +159,11 @@ export function writeLabels(s: SystemSnapshot, frame: WorldFrame, out: LabelWrit
   const powerY = BOARD.y - BOARD.z - Math.ceil(24 / (frame.scale ?? 2));
   if (!frame.visible || frame.visible.y <= powerY) out.label('power-use', BOARD.x + 50, powerY).text('Power', 'name', true).text(formatWatts(s.drawW), 'power');
   else out.label('power-use', b.save.x - 4, BOARD.y - 2, 'right').text(formatWatts(s.drawW), 'power');
+  // Before Rack this board is all its supply feeds: the draw reads against the power available.
+  if (!s.power.rackOpen && s.power.capacityW > 0) out.text('/ ' + formatWatts(s.power.capacityW), s.drawW > s.power.capacityW ? 'fault' : 'mute');
+  // An overload's deadline takes the cost's place; else what the draw is billed, so a falling balance has a number beside it.
+  if (s.power.overloadS != null) out.text('Overload ' + Math.ceil(s.power.overloadS) + 's', 'fault');
+  else if (s.energyPerMinute) out.text('−' + payoutCount(s.energyPerMinute) + '/min', 'gold');
   const form = frame.form;
   if (form === 'phone') return;
   for (const it of partLabels(s, form, firstRow(frame))) {

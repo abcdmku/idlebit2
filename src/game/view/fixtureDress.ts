@@ -139,7 +139,7 @@ function dressMarket(hot: HotBuffers, o: DressOptions): void {
   }
   hot.g[G.met] = 412; hot.g[G.failed] = 23; hot.g[G.taken] = 437; hot.g[G.dismissed] = 4;
   hot.g[G.deliveredWork] = 41_200; hot.g[G.failedWork] = 2_300;
-  hot.g[G.fail] = 9; hot.g[G.fail + 1] = 8; hot.g[G.fail + 2] = 3; hot.g[G.fail + 3] = 2; hot.g[G.fail + 5] = 1;
+  hot.g[G.fail] = 9; hot.g[G.fail + 1] = 8; hot.g[G.fail + 2] = 3; hot.g[G.fail + 3] = 2;
   hot.g[G.transitCount] = 2;
   hot.g[G.researchOps] = 3;
 }
@@ -165,8 +165,8 @@ export function fixtureReport(index: number, durationTicks: number): RoundReport
   return {
     byType: [{ type: 'compute', metWork: 128_400, failedWork: 27_500, dismissed: 4 }],
     index, startTick: 0, endedBy: 'sla', durationTicks, durationMs: durationTicks * TICK_MS, met: 1_284,
-    failedByCause: { timeout: 190, cantRun: 61, misroute: 12, swap: 3, late: 0 },
-    failDetail: { timeout: 'link', cantRun: 'ram', misroute: 'cache', swap: 'cold', late: null },
+    failedByCause: { timeout: 190, cantRun: 61, misroute: 12, swap: 3, late: 0, power: 0 },
+    failDetail: { timeout: 'link', cantRun: 'ram', misroute: 'cache', swap: 'cold', late: null, power: null },
     details: [{ cause: 'timeout', detail: 'link', count: 150 }, { cause: 'cantRun', detail: 'ram', count: 61 }],
     peakIntensity: 6.4, frontier: { priorBest: 5.8, priorBestRound: 2, priorBestMet: 1_100, runwayStart: null, runwayEnd: null }, dismissed: 4, deliveredWork: 128_400, failedWork: 27_500, spill: { ramWork: 0, diskWork: 0 }, gross: amount(18_420), data: amount(212), energy: amount(1_310), net: amount(17_110), researchOps: 48_000,
     energyBreakdown: { billed: amount(1_310), fromBattery: amount(0), batteryRefill: amount(0), fromGeneration: amount(0), fuel: amount(0) },

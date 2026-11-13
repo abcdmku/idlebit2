@@ -35,7 +35,7 @@ import { installedGpuStats } from './gpu';
 import { planInstallGpu } from './gpuPlans';
 import { planDowngrade } from './maintenance';
 import { gpuPowerPreview } from './gpuPower';
-import { overSupply, powerLock } from './overSupply';
+import { overSupply } from './overSupply';
 import { planRamEcc } from './eccPlans';
 
 /**
@@ -160,7 +160,7 @@ export function toQuote(state: GameState, action: GameAction, plan: Plan, effect
     action, label: plan.label, cost, currency, affordable: price <= 0n || amountCompare(wallet, cost) >= 0,
     ...(plan.ok && (action.type === 'downgradePart' || action.type === 'removePart' || action.type === 'removeUnit')
       ? { refund: amount(investmentChange(state.build, plan.change.build, plan.change.price, action).refund.toString()) } : {}),
-    locked: warning.overSupply ? powerLock(state, warning.overSupply) : plan.ok ? null : plan.lock ?? { code: plan.code === 'occupied' ? 'occupied' : plan.code === 'roundState' ? 'roundState' : 'fit', node: null, text: plan.reason },
+    locked: plan.ok ? null : plan.lock ?? { code: plan.code === 'occupied' ? 'occupied' : plan.code === 'roundState' ? 'roundState' : 'fit', node: null, text: plan.reason },
     cold, downtimeMs: cold && state.round.phase === 'running' ? state.research.unlocks.bootTicks * TICK_MS : 0,
     effect: shownEffect, workOps: null, ...gpuMetadata(state, action, plan), ...warning,
   };

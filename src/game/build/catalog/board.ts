@@ -8,6 +8,8 @@ import type { CatalogRow } from './types';
 export const RAM_CAPACITY_FACTOR: readonly number[] = [1, 2, 4, 6, 8, 12, 16, 20, 24, 28, 32, 40, 48, 56, 64, 80, 96, 112,
   128, 160, 192, 224, 256, 320, 384, 448, 512, 640, 768, 896, 1024, 1280, 1536, 1792, 2048, 3072];
 
+/** RAM draws a tenth of what its era ratio gives a core at the same rate: compute is the expensive part (owner, 12 Nov). */
+export const RAM_WATT_SCALE = 0.1;
 /**
  * base = bits, base2 = bandwidth bit/s (the rated rate). The CSV progression (hardware-progression.md §4):
  * 36 levels, capacity by RAM_CAPACITY_FACTOR, bandwidth ×1.5 and price ×1.7 per level, energy ratio by era.
@@ -18,7 +20,7 @@ export const RAM: CatalogRow = {
   gates: [r('systemBoard'), r('ddr'), r('ddr2'), r('ddr3'), r('ddr4'), r('ddr5')], curve: 'step',
   // SDRAM and DDR hold the System era's data-heavy working sets (tens of kbit) at mid levels, before E decays into loss.
   base: [256, 512, 2 ** 20, 2 ** 30, 2 ** 32, 2 ** 38], base2: [16, 32, 3.2e4, 6.4e7, 2.56e8, 1.28e11],
-  capacityTable: RAM_CAPACITY_FACTOR, watts: { kind: 'ratio', era: [0, 0, 1, 2, 2, 3] },
+  capacityTable: RAM_CAPACITY_FACTOR, watts: { kind: 'ratio', era: [0, 0, 1, 2, 2, 3], scale: RAM_WATT_SCALE },
   price: [3e5, 4.5e5, 5e6, 3e10, 5e10, 5e13], upgrade: [3e4, 4.5e4, 5e5, 3e9, 5e9, 7.7e12], };
 /** GPU metadata for generation adapters. Model evaluation owns specs and prices. */
 export const GPU: CatalogRow = {

@@ -1,5 +1,5 @@
 import type { Quote, ResearchId } from '../../game';
-import { bitRate, bits, measureUnit, ops } from './format';
+import { bitRate, bits, measureUnit, ops, watts } from './format';
 
 /** The component's resulting stats, kept within the existing two-line buy key. */
 export function purchaseGain(q: Quote): string {
@@ -27,8 +27,11 @@ export function resultingSpecs(q: Quote): string {
   return [measureUnit(e.capacityAfter, e.unit), e.throughputAfter !== undefined ? bitRate(e.throughputAfter) : ''].filter(Boolean).join(' · ');
 }
 
+/** The purchase is allowed, but at full load it draws more than its supply carries: 10 s over and the supply trips. */
+export const overloadWarning = (q: Quote): string =>
+  q.overSupply ? `Full load ${watts(q.overSupply.afterW)} / ${watts(q.overSupply.capW)}` : '';
+
 export function purchaseReason(q: Quote, researchName?: (id: ResearchId) => string): string | null {
-  if (q.overSupply || q.locked?.code === 'power') return 'No available power';
   const lock = q.locked;
   if (lock?.code === 'research' && lock.node) return `Needs ${researchName?.(lock.node) ?? lock.text.replace(/^Needs /, '')}`;
   if (lock) return lock.text === 'Max' ? 'Max level' : lock.text;

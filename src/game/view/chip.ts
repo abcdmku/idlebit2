@@ -16,6 +16,7 @@ import { spilledOutOfCache } from './memory';
 import { PART_LOAD_CACHE } from '../exec/memory';
 import { FAMILIES } from '../market/families';
 import { preloadForRecord, preloadView } from './preload';
+import { selectQueueHold } from './systemQueue';
 
 const cstateOf = (v: number | undefined): CoreView['cstate'] => v === 1 ? 1 : 0;
 const genOpen = (state: GameState, part: PartId, gen = 0): boolean => ((state.research.unlocks.gens[part] ?? 0) & (1 << gen)) !== 0;
@@ -142,6 +143,7 @@ export function chipSnapshot(state: GameState, id: SystemId, parent: NodeRef | n
     generation: sched.gen, level: sched.level, strategy: QUEUE_STRATEGY_IDS[c.strategy[id] ?? 0] ?? sched.strategy,
     q: c.Q[id] ?? 0, queued: h.queueLen[id] ?? 0, k: c.K[id] ?? 0, running: h.running[id] ?? 0, reserved: h.reserved[id] ?? 0,
     optimization: sched.optimization ?? 'utilization', batching: sched.batching ?? false, preparation, batchSavedBits: h.batchSavedBits[id] ?? 0,
+    hold: selectQueueHold(state, id),
   } : null;
   const queued: number[] = [];
   if (scheduler) {

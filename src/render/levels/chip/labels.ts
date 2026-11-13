@@ -5,7 +5,7 @@
 import { formatHertz, formatSize } from '../../../game';
 import { formatCredits } from '../../../game/format';
 import { familyId } from '../../../game';
-import type { ChipSnapshot } from '../../../game';
+import type { ChipSnapshot, QueueHoldView } from '../../../game';
 import { familyName, whole } from '../../core';
 import type { LabelWriter, ViewPresentation, WorldFrame, WorldForm } from '../../core';
 import { PHONE_TYPE, typeForScale } from '../../core';
@@ -13,7 +13,16 @@ import { arrangementOf, coreSites, coreText } from './layout';
 import { coreActivityText, coreActivityTone, coreSleep, labelFits, readySpeedText, tileLabelFits } from './speed';
 import { chipFloor, isLive, lentCore, queueOpen, siteCount, spilledOut } from './world';
 
-const CORE_NAMES = Array.from({ length: 32 }, (_, i) => `Core ${i + 1}`);
+function queueHoldText(hold: QueueHoldView): string {
+  switch (hold.reason) {
+    case 'loading': return 'Loading cache';
+    case 'cores': return `Needs ${hold.coresWanted} cores`;
+    case 'cache': return 'Cache full';
+    case 'memory': return 'Memory full';
+    case 'device': return 'GPU busy';
+  }
+}
+const CORE_NAMES =Array.from({ length: 32 }, (_, i) => `Core ${i + 1}`);
 const LABEL_IDS = Array.from({ length: 32 }, (_, i) => `core${i}`);
 /** The add-core quote among the tray quotes the UI holds: its price text and whether it is affordable now, or null. */
 export function addCorePrice(view: ViewPresentation | null | undefined, chip: ChipSnapshot): { readonly text: string; readonly affordable: boolean } | null {
@@ -30,6 +39,8 @@ export function chipLabels(chip: ChipSnapshot, frame: WorldFrame, out: LabelWrit
   const sc = chip.scheduler;
   if (sc) {
     out.label('queue', f.queue.x + pad, f.queue.y + 3).text('Queue', 'name', true).text(`${whole(live ? sc.queued : 0)} / ${whole(sc.q)}`, 'value');
+    // Free cores with a waiting queue read as a fault unless the queue says what the next task waits for.
+    if (live && sc.hold) out.text(`· ${queueHoldText(sc.hold)}`, sc.hold.reason === 'loading' ? 'preload' : 'warn');
   }
   else if (queueOpen(chip) && !view?.sourceActions?.includes('queue')) out.label('queue', f.queue.x + pad, f.queue.y + 3).text('Queue', 'dim', true).text('none', 'dim');
   if (!view?.sourceActions?.includes('cache')) {

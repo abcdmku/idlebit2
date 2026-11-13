@@ -59,7 +59,7 @@ function siteView(state: GameState, regionIndex: number, site: number): SiteView
   return {
     siteId: siteId(site), region: region.id, open: c.opened[site] === 1,
     online: containerMode(state, c.alive[site], c.intent[site], probe), zones, timerS: probeTimerS(state, probe),
-    grid: supplyView('grid', b.grid, { capacityW: c.gridCapW[site] ?? 0, usage: h.gridUsage[site] ?? 0, loss: c.gridLoss[site] ?? 0 }, region.energyPrice),
+    grid: supplyView('grid', b.grid, { capacityW: c.gridCapW[site] ?? 0, usage: h.gridUsage[site] ?? 0, loss: c.gridLoss[site] ?? 0, overTicks: h.overTicks[site] }, region.energyPrice),
     dataPlane: {
       generation: b.dataPlane.gen, bitsPerSec: c.dpSpeed[site] || ladderHz(b.dataPlane.k),
       latencyMs: (c.dpLatencyTicks[site] ?? 0) * TICK_MS, active: dpActive,

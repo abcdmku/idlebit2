@@ -1,4 +1,5 @@
 import { supplyPreparation, supplyResearch } from '../build/supplyRecovery';
+import { overSupply } from '../build/overSupply';
 import { marketResearchCpuEnergy } from '../build/researchEnergy';
 import { POWER_SCALE } from '../core/constants';
 import { capacity } from '../build/catalog/curves';
@@ -502,9 +503,11 @@ function gpuImproves(q: Quote): boolean {
       || after.idleW + after.loadW < before.idleW + before.loadW);
 }
 
+/** The bot never builds past a supply's full-load allocation: the game allows it, and the supply trips (D82). */
 function tryAction(state: GameState, action: GameAction): GameState | null {
   const out = applyAction(state, action);
-  return out.ok ? out.state : null;
+  if (!out.ok || out.state.build !== state.build && overSupply(state, out.state.build)) return null;
+  return out.state;
 }
 
 /**
@@ -720,7 +723,7 @@ function supplyResearchPath(state: GameState, byId: ReadonlyMap<string, Research
   }
   for (const request of candidateRequests(state)) for (const q of quote(state, request).quotes) {
     if ((q.locked && q.locked.code !== 'power') || !q.affordable || !q.overSupply || score(state, q) === null) continue;
-    const node = q.locked?.node ?? supplyResearch(state, q);
+    const node = q.locked?.node ?? (q.overSupply.part === 'pdu' && !state.research.unlocks.levels.rack ? 'rack' : supplyResearch(state, q));
     if (node) add(node);
   }
   if (state.research.unlocks.levels.rack) add('rackVarSpeed');

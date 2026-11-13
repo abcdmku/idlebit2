@@ -2,9 +2,11 @@ import { secondsToTicks } from '../core/constants';
 
 /* Phys starting values (spec §9, §10, Appendix B). Durations are whole ticks. */
 
-/** Supply loss multiplier (spec §9.2, D4.3): ×1 up to 90% usage, ×1.5 above. No legal build exceeds 100%. */
+/** Supply loss multiplier (spec §9.2, D4.3): ×1 up to 90% usage, ×1.5 above. */
 export const SUPPLY_BAND = 0.9;
 export const SUPPLY_MULT_HIGH = 1.5;
+/** Overload deadline: a supply delivering more than its capacity for longer than this trips (spec §9.2). */
+export const OVERLOAD_TRIP_TICKS = secondsToTicks(10);
 
 /** C-states (spec §9.3): idle factor, ticks idle before it applies, wake latency in ticks. */
 export const CSTATES = [

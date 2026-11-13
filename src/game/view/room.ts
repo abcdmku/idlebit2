@@ -34,7 +34,7 @@ export function roomUps(state: GameState, room: number): SupplyView[] {
   const c = state.compiled.room, h = state.hot.room;
   return b.ups.map((part, u) => {
     const i = room * MAX_UPS + u;
-    return supplyView('ups', part, { capacityW: c.upsCapW[i] ?? 0, usage: h.upsUsage[i] ?? 0, loss: c.upsLoss[i] ?? 0 }, siteEnergyPrice(state, c.site[room] ?? 0));
+    return supplyView('ups', part, { capacityW: c.upsCapW[i] ?? 0, usage: h.upsUsage[i] ?? 0, loss: c.upsLoss[i] ?? 0, overTicks: h.overTicks[room] }, siteEnergyPrice(state, c.site[room] ?? 0));
   });
 }
 

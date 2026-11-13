@@ -130,7 +130,7 @@ Mapping SDRAM/DDR and DDR3/DDR4 to a shared era preserves existing technology re
 
 Bandwidth is bit/s, not a separate CPU clock. Crossing the next RAM technology's bandwidth or capacity never disables upgrades on the old module. Dual/quad-channel and board rules keep their current effects. Low-voltage RAM remains worth buying because it lowers watts without altering the memory capacity gate.
 
-RAM earns no independent payout. Its normalized energy ratio prices memory work. Actual revenue still arrives only when complete tasks pay. A capacity increase can admit a new task family without creating an equal speed or revenue increase. Idle-heavy and capacity-heavy fleets must be checked using their real utilization.
+RAM earns no independent payout. Its normalized energy ratio prices memory work, and its watts are then a tenth of that (`RAM_WATT_SCALE`, D82): memory is cheap to run beside compute. Actual revenue still arrives only when complete tasks pay. A capacity increase can admit a new task family without creating an equal speed or revenue increase. Idle-heavy and capacity-heavy fleets must be checked using their real utilization.
 
 ## 5. Purchases and research
 

@@ -1,5 +1,6 @@
 import { ACCEL_CLOCKS } from '../core/constants';
 import { viewW } from '../core/constants';
+import { OVERLOAD_TRIP_TICKS } from '../phys/constants';
 import type { CompiledBuffers, HotBuffers } from '../core/buffers';
 import { HOME_TEMP_F, MAX_ZONES_PER_SITE, RACKS_PER_ROOM, REGIONS, SERVERS_PER_RACK, TICK_MS } from '../core/constants';
 import { MODE } from '../core/timers';
@@ -128,14 +129,18 @@ export const probeTimerS = (state: GameState, probe: number): number | null => (
 /** 1-2-5 ladder (spec §7.3): speed(k) = [1, 2, 5][k mod 3] × 10^(3 + floor(k / 3)) bit/s. */
 export const ladderHz = (k: number): number => [1, 2, 5][k % 3]! * 10 ** (3 + Math.floor(k / 3));
 
-export interface SupplyNumbers { readonly capacityW: number; readonly usage: number; readonly loss: number }
+/** Seconds left on a supply's overload deadline (phys/power.ts), or null while it is within capacity. */
+export const overloadS = (overTicks: number | undefined): number | null =>
+  overTicks && overTicks > 0 ? Math.max(0, OVERLOAD_TRIP_TICKS + 1 - overTicks) * TICK_MS / 1000 : null;
+
+export interface SupplyNumbers { readonly capacityW: number; readonly usage: number; readonly loss: number; readonly overTicks?: number }
 export function supplyView(kind: SupplyKind, part: PartLevel, n: SupplyNumbers, energyPrice: number): SupplyView {
   const deliveredW = n.usage * n.capacityW;
   const lossW = deliveredW * n.loss;
   return {
     kind, generation: part.gen, level: part.level, capacityW: viewW(n.capacityW), deliveredW: viewW(deliveredW), usage: n.usage,
     loss: n.loss, lossW: viewW(lossW),
-    creditsPerMinute: (deliveredW + lossW) * energyPrice * 60, };
+    creditsPerMinute: (deliveredW + lossW) * energyPrice * 60, overloadS: overloadS(n.overTicks), };
 }
 
 

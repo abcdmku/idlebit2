@@ -1,5 +1,3 @@
-import { reject } from '../core/actions';
-import { overSupply, powerLock } from './overSupply';
 import { amount } from '../amount';
 import { debitCredits } from '../core/actions';
 import { MODE, restingMode, setUnitMode, startTransition } from '../core/timers';
@@ -41,8 +39,6 @@ export function systemsUnder(build: BuildState, unit: UnitRef): number[] {
  * relinquished hardware. Only newly installed systems boot; existing systems stay live.
  */
 export function commitBuild(state: GameState, change: BuildChange, action?: GameAction): ActionOutcome {
-  const over = overSupply(state, change.build);
-  if (over) return reject(state, 'cap', powerLock(state, over).text);
   let next = state;
   if (change.price > 0n) {
     const paid = debitCredits(state, amount(change.price.toString()));

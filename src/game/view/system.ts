@@ -10,7 +10,8 @@ import type { SystemSnapshot } from '../types/snapshot';
 import type { GameState } from '../types/state';
 import type { BuildSlotView, PartView, PartViewKind } from '../types/views';
 import { chipSnapshot, chipStatic, cpuCountOf, type ChipStatic } from './chip';
-import { modeName, systemTimerS, ticksToS } from './common';
+import { modeName, siteEnergyPrice, systemTimerS, ticksToS } from './common';
+import { roundRewardBonuses } from '../rewards/bonuses';
 import { inboundTransfer } from './flows';
 import { queuedTasks, runningTasks } from './tasks';
 import { acceleratorView } from './accelerators';
@@ -103,6 +104,7 @@ export function systemSnapshot(state: GameState, id: SystemId, parent: NodeRef |
     used: { memory: (h.usedCache[id] ?? 0) + (h.usedRam[id] ?? 0), vram: h.usedVram[id] ?? 0, storage: h.usedDisk[id] ?? 0 },
     memory: { tiers: memoryTiers(state, id) },
     drawW: viewW(h.drawW[id] ?? 0),
+    energyPerMinute: Math.floor((h.drawW[id] ?? 0) * siteEnergyPrice(state, c.site[id] ?? 0) * 60 * (100 - roundRewardBonuses(state.roundRewards.claimed).energyPercent) / 100),
     saveable: state.research.unlocks.rules.includes('configSave'),
     slots: st.slots,
     inbound: inboundTransfer(state, id),

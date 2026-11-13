@@ -179,6 +179,13 @@ export interface SchedulerView {
   readonly preparation?: { readonly taskId: number; readonly family: FamilyId; readonly loadedBits: number; readonly targetBits: number;
     readonly requiredCores: number; readonly availableCores: number; readonly active: boolean } | null;
   readonly batchSavedBits?: number;
+  /** Why no queued task starts while a core is free; null when one can start, every core is busy or the queue is empty. */
+  readonly hold?: QueueHoldView | null;
+}
+/** What the next queued task waits for: its cache load, `coresWanted` free cores at once, cache or memory room, or its GPU. */
+export interface QueueHoldView {
+  readonly reason: 'loading' | 'cores' | 'cache' | 'memory' | 'device';
+  readonly coresWanted: number;
 }
 export interface ChipSnapshot {
   readonly level: 'chip';
@@ -247,6 +254,8 @@ export interface SystemSnapshot {
   /** D26.7: the hierarchy, cache, RAM, disk in that order (always three; capacity 0 for a tier the system lacks). */
   readonly memory: { readonly tiers: readonly MemTierView[] };
   readonly drawW: number;
+  /** Whole Credits a minute this draw is billed at now: the site price, less the claimed energy discount. */
+  readonly energyPerMinute?: number;
   readonly saveable: boolean;
   readonly slots: readonly BuildSlotView[];
   /** D25: the front shard on the system's port (the pipe before Rack), or null. Same as `chip.pipe.transfer`. */

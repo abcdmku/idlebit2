@@ -5,7 +5,7 @@ import type { FamilyId, RackId, ResearchId, RoomId, SiteId, SystemId } from './i
  * that kills work. Power and heat never fail a task (spec §9.2, §10.7). A distributed task records the root cause of the member loss.
  * Index in FAIL_CAUSES = the u8 stored in buffers and tallies.
  */
-export const FAIL_CAUSES = ['timeout', 'cantRun', 'misroute', 'swap', 'late'] as const;
+export const FAIL_CAUSES = ['timeout', 'cantRun', 'misroute', 'swap', 'late', 'power'] as const;
 export type FailCause = (typeof FAIL_CAUSES)[number];
 export type FailCounts = Readonly<Record<FailCause, number>>;
 

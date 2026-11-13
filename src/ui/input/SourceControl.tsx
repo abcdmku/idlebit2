@@ -130,8 +130,8 @@ export function SourceControl({ target }: { target: HitTarget }) {
   const detail = research ? needs.toLowerCase() === model.name.toLowerCase() ? 'Research' : `Research ${needs}` : disabled ? reason : gain;
   // A price not yet met is the price itself, dimmed: the part still says what the purchase gives.
   // Only a real lock (power, research, a ceiling) takes the gain's line.
-  const short = !!reason && !q.locked && !q.overSupply;
-  const shown = disabled && !short ? q.overSupply || q.locked?.code === 'power' ? 'No power' : detail : research ? detail : gain;
+  const short = !!reason && !q.locked;
+  const shown = disabled && !short ? detail : research ? detail : gain;
   return <div ref={ref} className={`source-control source-${model.kind}${compute ? ' source-compute' : ''}`} data-source-control={target.id}>
     <button type="button" className={`source-buy${short ? ' short' : ''}`} disabled={disabled} data-source-action={target.id} data-qa-target
       data-purchase-action={!research && !model.choice ? JSON.stringify(q.action) : undefined}

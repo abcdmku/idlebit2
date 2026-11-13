@@ -89,7 +89,7 @@ export function rackSnapshot(state: GameState, id: RackId, parent: NodeRef | nul
     throttled: (h.throttled[id] ?? 0) === 1,
     cooler: coolerView(c, h, id, b.cooler, rackSurroundF(state, id)),
     pdu: { reservedW: viewW(rackPowerBudget(state.build, id, state.research.unlocks).reserved), ...supplyView('pdu', b.pdu, {
-      capacityW: c.pduCapW[id] ?? 0, usage: h.pduUsage[id] ?? 0, loss: c.pduLoss[id] ?? 0,
+      capacityW: c.pduCapW[id] ?? 0, usage: h.pduUsage[id] ?? 0, loss: c.pduLoss[id] ?? 0, overTicks: h.overTicks[id],
     }, siteEnergyPrice(state, state.compiled.room.site[c.room[id] ?? 0] ?? 0)) },
     lb: lbView(state, b.lb, { kind: 0, id, strategy: c.lbStrategy[id] ?? 0, filters: c.lbFilters[id] ?? 0, routed: h.lbRouted[id] ?? 0, last: h.lbLast[id] ?? -1 }),
     switch: sw, powerCtl: powerCtlView(state, id), powerCtlLocked: !genUnlocked(state.research.unlocks, 'powerCtl', 0), servers,

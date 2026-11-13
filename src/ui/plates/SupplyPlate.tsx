@@ -12,7 +12,8 @@ const TITLE: Readonly<Record<SupplyView['kind'], string>> = { pdu: 'PDU', ups: '
 export function supplyLines(s: SupplyView): Line[] {
   const lines: Line[] = s.reservedW === undefined ? [] : [{ text: `Allocated ${watts(s.reservedW)} / ${watts(s.capacityW)} · full load`, tone: 'muted' }];
 
-  if (s.usage > 0.9) lines.push({ text: 'Over 90%: heat ×1.5', tone: 'warn' });
+  if (s.overloadS != null) lines.push({ text: 'Overload · fails in ' + Math.ceil(s.overloadS) + 's', tone: 'warn' });
+  else if (s.usage > 0.9) lines.push({ text: 'Over 90%: heat ×1.5', tone: 'warn' });
   lines.push({ text: `Loss ${percent(s.loss)} · ${watts(s.lossW)} of heat`, tone: 'muted' });
   return lines;
 }

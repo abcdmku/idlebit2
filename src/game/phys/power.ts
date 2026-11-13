@@ -3,7 +3,10 @@ import { DT_S, MAX_UPS } from '../core/constants';
 import { MODE, setUnitMode } from '../core/timers';
 import { touchSystem } from '../core/touch';
 import type { World } from '../core/world';
-import { CSTATES, S3_AFTER_TICKS, S3_WAKE_TICKS } from './constants';
+import { CSTATES, OVERLOAD_TRIP_TICKS, S3_AFTER_TICKS, S3_WAKE_TICKS } from './constants';
+import { RACKS_PER_ROOM, SERVERS_PER_RACK, MAX_ZONES_PER_SITE } from '../core/constants';
+import { startTransition } from '../core/timers';
+import { killSystem } from '../exec/kill';
 import { DRAW_NONE, drawKind, publishClockFactor, systemDraw, thermalDuty, updateCState, updatePStates } from './draw';
 import { billSite, billUtility, linkWatts, routerW, sitePrice } from './energy';
 import { generationFuelShare, siteGenerationW } from './start';
@@ -15,8 +18,8 @@ import { supplyLossW, supplyMultiplier, supplyUsage } from './supplies';
 /**
  * Power phase (tick step 8, spec §9): bottom up, systems → rack PDUs → zone UPSs → site grids.
  * Draws use the switches and temperatures from the start of the tick and the cooler watts the
- * previous heat step set. Everything is billed for this tick. Supplies never overload: every
- * purchase is refused at the PDU, UPS and grid limits (spec §9.2).
+ * previous heat step set. Everything is billed for this tick. A supply over its capacity for more
+ * than 10 s trips after billing: its systems lose their work and restart cold (spec §9.2, D82).
  *
  * Systems are event-driven (powerCache.ts): only a system whose inputs or rack context changed,
  * or whose last step was not a fixed point, runs its step; the others keep their contribution.
@@ -50,12 +53,14 @@ export function powerPhase(w: World): void {
   const roomIn = scratch('roomIn', c.room.len), roomHeat = scratch('roomHeat', c.room.len), roomAny = scratch('roomAny', c.room.len);
   // D31.3: watts each room's racks drew from their batteries this tick (not billed).
   const roomBat = scratch('roomBat', c.room.len), roundOn = w.round.phase === 'running';
+  // Racks to trip once this tick is billed: a supply over its capacity for more than 10 s.
+  let trips: number[] | null = null;
   {
     // Columns hoisted: one load each for the whole loop.
     const cr = c.rack, hr = h.rack;
     const alive = cr.alive, roomOf = cr.room, openedOf = cr.opened, pduCapW = cr.pduCapW, pduLoss = cr.pduLoss;
     const lbIdleW = cr.lbIdleW, battery = hr.batteryJ, rackPowered = hr.powered;
-    const coolerWOf = hr.coolerW, tempF = hr.tempF, drawW = hr.drawW, pduUsage = hr.pduUsage, heatW = hr.heatW;
+    const coolerWOf = hr.coolerW, tempF = hr.tempF, drawW = hr.drawW, pduUsage = hr.pduUsage, heatW = hr.heatW, overRack = hr.overTicks;
     const rackAny = k.rackAny, rackIn = k.rackIn, rackDuty = k.rackDuty, linkRack = links.rack;
     for (let r = 0; r < cr.len; r += 1) {
       if (alive[r] !== 1) continue;
@@ -76,6 +81,9 @@ export function powerPhase(w: World): void {
       const loss = cap > 0 ? delivered * pduLoss[r]! * supplyMultiplier(usage) : 0;
       drawW[r] = delivered;
       pduUsage[r] = usage;
+      // The starter rack's PDU limits its board before the Rack view opens too.
+      overRack[r] = pduCapW[r]! > 0 && delivered > pduCapW[r]! ? overRack[r]! + 1 : 0;
+      if (overRack[r]! > OVERLOAD_TRIP_TICKS) (trips ??= []).push(r);
       // D31.3: while the round runs and the rack is powered, its PDU input comes from the battery first.
       const charge = battery[r]!;
       if (roundOn && charge > 0 && rackPowered[r] === 1 && delivered + loss > 0) {
@@ -103,6 +111,10 @@ export function powerPhase(w: World): void {
     const delivered = roomIn[m]! + networkW + coolerW;
     const loss = opened ? upsStep(w, m, delivered, settings) : 0;
     h.room.drawW[m] = delivered;
+    let upsOver = false;
+    for (let i = 0; opened && i < Math.min(MAX_UPS, settings.upsCount[m]!); i += 1) upsOver ||= h.room.upsUsage[m * MAX_UPS + i]! > 1;
+    h.room.overTicks[m] = upsOver ? h.room.overTicks[m]! + 1 : 0;
+    if (h.room.overTicks[m]! > OVERLOAD_TRIP_TICKS) for (let i = 0; i < RACKS_PER_ROOM; i += 1) { const r = c.room.racks[m * RACKS_PER_ROOM + i]!; if (r >= 0) (trips ??= []).push(r); }
     h.room.heatW[m] = opened ? roomHeat[m]! + networkW + loss : 0;
     siteIn[site] = siteIn[site]! + delivered + loss;
     // Battery watts skip the UPS loss on their share too.
@@ -122,9 +134,33 @@ export function powerPhase(w: World): void {
     const loss = cap > 0 ? supplyLossW(delivered, cap, c.site.gridLoss[s]!) : 0;
     h.site.drawW[s] = delivered;
     h.site.gridUsage[s] = supplyUsage(delivered, cap);
+    h.site.overTicks[s] = h.site.gridUsage[s]! > 1 ? h.site.overTicks[s]! + 1 : 0;
+    if (h.site.overTicks[s]! > OVERLOAD_TRIP_TICKS) {
+      for (let z = 0; z < MAX_ZONES_PER_SITE; z += 1) {
+        const m = c.site.zones[s * MAX_ZONES_PER_SITE + z]!;
+        for (let i = 0; m >= 0 && i < RACKS_PER_ROOM; i += 1) { const r = c.room.racks[m * RACKS_PER_ROOM + i]!; if (r >= 0) (trips ??= []).push(r); }
+      }
+    }
     billSiteInput(w, s, delivered, loss, siteBat[s]!);
   }
   billUtility(w, links.utility, anyPowered);
+  if (trips) for (const r of trips) tripRack(w, r);
+}
+
+/**
+ * A tripped supply cuts power to every drawing system below it: their work fails with `power` and they
+ * restart cold (one boot time). The overload timers of the rack, its zone and its site start again.
+ */
+function tripRack(w: World, r: number): void {
+  const c = w.compiled, h = w.hot;
+  for (let k = 0; k < SERVERS_PER_RACK; k += 1) {
+    const s = c.rack.servers[r * SERVERS_PER_RACK + k]!;
+    if (s < 0 || c.sys.alive[s] !== 1 || !(h.sys.drawW[s]! > 0)) continue;
+    killSystem(w, s, 'power');
+    startTransition(w, s, 'cold');
+  }
+  const m = c.rack.room[r]!;
+  h.rack.overTicks[r] = 0; h.room.overTicks[m] = 0; h.site.overTicks[c.room.site[m]!] = 0;
 }
 
 /**

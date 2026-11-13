@@ -78,6 +78,8 @@ export interface PowerBudgetView {
   readonly rackReservedW: number;
   readonly capacityW: number;
   readonly rackOpen: boolean;
+  /** Seconds until an overloaded supply above this system trips (rack PDU, zone UPS, site grid), else null. */
+  readonly overloadS?: number | null;
 }
 
 export interface SupplyView {
@@ -93,6 +95,8 @@ export interface SupplyView {
   readonly lossW: number;
   /** Credits per minute of its delivered watts plus loss at the region's price, float64; display only ("<1" or whole). */
   readonly creditsPerMinute: number;
+  /** Seconds until this overloaded supply trips, else null. */
+  readonly overloadS?: number | null;
 }
 
 export interface PortView {

@@ -2045,3 +2045,15 @@ The PDU research copy now reads "far more capacity"; the old "×4 capacity per C
 ## D81, 12 Nov: cache hint placement and affordability colors
 
 The cache upgrade hint shares the heading's text row, above the usage meter. Insufficient currency uses the same red in every menu, including component plates, GPU choices, task fixes and research. Direct hardware prices and add labels use one neutral grey. Affordable prices retain their currency colors. Affordability comes from the quoted wallet check, independently of other reasons a control is disabled.
+
+## D82, 12 Nov: overload returns as a 10 s trip, visible power, cheap RAM
+
+Owner direction after playing D80 on a phone. It reverses D79 item 3 and D80 items 1 and 6 where they refuse purchases; the rest of D80 stands.
+
+1. **Purchases are never refused for power.** The full-load allocation (D79) is a warning on the quote (`overSupply`), shown on the buy key as Full load X / Y. `commitBuild` no longer rejects, and the `Power limit` lock is gone.
+2. **Overload trip.** A rack PDU, zone UPS or site grid that delivers more than its capacity for longer than 10 s (`OVERLOAD_TRIP_TICKS`) trips: every drawing system below it fails its work with the restored `power` cause and restarts cold for one boot time. New hot columns `rack/room/site.overTicks`. No failed-supply state, reboot timer, ride-through, capping or `dark` mode returns. A scripted run that bought two CPUs past a 1 W starter PDU tripped at 10.1 s, failed 15 tasks and ended the round on SLA.
+3. **Visible power.** Before Rack the system Power label reads draw / available. It also shows the Credits a minute the draw is billed, in the shell's three-figure currency form, or the overload countdown. The system summary row is Power limit: allocated of capacity. Supply plates show the countdown.
+4. **RAM draws a tenth** (`RAM_WATT_SCALE = 0.1` on its era ratio): compute is the expensive part. At SDRAM speed level 16 a module's full-use draw falls from 245 kW to 24.5 kW (sim watts), beside 499 kW for the 10-core CPU the bot owns at that point. Drives are unchanged.
+5. **Queue.** While a core is free and nothing queued can start, the chip Queue label names the wait. Cache preparation hands out cache in queue order, so two part-loaded tasks can no longer fill the cache and stall the system until the 120 s round stall (reproduced: 1,036 ticks).
+6. **Bot.** The campaign bot still never builds past a full-load allocation (`tryAction` checks `overSupply`). Seed 42 reaches Rack at 3:45 with no `power` failures.
+7. **Save.** `SAVE_VERSION` is 39 and older saves reset. `G.fail` moved to the end of the global scalars: a sixth cause would otherwise overwrite `G.running`. The QA stages must be rebuilt (`node scripts/qa/fixtures/build.mjs`).

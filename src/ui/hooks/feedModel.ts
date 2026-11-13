@@ -5,7 +5,7 @@ import type { FailCause, FailDetail, FamilyId, QueueEntryView, TaskRef } from '.
 import { OUTAGE_TEXT, taskBits } from './taskRequirements';
 
 export const CAUSE_NAME: Readonly<Record<FailCause, string>> = {
-  timeout: 'Timed out', cantRun: "Can't run", misroute: 'Misrouted', swap: 'Interrupted', late: 'Late',
+  timeout: 'Timed out', cantRun: "Can't run", misroute: 'Misrouted', swap: 'Interrupted', late: 'Late', power: 'Power lost',
 };
 const DETAIL_WORD: Readonly<Partial<Record<FailDetail, string>>> = {
   ram: 'RAM', gpu: 'GPU', gpuCores: 'GPU cores', vram: 'VRAM', ecc: 'ECC', cold: 'hardware change', offline: 'taken offline',

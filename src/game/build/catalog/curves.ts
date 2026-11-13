@@ -83,7 +83,8 @@ export function partWatts(row: CatalogRow, g: number, level: number, rate?: { ra
   switch (w.kind) {
     case 'ratio': {
       const era = w.era[g] ?? 0;
-      return rate ? ratioWatts(era, rate.native, rate.rate, w.decay) : ratioWatts(era, ratedRate(row, g, 1), ratedRate(row, g, level), w.decay);
+      const r = rate ? ratioWatts(era, rate.native, rate.rate, w.decay) : ratioWatts(era, ratedRate(row, g, 1), ratedRate(row, g, level), w.decay);
+      return w.scale === undefined ? r : { idle: r.idle * w.scale, load: r.load * w.scale };
     }
     case 'idle': return { idle: (w.idle[g] ?? 0) * x ** 0.25, load: 0 };
     case 'cooler': {
