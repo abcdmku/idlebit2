@@ -13,6 +13,8 @@ import { arrangementOf, coreSites, coreText } from './layout';
 import { coreActivityText, coreActivityTone, coreSleep, labelFits, readySpeedText, tileLabelFits } from './speed';
 import { chipFloor, isLive, lentCore, queueOpen, siteCount, spilledOut } from './world';
 
+const NEEDS: Readonly<Record<string, string>> = { cache: 'cache', ram: 'RAM', disk: 'disk', gpu: 'GPU', vram: 'VRAM', gpuCores: 'GPU cores',
+  ecc: 'ECC', members: 'servers', zones: 'zones', region: 'a region' };
 function queueHoldText(hold: QueueHoldView): string {
   switch (hold.reason) {
     case 'loading': return 'Loading cache';
@@ -20,6 +22,11 @@ function queueHoldText(hold: QueueHoldView): string {
     case 'cache': return 'Cache full';
     case 'memory': return 'Memory full';
     case 'device': return 'GPU busy';
+    case 'needs': return `Next task needs ${NEEDS[hold.detail ?? 'cold'] ?? 'hardware'}`;
+    case 'research': return 'Research is next';
+    case 'transfer': return `Input ${Math.ceil(hold.seconds ?? 0)}s`;
+    case 'link': return 'No input link';
+    case 'router': return 'Router full';
   }
 }
 const CORE_NAMES =Array.from({ length: 32 }, (_, i) => `Core ${i + 1}`);
@@ -40,7 +47,7 @@ export function chipLabels(chip: ChipSnapshot, frame: WorldFrame, out: LabelWrit
   if (sc) {
     out.label('queue', f.queue.x + pad, f.queue.y + 3).text('Queue', 'name', true).text(`${whole(live ? sc.queued : 0)} / ${whole(sc.q)}`, 'value');
     // Free cores with a waiting queue read as a fault unless the queue says what the next task waits for.
-    if (live && sc.hold) out.text(`· ${queueHoldText(sc.hold)}`, sc.hold.reason === 'loading' ? 'preload' : 'warn');
+    if (live && sc.hold) out.text(`· ${queueHoldText(sc.hold)}`, sc.hold.reason === 'loading' ? 'preload' : sc.hold.reason === 'transfer' ? 'net' : sc.hold.reason === 'research' ? 'rnd' : 'warn');
   }
   else if (queueOpen(chip) && !view?.sourceActions?.includes('queue')) out.label('queue', f.queue.x + pad, f.queue.y + 3).text('Queue', 'dim', true).text('none', 'dim');
   if (!view?.sourceActions?.includes('cache')) {

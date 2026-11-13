@@ -182,10 +182,17 @@ export interface SchedulerView {
   /** Why no queued task starts while a core is free; null when one can start, every core is busy or the queue is empty. */
   readonly hold?: QueueHoldView | null;
 }
-/** What the next queued task waits for: its cache load, `coresWanted` free cores at once, cache or memory room, or its GPU. */
+/**
+ * Why free cores have nothing to start. A queued task waits for its cache load, `coresWanted` free cores at once,
+ * cache or memory room, or its GPU. Or nothing startable is queued and the market head is not arriving: it needs
+ * hardware no system has (`detail`), the research task is first in line, its input is still transferring
+ * (`seconds` left), there is no input link, or the router's queue is full.
+ */
 export interface QueueHoldView {
-  readonly reason: 'loading' | 'cores' | 'cache' | 'memory' | 'device';
+  readonly reason: 'loading' | 'cores' | 'cache' | 'memory' | 'device' | 'needs' | 'research' | 'transfer' | 'link' | 'router';
   readonly coresWanted: number;
+  readonly detail?: FailDetail | null;
+  readonly seconds?: number;
 }
 export interface ChipSnapshot {
   readonly level: 'chip';

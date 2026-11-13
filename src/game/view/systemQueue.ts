@@ -12,6 +12,11 @@ import type { SystemId } from '../types/ids';
 import type { SystemQueueTaskView } from '../types/views';
 import { QUEUE_STRATEGY_IDS } from '../types/catalog';
 import { preloadForRecord } from './preload';
+import { G } from '../core/buffers';
+import { detailIndex } from '../market/fleet';
+import { FAIL_DETAILS } from '../types/events';
+import { fleetGates } from './capability';
+import { pickupWait } from './pickup';
 
 /**
  * Why system s starts no queued task although a core is free, read from the same checks the scheduler makes
@@ -19,10 +24,13 @@ import { preloadForRecord } from './preload';
  */
 export function selectQueueHold(state: GameState, s: number): QueueHoldView | null {
   const w = state as unknown as World, rec = state.hot.rec, h = state.hot.sys, c = state.compiled.sys;
-  if (state.round.phase !== 'running' || !runsTasks(h.mode[s]!) || !(h.queueLen[s]! > 0)) return null;
+  if (state.round.phase !== 'running' || !runsTasks(h.mode[s]!)) return null;
   const strategy = strategyOf(w, s), free = c.threads[s]! - h.busyThreads[s]!;
   if (!strategy.timeSlice && free <= 0) return null;
-  if (h.running[s]! >= keffOf(w, s) - (h.researchThreads[s]! > 0 ? 1 : 0) || strategy.pickQueue(w, s) >= 0) return null;
+  if (h.running[s]! >= keffOf(w, s) - (h.researchThreads[s]! > 0 ? 1 : 0)) return null;
+  // Nothing queued: the wait is upstream, at the market head.
+  if (!(h.queueLen[s]! > 0)) return pickupHold(state, s);
+  if (strategy.pickQueue(w, s) >= 0) return null;
   let r = h.queueHead[s]!;
   for (let q = rec.next[r]!; q >= 0; q = rec.next[q]!)
     if (rec.taken[q]! < rec.taken[r]! || rec.taken[q] === rec.taken[r] && rec.taskId[q]! < rec.taskId[r]!) r = q;
@@ -35,6 +43,24 @@ export function selectQueueHold(state: GameState, s: number): QueueHoldView | nu
   else if (workingSetOf(shape, units) - rec.preloadBits[r]! > freeHierarchy(w, s))
     reason = c.ramCap[s]! + c.storageCap[s]! > 0 || c.diskNode[s]! >= 0 ? 'memory' : 'cache';
   return { reason, coresWanted };
+}
+
+/** Why the market head is not arriving at an idle system, or null when it is on its way or there is none. */
+function pickupHold(state: GameState, s: number): QueueHoldView | null {
+  const hot = state.hot, front = hot.g[G.frontHead] ?? -1, next = state.market.window[0];
+  const family = front >= 0 ? hot.rec.family[front]! : next?.family, size = front >= 0 ? hot.rec.units[front]! : next?.size;
+  const def = family === undefined ? undefined : FAMILIES[family];
+  if (!def || size === undefined) return null;
+  const hold = (reason: QueueHoldView['reason'], more: Partial<QueueHoldView> = {}): QueueHoldView => ({ reason, coresWanted: 0, ...more });
+  const wait = pickupWait(state, def, size);
+  if (wait === 'research') return hold('research');
+  const gate = fleetGates(state)(def, size);
+  if (gate !== 0) return hold('needs', { detail: FAIL_DETAILS[detailIndex(gate)] ?? null });
+  if (wait === 'link') return hold('link');
+  if (wait === 'routerQueue') return hold('router');
+  // The lone system's pipe carries one transfer at a time; a second or more left is worth naming.
+  const speed = state.compiled.sys.pipeSpeed[s] ?? 0, left = hot.sys.pipeRec[s]! >= 0 && speed > 0 ? hot.sys.pipeLeft[s]! / speed : 0;
+  return wait === 'transfer' && left >= 1 ? hold('transfer', { seconds: left }) : null;
 }
 
 /** The hardware queue, in admission order. Market offers are a separate list. Pure, lazy reads. */
