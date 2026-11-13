@@ -255,7 +255,8 @@ b, .b { font-weight: 700; }
 .first-buy.short { color: var(--currency-short); }
 
 /* D90 live rates: one body-size line; each figure keeps its cell so the line never shifts as values change. */
-.rates-line { display: flex; flex-wrap: wrap; align-items: center; gap: 0 8px; margin: 0; min-height: var(--lh); white-space: nowrap; }
-.rates-line > span { display: inline-flex; align-items: center; gap: 3px; }
-.rates-line > .gold, .rates-line > .bad, .rates-line > .data { min-width: 64px; }
-.wallet-body > .rates-line { grid-column: 1 / -1; margin-bottom: 8px; }
+.rates-line { position: absolute; box-sizing: border-box; display: flex; align-items: center; gap: 8px; margin: 0; line-height: var(--lh); white-space: nowrap; }
+.rates-line > span { display: inline-flex; align-items: center; gap: 3px; min-width: 72px; }
+.rates-line > span:last-child { margin-left: auto; min-width: 0; }
+/* Portrait: the line lies over the world's foot, so it takes the notice line's backing. */
+.band:not(.side) .rates-line { background: #100c22ed; padding-inline: 4px; }

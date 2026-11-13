@@ -60,6 +60,8 @@ interface Common {
   readonly endKey: Rect;
   /** Data over Credits, right-aligned. */
   readonly wallet: Rect;
+  /** D90: the live rates line, on phones: over the world's foot on the bottom bar (portrait), under the band (landscape). Desktop sets its rates beside the wallet and level name. */
+  readonly rates: Rect | null;
   /** The pipe leaves the strip under the head's icon, drops to `pipeRunY`, then runs to the level's entry. */
   readonly pipeSrc: { readonly x: number; readonly y: number };
   readonly pipeRunY: number;
@@ -98,12 +100,12 @@ export function shellLayout(vw: number, vh: number, safe: SafeInsets = NO_INSETS
   return phone(aw, ah, safe);
 }
 
-/** Notices: the gutter above the desktop deck, just above the compact phone bar, or the landscape gutter between the card and the menu keys. */
+/** Notices: the gutter above the desktop deck, above the rates line on the compact phone bar, or the landscape gutter between the card and the menu keys. */
 export function nowRows(L: ShellLayout): {
   readonly notice: number;
 } {
   // Desktop: the line ends on the deck's top edge and stays on the 8 px grid (a 24 px line reaches 8 px over the world's foot).
-  return { notice: L.kind === 'desktop' ? -Math.max(DECK_GAP, L.lh) : hasTaskDock(L) ? -24 : L.settings.y - L.now.y - L.lh };
+  return { notice: L.kind === 'desktop' ? -Math.max(DECK_GAP, L.lh) : hasTaskDock(L) ? -32 : L.settings.y - L.now.y - L.lh };
 }
 
 /**
@@ -112,15 +114,16 @@ export function nowRows(L: ShellLayout): {
  */
 function landscape(aw: number, ah: number, safe: SafeInsets): PhoneLayout {
   const U = 8, W = snap8(aw), H = snap8(ah), x = safe.left + Math.floor((aw - W) / 2), y = safe.top;
-  // The band, as on a portrait phone: the ladder with Data over Credits, then SLA and End round.
-  const rungRow = 48, band = r(U, U, LANDSCAPE_COLUMN_W, rungRow + 48), band0 = rungs(band, rungRow, 0);
+  // The band, as on a portrait phone: the ladder with Data over Credits, SLA and End round, then the rates line,
+  // which takes what was the gutter between the band and the market.
+  const rungRow = 48, band = r(U, U, LANDSCAPE_COLUMN_W, rungRow + 48 + 16), band0 = rungs(band, rungRow, 0);
   const walletX = band0[4].x + band0[4].w + 8, endW = 64;
   // The column's four groups (band, market, task card, menu keys) stand one 16 px gutter apart; the gutter under the
   // card carries the notice line. A screen too short for that closes up to 8 px and sets the market on the band.
   const roomy = H >= 368, gap = roomy ? 16 : U;
   // The market keeps its two-line cards while the column has the height; a shorter screen gets the compact strip.
   const stripH = H >= 384 ? 72 : 48, cardW = stripH > 48 ? band.w / 2 : 200;
-  const strip = r(U, band.y + band.h + (roomy ? gap : 0), band.w, stripH), headSlot = r(U, strip.y, stripH > 48 ? band.w / 2 : 160, stripH);
+  const strip = r(U, band.y + band.h, band.w, stripH), headSlot = r(U, strip.y, stripH > 48 ? band.w / 2 : 160, stripH);
   const card = (i: number) => r(headSlot.x + headSlot.w + i * cardW, strip.y, cardW, stripH);
   // The menu keys sit on the bottom edge and the task card on them; a taller screen leaves the slack under the strip.
   const menu = r(U, H - U - KEY_H, band.w, KEY_H), below = strip.y + strip.h + gap;
@@ -132,7 +135,7 @@ function landscape(aw: number, ah: number, safe: SafeInsets): PhoneLayout {
     lab: r(view.x + U, U, view.w - 2 * U, H - 2 * U),
     rungs: band0, rungRow, rungLabel: r(walletX, band.y, 0, rungRow),
     sla: r(band.x, band.y + rungRow, band.w - endW - U, 48), endKey: r(band.x + band.w - endW, band.y + rungRow, endW, 48),
-    wallet: r(walletX, band.y, band.x + band.w - walletX, rungRow),
+    wallet: r(walletX, band.y, band.x + band.w - walletX, rungRow), rates: r(band.x, band.y + rungRow + 48, band.w, 16),
     // The pipe leaves the strip's right end, climbs the world's left edge and runs along its top into the entry.
     pipeSrc: { x: view.x, y: strip.y + strip.h / 2 }, pipeRunY: 4,
     calloutBounds: inset(view, 8), callout: { w: Math.min(288, view.w - 16), h: 104 } };
@@ -185,7 +188,7 @@ function desktop(N: 2 | 3, aw: number, ah: number, safe: SafeInsets): DesktopLay
     world, view, band, strip, headSlot, cards: [card(0), card(1), card(2), card(3)],
     now, dismiss: r(now.x + now.w - 8 - actionW, now.y + (deckH - KEY_H) / 2, actionW, KEY_H),
     research, settings, lab: r(world.x, top, world.w, H - DECK_GAP - top),
-    rungs: band0, rungRow: band.h, rungLabel, sla, endKey, wallet,
+    rungs: band0, rungRow: band.h, rungLabel, sla, endKey, wallet, rates: null,
     // The run sits 4 art px under the strip: the pipe and its half-width fit one lattice step of top gutter.
     pipeSrc: { x: headSlot.x + lat + 8 * N, y: top }, pipeRunY: top + 4 * N,
     // Plates and callouts: a lattice step in from the sides, 8 px under the strip, down to the notice gutter.
@@ -197,7 +200,8 @@ function phone(aw: number, ah: number, safe: SafeInsets): PhoneLayout {
   const N = 2, U = 8, lat = 8;
   const W = Math.floor(Math.min(aw, 440) / U) * U, H = Math.max(320, Math.floor(ah / U) * U);
   const x = safe.left + Math.floor((aw - W) / 2), y = safe.top;
-  const nowH = 56, nowY = H - U - nowH;
+  // The bottom bar stands on the screen edge (user, 13 Nov); the rates line (D90) lies on its top edge, over the world.
+  const nowH = 56, nowY = H - nowH;
   const world = r(U, U, W - 2 * U, nowY - 2 * U);
   // The band: the ladder row (48 px rungs, a primary tap) with Data over Credits at its right, then SLA and End round.
   const rungRow = 48, band = r(U, U, world.w, rungRow + 48);
@@ -221,9 +225,10 @@ function phone(aw: number, ah: number, safe: SafeInsets): PhoneLayout {
     kind: 'phone', N, lat, gutter: U, x, y, w: W, h: H, body: 13, lh: 16, big: 24, mid: 18,
     world, view, band, strip, headSlot, cards: [card(0), card(1), card(2), card(3)],
     now, dismiss: r(now.x + now.w - 64, now.y, 64, nowH),
-    research, settings, lab: r(U, H < 640 ? band.y + band.h : top, world.w, H - U - (H < 640 ? band.y + band.h : top)),
+    research, settings, lab: r(U, H < 640 ? band.y + band.h : top, world.w, H - (H < 640 ? band.y + band.h : top)),
     rungs: band0, rungRow, rungLabel: r(walletX, band.y, 0, rungRow),
     sla: r(band.x, band.y + rungRow, band.w - endW - hudGap, 48), endKey: r(band.x + band.w - endW, band.y + rungRow, endW, 48), wallet: r(walletX, band.y, band.x + band.w - walletX, rungRow),
+    rates: r(now.x, now.y - 16, now.w, 16),
     pipeSrc: { x: headSlot.x + 8 + 16, y: top }, pipeRunY: top + U,
     calloutBounds: inset(view, lat), callout: { w: 288, h: 104 },
   };

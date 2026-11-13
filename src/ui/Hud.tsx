@@ -17,7 +17,7 @@ import { CoinIcon } from './plates/icons';
 import { Sla } from './hud/Sla';
 import { useNewLevels } from './hud/useNewLevels';
 import { useFleetFaults } from './health/useFleetHealth';
-import { efficiencyText, rateText, ratesWords, useRates } from './hud/rates';
+import { efficiencyText, RatesLine, rateText, ratesWords, useRates } from './hud/rates';
 
 /** The ladder lists the deepest level first: CPU, System, Rack, Room, Global. */
 const LADDER: readonly LevelId[] = [...ORDER];
@@ -91,7 +91,7 @@ function Wallet() {
   const credits = amountText(w.credits), data = amountText(w.data);
   return <button type="button" className={`wallet-key${debt ? ' debt' : ''}${bare ? ' bare' : snug ? ' snug' : ''}`} data-qa-target
     style={{ right: L.w - (box0.x + box0.w), top: box0.y + (d ? Math.max(0, (box0.h - 48) / 2) : 0), height: Math.min(48, box0.h), width: box0.w }}
-    aria-label={`${data} Data, ${credits} Credits${debt ? ', in debt' : ''}. ${d && rates ? ratesWords(rates) + '. ' : ''}View history${debt ? ' and bankruptcy' : ''}`} aria-haspopup="dialog"
+    aria-label={`${data} Data, ${credits} Credits${debt ? ', in debt' : ''}. ${rates ? ratesWords(rates) + '. ' : ''}View history${debt ? ' and bankruptcy' : ''}`} aria-haspopup="dialog"
     onClick={() => view.dispatch({ type: 'toggleSheet', sheet: 'creditsHistory' })}>
     <span className="wallet-row">
       {!bare && <CurrencyIcon kind="data" n={L.N} />}<b className="fig mid data" data-testid="data">{data}</b>{d && <span className="wallet-label data" data-testid="data-rate">{rates ? rateText(rates.dataPerSec) : ''}</span>}
@@ -141,5 +141,6 @@ export function Hud() {
     <EndRound />
     <Wallet />
     <Efficiency />
+    {L.rates && <RatesLine style={box(L.rates)} />}
   </header>;
 }

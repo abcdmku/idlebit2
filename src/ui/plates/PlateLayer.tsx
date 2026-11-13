@@ -152,8 +152,10 @@ export function plateArea(layout: ShellLayout, bounds: Rect | null): Rect | null
     const top = layout.band.y + layout.band.h + 8;
     return { x: 8, y: top, w: layout.w - 16, h: layout.h - 8 - top };
   }
-  if (layout.h >= 640 || layout.w >= 640) return bounds;
-  const top = layout.band.y + layout.band.h + 8, bottom = layout.h - 8;
+  // D90: a plate that fits stays above the notice and rates lines, so a setting can be tuned with the figures in view.
+  const bottom = layout.rates ? layout.rates.y - 16 : layout.h - 8;
+  if (layout.h >= 640 || layout.w >= 640) return { ...bounds, h: Math.min(bounds.y + bounds.h, bottom) - bounds.y };
+  const top = layout.band.y + layout.band.h + 8;
   return { x: bounds.x, y: top, w: bounds.w, h: bottom - top };
 }
 
@@ -165,9 +167,11 @@ export function plateSpill(layout: ShellLayout, area: Rect | null): Rect[] | nul
   if (!area) return null;
   const wide = layout.kind === 'desktop' || (layout.w >= 640 && layout.h < 480);
   const x = wide ? 8 : area.x, w = wide ? layout.w - 16 : area.w;
-  const all = { x, y: 8, w, h: layout.h - 16 };
+  // Portrait phone: every step ends above the notice and rates lines (D90) and the bottom bar; a taller plate scrolls.
+  const bottom = !wide && layout.rates ? layout.rates.y - 16 : layout.h - 8;
+  const all = { x, y: 8, w, h: bottom - 8 };
   const top = layout.band.y + layout.band.h + 8;
-  return area.y > top ? [{ x, y: top, w, h: layout.h - 8 - top }, all] : [all];
+  return area.y > top ? [{ x, y: top, w, h: bottom - top }, all] : [all];
 }
 
 /** The full plate for the selected target: opened from its callout (More), or at once for a save icon. */

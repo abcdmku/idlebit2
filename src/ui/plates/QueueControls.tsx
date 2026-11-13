@@ -5,7 +5,6 @@ import { LOADING_EFFECT, QUEUE_EFFECT } from './copy';
 import { LockIcon } from './icons';
 import { PreloadBudget } from './PreloadBudget';
 import { ChoiceStrip } from './ChoiceStrip';
-import { RatesLine } from '../hud/rates';
 import '../styles/queue-controls.css';
 
 export interface StripOption<T extends string> { readonly id: T; readonly label: ReactNode; readonly name: string; readonly lock: LockReason | null }
@@ -40,7 +39,6 @@ export function QueueControls({ system, view, onAction, onResearch }: { system: 
   // Slicing shares every core among the running tasks, so nothing is left to preload with.
   const sliced = view.strategy === 'timeSlice', loading = view.optimization ?? 'utilization';
   return <section className="queue-controls" aria-label="Queue settings">
-    <RatesLine />
     <LockableStrip label="Queue order" className="queue-order" value={view.strategy} onResearch={onResearch}
       options={order.map(q => ({ id: q.id, label: NAMES[q.id][0], name: NAMES[q.id][1], lock: q.locked }))}
       onPick={strategy => onAction({ type: 'setStrategy', unit: { kind: 'system', id: system }, strategy })} />
