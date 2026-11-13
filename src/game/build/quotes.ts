@@ -148,7 +148,7 @@ function inboundQuotes(state: GameState, at: NodeRef): Quote[] {
 export function toQuote(state: GameState, action: GameAction, plan: Plan, effect: EffectPreview | null = null): Quote {
   const price = planPrice(plan) ?? 0n;
   const maintenance = action.type === 'downgradePart' || action.type === 'removePart' || action.type === 'removeUnit';
-  const single = singleCost(action, price);
+  const single = singleCost(action, price, state.build);
   const after = plan.ok ? plan.change.build : single === null ? plan.after?.() : undefined;
   const capital = after && (single === null || maintenance) ? investmentChange(state.build, after, price, action) : null;
   // D83: Data parts pay their value ÷ CREDITS_PER_DATA_PART in Data; a mixed purchase leads with Data and adds the Credit part.

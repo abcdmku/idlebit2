@@ -42,7 +42,7 @@ export function systemsUnder(build: BuildState, unit: UnitRef): number[] {
 export function commitBuild(state: GameState, change: BuildChange, action?: GameAction): ActionOutcome {
   const capital = investmentChange(state.build, change.build, change.price, action);
   // The quote's rule (quotes.ts): one-kind actions pay one currency, mixed ones split by asset (D83).
-  const cost = (action && singleCost(action, change.price)) ?? capital.cost;
+  const cost = (action && singleCost(action, change.price, state.build)) ?? capital.cost;
   let next = state;
   if (cost.credits > 0n) {
     const paid = debitCredits(next, amount(cost.credits.toString()));

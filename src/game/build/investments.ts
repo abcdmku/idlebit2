@@ -3,7 +3,7 @@ import type { GameAction } from '../types/actions';
 import type { BuildState, HardwarePayment } from '../types/build';
 import type { PartSlot } from '../types/ids';
 import { assetKey, assetPurchaseSteps, changedAssets, type HardwareAsset } from './assets';
-import { CREDITS_PER_DATA_PART, isDataAsset, splitCost, type Cost } from './currency';
+import { CREDITS_PER_DATA_PART, assetDataValue, splitCost, type Cost } from './currency';
 
 const paid = (payments: readonly HardwarePayment[]) => payments.reduce((sum, p) => sum + BigInt(p.credits), 0n);
 
@@ -38,7 +38,7 @@ export function investmentChange(before: BuildState, after: BuildState, price: b
   const investments: Record<string, readonly HardwarePayment[]> = { ...before.investments };
   const oldAt = new Map<string, { asset: HardwareAsset; history: readonly HardwarePayment[] }>();
   let lostCredits = 0n, lostData = 0n;
-  const lose = (asset: HardwareAsset, value: bigint) => { if (isDataAsset(asset)) lostData += value; else lostCredits += value; };
+  const lose = (asset: HardwareAsset, value: bigint) => { const data = assetDataValue(asset, value); lostData += data; lostCredits += value - data; };
   for (const asset of have.values()) delete investments[asset.key];
   for (const asset of have.values()) {
     const history = before.investments[asset.key] ?? [{ version: asset.version, credits: amount('0') }];
@@ -70,7 +70,7 @@ export function investmentChange(before: BuildState, after: BuildState, price: b
   purchases.forEach((p, i) => {
     const cost = i === purchases.length - 1 ? remaining : weight > 0n ? price * p.weight / weight : 0n;
     remaining -= cost;
-    if (isDataAsset(p.asset)) dataValue += cost;
+    dataValue += assetDataValue(p.asset, cost);
     if (cost > 0n || paid(p.history) > 0n) {
       const steps = assetPurchaseSteps(after, p.asset, p.old), total = steps.reduce((sum, step) => sum + step.weight, 0n);
       let unassigned = cost;

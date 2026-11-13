@@ -1220,7 +1220,7 @@ clock or RAM upgrade  = ceil(upgrade[g] × 1.7^(L−1) × drive)
 
 Every price below, after its multipliers, is rounded up with `ceil` to whole Credits.
 
-**Currency (D83).** Every price above is a Credit value. Cache, RAM capacity, drive capacity and accelerator cards (GPU, NPU) are paid in Data at `ceil(value ÷ 50)`, one Data per 50 Credits, about what tasks pay out per Data. Clocks, the RAM and drive Speed tracks and every other part are paid in Credits. A purchase that buys both kinds, such as Replace CPU, an added CPU, a new system or rack, or a config, charges each part in its own currency. Its price shows the Data first, then the Credits. Refunds return half the paid value in the currency it was paid in.
+**Currency (D83).** Every price above is a Credit value. Cache, RAM capacity, drive capacity and NPUs are paid in Data at `ceil(value ÷ 50)`, one Data per 50 Credits, about what tasks pay out per Data. A GPU pays both (D89), in the ratio of its VRAM boost to its clock boost: type 3 pays half its value in Data, type 5 four fifths, type 7 a third and type 9 two thirds, and the rest in Credits. Clocks, the RAM and drive Speed tracks and every other part are paid in Credits. A purchase that buys both kinds, such as Replace CPU, an added CPU, a new system or rack, or a config, charges each part in its own currency. Its price shows the Data first, then the Credits. Refunds return half the paid value in the currency it was paid in.
 
 Special prices:
 - **Extra units.** A core, RAM module, GPU, NPU or drive bought when `n >= 1` of that kind are already in the system (per socket for cores) costs `installPrice × 1.25^(n − 1)` **(s)**; cores use 1.65 **(s)**, as in v2.

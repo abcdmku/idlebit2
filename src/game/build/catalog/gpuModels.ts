@@ -18,6 +18,20 @@ export const GPU_ENERGY: GpuEnergyCalibration = Object.freeze({
   eraScale: [1, 1, 1] as const,
 });
 
+/** What each type multiplies over the base card: 3 is cores, 5 is VRAM, 7 is clock, 9 is all three. */
+const SERIES_BOOST: Readonly<Record<GpuSeries, { readonly cores: number; readonly vram: number; readonly clock: number }>> = {
+  3: { cores: 4, vram: 1, clock: 1 }, 5: { cores: 1, vram: 4, clock: 1 }, 7: { cores: 1, vram: 1, clock: 2 }, 9: { cores: 4, vram: 4, clock: 2 },
+};
+
+/**
+ * D89: a card pays its value as Data in the ratio of its VRAM boost to its clock boost; the rest is Credits.
+ * Type 3 (cores) pays 1/2 in Data, 5 (VRAM) 4/5, 7 (clock) 1/3 and 9 (all three) 2/3.
+ */
+export function gpuDataValue(model: GpuModelId, value: bigint): bigint {
+  const boost = SERIES_BOOST[requireModel(model).series], vram = BigInt(boost.vram);
+  return value * vram / (vram + BigInt(boost.clock));
+}
+
 /** Technology is supplied by the caller, including generation-specific tensor eligibility. */
 function technologyFactor(value: number | undefined, name: keyof GpuTechnology): number {
   if (value === undefined) return 1;
@@ -35,10 +49,11 @@ function stats(
 ): GpuStats {
   const k = TIERS.indexOf(tier);
   const capacity = 2 ** k;
-  const cores = 2 ** (generation - 1) * (series === 3 || series === 9 ? 4 : 1) * capacity;
-  const vramBits = 2 ** (13 + 4 * (generation - 1)) * (series === 5 || series === 9 ? 4 : 1)
+  const boost = SERIES_BOOST[series];
+  const cores = 2 ** (generation - 1) * boost.cores * capacity;
+  const vramBits = 2 ** (13 + 4 * (generation - 1)) * boost.vram
     * capacity * technologyFactor(technology.vramMultiplier, 'vramMultiplier');
-  const clockHz = 10 ** (generation + 2) * (series === 7 || series === 9 ? 2 : 1) * (10 + k) / 10;
+  const clockHz = 10 ** (generation + 2) * boost.clock * (10 + k) / 10;
   const opsPerS = cores * clockHz;
   const tensorOpsPerS = opsPerS * technologyFactor(technology.tensorFactor, 'tensorFactor');
   const era = Math.floor((generation - 1) / 3);
