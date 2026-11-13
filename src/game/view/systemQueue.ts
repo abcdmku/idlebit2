@@ -26,8 +26,9 @@ export function selectQueueHold(state: GameState, s: number): QueueHoldView | nu
   const w = state as unknown as World, rec = state.hot.rec, h = state.hot.sys, c = state.compiled.sys;
   if (state.round.phase !== 'running' || !runsTasks(h.mode[s]!)) return null;
   const strategy = strategyOf(w, s), free = c.threads[s]! - h.busyThreads[s]!;
-  if (!strategy.timeSlice && free <= 0) return null;
-  if (h.running[s]! >= keffOf(w, s) - (h.researchThreads[s]! > 0 ? 1 : 0)) return null;
+  // Every core (or run slot) is taken: queued tasks wait their turn.
+  if (!strategy.timeSlice && free <= 0 || h.running[s]! >= keffOf(w, s) - (h.researchThreads[s]! > 0 ? 1 : 0))
+    return h.queueLen[s]! > 0 ? { reason: 'busy', coresWanted: 0 } : null;
   // Nothing queued: the wait is upstream, at the market head.
   if (!(h.queueLen[s]! > 0)) return pickupHold(state, s);
   if (strategy.pickQueue(w, s) >= 0) return null;

@@ -179,17 +179,17 @@ export interface SchedulerView {
   readonly preparation?: { readonly taskId: number; readonly family: FamilyId; readonly loadedBits: number; readonly targetBits: number;
     readonly requiredCores: number; readonly availableCores: number; readonly active: boolean } | null;
   readonly batchSavedBits?: number;
-  /** Why no queued task starts while a core is free; null when one can start, every core is busy or the queue is empty. */
+  /** Why queued tasks wait or none arrive; null when one can start now or nothing is waiting. */
   readonly hold?: QueueHoldView | null;
 }
 /**
- * Why free cores have nothing to start. A queued task waits for its cache load, `coresWanted` free cores at once,
+ * Why queued tasks wait, or why free cores have nothing to start. Every core is busy. Or a queued task waits for its cache load, `coresWanted` free cores at once,
  * cache or memory room, or its GPU. Or nothing startable is queued and the market head is not arriving: it needs
  * hardware no system has (`detail`), the research task is first in line, its input is still transferring
  * (`seconds` left), there is no input link, or the router's queue is full.
  */
 export interface QueueHoldView {
-  readonly reason: 'loading' | 'cores' | 'cache' | 'memory' | 'device' | 'needs' | 'research' | 'transfer' | 'link' | 'router';
+  readonly reason: 'busy' | 'loading' | 'cores' | 'cache' | 'memory' | 'device' | 'needs' | 'research' | 'transfer' | 'link' | 'router';
   readonly coresWanted: number;
   readonly detail?: FailDetail | null;
   readonly seconds?: number;
