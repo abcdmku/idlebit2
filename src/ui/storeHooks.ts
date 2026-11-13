@@ -20,8 +20,8 @@ export interface ShellSurface {
   frameListeners: Set<FrameListener>;
   /** The visible level's build quotes the deck holds; the world prices ghosts with them. */
   buildQuotes: QuoteResult | null;
-  /** Controls whose sole action and facts are drawn directly on the hardware by React. */
-  sourceActions?: Map<string, { target: HitTarget; rect: Rect }>;
+  /** Claimed board labels: the site each covers, and the element whose text an outside tag must not cover. */
+  sourceActions?: Map<string, { target: HitTarget; rect: Rect; el?: HTMLElement }>;
   /** Real canvas draws so far (QA). */
   drawCount: number;
 }

@@ -20,12 +20,12 @@ export function SourceControl({ target }: { target: HitTarget }) {
   // The World's closed regions share one plate (phone list) or legend (desktop grid): it says what opens them, once.
   const group = target.id === 'locked';
   const board = focus.level === 'system';
-  const textKey = model ? `${model.name}|${model.quote.cost}|${model.choice}|${model.quote.locked?.code ?? ''}` : '';
+  const textKey = model ? `${model.name}|${model.quote.cost}|${model.quote.creditCost ?? ""}|${model.choice}|${model.quote.locked?.code ?? ''}` : '';
   useEffect(() => {
     const el = ref.current;
     if (!el || !model) return;
-    const sources = shell.surface.sourceActions ??= new Map();
-    const source = { target, rect: { x: 0, y: 0, w: 0, h: 0 } };
+    const sources: NonNullable<typeof shell.surface.sourceActions> = shell.surface.sourceActions ??= new Map();
+    const source = { target, rect: { x: 0, y: 0, w: 0, h: 0 }, el };
     // One label per site: this control claims its target while it is shown, and the level then draws none there.
     // The renderer redraws at once on a change, so the canvas and this element agree in every painted frame.
     const claim = (on: boolean) => {
@@ -35,7 +35,7 @@ export function SourceControl({ target }: { target: HitTarget }) {
     const r: Rect = { x: 0, y: 0, w: 0, h: 0 };
     const nameEl = el.querySelector<HTMLElement>('.source-name'), priceEl = el.querySelector<HTMLElement>('.source-price');
     // The add's text widths, measured once per wording (the short compute names have their own).
-    const need = new Map<string, readonly [number, number, number]>();
+    const need = new Map<string, readonly [number, number, number, number]>();
     let flatNeed: number | null = null, fullName: number | null = null;
     const position = () => {
       const renderer = shell.surface.renderer, L = shell.surface.layout;
@@ -79,10 +79,15 @@ export function SourceControl({ target }: { target: HitTarget }) {
         const wording = `${tight}|${brief}`;
         let widths = need.get(wording);
         if (!widths && el.dataset.mode) {
-          need.set(wording, widths = [nameEl?.offsetWidth ?? 0, priceEl?.offsetWidth ?? 0, priceEl?.querySelector<HTMLElement>('.pz')?.offsetWidth ?? 0]);
+          // Measure on one line whatever mode the last wording left, so a split price reads its full width.
+          el.dataset.mode = 'stack';
+          const pz = priceEl?.querySelector<HTMLElement>('.pz'), credit = pz?.querySelector<HTMLElement>(':scope > .pz');
+          // D83: a mixed price's Data part (glyph, gap and figure) and its Credit part, for a price split over two lines.
+          const dataW = credit ? 13 + (pz?.querySelector<HTMLElement>(':scope > span:not(.pz)')?.offsetWidth ?? 0) : 0;
+          need.set(wording, widths = [nameEl?.offsetWidth ?? 0, priceEl?.offsetWidth ?? 0, pz?.offsetWidth ?? 0, Math.max(dataW, credit?.offsetWidth ?? 0)]);
           if (!brief) fullName = widths[0];
         }
-        const [nameW, priceW, figureW] = widths ?? [0, 0, 0];
+        const [nameW, priceW, figureW, partW] = widths ?? [0, 0, 0, 0];
         // In the site when its text fits: name over price ("from" on its own line in a narrow site that draws no mark
         // of its own), or one line in a flat site. Otherwise a tag just outside it.
         // A map pad too narrow for "from" beside its figure keeps the name over the figure alone.
@@ -94,14 +99,28 @@ export function SourceControl({ target }: { target: HitTarget }) {
         const row = nameW + priceW + TAG_GAP + 16 <= r.w && r.h >= 16, flatBay = row && r.h < 44 && !compute && !foot;
         const mode = bare || Math.max(nameW, priceW) + (compute ? 0 : 2) <= r.w && r.h >= 34 && !flatBay ? 'stack'
           : model.choice && (target.kind === 'add' || target.owner.level === 'global') && Math.max(nameW, figureW) + 2 <= r.w && r.h >= 48 ? 'stack3'
+          // A mixed price too wide for one line puts its Credits under its Data, inside the site.
+          : !model.choice && partW > 0 && Math.max(nameW, partW) + (compute ? 0 : 2) <= r.w && r.h >= 50 && !flatBay ? 'split'
           : row ? 'row' : 'out';
         el.dataset.mode = mode;
         if (mode === 'out') {
-          const tw = nameW + priceW + (priceW ? TAG_GAP : 0) + TAG_PAD;
-          // A rack or server site runs its tag east over the free slots; a pad at the end of a site's row runs it back over the row.
-          const tx = Math.max(L.view.x + 4, Math.min(L.view.x + L.view.w - tw - 4, target.kind === 'slot' ? r.x + r.w - tw : r.x));
-          const below = r.y + r.h + 2, ty = below + TAG_H <= L.view.y + L.view.h - 4 ? below : r.y - TAG_H - 2;
-          el.style.setProperty('--tag-x', `${Math.round(tx - x)}px`); el.style.setProperty('--tag-y', `${Math.round(ty - y)}px`);
+          // Other labels' text, in this layer's space (page rects less this element's own offset).
+          const own = el.getBoundingClientRect(), ox = own.x - (parseFloat(el.style.left) || 0), oy = own.y - (parseFloat(el.style.top) || 0);
+          const texts = [...sources.values()].flatMap(s => s === source || !s.el ? [] : [...s.el.querySelectorAll('.source-name, .source-price, .source-gain')]
+            .map(t => t.getBoundingClientRect()).filter(b => b.width > 0).map(b => ({ x: b.x - ox, y: b.y - oy, w: b.width, h: b.height })));
+          // One line, else name over price (a 320 px board's drive tag), each below the site and then above it. The first
+          // spot that covers no other label's text wins (never "Add drive" over a GPU bay's "from" line), else the least covered.
+          const spots = [[nameW + priceW + (priceW ? TAG_GAP : 0) + TAG_PAD, TAG_H], [Math.max(nameW, priceW) + TAG_PAD, 2 * TAG_H - 4]].flatMap(([tw, th]) => {
+            // A rack or server site runs its tag east over the free slots; a pad at the end of a site's row runs it back over the row.
+            const tx = Math.max(L.view.x + 4, Math.min(L.view.x + L.view.w - tw - 4, target.kind === 'slot' ? r.x + r.w - tw : r.x));
+            const below = r.y + r.h + 2, above = r.y - th - 2;
+            return [...(below + th <= L.view.y + L.view.h - 4 ? [below] : []), ...(above >= L.view.y + 4 ? [above] : [])]
+              .map(ty => ({ tx, ty, two: th > TAG_H, covered: texts.reduce((sum, o) =>
+                sum + Math.max(0, Math.min(tx + tw, o.x + o.w) - Math.max(tx, o.x)) * Math.max(0, Math.min(ty + th, o.y + o.h) - Math.max(ty, o.y)), 0) }));
+          });
+          const spot = spots.reduce<(typeof spots)[number] | undefined>((best, s) => !best || s.covered < best.covered ? s : best, undefined);
+          el.dataset.tag2 = String(!!spot?.two);
+          if (spot) { el.style.setProperty('--tag-x', `${Math.round(spot.tx - x)}px`); el.style.setProperty('--tag-y', `${Math.round(spot.ty - y)}px`); }
         }
         // The gain line needs a third row and a readable width; smaller sites keep the name and price.
         el.dataset.roomy = String(mode === 'stack' && h >= 64 && r.w >= 112 && !foot);

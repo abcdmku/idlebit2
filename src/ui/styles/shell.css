@@ -61,9 +61,14 @@ html, body, #root { margin: 0; width: 100%; height: 100%; overflow: hidden; back
 /* The World's closed regions: the research that opens them, on the head line of their plate (list) or legend (grid). */
 .source-add[data-mode="head"] .source-buy { align-items: flex-start; justify-content: flex-start; padding: var(--head-y, 4px) 16px !important; }
 .source-add[data-mode="stack3"] .source-price { display: flex; flex-direction: column; align-items: center; }
+/* D83: a mixed price split in its site, Credits under Data. */
+.source-add[data-mode="split"] .source-price .pz { display: grid; grid-template-columns: auto auto; justify-content: center; align-items: center; column-gap: 3px; }
+.source-add[data-mode="split"] .source-price .pz > .pz { grid-column: 1 / -1; justify-self: center; }
 .source-add[data-mode="out"] .source-buy { display: block; overflow: visible; }
 .source-add[data-mode="out"] .source-text { position: absolute; left: var(--tag-x, 0); top: var(--tag-y, 100%); height: 20px; display: flex;
   align-items: center; gap: 8px; padding: 0 6px; background: #120d28e8; white-space: nowrap; }
+/* An outside tag too wide for clear space on one line: name over price. */
+.source-add[data-mode="out"][data-tag2="true"] .source-text { flex-direction: column; justify-content: center; height: 36px; gap: 0; }
 .source-add .source-gain { display: none; max-width: 100%; }
 .source-add[data-roomy="true"] .source-gain { display: block; }
 .source-add .source-price { padding: 0 !important; }
