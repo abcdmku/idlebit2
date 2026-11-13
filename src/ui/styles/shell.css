@@ -15,7 +15,7 @@ html, body, #root { margin: 0; width: 100%; height: 100%; overflow: hidden; back
 .world { position: absolute; left: 0; top: 0; touch-action: none; cursor: pointer; }
 [data-testid="net-income"] .coin { margin-right: 3px; vertical-align: 0; }
 .world:focus-visible { outline: none; }
-.world-controls { position: absolute; inset: 0; pointer-events: none; z-index: 2; }
+.world-controls { position: absolute; inset: 0; pointer-events: none; z-index: 2; --currency-short: var(--component-short); }
 .world-key { position: absolute; pointer-events: none; opacity: 0; }
 .world-key:focus-visible { opacity: 1; background: #120d28e8; color: var(--focus); text-align: center !important; padding: 8px; }
 /* The pan cue: the edge a panned rest cuts fades into the level's ground under a chevron that points to the rest of it. */
@@ -55,7 +55,7 @@ html, body, #root { margin: 0; width: 100%; height: 100%; overflow: hidden; back
 .source-add[data-foot="true"] .source-text { display: flex; flex-direction: column; align-items: center; justify-content: center; height: var(--foot); }
 .source-from, .source-lock { color: var(--muted); font-weight: 500; }
 .source-add[data-from="false"] .source-from { display: none; }
-.source-add .source-buy.short .source-price .pz { color: var(--muted); }
+.source-buy.short .source-name, .source-buy.short .source-price, .source-buy.short .source-from { color: var(--currency-short); }
 /* A flat site (a rack bay) reads on one line; a site narrower than its text wears it as a tag at its edge. */
 .source-add[data-mode="row"] .source-buy { flex-direction: row; gap: 8px; }
 /* The World's closed regions: the research that opens them, on the head line of their plate (list) or legend (grid). */
@@ -67,7 +67,7 @@ html, body, #root { margin: 0; width: 100%; height: 100%; overflow: hidden; back
 .source-add .source-gain { display: none; max-width: 100%; }
 .source-add[data-roomy="true"] .source-gain { display: block; }
 .source-add .source-price { padding: 0 !important; }
-.source-add .source-buy:disabled .source-name { color: var(--muted); font-weight: 500; }
+.source-add .source-buy:disabled:not(.short) .source-name { color: var(--muted); font-weight: 500; }
 .source-compute[data-tight="true"] .source-price .px-ic { display: none; }
 .source-short { display: none; }
 .source-compute[data-brief="true"] .source-full { display: none; }
@@ -81,6 +81,7 @@ html, body, #root { margin: 0; width: 100%; height: 100%; overflow: hidden; back
 .aic { position: absolute; line-height: 0; }
 b, .b { font-weight: 700; }
 .mute { color: var(--muted); } .dim { color: var(--dim); } .gold { color: var(--gold); } .data { color: var(--data); }
+.currency-short { color: var(--currency-short); }
 .cyan { color: var(--cyan); } .warn { color: var(--warn); } .bad { color: var(--fault-text); } .ok { color: var(--ok); }
 .net { color: #7be38f; } .rnd { color: #ff6bd6; } .op { color: #e6dcff; }
 .head { font-size: var(--head); font-weight: 700; }
@@ -244,7 +245,7 @@ b, .b { font-weight: 700; }
 .source-part[data-flat="true"] .source-price { padding: 0; }
 /* The first purchase: the cheapest upgrade's price on its part until the build first changes (FirstBuy). */
 .first-buy { position: absolute; display: inline-flex; align-items: center; gap: 6px; pointer-events: none; white-space: nowrap;
-  line-height: 16px; font-weight: 600; color: var(--gold); }
+  line-height: var(--lh); font-weight: 600; color: var(--gold); }
 .first-buy .pz { gap: 3px; }
 .first-buy .px-ic { width: 10px; height: 10px; }
-.first-buy.short, .first-buy.short .pz { color: var(--muted); }
+.first-buy.short { color: var(--currency-short); }

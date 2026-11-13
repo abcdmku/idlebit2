@@ -67,7 +67,6 @@
 .v3-plate .key.replace:not(:disabled) .pz { color: #ffcc3d; }
 .part-option { display: flex; flex-direction: column; gap: var(--s1); }
 .option-name { font-weight: 600; display: flex; justify-content: space-between; gap: var(--s2); }
-.price-short .pz { color: #b9b0df; }
 .option-values { color: #c9c1e5; line-height: var(--lh); }
 .v3-plate .option-cold { margin: 0; color: #ffbf8a; }
 .memory-current { display:flex; justify-content:space-between; gap:8px; }

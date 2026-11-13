@@ -27,24 +27,28 @@ export function FirstBuy({ targets }: { targets: readonly HitTarget[] }) {
     .find(q => !q.locked && q.currency === 'credits' && partKind(q) !== null) ?? null;
   const quote = fix ?? (steps.length ? steps.reduce(cheaper) : null);
   const kind = partKind(quote);
-  const id = kind ? targets.find(t => t.kind === 'part' && t.part?.slot.kind === kind)?.id ?? null : null;
+  const target = kind ? targets.find(t => t.kind === 'part' && t.part?.slot.kind === kind) : null;
+  const id = target?.id;
   useEffect(() => {
     const el = ref.current;
-    if (!el || !id) return;
+    if (!el || !id || !target) return;
     const r: Rect = { x: 0, y: 0, w: 0, h: 0 };
     const position = () => {
-      const renderer = shell.surface.renderer;
+      const renderer = shell.surface.renderer, L = shell.surface.layout;
       el.hidden = !renderer || !!renderer.transition || !renderer.anchor(id, r);
       // The right end of the part, where its own label and meter never reach; a part too narrow for both keeps its label.
       if (!el.hidden && r.w < el.offsetWidth + 144) el.style.visibility = 'hidden';
       else if (!el.hidden) el.style.visibility = '';
-      if (!el.hidden) Object.assign(el.style, { left: `${Math.round(r.x + r.w - el.offsetWidth - 16)}px`, top: `${Math.round(r.y + r.h / 2 - 8)}px` });
+      // The cache's meter occupies its lower half. Share the heading's snapped text row above it.
+      const scale = r.w / target.rect.w;
+      const top = id === 'cache' ? L.view.y + Math.round((r.y + 3 * scale - L.view.y) / 8) * 8 : r.y + (r.h - L.lh) / 2;
+      if (!el.hidden) Object.assign(el.style, { left: `${Math.round(r.x + r.w - el.offsetWidth - 16)}px`, top: `${Math.round(top)}px` });
     };
     position(); shell.surface.frameListeners.add(position);
     return () => { shell.surface.frameListeners.delete(position); };
-  }, [shell, id, quote?.cost]);
+  }, [shell, id, target, quote?.cost]);
   if (!quote || !id) return null;
   return <span ref={ref} className={`first-buy${quote.affordable ? '' : ' short'}`} data-testid="first-buy" hidden>
-    Upgrade <Price cost={quote.cost} currency={quote.currency} />
+    Upgrade <Price cost={quote.cost} currency={quote.currency} affordable={quote.affordable} />
   </span>;
 }

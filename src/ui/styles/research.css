@@ -4,7 +4,7 @@
   pointer-events: auto; color: #efeaff; background: #1c1838; font: 400 var(--body, 13px)/var(--lh, 16px) 'Chakra Petch', sans-serif;
   box-shadow: 0 0 0 2px #8c90ad, 0 4px 0 2px #0e0b1c, inset 0 2px #c9cce0;
   --well: #15122a; --rail: #5d5296; --hi: #3a2f6e; --lo: #29234b; --data: #3ee0a0; --gold: #ffcc3d; --muted: #a99be6; --link: #a6f6ff;
-  --go: #7dff9a; --run: #ff9be6; --short: #ff6a5a; }
+  --go: #7dff9a; --run: #ff9be6; --short: var(--currency-short); }
 .lab * { box-sizing: border-box; }
 .lab button { font: inherit; color: inherit; border: 0; margin: 0; border-radius: 0; cursor: pointer; }
 .lab button:focus-visible { outline: 2px solid var(--link); outline-offset: -2px; }

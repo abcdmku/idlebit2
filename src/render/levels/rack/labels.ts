@@ -149,7 +149,7 @@ function addLine(s: RackSnapshot, view: ViewPresentation, ax: number, out: Label
   const q = view.quotes?.quotes;
   let one = -1, n = 0;
   if (q) for (let i = 0; i < q.length; i++) if (q[i]!.action.type === 'addUnit' && !q[i]!.locked) { one = i; n++; }
-  if (n === 1 && q![one]!.currency === 'credits') (two ? out.br() : out).icon('credits').text(payoutCount(Number(q![one]!.cost)), q![one]!.affordable ? 'gold' : 'dim');
+  if (n === 1 && q![one]!.currency === 'credits') (two ? out.br() : out).icon('credits').text(payoutCount(Number(q![one]!.cost)), q![one]!.affordable ? 'gold' : 'shortfall');
 }
 /** Name tags left of the cabinet, each with a leader to its unit. The phone stacks name over value. */
 function tags(s: RackSnapshot, ax: number, phone: boolean, beside: boolean, out: LabelWriter): void {

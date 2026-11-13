@@ -13,9 +13,10 @@ export function Pips({ filled, max }: { filled: number; max: number }) {
   </span>;
 }
 
-/** A whole price with its currency glyph. Gold for Credits, green for Data. */
-export function Price({ cost, currency = 'credits' }: { cost: Amount | number; currency?: Currency }) {
-  return <span className={`pz ${currency === 'data' ? 'd' : 'c'}`}>
+/** A whole price with its currency glyph. Shortfalls use the menu or hardware context's shared color. */
+export function Price({ cost, currency = 'credits', affordable }: { cost: Amount | number; currency?: Currency; affordable?: boolean }) {
+  return <span className={`pz ${currency === 'data' ? 'd' : 'c'}`} data-affordable={affordable}
+    style={affordable === false ? { color: 'var(--currency-short)' } : undefined}>
     {currency === 'data' ? <GemIcon /> : <CoinIcon />}<span>{wholeText(cost)}</span>
   </span>;
 }
@@ -61,7 +62,7 @@ export function Key({ label, price, detail, tone = '', disabled, ariaLabel, pres
   return <button type="button" className={`key ${tone}${pressed ? ' on' : ''}`} disabled={disabled} aria-label={ariaLabel} aria-pressed={pressed} data-purchase-action={purchase ? JSON.stringify(purchase.action) : undefined}
     onClick={(e) => { e.stopPropagation(); if (!disabled) onPress(); }}>
     <span className="kl">{label}</span>
-    {price && <Price cost={price.cost} currency={price.currency} />}
+    {price && <Price cost={price.cost} currency={price.currency} affordable={purchase?.affordable} />}
     {detail != null && <span className="action-detail clip">{detail}</span>}
   </button>;
 }

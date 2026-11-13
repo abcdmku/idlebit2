@@ -133,7 +133,7 @@ export function SourceControl({ target }: { target: HitTarget }) {
   const short = !!reason && !q.locked && !q.overSupply;
   const shown = disabled && !short ? q.overSupply || q.locked?.code === 'power' ? 'No power' : detail : research ? detail : gain;
   return <div ref={ref} className={`source-control source-${model.kind}${compute ? ' source-compute' : ''}`} data-source-control={target.id}>
-    <button type="button" className={`source-buy${model.choice && short ? ' short' : ''}`} disabled={disabled} data-source-action={target.id} data-qa-target
+    <button type="button" className={`source-buy${short ? ' short' : ''}`} disabled={disabled} data-source-action={target.id} data-qa-target
       data-purchase-action={!research && !model.choice ? JSON.stringify(q.action) : undefined}
       aria-label={[!group && model.name, short ? gain : '', detail, !research && `${model.choice ? 'from ' : ''}${q.cost} Credits`].filter(Boolean).join('. ')}
       title={detail || undefined} onClick={() => runSourceAction(shell, target)}>
@@ -144,7 +144,7 @@ export function SourceControl({ target }: { target: HitTarget }) {
       {/* A locked site says what unlocks it where its price would stand. */}
       {add && research && <span className="source-price source-lock" data-qa-label>{detail}</span>}
       {!research && q.cost !== '0' && <span className="source-price" data-qa-label>{model.choice ? <span className="source-from">from </span>
-        : !disabled && !add && <span aria-hidden="true">↑ </span>}<Price cost={q.cost} currency={q.currency} /></span>}</span>
+        : !disabled && !add && <span aria-hidden="true">↑ </span>}<Price cost={q.cost} currency={q.currency} affordable={q.affordable} /></span>}</span>
     </button>
   </div>;
 }

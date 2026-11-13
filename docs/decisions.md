@@ -2041,3 +2041,7 @@ D79 left machinery that legal play cannot reach, and a heat bound that held only
 8. **Save.** `SAVE_VERSION` is 38 and older saves reset. The QA stages are rebuilt: early 0.25 h, mid 2 h, rack 5 h, room 72 h and global 264 h.
 
 The PDU research copy now reads "far more capacity"; the old "×4 capacity per Credit" was untrue.
+
+## D81, 12 Nov: cache hint placement and affordability colors
+
+The cache upgrade hint shares the heading's text row, above the usage meter. Insufficient currency uses the same red in every menu, including component plates, GPU choices, task fixes and research. Direct hardware prices and add labels use one neutral grey. Affordable prices retain their currency colors. Affordability comes from the quoted wallet check, independently of other reasons a control is disabled.

@@ -42,7 +42,7 @@ export function GenerationAction({ quote, primary = false, onAction, onResearch,
   const announcedLabel = node || noPower ? label : `Upgrade to ${fullTarget}`;
   // A lock's reason stays; resulting specs give way to the price in a narrow key.
   const why = !!(quote.locked || quote.overSupply), detail = why ? reason : spec;
-  const price = !(quote.locked && quote.cost === '0') && <Price cost={quote.cost} currency={quote.currency} />;
+  const price = !(quote.locked && quote.cost === '0') && <Price cost={quote.cost} currency={quote.currency} affordable={quote.affordable} />;
   return <button type="button" className={`key generation-action${primary && !node ? '' : ' replace'}`} disabled={disabled}
     data-research-target={node ?? undefined} data-purchase-action={!node ? JSON.stringify(quote.action) : undefined}
     aria-label={[announcedLabel, !node && spec, !node && reason, !node && `${quote.cost} Credits`].filter(Boolean).join('. ')}

@@ -7,4 +7,3 @@
 .gpu-picker .gpu-choose .inline-setting > span { width: 28px; }
 .gpu-picker .gpu-choose .choice-strip button { display: grid; justify-items: center; align-content: center; padding: 2px; line-height: var(--lh); }
 .gpu-picker .gpu-choose .choice-strip .pz { font-weight: 400; gap: 3px; }
-.gpu-picker .gpu-choose .choice-strip button.short .pz { color: #b9b0df; }

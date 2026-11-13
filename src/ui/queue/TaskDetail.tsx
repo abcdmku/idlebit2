@@ -13,6 +13,7 @@ import { wholeText } from '../hooks/format';
 import { blockedText, taskBits, waitingText } from '../hooks/taskRequirements';
 
 import { PlateFrame } from '../plates/PlateFrame';
+import { Price } from '../plates/widgets';
 import { useLayout } from '../shell/geometry';
 import { hasTaskDock } from '../layout';
 import { shallowEqual, useGameSelector, useShell, useViewState } from '../storeHooks';
@@ -122,14 +123,14 @@ function OpenTask({ taskKey: key }: { taskKey: string }) {
     </dl>
     {(t.blockedBy || t.dismissible) && <div className="keys">
       {/* One line per missing component or research; each buys every level it needs in one tap. */}
-      {primaryMeet && <MeetKey quote={primaryMeet} n={L.N} onAction={a => shell.dispatch(a)}
+      {primaryMeet && <MeetKey quote={primaryMeet} onAction={a => shell.dispatch(a)}
         onResearch={id => shell.view.dispatch({ type: 'openResearch', project: id })} />}
       {fixes.map(o => <button key={o.key} type="button" className="key" data-qa-target data-testid="td-fix" disabled={!offerAction(o)} onClick={() => tap(o)}>
-        {fixLabel(o)}{o.right.kind !== 'research' && o.price !== null && <span className="pz"> <CoinIcon />{wholeText(o.price)}</span>}</button>)}
+        {fixLabel(o)}{o.right.kind !== 'research' && o.price !== null && <Price cost={o.price} affordable={o.affordable} />}</button>)}
 
       {t.blockedBy && !fixes.length && !meet.length && <p className="key-slot">No fix yet</p>}
       {/* Every way to fix it is its own key here (R16: two taps from play), not behind Details. */}
-      {meet.filter(q => q !== primaryMeet).map((q, i) => <MeetKey key={i} quote={q} n={L.N} onAction={a => shell.dispatch(a)}
+      {meet.filter(q => q !== primaryMeet).map((q, i) => <MeetKey key={i} quote={q} onAction={a => shell.dispatch(a)}
         onResearch={id => shell.view.dispatch({ type: 'openResearch', project: id })} />)}
       {t.dismissible && <button type="button" className="key quiet" data-qa-target data-testid="td-dismiss"
         onClick={() => { shell.dispatch({ type: 'dismissTask', task: t.task }); close(); }}>Dismiss</button>}

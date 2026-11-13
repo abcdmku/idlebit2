@@ -55,8 +55,8 @@ export function chipLabels(chip: ChipSnapshot, frame: WorldFrame, out: LabelWrit
       const scale = frame.scale ?? (form === 'phone' ? 2 : 3), t = form === 'phone' ? PHONE_TYPE : typeForScale(scale);
       const py = add.y + (add.h - 2 * t.line / scale) / 2;
       if (labelFits('Add core', add, scale, t.body, 2 * t.line))
-        out.label('addPrice', add.x + add.w / 2, py, 'center').text('Add core', price.affordable ? 'name' : 'dim')
-          .br().text(price.text, price.affordable ? 'gold' : 'dim');
+        out.label('addPrice', add.x + add.w / 2, py, 'center').text('Add core', price.affordable ? 'name' : 'shortfall')
+          .br().text(price.text, price.affordable ? 'gold' : 'shortfall');
     }
     // Every tile shows its own speed (user): the die grows so a tile always fits its label (layout.ts).
     // A sleeping core shows its C-state, dimmed. No busy tag: each tile shows its own state.
@@ -77,8 +77,8 @@ export function chipLabels(chip: ChipSnapshot, frame: WorldFrame, out: LabelWrit
       if (view?.sourceActions?.includes('add:core')) continue;
       // the add site: what it sells and its price (dim when unaffordable)
       const scale = frame.scale ?? (form === 'phone' ? 2 : 3), t = form === 'phone' ? PHONE_TYPE : typeForScale(scale);
-      out.label(LABEL_IDS[i]!, r.x + r.w / 2, r.y + (r.h - 2 * t.line / scale) / 2, 'center').text('Add core', price?.affordable ? 'name' : 'dim');
-      if (price) out.br().text(price.text, price.affordable ? 'gold' : 'dim');
+      out.label(LABEL_IDS[i]!, r.x + r.w / 2, r.y + (r.h - 2 * t.line / scale) / 2, 'center').text('Add core', price ? price.affordable ? 'name' : 'shortfall' : 'dim');
+      if (price) out.br().text(price.text, price.affordable ? 'gold' : 'shortfall');
       continue;
     }
     // A18: "Core 1 · 1 Hz" on one line, or name then Hz on their own lines, never "Core 11 Hz".

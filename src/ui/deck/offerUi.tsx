@@ -10,7 +10,7 @@ export function Coin({ n }: { n: number }) {
   return <ArtCanvas w={5} h={5} n={n} artKey="coin5" className="inl" draw={g => { g.clearRect(0, 0, 5, 5); g.drawImage(SPR.coin5, 0, 0); }} />;
 }
 export function PriceText({ offer, n }: { offer: Offer; n: number }) {
-  return <span className={offer.affordable ? 'gold' : 'dim'}><Coin n={n} /> {wholeText(offer.price ?? 0)}</span>;
+  return <span className={offer.affordable ? 'gold' : 'currency-short'}><Coin n={n} /> {wholeText(offer.price ?? 0)}</span>;
 }
 export function LockGlyph({ n }: { n: number }) {
   return <ArtCanvas w={7} h={8} n={n} artKey="lock" className="inl" style={{ verticalAlign: 'middle' }} draw={g => { g.clearRect(0, 0, 7, 8); g.drawImage(SPR.lock, 0, 0); }} />;

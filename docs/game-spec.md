@@ -1861,6 +1861,8 @@ D78 amends §4.7, §12.4, §13, §15 and §16. Where an earlier paragraph disagr
 
 **Research.** Rows are ordered ready-first when the list opens and do not reorder while open. Tabs show ready counts. The row shows compact costs with unaffordable currencies marked; the open row adds the exact cost only when the compact figure rounds. Each state has a tag: Ready, Running with measured progress, In line, Line busy, Paused, No Credits, Queued, Locked, Done. The dialog sizes to its content and leaves the bottom bar visible.
 
+**Affordability (D81).** Insufficient currency is red in menus, including component plates, task fixes, GPU choices and research costs. Prices shown directly on hardware components use one neutral grey instead. Credits and Data keep their currency colors when affordable. The cache's upgrade hint shares the cache heading's text row above the usage meter.
+
 **Settings.** Besides music (§16.5): Effects on/off and volume, stored locally (default on, 40%); a Keys list on desktop (R Research, + − Zoom, Esc Close); Export, which downloads the stored save envelope; Import, which validates the file through the save parser, changes nothing and states one reason if rejected, and otherwise needs a second tap, then replaces the save and reloads with no time away; and Reset game, which needs two taps. Armed keys disarm after 5 s, and Escape or Back cancels them first.
 
 **Effects.** Synthesized tones, no assets: a task met (at most 4 per second, pitch by payout size), a task failed (at most 2 per second), round end, a reward milestone reached, a payment and research completed. Silent before the first gesture, while hidden and during catch-up.

@@ -68,7 +68,7 @@ function addLines(s: RoomSnapshot, view: ViewPresentation, out: LabelWriter): vo
     const q = view.quotes?.quotes;
     let one = -1, n = 0;
     if (q) for (let i = 0; i < q.length; i++) if (q[i]!.action.type === 'addUnit' && !q[i]!.locked) { one = i; n++; }
-    if (n === 1 && q![one]!.currency === 'credits') out.br().icon('credits').text(payoutCount(Number(q![one]!.cost)), q![one]!.affordable ? 'gold' : 'dim');
+    if (n === 1 && q![one]!.currency === 'credits') out.br().icon('credits').text(payoutCount(Number(q![one]!.cost)), q![one]!.affordable ? 'gold' : 'shortfall');
   } else if (canAddRow(s)) {
     if (view.sourceActions?.includes('row')) return;
     const r = G.rowSite;

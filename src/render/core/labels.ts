@@ -6,13 +6,14 @@ import { toScreen } from './camera';
 import type { Camera, PixelRatio } from './camera';
 import type { Point, Rect } from './geom';
 import { SPR } from './sprites';
+import { P } from './palette';
 
-export type LabelTone = 'name' | 'silk' | 'value' | 'mute' | 'dim' | 'net' | 'cyan' | 'gold' | 'data' | 'warn' | 'ok' | 'rnd' | 'power' | 'preload' | 'fault';
+export type LabelTone = 'name' | 'silk' | 'value' | 'mute' | 'dim' | 'shortfall' | 'net' | 'cyan' | 'gold' | 'data' | 'warn' | 'ok' | 'rnd' | 'power' | 'preload' | 'fault';
 export type LabelAlign = 'left' | 'right' | 'center';
 export const TONE: Readonly<Record<LabelTone, string>> = {
   name: '#efeaff', silk: '#a99be6', value: '#e6dcff', mute: '#a99be6', dim: '#a49cd2', net: '#7be38f',
   cyan: '#a6f6ff', gold: '#ffcc3d', data: '#27d9a0', warn: '#ffb03b', ok: '#7dff9a', rnd: '#ff6bd6', power: '#ffcf9a',
-  preload: '#a8c6ff', fault: '#ff6b6b',
+  preload: '#a8c6ff', fault: '#ff6b6b', shortfall: P.steel,
 };
 export const TAG_FILL = 'rgba(14, 11, 28, 0.85)';
 /** CSS px. One body size and one line height per layout (Control deck: 16/24 desktop, 13/16 phone). */
