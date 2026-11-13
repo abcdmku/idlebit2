@@ -676,6 +676,24 @@ function researchLeftS(state: GameState): number {
     rate += (c.threadRate[id] ?? 0) * (c.threads[id] ?? 0) * (c.etaCfg[id] ?? 1);
   return rate > 0 ? Math.max(0, researchDef(r.active)!.work - r.activeProgress) / rate : Infinity;
 }
+/** D86: seconds of work left on the active project at its in-round share (a quarter of each system's threads, at least one). */
+function roundResearchLeftS(state: GameState): number {
+  const r = state.research;
+  if (r.active === null) return 0;
+  const c = state.compiled.sys;
+  let rate = 0;
+  for (let id = 0; id < c.len; id += 1) if (c.alive[id] === 1 && state.build.systems[id]?.online)
+    rate += (c.threadRate[id] ?? 0) * Math.max(1, Math.floor((c.threads[id] ?? 0) / 4)) * (c.etaCfg[id] ?? 1);
+  return rate > 0 ? Math.max(0, researchDef(r.active)!.work - r.activeProgress) / rate : Infinity;
+}
+/** A project that would crawl for hours in rounds but finishes in a short break: a player runs it between rounds. */
+const LONG_IN_ROUND_S = 3600, BREAK_RESEARCH_MAX_S = 1800;
+function breakBeatsRound(state: GameState): boolean {
+  if (state.research.active === null || state.research.stoppedInsolvent) return false;
+  const seconds = researchLeftS(state);
+  return roundResearchLeftS(state) > LONG_IN_ROUND_S && seconds <= BREAK_RESEARCH_MAX_S
+    && seconds * researchEnergy(state) <= Number(state.wallet.credits) * 0.6;
+}
 /** Finish an affordable project between rounds instead of paying its energy during a losing market. */
 function canFinishResearch(state: GameState): boolean {
   if (state.research.active === null || state.research.stoppedInsolvent) return false;
@@ -855,14 +873,14 @@ export function decide(state: GameState, policy: Policy, log: BotEvent[], need: 
       if (next) s = next;
     }
   }
-  const waitForResearch = canFinishResearch(s);
+  const waitForResearch = canFinishResearch(s) || breakBeatsRound(s);
   if (s.round.phase !== 'running' && waitForResearch && s.round.autoReturnOn) {
     const next = tryAction(s, { type: 'setAutoReturn', on: false });
     if (next) { log.push({ tick: s.clock.tick, kind: 'configure', label: 'Auto return off · finish research', cost: '0' }); s = next; }
   }
   // D27: research holds threads and the market waits behind it, so a player lets a short project
   // finish between rounds before returning.
-  const finishing = s.research.active !== null && !s.research.stoppedInsolvent && researchLeftS(s) <= RESEARCH_WAIT_S;
+  const finishing = s.research.active !== null && !s.research.stoppedInsolvent && (researchLeftS(s) <= RESEARCH_WAIT_S || breakBeatsRound(s));
   if (s.round.phase !== 'running' && finishing && s.hot.g[G.researchBreak] !== 1) {
     // Spec §11.3: a project carried over from the round waits for Return unless the player runs it now.
     const next = tryAction(s, { type: 'resumeResearch' });

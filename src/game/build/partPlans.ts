@@ -34,8 +34,9 @@ export function planReplaceCpu(state: GameState, system: SystemId): Plan {
     return null;
   };
   const cores = cpu.cores.map((c) => keep('core', c));
-  const cache = keep('cache', cpu.cache);
-  if (cores.some((c) => !c) || !cache) return fail('cap', 'A part would lose capacity', label);
+  if (cores.some((c) => !c)) return fail('cap', 'A part would lose capacity', label);
+  // D87: the new package's cache starts at L1. Carrying a levelled old cache's capacity priced the next generation out.
+  const cache: PartLevel = { gen: g, level: 1 };
   const next: CpuBuild = { cpu: { gen: g, level: 1 }, cores: cores as PartLevel[], clock: { gen: g, level: 1 }, cache };
   const price = cpuPrice(next, 1) * BigInt(spec.cpuCount);
   return planned({ build: withSpec(state.build, system, { ...spec, cpu: next }), price, cold: coldScopes(state, { kind: 'system', id: system }) }, label);

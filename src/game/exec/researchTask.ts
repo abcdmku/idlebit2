@@ -47,10 +47,12 @@ function hold(w: World, s: number, threads: number): void {
 }
 
 /**
- * Threads a holder keeps during a round (D27 amendment): one per system, a fine-grain shard on every system
- * with room, so research slows the market instead of stopping it. Between rounds it spreads over every thread.
+ * Threads a holder keeps during a round (D27 amendment, D86): a quarter of the system's threads, at least one,
+ * a fine-grain shard on every system with room, so research slows the market instead of stopping it and a
+ * many-core box researches at many-core speed. Between rounds it spreads over every thread.
  */
-const ROUND_THREADS = 1;
+const ROUND_THREAD_SHARE = 0.25;
+const roundThreads = (w: World, s: number): number => Math.max(1, Math.floor(hwThreads(w, s) * ROUND_THREAD_SHARE));
 
 /** A holder takes `more` free threads (between rounds), or gives |more| back (a round starts). */
 function grow(w: World, s: number, more: number): void {
@@ -130,8 +132,8 @@ export function researchTakePhase(w: World): boolean {
         const t = h.researchThreads[s]!;
         if (t === 0) continue;
         if (!researchesInMode(h.mode[s]!) || w.compiled.sys.intent[s] !== 1) release(w, s);
-        // In a round a holder keeps one thread: the market resumes on the rest (round start after a spread).
-        else if (running && t > ROUND_THREADS) grow(w, s, ROUND_THREADS - t);
+        // In a round a holder keeps its round share: the market resumes on the rest (round start after a spread).
+        else if (running && t > roundThreads(w, s)) grow(w, s, roundThreads(w, s) - t);
       }
     }
   }
@@ -147,9 +149,9 @@ export function researchTakePhase(w: World): boolean {
   for (let s = 0; s < w.compiled.sys.len; s += 1) {
     if (!canTake(w, s)) continue;
     const free = hwThreads(w, s) - h.busyThreads[s]!;
-    // In a round the holder claims its thread even while every thread runs a task: queued tasks wait
-    // behind it, and it starts researching when the next running task frees a thread (research.ts).
-    hold(w, s, w.round.phase === 'running' ? ROUND_THREADS : free);
+    // In a round the holder claims its threads even while every thread runs a task: queued tasks wait
+    // behind it, and it researches on each thread a running task frees (research.ts).
+    hold(w, s, w.round.phase === 'running' ? roundThreads(w, s) : free);
     if (w.round.phase === 'running') noteTake(w, s);
   }
   if (g[G.researchHolders]! === 0) return false;

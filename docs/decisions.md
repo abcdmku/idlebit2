@@ -2080,3 +2080,25 @@ Owner direction: a GHz box with two CPUs at 6 GHz, a decent card and 64 GB shoul
 2. **Flat energy per op.** CPU and RAM native ratio is 10 in the Hz era and 6 from kHz on (was 10, 6, 3, 2); GPU `eraScale` is 1, 1, 1 (was 1, 2, 3). A native MHz part bills half of what it did, a GHz part a third. Before this the GHz reference box drew 24 TW of sim power (24 MW shown).
 3. **Same overclocking wall.** MHz and GHz decay 0.92 and 0.908 per pushed level (was 0.95 and 0.9625), so a pushed core still loses marginal payback at L20 → L21 and L17 → L18 and runs at a loss from L23 and L20 (`hardware-progression.md` §3).
 4. **Pacing.** Hz and kHz rules are unchanged, so the campaign up to Room keeps its timings. Save shape is unchanged; `SAVE_VERSION` stays.
+
+## D85, 13 Nov: the starter PDU carries a Rack-era box
+
+Owner direction: the default supply should be closer to what a system uses as Rack unlocks. Before this the Basic PDU started at 1e6 sim W (140 µW shown), and the seed-42 and seed-1042 bots reached Rack with exactly 100% of it reserved, then bought L4–L5 within the hour and reserved 0.5–0.9 mW.
+
+1. **Base.** Basic PDU (`pdu` gen 0) base goes from 1e6 to 7.15e6 sim W: 1 mW at L1 (owner's figure), doubling per level as before. Prices and the Metered and Switched PDUs are unchanged.
+2. **Starter.** The starter allocation is the same part, so a pre-Rack build has about seven times the room before its buy keys show Full load or an overload trip can start.
+3. **Balance check (10 h, seeds 42, 1042, 2042, with D86).** Rack opens at 2:45–2:52 (band 3:30–5:00). A 4× base stalled all three seeds after Rack: the bot spent the room on up to 15 slow cores, and Rack-era research crawled on one in-round thread for about 5 h (seed 2042 already stalled this way at 1e6). D86 fixes the crawl. Open: with the bigger cap the bot also grows its Hz cache, and Replace CPU must keep cache capacity, so the kHz package costs about 380M Credits of value, mostly kHz cache, and seed 42 never leaves the Hz CPU (`docs/backlog.md`).
+
+## D86, 13 Nov: in-round research takes a quarter of the threads
+
+Owner direction: fix the post-Rack research crawl in both the game and the bot.
+
+1. **Game.** During a round a research holder keeps one slot and `max(1, floor(threads / 4))` threads (was one thread), and runs one fewer task per thread it holds. A one- to seven-thread box is unchanged; a 15-thread box researches three times as fast and gives up three more threads of market work. Between rounds holders still spread over every thread.
+2. **Bot.** When the active project would take more than an hour at the in-round share but finishes within 30 minutes on every thread, and its energy is under 60% of the wallet, the bot runs it between rounds before returning.
+3. **Check.** Seeds 1042 and 2042 now finish 47 research nodes in 10 h (22 with the 4× PDU alone); seed 42 finishes 25, held back by the CPU replacement price in D85 item 3.
+
+## D87, 13 Nov: Replace CPU starts the new cache at L1
+
+Owner direction, closing D85 item 3. Replace CPU installs the new generation's cache at L1 instead of the lowest level that keeps the old capacity. kHz L1 holds 1,024 bits, more than a Hz cache up to L11; larger working sets spill to RAM until the player levels it. Cores still keep capacity. The seed-42 kHz package falls from about 380M Credits of value to under 1M.
+
+**Check (10 h, seeds 42, 1042, 2042, with D84–D86).** Every seed leaves the Hz CPU by 0:46–1:10 and grows: 9–12 systems, 53–61 research nodes, 2.6B–26.8B Credits and 0.5B–1.5B Data at 10 h (was 1 system and 1.27B Credits). Rack opens at 1:35–1:45, ahead of its 3:30–5:00 band. A Rack Data price of 1M or 2.5M (from 270k) moves it only to about 2:00, because income now compounds; pacing is open in `docs/backlog.md`.
