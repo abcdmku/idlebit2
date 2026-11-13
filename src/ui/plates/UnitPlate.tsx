@@ -62,6 +62,7 @@ export function ServerPlate({ slot, servers, onGoInside, onStep, ...common }: Se
   return <UnitPlate {...common} bootS={s.timerTotalS ?? common.bootS} className="server" unit={{ kind: 'system', id: s.systemId }} title={`Server ${slot + 1}`}
     sub={s.kind === 'storageNode' ? 'Storage node' : undefined} status={status}
     mode={s.state} timerS={s.timerS}>
+    <Key tone="row" label="Open system" onPress={onGoInside} />
     <div className="key-pair">
       <Key tone="row" label={`‹ Server ${(nb?.[0] ?? slot) + 1}`} ariaLabel="Previous server" disabled={!nb} onPress={() => nb && onStep(nb[0])} />
       <Key tone="row" label={`Server ${(nb?.[1] ?? slot) + 1} ›`} ariaLabel="Next server" disabled={!nb} onPress={() => nb && onStep(nb[1])} />

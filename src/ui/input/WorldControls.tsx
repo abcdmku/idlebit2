@@ -6,7 +6,7 @@ import { regionName, SLOT_TITLE, UNIT_NOUN } from '../plates/copy';
 import { useLayout } from '../shell/geometry';
 import { useShell } from '../storeHooks';
 import { LEVEL_NAMES } from '../viewState';
-import { activateTarget } from './commands';
+import { activateTarget, openTargetMenu } from './commands';
 import { FirstBuy } from './FirstBuy';
 import { SourceControl } from './SourceControl';
 import { sourceRequest } from './sourceAction';
@@ -97,6 +97,10 @@ export function WorldControls() {
     {targets.map(t => <button key={t.id} type="button" className="world-key" aria-label={targetLabel(t)}
       ref={el => { if (el) buttons.current.set(t.id, el); else buttons.current.delete(t.id); }}
       onFocus={() => focus(t.id)} onBlur={() => shell.surface.renderer?.press(null)}
+      onKeyDown={event => {
+        if (event.key !== 'ContextMenu' && !(event.shiftKey && event.key === 'F10')) return;
+        event.preventDefault(); openTargetMenu(shell, current.current.get(t.id) ?? null);
+      }}
       onClick={() => { const live = current.current.get(t.id); if (live) activateTarget(shell, live); }}>{targetLabel(t)}</button>)}
     {targets.filter(t => sourceRequest(t, shell.store.getSnapshot().focus)).map(t => <SourceControl key={`source-${t.id}`} target={t} />)}
     <FirstBuy targets={targets} />

@@ -3,6 +3,7 @@
 import type { HitTarget } from '../../render/core';
 import type { ShellContextValue } from '../storeHooks';
 import { hasPlate } from '../plates/PlateLayer';
+import { targetUnit } from '../plates/market';
 import { isAdd, tapAdd } from './addTap';
 import { actionAtSource, runSourceAction } from './sourceAction';
 
@@ -21,6 +22,16 @@ export function activateTarget(shell: Shell, hit: HitTarget | null): void {
   // Slots with a build choice open that picker. A single installation buys on its source above.
   if (isAdd(hit)) { tapAdd(shell, hit); return; }
   shell.view.dispatch({ type: 'select', target: hit, plate: hasPlate(hit, shell.store.getSnapshot().focus) });
+}
+
+/** A held unit opens its overview in place, without drilling or buying. */
+export function openTargetMenu(shell: Shell, hit: HitTarget | null): void {
+  if (!hit) return;
+  const focus = shell.store.getSnapshot().focus;
+  const unit = targetUnit(hit) ?? (focus.level === 'system' || focus.level === 'chip' ? { kind: 'system' as const, id: focus.systemId } : null);
+  if (!unit) return;
+  if (unit.kind !== 'system' && !(unit.kind === 'rack' && focus.level === 'rack')) return;
+  shell.view.dispatch({ type: 'select', target: { ...hit, kind: 'unit', unit, part: null, sw: null, port: null, rect: { ...hit.rect } }, plate: true });
 }
 
 export function zoomGesture(shell: Shell, direction: 'in' | 'out', hit: HitTarget | null): void {

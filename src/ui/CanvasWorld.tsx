@@ -24,7 +24,7 @@ const rackRestPan: PanTarget = {
   setDragging: on => { rackRowScroll.setDragging(on); restPan.setDragging(on); },
   release: (vx, vy) => { rackRowScroll.release(vx); restPan.release(0, vy); },
 };
-import { activateTarget, zoomGesture } from './input/commands';
+import { activateTarget, openTargetMenu, zoomGesture } from './input/commands';
 import { bindGestures, type PanHandler } from './input/gestures';
 import { useLayout } from './shell/geometry';
 import { useShell } from './storeHooks';
@@ -123,6 +123,7 @@ export function CanvasWorld() {
         return null;
       },
       pan,
+      menu: hit => openTargetMenu(shell, hit),
       hover: hit => { hoverId = hit?.id ?? null; },
       tap: hit => {
         // A darkened rack in the row becomes active where it stands; the camera does not move.
@@ -141,5 +142,5 @@ export function CanvasWorld() {
   // A new layout (resize, safe areas) re-frames the world.
   useEffect(() => { rendererRef.current?.resize(layout.w, layout.h, window.devicePixelRatio || 1, layout.world, framingOf(layout)); }, [layout]);
   return <canvas ref={ref} className="world" tabIndex={0} style={{ width: layout.w, height: layout.h }}
-    aria-label="Compute world. Tap a part for its upgrade, pinch or scroll to zoom." />;
+    aria-label="Compute world. Tap hardware to open it. Hold or right-click a system for its menu. Pinch or scroll to zoom." />;
 }

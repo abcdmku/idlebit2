@@ -57,6 +57,7 @@ export function configKind(owner: LevelSnapshot['level'], parent: ScopeRef): Con
 
 /** The quote request a selected target's plate needs. Pure, so tests can check the routing. */
 export function plateRequest(t: HitTarget, focus: LevelSnapshot): QuoteRequest | null {
+  if (t.kind === 'unit' && t.unit) return t.unit.kind === 'system' || t.unit.kind === 'rack' ? { kind: 'unit', unit: t.unit } : null;
   // D31.3: the rack's fifth infrastructure slot, under the cooler.
   if (isPowerCtl(t) && focus.level === 'rack') return { kind: 'power', unit: { kind: 'rack', id: focus.rackId } };
   if (isCores(t)) return null;
@@ -116,7 +117,7 @@ export function hasPlate(t: HitTarget, focus: LevelSnapshot): boolean {
 /** A zone's entry has no part of its own. Server links start at Rack. */
 export const isInbound = (t: Pick<HitTarget, 'kind' | 'id' | 'part'>) => t.kind === 'link' && !t.part && (t.id === 'entry' || t.id === 'pipe');
 
-export const isCores = (t: Pick<HitTarget,'id'|'part'>) => t.id==='cores'||t.part?.slot.kind==='core';
+export const isCores = (t: Pick<HitTarget,'id'|'part'|'kind'>) => t.kind !== 'unit' && (t.id==='cores'||t.part?.slot.kind==='core');
 
 /** The router a target is (D25.7): the rack LB, the room LB in the network rack, or the global scheduler. */
 export function routerOf(t: HitTarget, focus: LevelSnapshot): ScopeRef | null {
@@ -238,6 +239,15 @@ function TargetPlate({ target: t, focus }: { target: HitTarget; focus: LevelSnap
   };
 
 
+  const save = (unit: UnitRef) => view.dispatch({ type: 'select', target: { ...t, id: `${t.id}:save`, kind: 'save', unit, rect: { ...t.rect } } });
+  if (t.kind === 'unit' && t.unit) return unitPlate(t.unit, focus, { ...common, onSave: save, market: marketOf(shell.store.getState(), t.unit), rowQuote, select: target => view.dispatch({ type: 'select', target, plate: true }) }, (slot) => {
+    if (focus.level !== 'rack') return;
+    const id = focus.servers[slot]?.systemId;
+    if (id == null) return;
+    const target = surface.renderer?.getTargets().find(target => target.drill?.level === 'system' && target.drill.id === id);
+    if (target) view.dispatch({ type: 'select', target: { ...target, kind: 'unit', unit: { kind: 'system', id }, slot }, plate: true });
+  }, () => { if (t.drill) view.dispatch({ type: 'drill', ref: t.drill }); }, selectUnitLabel(shell.store.getState(), t.unit));
+
   const gpuSlot = gpuPlateSlot(t, focus);
   if (gpuSlot !== undefined && focus.level === 'system') {
     const installed = gpuSlot === null ? undefined : focus.gpu.find(p => p.slot === gpuSlot);
@@ -284,12 +294,6 @@ function TargetPlate({ target: t, focus }: { target: HitTarget; focus: LevelSnap
       room={focus.roomId} zone={focus.zone} network={focus.network} racks={focus.racks.filter((r) => r.rackId !== null).length} initialPort={t.port} />;
     return null;
   }
-  const save = (unit: UnitRef) => view.dispatch({ type: 'select', target: { ...t, id: `${t.id}:save`, kind: 'save', unit, rect: { ...t.rect } } });
-  if (t.kind === 'unit' && t.unit) return unitPlate(t.unit, focus, { ...common, onSave: save, market: marketOf(shell.store.getState(), t.unit), rowQuote, select: target => view.dispatch({ type: 'select', target, plate: true }) }, (slot) => {
-    const next = { ...t, id: `${t.id.replace(/\d+$/, '')}${slot}`, slot, unit: focus.level === 'rack' && focus.servers[slot].systemId !== null
-      ? { kind: 'system', id: focus.servers[slot].systemId! } as UnitRef : t.unit };
-    view.dispatch({ type: 'select', target: next });
-  }, () => { if (t.drill) view.dispatch({ type: 'drill', ref: t.drill }); }, selectUnitLabel(shell.store.getState(), t.unit));
   if ((t.kind === 'part' || t.kind === 'link') && t.part) {
     const s = t.part.slot;
     if (s.kind === 'pdu' && focus.level === 'rack') return <SupplyPlate {...common} quotes={quotes} supply={focus.pdu}></SupplyPlate>;

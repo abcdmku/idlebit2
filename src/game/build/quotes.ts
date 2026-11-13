@@ -35,6 +35,7 @@ import { gpuAsType, gpuAtGeneration, gpuModel } from './catalog/gpuModels';
 import { installedGpuStats } from './gpu';
 import { planInstallGpu } from './gpuPlans';
 import { planDowngrade } from './maintenance';
+import { planRemoveUnit } from './units';
 import { gpuPowerPreview } from './gpuPower';
 import { overSupply } from './overSupply';
 import { planRamEcc } from './eccPlans';
@@ -49,6 +50,7 @@ export function quote(state: GameState, request: QuoteRequest): QuoteResult {
 
 function quotesFor(state: GameState, r: QuoteRequest): Quote[] {
   switch (r.kind) {
+    case 'unit': return [toQuote(state, { type: 'removeUnit', unit: r.unit }, planRemoveUnit(state, r.unit))];
     case 'gpuModels': return gpuOffers(state, r.system, r.index, r.generation).map((model) =>
       toQuote(state, { type: 'installGpu', system: r.system, index: r.index, model }, planInstallGpu(state, r.system, model, r.index)));
     case 'part': return r.minimumCapacity ? supplyPlans(state, r.part, r.minimumCapacity).map(({ action, plan }) => toQuote(state, action, plan, effectOf(state, r.part, plan))) : partQuotes(state, r.part);

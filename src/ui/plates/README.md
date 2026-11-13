@@ -18,6 +18,8 @@ RAM and drives show separate Space and Speed rows. Each row contains its current
 
 One-action hardware buys on its source control with price and stat gain (D72). Links, one-choice empty slots and parts without another generation or operating setting do not open a confirmation popup. Power and wallet limits disable that control in place. A choice between builds, generations or operating settings keeps its menu. Navigating to a simple part reveals the source control without purchasing it.
 
+D93: a locked next upgrade opens the installed component's panel first; its Research key opens the project. A hold of 500 ms, right-click or keyboard menu key opens a server's system menu in place. The menu includes Remove system with the simulation's removal quote and refunds; the starter system's key is disabled. Drags, pinch and canceled pointers cannot open the menu, and release cannot also activate a menu key.
+
 Component popups show current facts and buy only that component. Shared purchase text is in purchaseText.ts; QuoteKey renders the action, price and gain in one 44px button. A power limit disables that same button and displays Can't upgrade / No available power. RAM and drives use two 36px rows for independent Space and Speed changes. Generation changes start both tracks at level 1. While research locks the next generation, its key reads Research and opens the required research entry without purchasing or starting it. Once unlocked, it shows the target name, quoted specs and price and buys that component.
 
 

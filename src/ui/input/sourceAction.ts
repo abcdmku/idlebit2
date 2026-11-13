@@ -77,6 +77,8 @@ export function sourceAction(target: HitTarget, focus: LevelSnapshot, quotes: re
     const available = own.filter(q => q.locked?.code !== 'research' && q.locked?.code !== 'ceiling' && q.locked?.code !== 'cap');
     const q = step ?? (available.length === 1 ? available[0] : next);
     if (!step && available.length > 1) return null;
+    // Inspect the hardware first. Its Research key is the explicit route to a locked upgrade.
+    if (q?.locked?.code === 'research') return null;
     return q ? { name: partFacts(focus, target.part!.slot)?.title ?? SLOT_TITLE[kind], quote: q,
       gain: purchaseGain(q), kind: 'part', choice: false } : null;
   }

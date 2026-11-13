@@ -1,10 +1,12 @@
 import type { Amount } from '../amount';
 import type { InfraSlot } from './catalog';
 import type { GameAction } from './actions';
-import type { NodeRef, PartRef, RackId, ResearchId, RoomId, ScopeRef, SiteId, SwitchRef, SystemId } from './ids';
+import type { NodeRef, PartRef, RackId, ResearchId, RoomId, ScopeRef, SiteId, SwitchRef, SystemId, UnitRef } from './ids';
 import type { GpuGeneration, GpuStats } from './gpu';
 
 export type QuoteRequest =
+  /** Removal eligibility and refunds from the same planner as removeUnit. */
+  | { readonly kind: 'unit'; readonly unit: UnitRef }
   | { readonly kind: 'gpuModels'; readonly system: SystemId; readonly index: number | null; readonly generation: GpuGeneration }
   /** The 4 primary tray items, followed by per-core upgrade quotes at chip level. */
   | { readonly kind: 'tray'; readonly at: NodeRef }

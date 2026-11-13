@@ -2151,3 +2151,9 @@ Owner direction: level 36 research is end game. Package C-states must not requir
 `packageC` requires `cstate1` instead of `cstate36`. Its processor work, price and idle-power effect stay as defined. The first C-state purchase opens the package project; later C-state purchases keep improving the idle cores independently.
 
 No save change.
+
+## D93, 13 Nov: hardware opens first; hold a system for its menu
+
+Hardware selection opens the hardware's own view or component panel. A locked next upgrade does not redirect an installed component to Research; its explicit Research key opens that project. Empty installation sites keep their existing research links and direct purchases. A pointer gesture consumes its trailing click so opening a panel cannot also activate a newly shown key.
+
+Hold a server for 500 ms to open its system menu in place. Right-click and the keyboard menu key or Shift+F10 do the same. A short tap still opens the system. Movement, a second pointer, cancellation and zoom cancel the hold. The menu offers Open system, On market, server navigation and Remove system with the simulation's quoted refunds. The starter system remains protected. Removing a system while inside it returns to its rack. Removal rules, prices and the save shape are unchanged.
