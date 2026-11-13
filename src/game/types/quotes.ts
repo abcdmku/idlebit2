@@ -93,14 +93,6 @@ export interface EffectPreview {
   /** RAM bandwidth or drive IO for this part, bit/s, when capacity alone would hide a trade-off. */
   readonly throughputBefore?: number;
   readonly throughputAfter?: number;
-  /**
-   * A power supply change only: its loss before and after, in percent of delivered watts at
-   * typical load (×1 up to 90% usage; exact, the UI rounds). wattsBefore/After are then the
-   * system's input power at its current draw (delivered + loss), so the energy delta and payback
-   * are the saving.
-   */
-  readonly lossPctBefore?: number;
-  readonly lossPctAfter?: number;
 }
 /** Full-load system power at the current research and environment. */
 export interface GpuPowerPoint {
@@ -116,7 +108,7 @@ export interface GpuPowerPreview {
   readonly after: GpuPowerPoint;
 }
 /** A hardware purchase blocked by its rack, zone or site full-load allocation, in view watts. */
-export interface OverSupply { readonly part: 'psu' | 'pdu' | 'ups' | 'grid'; readonly capW: number; readonly afterW: number; readonly rack?: RackId; readonly room?: RoomId; readonly site?: SiteId }
+export interface OverSupply { readonly part: 'pdu' | 'ups' | 'grid'; readonly capW: number; readonly afterW: number; readonly rack?: RackId; readonly room?: RoomId; readonly site?: SiteId }
 
 export interface Quote {
   /** Set when the plan's full-load draw would exceed a supply; absent otherwise. */

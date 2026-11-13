@@ -29,11 +29,3 @@ export interface WorkTreeNode {
   readonly ops: Amount;
   readonly primitive: boolean;
 }
-export interface TaskWorkTree {
-  readonly root: WorkTreeNode;
-  readonly current: WorkTreeNode;
-  readonly note: string;
-  readonly path: readonly string[];
-  readonly ancestors: readonly WorkTreeNode[];
-  readonly children: readonly WorkTreeNode[];
-}

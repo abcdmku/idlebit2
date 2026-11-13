@@ -193,7 +193,7 @@ The table uses a native `G990` at full utilization, memory multiplier 1, no HBM,
 
 Apply the existing `eta_cfg * e(T)` once to effective GPU throughput and existing heat policy once to heat. Never change gates when throttling changes clock. Before Rack, `e(T)=1`. Idle and utilization must be per device: an unused card draws its idle watts, not full load because another GPU is busy. Research draws real GPU load watts too; current `phys/draw.ts` only checks GPU task activity and needs that integration fix.
 
-At the home price 0.01 Credits/J, native 1330 uses 2,200 W at 4,000 ops/s, spending 0.55% of its GPU work payout on GPU energy. Native 1530 uses 550 W at 1,000 ops/s. Neither fits the 256 W starter PSU by itself. An 80 Plus supply at native 1,024 W fits the latter, with 474 W left for other parts; level 3 gives 4,096 W for the former, with 1,896 W left. Quotes must include the whole system load and supply losses, not promise these headrooms for the complete system.
+At the home price 0.01 Credits/J, native 1330 uses 2,200 W at 4,000 ops/s, spending 0.55% of its GPU work payout on GPU energy. Native 1530 uses 550 W at 1,000 ops/s. The board power supply this example sized against is removed (D80); the limit is now the rack PDU allocation (spec §9.2). Quotes must include the whole system load and supply losses, not promise these headrooms for the complete system.
 
 ## Upgrade or replace, with numbers
 

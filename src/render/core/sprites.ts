@@ -34,11 +34,6 @@ export function pix(rows: readonly string[], map: Readonly<Record<string, string
   return canvas;
 }
 export function stamp(g: CanvasRenderingContext2D, sprite: CanvasImageSource, x: number, y: number): void { g.drawImage(sprite, x | 0, y | 0); }
-export function dataURL(canvas: HTMLCanvasElement, scale = 1): string {
-  if (scale === 1) return canvas.toDataURL();
-  const out = document.createElement('canvas'); out.width = canvas.width * scale; out.height = canvas.height * scale;
-  context2d(out).drawImage(canvas, 0, 0, out.width, out.height); return out.toDataURL();
-}
 const COIN5 = ['.kkk.', 'kwyyk', 'kyyok', 'kyook', '.kkk.'];
 const COIN8 = ['..kkkk..', '.kwyyyk.', 'kwyyyyok', 'kwyyyyok', 'kyyyyyok', 'kyyyyook', '.kooook.', '..kkkk..'];
 const GEM8 = ['...kk...', '..kwtk..', '.kwttdk.', 'kwtttddk', 'kttttddk', '.kttddk.', '..kddk..', '...kk...'];

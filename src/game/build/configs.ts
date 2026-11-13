@@ -109,8 +109,7 @@ export function mergeSpec(have: SystemSpec, want: SystemSpec): { spec: SystemSpe
   m.price += accelerators.price;
   m.cold ||= accelerators.cold;
   const drives = mergeList(() => PARTS.storage, have.drives, want.drives, m);
-  const psu = have.psu;
-  const merged: SystemSpec = { ...want, cpu, scheduler: scheduler && want.scheduler ? { ...scheduler, strategy: want.scheduler.strategy } : null, ram, accels, drives, psu };
+  const merged: SystemSpec = { ...want, cpu, scheduler: scheduler && want.scheduler ? { ...scheduler, strategy: want.scheduler.strategy } : null, ram, accels, drives };
   const same = JSON.stringify(merged) === JSON.stringify(want);
   return { spec: same ? want : merged, price: m.price, cold: m.cold, accelCold: accelerators.cold };
 }
@@ -137,7 +136,7 @@ export function planApplyConfig(state: GameState, unit: UnitRef, name: string): 
     const l = rackLock(u, want);
     const m: Merge = { price: 0n, cold: false };
     const cooler = { ...mergePart(PARTS.rackCooler, rack.cooler, want.cooler, m)!, setpointF: want.cooler.setpointF };
-    const pdu = { ...mergePart(PARTS.pdu, rack.pdu, want.pdu, m)!, capped: want.pdu.capped };
+    const pdu = mergePart(PARTS.pdu, rack.pdu, want.pdu, m)!;
     const lbPart = mergePart(PARTS.lb, rack.lb, want.lb, m)!;
     // Queue slots only grow, like part levels: the steps from the rack's level to the saved one.
     const queueLevel = Math.max(rack.lb.queueLevel, want.lb.queueLevel);

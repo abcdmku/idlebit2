@@ -124,9 +124,3 @@ export class ZoomTransition {
   }
   get finished(): boolean { return this.state.progress >= 1 && !this.isHeld; }
 }
-
-/** How far `key`'s full world has faded in over its mini: 0 off-path or at rest. */
-export function transitionAlpha(state: ZoomState | null, key: string): number {
-  if (state) for (let i = 0; i < state.path.length; i++) if (state.path[i].key === key) return state.alphas[i];
-  return 0;
-}

@@ -54,7 +54,7 @@
 .v3-plate .memory-track .memory-down:disabled { color: #5d5296; }
 .v3-plate .memory-track .memory-down:disabled::after { border-color: #2c2552; }
 .v3-plate .plate-footer .key { min-height: 44px; }
-.v3-plate .cx-tog, .v3-plate .cx-row { min-height: var(--ctl); padding-top: 2px; padding-bottom: 2px; }
+.v3-plate .cx-tog { min-height: var(--ctl); padding-top: 2px; padding-bottom: 2px; }
 .v3-plate .sys-summary { margin-top: 4px; gap: 2px; }
 .v3-plate .sum-row { min-height: 44px; padding: 2px 4px; }
 .v3-plate .start-row { margin-top: 4px; gap: 4px; }
@@ -65,8 +65,6 @@
 .v3-plate .port-list { margin-top: 4px; gap: 4px; }
 .v3-plate .routing-picker { margin: 4px 0; }
 .v3-plate .filter-options { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 2px 6px; }
-.v3-plate .filter-options .cx-row { min-width: 0; column-gap: 4px; }
-.v3-plate .filter-options .cx-rows { display: contents; }
 /* Visible controls share a compact row rhythm; short panels never reserve empty rows. */
 .v3-plate { width: 352px; --s3: 8px; }
 /* Control size (D73). A mouse gets compact 32px controls. A phone layout or any coarse pointer gets 40px controls
@@ -76,8 +74,8 @@
 .l-phone .v3-plate { --ctl: 40px; --hit: -2px; }
 @media (pointer: coarse) { .v3-plate { --ctl: 40px; --hit: -2px; } .v3-plate .choice-strip button { min-width: 44px; } }
 .l-phone .v3-plate .choice-strip button { min-width: 44px; }
-.v3-plate :is(.choice-strip button, .route-filter, .queue-batching, .cx-tog, .cx-row, .setpoint .step, .range-setting label) { position: relative; min-height: var(--ctl); }
-.v3-plate :is(.choice-strip button, .route-filter, .queue-batching, .cx-tog, .cx-row, .setpoint .step, .range-setting label)::after { content: ''; position: absolute; inset: var(--hit) 0; }
+.v3-plate :is(.choice-strip button, .route-filter, .queue-batching, .cx-tog, .setpoint .step, .range-setting label) { position: relative; min-height: var(--ctl); }
+.v3-plate :is(.choice-strip button, .route-filter, .queue-batching, .cx-tog, .setpoint .step, .range-setting label)::after { content: ''; position: absolute; inset: var(--hit) 0; }
 .v3-plate .range-setting input[type="range"] { height: calc(var(--ctl) - 2 * var(--hit)); }
 /* The title and its subtitle each stay on one line; the keys keep their place at the right. */
 .v3-plate.has-x .p-head { padding-right: 0; min-height: 36px; align-items: center; flex-wrap: nowrap; }
@@ -213,7 +211,6 @@
  .l-phone .v3-plate.hardware-queue { width: 660px; }
 }
 .v3-plate .lb-wells { flex-basis: auto; }
-.v3-plate .routing-controls .filter-options .cx-row { padding-inline: 4px; }
 /* A data plane in a short landscape: its routing on the left, its purchases in a column on the right, all in view. */
 @media (min-width: 700px) and (max-height: 480px) {
  .v3-plate:has(.site-routing) { width: 800px; grid-template-columns: minmax(0,1fr) 248px; grid-template-rows: auto minmax(0,1fr) auto; column-gap: 12px; }

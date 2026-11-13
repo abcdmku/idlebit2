@@ -3,15 +3,13 @@
 // load balancer; the door in the back wall walks to the site's next zone. The hall is planned for
 // the free world it rests in (layout.ts): every method lays the live hall out for its snapshot first.
 import { P, R, copyRect, px, setRect } from '../../core';
-import type { LevelRegistry, LevelRenderer, Rect } from '../../core';
+import type { LevelRegistry, LevelRenderer } from '../../core';
 import { createFanBank } from '../rack/art';
 import { MINI_SIZE, drawRoomMini } from './mini';
 import { roomChildren, roomTargets } from './targets';
 import { canAddRow, drawWorld } from './world';
-import { roomPowered } from './state';
 import { roomLabels } from './labels';
-import { BOH, COLS, G, WORLD_X, planFor, useRows } from './layout';
-import { upsCabinets, upsFoot } from './infra';
+import { COLS, G, WORLD_X, planFor, useRows } from './layout';
 
 
 function icon(g: CanvasRenderingContext2D): void {
@@ -70,17 +68,6 @@ export function createRoomRenderer(registry: LevelRegistry): LevelRenderer<'room
     },
     panSnap: () => ({ x: 0, y: G.pitch }),
     targets: (s, _view, out, from) => { useRows(s.rows); return roomTargets(s, out, from); },
-    faults(s, out: Rect[]) {
-      let n = 0;
-      const G0 = useRows(s.rows), RACK_RECTS = G0.racks, bank = upsCabinets(s.ups);
-      if (s.crashed && n < out.length) setRect(out[n++], G0.ix + 8, G0.iy + 8, G0.iw - 16, 4);
-      if (!roomPowered(s) && bank > 0 && n < out.length) { const f = upsFoot(bank - 1, bank); setRect(out[n++], f.x, f.y - BOH.z, f.w, f.h + BOH.z); }
-      for (let i = 0; i < Math.min(s.racks.length, s.rows * COLS) && n < out.length; i++) {
-        const k = s.racks[i];
-        if (k.rackId !== null && k.state === 'crashed') copyRect(RACK_RECTS[i], out[n++]);
-      }
-      return n;
-    },
     icon,
   };
 }

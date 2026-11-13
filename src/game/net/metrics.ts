@@ -89,25 +89,14 @@ export function linkSpeedOf(w: World, kind: number, u: number): number {
   return l < 0 ? Infinity : c.link.speed[l]! * Math.max(1, c.link.channels[l]!);
 }
 
-/** Last tick's usage of the candidate's own supply (rack LB: the PSU; room: the PDU; site: the UPS; global: the grid). */
+/** Last tick's usage of the candidate's own supply (room: the PDU; site: the UPS; global: the grid). A system has none. */
 export function supplyUsage(w: World, kind: number, u: number): number {
   const h = w.hot;
   switch (kind) {
-    case RACK: return h.sys.psuUsage[u]!;
+    case RACK: return 0;
     case ROOM: return h.rack.pduUsage[u]!;
     case SITE: { let m = 0; for (let k = 0; k < MAX_UPS; k += 1) m = Math.max(m, h.room.upsUsage[u * MAX_UPS + k]!); return m; }
     default: return h.site.gridUsage[u]!;
-  }
-}
-
-/** Overload timer of the candidate's own supply is running (spec §8.4 power / health). */
-export function supplyOver(w: World, kind: number, u: number): boolean {
-  const h = w.hot;
-  switch (kind) {
-    case RACK: return h.sys.psuOverTicks[u]! > 0;
-    case ROOM: return h.rack.pduOverTicks[u]! > 0;
-    case SITE: { for (let k = 0; k < MAX_UPS; k += 1) if (h.room.upsOverTicks[u * MAX_UPS + k]! > 0) return true; return false; }
-    default: return h.site.gridOverTicks[u]! > 0;
   }
 }
 

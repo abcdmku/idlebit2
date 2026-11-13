@@ -27,7 +27,7 @@ export function readPart(build: BuildState, ref: PartRef): PartAt | null {
       case 'cpu': case 'clock': case 'cache': return at(slot.kind, cpu?.[slot.kind]);
       case 'core': return at('core', cpu?.cores[slot.index]);
       case 'scheduler': return at('scheduler', sys.scheduler);
-      case 'psu': return at('psu', sys.psu);
+
       case 'ram': return at('ram', sys.ram[slot.index]);
       case 'gpu': {
         const a = sys.accels[slot.index];
@@ -105,7 +105,7 @@ export function writePart(build: BuildState, ref: PartRef, gen: number, level: n
     let next: SystemSpec | null = null;
     if (isChipSlot(ref)) next = writeChip(sys, ref, gen, level);
     else if (slot.kind === 'scheduler') next = sys.scheduler && { ...sys, scheduler: setLevel(sys.scheduler, gen, level) };
-    else if (slot.kind === 'psu') next = { ...sys, psu: setLevel(sys.psu, gen, level) };
+
     else if (slot.kind === 'ram' && sys.ram[slot.index]) next = { ...sys, ram: replaceAt(sys.ram, slot.index, setMemory(sys.ram[slot.index]!, gen, level)) };
     else if (slot.kind === 'gpu' && sys.accels[slot.index]) {
       const card = sys.accels[slot.index]!;

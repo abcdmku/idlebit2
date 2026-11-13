@@ -57,5 +57,3 @@ export function placePlate(a: Rect | null, w: number, content: number, safe: Rec
   }
   return below >= above ? { x, y: a.y + a.h + 8, w, h, room: h } : { x, y: a.y - 8 - h, w, h, room: h };
 }
-
-export const intersects = (p: Rect, q: Rect) => p.x < q.x + q.w && q.x < p.x + p.w && p.y < q.y + q.h && q.y < p.y + p.h;

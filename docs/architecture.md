@@ -39,21 +39,21 @@ The order is fixed, and each phase has one owning domain. Rates hold for the who
 
 | # | Phase | Owner | Does |
 |---|---|---|---|
-| 1 | `timers` | core | Boot timers (one shared boot time covers online/offline transitions, post-failure reboot, mid-round add and cold change, D1.8), drain, auto-return, C-state and S3 timers. All are counted in ticks. |
+| 1 | `timers` | core | Boot timers (one shared boot time covers online/offline transitions, mid-round add and cold change, D1.8), drain, auto-return, C-state and S3 timers. All are counted in ticks. |
 | 2 | `market` | market | Advances round-age difficulty, consumes each due saved slot every 20 ticks into pending work and refills the five-task schedule. Marked slots retire at arrival without an outcome. RNG is used only for plan generation, including initialization and round preparation. |
 | 3 | `links` | net | Advances every link clock. A transfer that finishes a hop enters the next link on its reserved path, or arrives at its server. |
 | 4 | `route` | net | D25: shard stealing; then each router queue dispatches FIFO, top-down (global → data plane → room LB → rack LB); then the top router takes heads. One `split` builds the tree for a take or a dispatch. It narrows candidates to children with room (or a free queue slot), applies filters and strategy shares, and cuts whole-unit shards of at least the effective grain. It reserves every slot and queue entry atomically and enqueues one transfer per shard. Minimum splits (`members`) use the same path. A head with no split and a full top queue stays in the market (D1.5). No routing budget (D12.5). |
 | 5 | `admit` | exec | Arriving shard transfers take their reserved slot (running or the scheduler queue). Before Rack the lone system pulls the head itself. Gates are checked per shard here; a shard the server cannot run fails its whole task as `misroute` and aborts its siblings. |
 | 6 | `run` | exec | Resource clocks advance; shard completions, stage transitions and in-tick carry happen; a task whose last shard completes is met and tallied once with its full payout (D25.5); research compute is tallied. |
 | 7 | `deadlines` | market | At the end of `arrival + 99`, after pickup opportunities, fails unpicked work once: `cantRun` for still-unsupported pending work, `timeout` otherwise. Future slots have no active pickup clock. |
-| 8 | `power` | phys | Draws, usage, overload timers, supply failure and reboot, PSU heat multipliers, joules per site. |
-| 9 | `thermal` | phys | Rack and room lumps, cooling and setpoints, e(T) for the next tick, crash timers, crash and recovery. |
+| 8 | `power` | phys | Draws at each lump's thermal duty, usage, supply losses, joules per site. No overload timers or supply failures (D80). |
+| 9 | `thermal` | phys | Rack and room lumps with the duty stop, cooling and setpoints, e(T) and throttle state for the next tick. Heat never crashes a unit (D67, D80). |
 | 10 | `ledger` | core | Adds `count × price` payouts and the per-site energy bills to the wallet as `Amount`. Stops between-round research if Credits can't pay. |
 | 11 | `round` | market | SLA check. Below 80% the round ends inside this tick: every record is freed, every unit is paused and the report is written. Retire unused forecast IDs and prepare the next round's five tasks once at relative offsets +2 through +10 seconds. |
 | 12 | `research` | build | Applies tallied research ops to the active project. Completion applies effects and recompiles the affected units. |
 | 13 | `events` | core | Appends the tick's cohort events to the ring and updates lifetime counters. |
 
-Work lost in phases 8 and 9 is counted as failed with cause `overload` or `heat` at that tick. A unit that fails or crashes in tick *t* draws nothing from tick *t+1*.
+Phases 8 and 9 lose no work: the `power` and `heat` failure causes and the `dark` and `crashed` states are removed (D80).
 
 ### 1.3 State layout
 
@@ -89,14 +89,14 @@ export interface GameState {
 
 **Per-system hot fields**, with the writing phase in brackets:
 
-- `state` (u8: empty, offline, booting, idle, running, sleep, paused, dark, crashed, draining) and `timer` (u16 ticks) [timers, power, thermal]
+- `state` (u8: empty, offline, booting, idle, running, sleep, paused, draining; D80 removed dark and crashed) and `timer` (u16 ticks) [timers]
 - for each resource `r` in {cpu, ram, gpu, io}: `wAnchor`, `eAnchor`, `rate`, `due` (f64), `head` (i32 record), `active` (u16) [exec]
 - `busyThreads`, `usedCache`, `usedRam`, `usedDisk` (D26), `usedVram`, `queueHead`, `queueTail`, `queueLen`, `reserved` (shards), `freeSlots` [exec]; one IO FIFO per drive (D1.2: a drive serves one IO stage at a time until `ncq`) [exec]
-- `drawW`, `psuOverS`, `psuFailed` [power]; `idleSinceTick`, `cstate`, `turbo` [power]
+- `drawW` [power]; `idleSinceTick`, `cstate`, `turbo` [power]
 
-**Free-slot summaries.** Exec keeps `freeSlots` per rack, room and site: the number of servers below that can admit now. A server cannot admit when it is busy with no scheduler, its queue is full, or it is booting, crashed, dark or offline (D1.5). Routers read these summaries, so a first-fit route costs O(sites + zones + racks + 12), not a fleet scan.
+**Free-slot summaries.** Exec keeps `freeSlots` per rack, room and site: the number of servers below that can admit now. A server cannot admit when it is busy with no scheduler, its queue is full, or it is booting or offline (D1.5). Routers read these summaries, so a first-fit route costs O(sites + zones + racks + 12), not a fleet scan.
 
-**Per-rack hot fields:** `tempF`, `eff`, `effClock` (cumulative Σ e·dt), `crashS`, `crashed`, `rebootTicks`, `coolerDuty`, `heatW`, `drawW`, `pduOverS`, `pduFailed`, `nextDue`, `dirty`. Rooms and sites have the same lump and supply fields: room `tempF`, `upsOverS`, cooler duty; site `gridOverS`, `outsideF`, joules this tick.
+**Per-rack hot fields:** `tempF`, `eff`, `effClock` (cumulative Σ e·dt), `throttled`, `coolerDuty`, `heatW`, `drawW`, `pduUsage`, `nextDue`, `dirty`. Rooms and sites have the same lump and supply fields: room `tempF`, `upsUsage`, cooler duty; site `gridUsage`, `outsideF`, joules this tick. The overload, failure, crash and reboot columns are removed (D80).
 
 **Hops and links.** A hop is any routing point: the system feed pull before Rack, the rack LB, the room LB, the site data plane and the backbone scheduler. Under D25.7 every router hop has a **queue** of up to `L ≤ 32` taken-but-undispatched entries (a logical hold: no bits move until dispatch). Otherwise a task waits only in the global feed, then its shards travel reserved paths. Each hop has a strategy id, a filter mask, a queue level, its queue ring and a cursor for strategies that need one. Placement modes and the routing budget are gone (D25.6, D12.5). A link is any serial channel: a switch port, an uplink, a data-plane link or a backbone link. Each link has a speed, a cumulative bit clock, a latency in ticks and a transfer FIFO. QoS reorders that FIFO by payload.
 
@@ -338,7 +338,7 @@ core/                        S1
   advance.ts                 carry, tick loop, quiescent skip
   tick.ts                    phase order (§1.2)
   ledger.ts                  Amount wallet per tick, net ring
-  timers.ts                  one boot time (D1.8) for online/offline, reboot, mid-round add, cold change; drain; auto-return
+  timers.ts                  one boot time (D1.8) for online/offline, mid-round add, cold change; drain; auto-return
   actions.ts                 applyAction dispatcher, debit, revision of compiled
   events.ts                  ring writer
 save/                        S1  schema.ts, serialize.ts (typed arrays as base64), validate.ts
@@ -363,13 +363,13 @@ net/                         S3
   links.ts                   serial links, bit clocks, FIFOs, QoS, cut-through, latency
   hops.ts                    route phase: top-down path choice over free-slot summaries, reservations, routing budget
   routers/                   firstFit.ts roundRobin.ts leastConn.ts weighted.ts leastWork.ts binPacking.ts latency.ts price.ts index.ts
-  filters.ts                 capability, health, power, thermal, region
+  filters.ts                 region, capability, power, thermal (local is applied in split.ts)
   split.ts                   D25 split: candidates, share weights, grain, minimum split, atomic reserve; stealing; checkpointing
 phys/                        S4
   draw.ts                    idle/load watts, C-states, package C, DVFS, turbo, S3, power capping
-  supplies.ts                PSU, PDU, UPS, grid usage; overload timers; failure, reboot; loss; ×1/×1.5/×3; dual feed; ride-through
+  supplies.ts                PDU, UPS, grid usage and loss; ×1 up to 90% usage, ×1.5 above (D80)
   thermal.ts                 rack and room lumps, per-tick decay constants, leak, setpoints, economizer, outside air
-  efficiency.ts              e(T), thermal throttle, crash timers and recovery
+  efficiency.ts              e(T), thermal throttle
   energy.ts                  joules per site per tick for the ledger
 build/                       S5
   catalog/                   chip.ts board.ts infra.ts network.ts site.ts tiers.ts (generations, levels, prices, watts)
@@ -441,11 +441,11 @@ export function killSubtree(w: World, unit: UnitRef, cause: FailCause): void; //
 
 | Field group | Writer |
 |---|---|
-| system/rack/room/site `state`, `timer`, auto-return | core (timers); power and thermal set `dark`/`crashed` through `core/timers.setUnitState` |
+| system/rack/room/site `state`, `timer`, auto-return | core (timers) |
 | clocks, `due`, `nextDue`, `busyThreads`, used capacities, queues, reservations, `freeSlots` summaries, record `finish`/`stage` | exec |
 | link clocks and FIFOs, cursors, router queues, split reservations | net |
 | feed, deadline ring, intensity, rng, round counters | market |
-| `drawW`, supply timers and flags, `tempF`, `eff`, `effClock`, crash timers, joules | phys |
+| `drawW`, supply usage, `tempF`, `eff`, `effClock`, throttle state, joules | phys |
 | wallet `Decimal`, ledger ring | core |
 | research progress, completion | build |
 
@@ -481,9 +481,9 @@ export type LevelSnapshot = ChipSnapshot | SystemSnapshot | RackSnapshot | RoomS
 | Feed (pixel object at every level) | Exactly five `feed.upcoming` saved tasks with epoch/round/task ID, name, numerical work and requirements, arrival offset, nullable absolute arrival tick and dismissal mark. Separate `feed.entries` (≤ 8 pending) keep real deadline, blocked requirement and committed/dismissible status. Keep pending/transit/queued/running counts, intensity, authored `1 task / 2 s` cadence and existing failures/telemetry. | Future tasks have no pickup countdown. Pending countdowns use the real deadline. Paused forecasts show times after Return. Unsupported rows need no telemetry. |
 | Round report plate | `round.lastReport: RoundReport { index, durationMs, met, failedByCause, peakIntensity, creditsEarned, energyCost, net }` and `round.canReturn` | Return to market reads `canReturn`. |
 | Chip | `ChipSnapshot { systemId, online: UnitState, tier, clock { hz, generation, level }, lanes, coreSites, cores: CoreView[] { busy, family, progress, threads, research, cstate }, cache: { levels: { kind, bits, generation, level }[], usedBits }, scheduler: { generation, level, strategy, q, queued, k, running } \| null, researchShare, slots: BuildSlotView[] }` | Strict grid. Clock LED blink comes from `hz` and sim time, capped visually. |
-| System | `SystemSnapshot { systemId, online, bootMs, cpu: PartView, ram: PartView[], gpu: PartView[], storage: PartView[], psu: SupplyView, running: TaskView[] (≤ K), queue { cap, count, sample: TaskView[] (≤ 8) }, reserved, rates { ops, ramBits, gpuOps, ioBits }, capacities { cache, ram, vram, storage }, drawW, saveable }` | `PartView { slot, kind, generation, level, active, resourceBusy }`. No prices in the world. |
-| Rack | `RackSnapshot { rackId, online, tempF, eff, crashS, crashed, cooler { tech, generation, level, duty, setpointF, watts }, pdu: SupplyView, lb: LbView, switch: SwitchView, servers: ServerSlotView[12] }` | `ServerSlotView { systemId \| null, state, load, running, port \| null }`. Port LEDs come from `PortView.active`. |
-| Room | `RoomSnapshot { roomId, siteId, zone, zones, online, tempF, outsideF, crashS, cooler, ups: SupplyView, network: { switch: SwitchView, lb: LbView }, rows, racks: RackSlotView[rows × 8] }` | `RackSlotView { rackId \| null, state, load, tempF, pduUsage, servers: Uint8Array(12) of UnitState codes }`. |
+| System | `SystemSnapshot { systemId, online, bootMs, cpu: PartView, ram: PartView[], gpu: PartView[], storage: PartView[], running: TaskView[] (≤ K), queue { cap, count, sample: TaskView[] (≤ 8) }, reserved, rates { ops, ramBits, gpuOps, ioBits }, capacities { cache, ram, vram, storage }, drawW, saveable }` | `PartView { slot, kind, generation, level, active, resourceBusy }`. No prices in the world. |
+| Rack | `RackSnapshot { rackId, online, tempF, eff, cooler { tech, generation, level, duty, setpointF, watts }, pdu: SupplyView, lb: LbView, switch: SwitchView, servers: ServerSlotView[12] }` | `ServerSlotView { systemId \| null, state, load, running, port \| null }`. Port LEDs come from `PortView.active`. |
+| Room | `RoomSnapshot { roomId, siteId, zone, zones, online, tempF, outsideF, cooler, ups: SupplyView, network: { switch: SwitchView, lb: LbView }, rows, racks: RackSlotView[rows × 8] }` | `RackSlotView { rackId \| null, state, load, tempF, pduUsage, servers: Uint8Array(12) of UnitState codes }`. |
 | Global | `GlobalSnapshot { sites: SiteView[8], backbone: { generation, links: LinkView[] }, regionsOpen }` | `SiteView { siteId \| null, region, open, online, zones: ZoneView[], grid: SupplyView, dataPlane { generation, bitsPerSec, latencyMs, active }, energyPrice: Amount, outsideF }`. |
 | Plates | The focus snapshot for live values, plus `quote()` results | Plates never compute prices. |
 | Research wafer | `selectResearchTree(state)`, called only while the wafer is open | A lazy selector, not part of the snapshot. |
@@ -491,8 +491,8 @@ export type LevelSnapshot = ChipSnapshot | SystemSnapshot | RackSnapshot | RoomS
 Shared views:
 
 ```ts
-export interface SupplyView { kind: 'psu' | 'pdu' | 'ups' | 'grid'; generation: number; level: number; capacityW: number;
-  deliveredW: number; usage: number; overloadS: number; failed: boolean; rebootMs: number | null; loss: number; capped: boolean }
+export interface SupplyView { kind: 'pdu' | 'ups' | 'grid'; generation: number; level: number; capacityW: number;
+  deliveredW: number; usage: number; loss: number }   // D80: no psu kind, overload, failure, reboot or cap fields
 export interface SwitchView { generation: number; topHz: number; sameSpeed: boolean; portCeiling: number;
   ports: readonly PortView[]; uplinks: readonly PortView[] }
 export interface PortView { speedHz: number; rung: number; peer: number | null; active: boolean; family: FamilyId | null;
@@ -605,7 +605,7 @@ export type SwitchRef = { kind: 'rack'; id: RackId } | { kind: 'room'; id: RoomI
 | Sim | `amount.ts`, `format.ts`, `purity.test.ts` stay in place. v2 `rng.ts` test vectors are reused by `core/rng.test.ts`. | Everything else |
 | Render core | `camera.ts`, `glyphs.ts`, `hit.ts`, `palette.ts`, `paths.ts`, `sprites.ts`, `harness.ts`, `registry.ts` (LevelId `room`), `transition.ts` and `view.ts` (types only) | `types.ts` (LevelRenderer reads `LevelSnapshot`), `px.ts` (drop v2 imports), `activity.ts`, `fx.ts`, `decoration.ts`, new `feed.ts` (the pixel feed object) |
 | Chip | `sprites.ts`, `art.ts` (part art), `bitrouge-machine.ttf`, `readouts.css` | `layout.ts`, `geometry.ts`, everything else. This is the strict-grid rebuild (program §12). |
-| System | `art.ts`, `board.ts`, `sprites.ts`, `partKinds.ts` | `layout.ts`, `geometry.ts`, `parts.ts`, `power.ts`, `activity.ts`, `mini.ts`, `index.ts` (CPU/RAM/GPU/Storage tray, PSU on board, no cooling) |
+| System | `art.ts`, `board.ts`, `sprites.ts`, `partKinds.ts` | `layout.ts`, `geometry.ts`, `parts.ts`, `power.ts`, `activity.ts`, `mini.ts`, `index.ts` (CPU/RAM/GPU/Storage tray, no PSU, no cooling) |
 | Rack | `layout.ts`, cabinet and panel drawing routines out of `cabinet.ts` and `panels.ts` | `model.ts`, `world.ts`, `index.ts`, `mini.ts`, `power.ts`; new switch ports, LB slot and 4-slot infra |
 | Room (was datacenter) | `layout.ts`, `static.ts`, sprite routines out of `sprites.ts` | `model.ts`, `world.ts`, `index.ts`, `mini.ts`; one AZ per view, network rack, zone switcher |
 | Global | `geo.ts`, `layout.ts`, `map.ts`, sprite routines | `model.ts`, `index.ts`, `parts.ts`, `power.ts`; sites, zones, data plane, backbone |
@@ -639,7 +639,7 @@ Twelve agents. S1 alone owns `src/game/types/**`, `src/game/index.ts`, `src/game
 | **S1 Sim core and contract** | `src/game/{index.ts,types/**,core/**,save/**,testkit/**}`, `docs/v3-contract-requests.md` | This doc, program, spec | Contract, tick loop, World, pools, RNG, ledger, timers, action dispatcher, save v3, fleet builders, oracle | Day 0 | G0: full contract and a running empty tick; G1–G3: core features each gate needs |
 | **S2 Market, rounds and balance** | `src/game/{market/**,probes/**}`, `scripts/balance/**` | `docs/tasks.md` | Families, curve, arrivals, feed, deadline ring, SLA, rounds, report, auto-return; the balance bot and 24 h campaign | After G0 | G1: bands to `ram`; G3: all bands; G4: campaign and pacing |
 | **S3 Execution and network** | `src/game/{exec/**,net/**}` | Spec, research tree | Work clocks, admission gates, schedulers, research share, kill; links, hops, routers, filters, gangs, data plane, backbone | After G0 | G1: exec, system strategies; G2: rack network, gang rack; G3: room, site, global |
-| **S4 Power and heat** | `src/game/phys/**` | Spec power and heat sections | Draw model, supplies, overload, failures, lumps, cooling, e(T), crash, joules | After G0 | G1: PSU, C-states, DVFS; G2: rack; G3: room, site, regions |
+| **S4 Power and heat** | `src/game/phys/**` | Spec power and heat sections | Draw model, supplies, lumps, cooling, e(T), thermal duty, joules (overload, failures and crash removed, D80) | After G0 | G1: C-states, DVFS; G2: rack; G3: room, site, regions |
 | **S5 Catalog, research, configurations and quotes** | `src/game/build/**` | Spec catalog, `docs/research.md` appendix | Catalog, compile, part/unit/config/port actions, research tree and effects, quotes | After G0 | G1: chip and board; G2: rack, configuration plate; G3: room, global |
 | **S6 Snapshot and selectors** | `src/game/view/**` | Contract, domain hot fields | `deriveRenderSnapshot`, HUD, feed, round, level builders, selectors, snapshot fixtures | After G0 | G1: chip, system, HUD, feed; G2: rack; G3: room, global |
 | **R1 Renderer core** | `src/render/core/**`, `src/render/index.ts`, `src/render/levels/index.ts` | Contract, mockups v3 | LevelRenderer v3, registry, camera, transitions, hit, pixel feed object, harness | Day 0 (copy art), contract after G0 | G1 |
@@ -683,8 +683,8 @@ Fixtures are deterministic builders in `src/game/testkit/fleets.ts`. There are n
 | `boot` | `createInitialState(42)` |
 | `rackFull` | One rack, 12 max-tier servers, all rack research, round running at the curve point that loads it |
 | `roomFull` | One room, 24 racks |
-| `fleetMax` | 8 sites × 3 zones × 24 racks × 12 servers. Maximum compute parts with synthetic power/cooling capacity headroom, all research complete, `leastWork` + capability + health filters, router queues at level 32, `gather` and `shardSteal` on (D25), auto-return at its minimum delay. Prime intensity 34 at the accepted one-task-per-20-ticks cadence, then warm 600 ticks so pools are populated. |
-| `fleetMaxHot` | `fleetMax` with undersized PDUs and coolers, so supplies cycle and racks crash. This exercises the failure and kill paths. |
+| `fleetMax` | 8 sites × 3 zones × 24 racks × 12 servers. Maximum compute parts with synthetic power/cooling capacity headroom, all research complete, `leastWork` + capability filter, router queues at level 32, `gather` and `shardSteal` on (D25), auto-return at its minimum delay. Prime intensity 34 at the accepted one-task-per-20-ticks cadence, then warm 600 ticks so pools are populated. |
+| `fleetMaxHot` | `fleetMax` on its catalog coolers, which its servers outrun, so every rack runs hot on the thermal duty line and throttles. Since D80 no supply fails and no rack crashes. |
 
 ### 7.3 Budgets
 
@@ -713,7 +713,7 @@ Fixtures are deterministic builders in `src/game/testkit/fleets.ts`. There are n
    - Arrivals are counted per cohort.
    - G3 measures `fleetMax` before balance work starts.
    - The fallback is constants (§1.10), not new machinery.
-2. **Mechanic sprawl.** 144 research nodes, many of which add a per-tick rule: C-states, turbo, DVFS, S3, NUMA, work stealing, live migration, checkpointing, dual feed, ride-through, economizer.
+2. **Mechanic sprawl.** 144 research nodes, many of which add a per-tick rule: C-states, turbo, DVFS, S3, work stealing, checkpointing, dual feed, economizer. D80 removed NUMA, live migration and ride-through with 13 other nodes.
    - Each mechanic should be a compiled parameter evaluated where the pass already is: in the system visit or the rack pass, never a new per-tick loop.
    - A research node whose mechanic is not implemented carries `implemented: false` in the catalog and is hidden. The tree stays honest and verify stays green while S3, S4 and S5 land mechanics slice by slice.
 3. **Contract bottleneck at S1.**

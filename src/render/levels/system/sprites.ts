@@ -1,8 +1,7 @@
-// System part sprites in 3/4 view (mockup v3 levels/system/sprites.js; the board PSU from
-// core/power.js). Each takes a ground footprint from a board site and draws its top face raised
+// System part sprites in 3/4 view (mockup v3 levels/system/sprites.js). Each takes a ground footprint from a board site and draws its top face raised
 // by z plus a front face. `on` is true only while the part serves a real stage. No fans: nothing
 // on a board cools.
-import { P, R, bloom, brackets, dotted, frame, mix, prism as prism0, px, silk } from '../../core';
+import { P, R, bloom, brackets, dotted, mix, prism as prism0, px } from '../../core';
 import type { PrismStyle, Rect } from '../../core';
 import { DIMM_Z } from './layout';
 import type { BoardLayout } from './layout';
@@ -171,13 +170,4 @@ export function drawEmptySite(g: G, b: BoardLayout, type: 'cpu' | 'ram' | 'gpu' 
 export function drawConnector(g: G, f: Rect, on: boolean): void {
   R(g, f.x, f.y, f.w, f.h, P.ink); R(g, f.x + 1, f.y + 1, f.w - 2, f.h - 2, on ? P.padHi : P.pad);
 }
-/** Board PSU: vents and a usage meter (one LED per step of delivered / capacity). Amber while it warns. */
-export function drawPsu(g: G, r: Rect, usage: number, warning: boolean): void {
-  const t = prism0(g, r.x, r.y, r.w, r.h, 5, { top: P.steelLo, front: P.substrate, hi: P.steelHi }, top0);
-  const tx = t.x, ty = t.y, tw = t.w, th = t.h;
-  for (let x = tx + 3; x < tx + tw - 3; x += 4) R(g, x, ty + 2, 2, 3, P.ink);
-  R(g, tx + 2, ty + th - 5, tw - 4, 4, P.ink);
-  const col = warning ? P.amber : P.led, n = Math.floor((r.w - 4) / 3);
-  for (let i = 0; i < n; i++) R(g, tx + 2 + i * 3, ty + th - 4, 2, 2, i / n < usage ? col : P.ledOff);
-  if (warning) { frame(g, tx - 2, ty - 2, tw + 4, th + 9, P.amber); silk(g, tx + Math.floor(tw / 2) - 1, ty - 7, '!', P.amber); }
-}
+

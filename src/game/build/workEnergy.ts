@@ -1,5 +1,5 @@
 import type { CompiledBuffers } from '../core/buffers';
-import { supplyLossW } from '../phys/supplies';
+
 import type { SystemSpec } from '../types/build';
 import type { Unlocks } from '../types/state';
 
@@ -13,8 +13,6 @@ export interface WorkProfile {
   readonly otherIdle: number;
   readonly loads: readonly number[];
   readonly sleep: number;
-  readonly cap: number;
-  readonly loss: number;
 }
 
 export function workProfile(c: CompiledBuffers['sys'], id: number, spec: SystemSpec, u: Unlocks): WorkProfile {
@@ -25,7 +23,7 @@ export function workProfile(c: CompiledBuffers['sys'], id: number, spec: SystemS
   return { cpuRate: (c.threadRate[id] ?? 0) * (c.cores[id] ?? 0) * (c.etaCfg[id] ?? 1),
     researchRate: (c.threadRate[id] ?? 0) * (c.threads[id] ?? 0) * (c.etaCfg[id] ?? 1), gpuRate: c.gpuOps[id] ?? 0,
     cpuIdle: c.coreIdleW[id] ?? 0, cpuLoad: c.coreLoadW[id] ?? 0, otherIdle, loads,
-    sleep, cap: u.levels.rack ? c.psuCapW[id] ?? 0 : 0, loss: u.levels.rack ? c.psuLoss[id] ?? 0 : 0 };
+    sleep };
 }
 
 /**
@@ -37,11 +35,10 @@ export function workInputWatts(base: WorkProfile, next: WorkProfile, duty: numbe
   const cpu = used(base.cpuRate, next.cpuRate), gpu = used(base.gpuRate, next.gpuRate);
   let watts = next.cpuIdle * (cpu + (1 - cpu) * next.sleep) + next.otherIdle + next.cpuLoad * cpu;
   for (let r = 0; r < next.loads.length; r += 1) watts += next.loads[r]! * (r === 2 ? gpu : Math.min(1, duty * demand));
-  return watts + supplyLossW(watts, next.cap, next.loss);
+  return watts;
 }
 
 /** CPU-only research occupies every thread between rounds; other devices retain their idle draw. */
 export function researchInputWatts(p: WorkProfile): number {
-  const watts = p.cpuIdle + p.cpuLoad + p.otherIdle;
-  return watts + supplyLossW(watts, p.cap, p.loss);
+  return p.cpuIdle + p.cpuLoad + p.otherIdle;
 }

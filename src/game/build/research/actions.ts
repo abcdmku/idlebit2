@@ -38,7 +38,7 @@ function purchase(state: GameState, id: ResearchId): ActionOutcome {
 /** Why `id` can't be researched now, or null. Prerequisites may be satisfied by `pending` (active or queued earlier). */
 export function researchLock(r: ResearchState, id: ResearchId, pending: readonly ResearchId[] = [], claimed: readonly number[] = []): { code: 'invalid' | 'locked'; reason: string; node: ResearchId | null } | null {
   const def = researchDef(id);
-  if (!def || !def.implemented) return { code: 'invalid', reason: 'No such project', node: null };
+  if (!def) return { code: 'invalid', reason: 'No such project', node: null };
   if (r.completed.includes(id)) return { code: 'invalid', reason: 'Already researched', node: null };
   if (def.rewardMilestone && !claimed.includes(def.rewardMilestone))
     return { code: 'locked', reason: `Claim the ${def.rewardMilestone}-task reward`, node: null };

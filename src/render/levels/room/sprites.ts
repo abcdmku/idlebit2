@@ -2,7 +2,7 @@
 // footprint and rises z px. Lights and motion are arguments from real state: fan angle
 // from the cooler's duty, gauges from supply usage, tray fibre lit only while traffic runs.
 // The mockup's free-running shimmer, blinking breakers and pump flicker are gone (v2 §7).
-import { P, R, frame, mix, prism, px, silk } from '../../core';
+import { P, R, mix, prism, px } from '../../core';
 import { disc } from '../rack/art';
 import { BOH, CRAC, RACK_PITCH } from './layout';
 import type { PrismStyle, Rect } from '../../core';
@@ -31,9 +31,9 @@ export function roomFan(g: G, cx: number, cy: number, r: number, angle: number, 
 }
 
 /** Visual CRAC grade: 1 fan unit, 2 twin fan, 3 chilled-water CRAH, 4 liquid (closed loop). */
-export interface CracArt { grade: 1 | 2 | 3 | 4; angle: number; duty: number; powered: boolean }
+export interface CracArt { grade: 1 | 2 | 3 | 4; angle: number; duty: number }
 export function drawCrac(g: G, f: Rect, s: CracArt): void {
-  const z = CRAC.z, lvl = s.grade, on = s.powered && s.duty > 0;
+  const z = CRAC.z, lvl = s.grade, on = s.duty > 0;
   const t = prism(g, f.x, f.y, f.w, f.h, z, CRAC_STYLE[lvl - 1], top);
   const cx = t.x + (t.w >> 1), cy = t.y + (t.h >> 1), fy = t.y + t.h;
   if (lvl === 1) roomFan(g, cx, cy, 5, s.angle, on);
@@ -56,25 +56,18 @@ export function drawCrac(g: G, f: Rect, s: CracArt): void {
   }
   if (lvl >= 3) { R(g, t.x - 1, fy + z - 2, 2, 2, P.coolLo); R(g, t.x + t.w - 1, fy + z - 2, 2, 2, P.coolLo); }
   R(g, t.x + t.w - 4, fy + 1, 3, 1, P.ink);
-  px(g, t.x + t.w - 3, fy + 1, s.powered ? P.led : P.ledOff);
-  if (!s.powered) { const a = g.globalAlpha; g.globalAlpha = a * 0.55; R(g, t.x, t.y, t.w, t.h + z, P.ink); g.globalAlpha = a; }
+  px(g, t.x + t.w - 3, fy + 1, P.led);
 }
 
 /** UPS battery cabinet. The gauge is the feed's real usage: green, amber above 90%, red over capacity. */
-export function drawUps(g: G, f: Rect, usage: number, failed: boolean, li: boolean): void {
+export function drawUps(g: G, f: Rect, usage: number, li: boolean): void {
   const z = BOH.z, t = prism(g, f.x, f.y, f.w, f.h, z, li ? UPS_LI : UPS_STYLE, top);
   for (let x = t.x + 2; x < t.x + t.w - 2; x += 2) px(g, x, t.y + 3, P.steelLo);
-  const fy = t.y + t.h, segs = 5, lit = failed ? 0 : Math.min(segs, Math.round(segs * Math.max(0, usage)));
+  const fy = t.y + t.h, segs = 5, lit = Math.min(segs, Math.round(segs * Math.max(0, usage)));
   R(g, t.x + 2, fy + 3, 4, segs * 2 + 1, P.ink);
-  const c = usage > 1 ? P.fault : usage > 0.9 ? P.amber : li ? P.cool : P.led;
+  const c = usage > 0.9 ? P.amber : li ? P.cool : P.led;
   for (let i = 0; i < segs; i++) R(g, t.x + 3, fy + 4 + (segs - 1 - i) * 2, 2, 1, i < lit ? c : P.ledOff);
   R(g, t.x + 7, fy + 3, 1, z - 6, P.ink);
-  if (failed) frame(g, t.x - 1, t.y - 1, t.w + 2, t.h + z + 2, P.fault);
-}
-/** Overload readout over a supply: seconds accumulated toward the 10 s failure. */
-export function overloadMark(g: G, x: number, y: number, overloadS: number): void {
-  R(g, x - 1, y - 1, 12, 7, P.ink); R(g, x, y, Math.max(1, Math.ceil(10 * Math.min(1, overloadS / 10))), 5, P.amber);
-  silk(g, x + 11, y, '!', P.amber);
 }
 
 /** Ladder tray on the rack tops: two rails with fibre, lit while traffic runs. */
@@ -92,7 +85,7 @@ export function drawTrunk(g: G, x: number, y0: number, y1: number, rows: number,
   for (let y = y0 + 3; y < y1; y += 6) px(g, x + 1, y, P.steelLo);
 }
 /** Fibre entry on the back wall. Its jack lights are lit while the room switch's uplinks carry transfers. */
-export function drawGateway(g: G, r: Rect, fibres: number, live: boolean, powered: boolean): void {
+export function drawGateway(g: G, r: Rect, fibres: number, live: boolean): void {
   const n = Math.max(1, Math.min(4, fibres)), cx = r.x + (r.w >> 1), a = g.globalAlpha;
   for (let i = 0; i < n; i++) {
     const x = cx - n + 1 + i * 2 - (n > 2 ? 1 : 0);
@@ -105,7 +98,7 @@ export function drawGateway(g: G, r: Rect, fibres: number, live: boolean, powere
   const t = prism(g, r.x, r.y + 4, r.w, 3, 8, GATE_STYLE, top);
   const fy = t.y + t.h;
   for (let i = 0; i < n; i++) px(g, t.x + 2 + i * 2, fy + 2, live ? P.net : P.ledOff);
-  px(g, t.x + t.w - 3, fy + 2, powered ? P.led : P.ledOff);
+  px(g, t.x + t.w - 3, fy + 2, P.led);
   R(g, cx - 4, r.y - 26, 9, 5, P.ink); R(g, cx - 3, r.y - 25, 7, 3, P.steelLo); R(g, cx - 3, r.y - 25, 7, 1, P.steel);
 }
 /** Hot-aisle containment along the back of a row: glows with the row's real load and the room's heat. */

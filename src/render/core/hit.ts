@@ -2,7 +2,6 @@ import { projectRect } from './camera';
 import type { Camera, PixelRatio } from './camera';
 import type { Rect } from './geom';
 
-export { contains } from './geom';
 const scratch: Rect = { x: 0, y: 0, w: 0, h: 0 };
 /** Exact hits win. Expanded hits pick the nearest rect, then nearest row, then frontmost.
  * Supply targets in stable back-to-front drawing order. Never return an invisible overlap arbitrarily.

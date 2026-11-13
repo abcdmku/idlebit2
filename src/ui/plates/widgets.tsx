@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react';
 import { type Amount, type Currency, type Quote, type ResearchId } from '../../game';
 import { CoinIcon, GemIcon, LockIcon } from './icons';
-import { span, wholeText } from './format';
+import { wholeText } from './format';
 import { purchaseGain, purchaseReason } from './purchaseText';
 
 /* The plate language (mockup core/plate.js): head, status and bar, lines, list, keys, port grid, toggle, choices. */
@@ -66,14 +66,6 @@ export function Key({ label, price, detail, tone = '', disabled, ariaLabel, pres
   </button>;
 }
 
-/** A cold change's real cost: time offline and running work lost, only while a round runs (between rounds nothing runs). */
-export const coldText = (q: Pick<Quote, 'cold' | 'downtimeMs'>) => (q.cold && q.downtimeMs > 0 ? `Cold swap · ${span(q.downtimeMs / 1000)} offline, running work lost` : '');
-
-/** Hot or cold, with what a cold change costs in time and work (program §3). */
-export function changeNote(q: Pick<Quote, 'cold' | 'downtimeMs'>): string {
-  return q.cold ? coldText(q) || 'Cold swap' : '';
-}
-
 export interface QuoteKeyProps {
   quote: Quote;
   label: ReactNode;
@@ -118,16 +110,4 @@ export function Toggle({ label, note, on, disabled, onToggle }: { label: string;
     onClick={(e) => { e.stopPropagation(); onToggle(); }}>
     <s /><span>{label}{note && <small>{note}</small>}</span>
   </button>;
-}
-
-export interface Choice { readonly id: string; readonly label: string; readonly on: boolean; readonly note?: string; readonly lock?: string | null }
-export function Choices({ rows, label, onPick }: { rows: readonly Choice[]; label: string; onPick: (id: string) => void }) {
-  return <div className="cx-rows" role="group" aria-label={label}>
-    {rows.map((r) => <button key={r.id} type="button" className={`cx-row${r.on ? ' on' : ''}${r.lock ? ' lock' : ''}`}
-      aria-pressed={r.on} aria-disabled={r.lock ? true : undefined}
-      onClick={(e) => { e.stopPropagation(); if (!r.lock) onPick(r.id); }}>
-      <u /><span>{r.label}{!r.lock && r.note ? <small>{r.note}</small> : null}</span>
-      {r.lock && <small title={r.lock} aria-label={r.lock}><LockIcon /></small>}
-    </button>)}
-  </div>;
 }

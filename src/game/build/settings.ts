@@ -1,7 +1,7 @@
 import { FILTER_NAMES, QUEUE_NAMES, ROUTE_NAMES } from '../view/labels';
 import type { BuildState, QueueOptimization, RouterBuild, SystemSettings } from '../types/build';
 import { QUEUE_STRATEGY_IDS, type FilterId, type QueueStrategyId, type RouteStrategyId } from '../types/catalog';
-import type { PartRef, RackId, RoomId, ScopeRef, SystemId } from '../types/ids';
+import type { RackId, RoomId, ScopeRef, SystemId } from '../types/ids';
 import type { GameState } from '../types/state';
 import { ROUTER_QUEUE_MAX } from '../core/constants';
 import { lbQueueStep } from './catalog/network';
@@ -104,19 +104,6 @@ export function planSetpoint(state: GameState, unit: { kind: 'rack'; id: RackId 
   }
   if (!b.rooms[unit.id]) return fail('invalid', 'No such zone');
   return planned({ build: { ...b, rooms: b.rooms.map((z, i) => (i === unit.id && z ? { ...z, cooler: { ...z.cooler, setpointF } } : z)) }, price: 0n }, 'Setpoint');
-}
-
-/** The power-cap switch on a board PSU or rack PDU (spec §9.5). */
-export function planPowerCap(state: GameState, part: PartRef, on: boolean): Plan {
-  if (part.slot.kind === 'psu') return fail('locked', 'Power upgrades at Rack');
-  const lock = on ? ruleLock(state.research.unlocks, 'powerCap') : null;
-  if (lock) return locked(lock, 'Power cap', 0n);
-  const b = state.build;
-  if (part.unit.kind === 'rack' && part.slot.kind === 'pdu') {
-    const id = part.unit.id;
-    return b.racks[id] ? planned({ build: { ...b, racks: b.racks.map((r, i) => (i === id && r ? { ...r, pdu: { ...r.pdu, capped: on } } : r)) }, price: 0n }, 'Power cap') : fail('invalid', 'No such rack');
-  }
-  return fail('invalid', 'Only a power supply or PDU can cap');
 }
 
 function editSettings(state: GameState, system: SystemId, patch: Partial<SystemSettings>, label: string): Plan {

@@ -16,7 +16,7 @@ import { runwayMark } from '../build/research/runway';
 import { initialRoundRewards } from '../rewards/progress';
 
 /** D39: Control deck, level 3 and the scheduler are bought from the start; research never unlocks a part type. */
-const START_GENS: readonly PartId[] = ['cpu', 'core', 'clock', 'cache', 'scheduler', 'psu'];
+const START_GENS: readonly PartId[] = ['cpu', 'core', 'clock', 'cache', 'scheduler'];
 
 export function baseUnlocks(): Unlocks {
   const gens = Object.fromEntries(PART_IDS.map((p) => [p, START_GENS.includes(p) ? 1 : 0])) as Record<PartId, number>;
@@ -39,7 +39,7 @@ export function newRound(index: number, startTick: number, reports: RoundState['
   return {
     phase: 'running', index, startTick, endTick: null, autoReturnTick: null, autoReturnOn, peakIntensity: 0, grace: 0,
     gross: ZERO_AMOUNT, data: ZERO_AMOUNT, energy: ZERO_AMOUNT, researchOps: 0, reports,
-    frontier: { bestI: 0, bestRound: 0, bestMet: 0, bestMetRound: 0, taken: [], takenAtStart: 0 }, runwayStart: null,
+    frontier: { bestI: 0, bestRound: 0, bestMet: 0, bestMetRound: 0 }, runwayStart: null,
   };
 }
 

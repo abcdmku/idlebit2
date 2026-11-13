@@ -149,7 +149,7 @@ finish = W_at_entry + stageWork
 
 For n = 0, set both rates to zero. A tensor-only NPU's ordinary rate is always zero. The shared n includes each record's count, not just the number of records. Equal time shares therefore consume at most one domain's hardware budget across mixed ordinary and tensor work. Tensor acceleration belongs to that domain only. Separate ordinary and tensor clocks avoid per-record divisor rewrites when research changes tensor factors.
 
-Exec owns all task clocks, heads, holds and due values. Phys continues to own `rack.eff`, `rack.effClock` and power-state factors. Both accelerator clocks use the existing `Span` GPU efficiency-axis bounds; no wall-clock task timer is introduced. GPU rate does not inherit CPU DVFS or turbo. Preserve the existing CPU-only power-cap policy: GPU watts are uncappable load and still contribute to overloads. A future GPU cap needs its own rate and power contract.
+Exec owns all task clocks, heads, holds and due values. Phys continues to own `rack.eff`, `rack.effClock` and power-state factors. Both accelerator clocks use the existing `Span` GPU efficiency-axis bounds; no wall-clock task timer is introduced. GPU rate does not inherit CPU DVFS or turbo. Power capping is removed (D80); GPU watts count toward the installed-load limits checked at purchase.
 
 Use the existing sorted list operations with an explicit head array and index, or small accelerator-specific wrappers. Records still use `prev` and `next` and belong to exactly one run list at a time. GPU stage entry and exit update the appropriate accelerator list and count. Non-GPU stages keep their current lists and clock rules.
 
@@ -175,7 +175,7 @@ Reset card usage meters at the start of each run phase, not each advance call. S
 
 `systemDraw` retains the current idle, sleep and power-mode logic. Accelerator load uses each card's executing duty: `sum(accelLoadW[i] * accelTaskS[i] / DT_S)`. Every powered installed card still contributes its own idle watts. Unused cards incur no load; a card completing halfway through a tick incurs half a tick of task load. Assert each card's total equivalent busy seconds is in [0, DT_S], allowing only arithmetic roundoff in assertions.
 
-Keep GPU idle watts in `idleW[GPU]` if existing summaries need them, but never count those watts twice. Supply loss, heat, billing and whole-credit energy-meter rules stay in their existing phases. This contract supplies average watts for the existing per-tick physical model; it does not add sub-tick overload timers or change crash timing.
+Keep GPU idle watts in `idleW[GPU]` if existing summaries need them, but never count those watts twice. Supply loss, heat, billing and whole-credit energy-meter rules stay in their existing phases. This contract supplies average watts for the existing per-tick physical model; it adds no sub-tick timers. Overload timers and crashes no longer exist (D80).
 
 GPU upgrade and replacement previews in `build/effect.ts` must compare the selected card's evaluated specs and measured card duty. They must not use CPU utilization as GPU utilization or present an incompatible system maximum as that card's throughput. Preserve the existing exact quote and ledger path; upgrading hardware changes completed work and energy, never the payout per unit of work.
 
@@ -211,7 +211,7 @@ Reservation sums may differ in the last bits from subtraction history. Use a bou
 | Concurrency | Two 60-bit tasks on a 100-bit card cannot start together. Independent cards each make full independent progress. Linked reservations cannot exceed pooled VRAM. A blocked queue record is skipped and another fitting record starts. |
 | Mixed stages | A CPU-to-GPU entrant midway through a tick reduces the incumbent's GPU share immediately. Total ordinary/tensor time shares remain bounded. Short same-card tasks chain within a tick. GPU-stage exits keep VRAM until task completion. |
 | Cohorts | A cohort splits across cards only into separate records, respects each card's memory, and completes at each card's own rate. Running IO splits preserve aggregate GPU holds; each piece releases its share. |
-| All exits | Completion, explicit abort, gang loss, power failure, heat crash, cold replacement, offline transition and round end leave no leaked hold. Failure payouts remain zero, gang losses count once, and card slot reuse starts cleanly. |
+| All exits | Completion, explicit abort, gang loss, cold replacement, offline transition and round end leave no leaked hold (power failure and heat crash are removed, D80). Failure payouts remain zero, gang losses count once, and card slot reuse starts cleanly. |
 | Power and research | Only used cards draw task load; idle installed cards draw idle watts. Research is CPU-only and cannot add accelerator load or work. Mid-tick completion retains already-used energy. |
 | Recompile and save | Hot upgrades preserve completed work, alter only future speed and expand memory. Cold changes clean old slots. Save/load during mixed-domain work and mid-carry continues identically, including all new buffers and exact wallet strings. Invalid holds, domains, models and old versions are rejected. |
 | Determinism | Compare full state, events, RNG words and draw counts, Credits, Data and energy meters across one advance and uneven partitions, including 1 ms + 99 ms, multi-tick calls, research completion and failures. Repeat with a save/load between pieces. |
@@ -228,7 +228,7 @@ Run focused tests, `npm run typecheck`, `npm run verify`, then the existing maxi
 | GPU progression and catalog owner | Implement model IDs, evaluator, exact quotes, buy/upgrade/config validation and paired compiled columns. Prove monotone tier steps, exact path pricing, series-9 inequalities and generation tradeoffs. |
 | Execution owner | Own assignment, holds, clocks, lists, event integration, estimates, release paths, reconciliation and per-card usage/research publication. Adapt tests and oracle with the shared owner. |
 | Market and routing owner | Replace task GPU-count gates with core gates, regenerate family sources, update failure details, capability-class signatures and estimates. Include all eight ordered physical entries and link state in class keys; aggregate equality is insufficient. |
-| Physics owner | Consume the per-card duty meters in GPU load, keep existing power/heat timing, and test research-only draw and overload behavior. Avoid CPU power-policy changes. |
+| Physics owner | Consume the per-card duty meters in GPU load, keep existing power/heat timing, and test research-only draw. Avoid CPU power-policy changes. |
 | View and QA owners | Read real card assignment, VRAM and duty. Bind GPU activity to actual card clock and usage, saturating honestly above visible rates. Run focused regression and performance checks. |
 
 The design handoff also reconciles GPU sections in the progression, program, research, task and main spec documents. Runtime implementation and generated research files remain with their assigned owners.

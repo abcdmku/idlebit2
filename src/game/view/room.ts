@@ -6,7 +6,7 @@ import type { GameState } from '../types/state';
 import type { RackSlotView, SupplyView } from '../types/views';
 import { roomFlows } from './flows';
 import { rackPowerFields, roomStartView } from './power';
-import { containerMode, coolerView, lbView, outsideF, probeTimerS, rackProbe, roomProbe, siteEnergyPrice, supplyView, switchPorts, systemLoad, ticksToS } from './common';
+import { containerMode, coolerView, lbView, outsideF, probeTimerS, rackProbe, roomProbe, siteEnergyPrice, supplyView, switchPorts, systemLoad } from './common';
 
 /** One rack in a room grid slot: mode, load, °F, PDU usage and its 12 server mode codes. */
 export function rackSlot(state: GameState, rack: number): RackSlotView {
@@ -22,10 +22,9 @@ export function rackSlot(state: GameState, rack: number): RackSlotView {
     load += systemLoad(state, s);
     n += 1;
   }
-  const failed = (h.pduFailed[rack] ?? 0) === 1;
   return {
-    rackId: rackId(rack), state: containerMode(state, c.alive[rack], c.intent[rack], failed, (h.crashed[rack] ?? 0) === 1, rackProbe(state, rack)),
-    load: n > 0 ? load / n : 0, tempF: h.tempF[rack] ?? 70, pduUsage: failed ? 0 : (h.pduUsage[rack] ?? 0), servers, serversOnMarket,
+    rackId: rackId(rack), state: containerMode(state, c.alive[rack], c.intent[rack], rackProbe(state, rack)),
+    load: n > 0 ? load / n : 0, tempF: h.tempF[rack] ?? 70, pduUsage: h.pduUsage[rack] ?? 0, servers, serversOnMarket,
     ...rackPowerFields(state, rack),
   };
 }
@@ -35,27 +34,15 @@ export function roomUps(state: GameState, room: number): SupplyView[] {
   const c = state.compiled.room, h = state.hot.room;
   return b.ups.map((part, u) => {
     const i = room * MAX_UPS + u;
-    const failed = (h.upsFailed[i] ?? 0) === 1;
-    return supplyView('ups', part, {
-      capacityW: c.upsCapW[i] ?? 0, usage: h.upsUsage[i] ?? 0, overTicks: h.upsOverTicks[i] ?? 0, failed,
-      rebootTicks: h.upsRebootTicks[i] ?? 0, loss: c.upsLoss[i] ?? 0, capSwitch: part.capped, capFactor: 1,
-    }, siteEnergyPrice(state, c.site[room] ?? 0));
+    return supplyView('ups', part, { capacityW: c.upsCapW[i] ?? 0, usage: h.upsUsage[i] ?? 0, loss: c.upsLoss[i] ?? 0 }, siteEnergyPrice(state, c.site[room] ?? 0));
   });
 }
-
-/** True when every UPS of the zone has failed: the zone is dark. */
-export const roomDark = (state: GameState, room: number): boolean => {
-  const n = state.compiled.room.upsCount[room] || (state.build.rooms[room]?.ups.length ?? 0);
-  for (let u = 0; u < n; u += 1) if ((state.hot.room.upsFailed[room * MAX_UPS + u] ?? 0) === 0) return false;
-  return n > 0;
-};
 
 export function roomSnapshot(state: GameState, id: RoomId, parent: NodeRef | null): RoomSnapshot {
   const b = state.build.rooms[id]!;
   const c = state.compiled.room, h = state.hot.room;
   const site = c.site[id] ?? 0;
   const out = outsideF(state, site);
-  const crashed = (h.crashed[id] ?? 0) === 1;
   const probe = roomProbe(state, id);
   const rows = b.rows;
   const racks: RackSlotView[] = [];
@@ -67,9 +54,9 @@ export function roomSnapshot(state: GameState, id: RoomId, parent: NodeRef | nul
   return {
     level: 'room', parent, roomId: id, siteId: siteId(site), zone: b.zone,
     zones: (siteBuild?.zones ?? [id]).map((z) => (z === null ? null : roomId(z))),
-    online: containerMode(state, c.alive[id], c.intent[id], roomDark(state, id), crashed, probe),
+    online: containerMode(state, c.alive[id], c.intent[id], probe),
     timerS: probeTimerS(state, probe),
-    tempF: h.tempF[id] ?? 70, outsideF: out, crashS: ticksToS(h.crashTicks[id] ?? 0), crashed,
+    tempF: h.tempF[id] ?? 70, outsideF: out,
     cooler: coolerView(c, h, id, b.cooler, out),
     ups: roomUps(state, id),
     power: { start: roomStartView(state, id, Array.from({ length: RACKS_PER_ROOM }, (_, i) => c.racks[id * RACKS_PER_ROOM + i] ?? -1)) },

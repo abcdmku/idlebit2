@@ -28,12 +28,14 @@ function ResearchKey() {
   const r = useGameSelector(s => ({ active: s.feed.research?.name ?? s.research.name, progress: s.feed.research?.progress ?? s.research.progress,
     needsData: s.research.needsData, stopped: s.research.stoppedInsolvent, queued: s.research.queued,
     rate: s.feed.research?.opsPerSec ?? s.research.opsPerSec, waiting: s.feed.research ? !s.feed.research.running : false,
+    // Between rounds a waiting project runs after Return to market (spec §11.3), not from a line.
+    between: s.hud.roundState !== 'running', requested: s.research.breakRequested,
     // A paused project keeps its progress but holds no place in line.
     paused: !s.research.active && Object.keys(store.getState().research.parked).length > 0 }), shallowEqual, 250);
   const n = L.N, d = L.kind === 'desktop', k = L.research, pct = r.active ? `${Math.floor(r.progress * 100)}%` : '';
   if (hasTaskDock(L)) return <button type="button" className={`skey research-dock-key${open ? ' open' : ''}`} style={box(k)}
     data-testid="research-key" data-qa-target aria-expanded={open} aria-haspopup="dialog"
-    title={r.active ? `Research: ${r.active} ${pct}` : ready ? `${ready} research projects ready` : 'Research'}
+    title={r.active ? `Research: ${r.active} ${pct}${r.waiting && r.between ? r.requested ? ', no server ready' : ', after Return' : ''}` : ready ? `${ready} research projects ready` : 'Research'}
     aria-label={r.active ? `Research ${r.active} ${pct}` : 'Research'} onClick={() => view.dispatch({ type: 'toggleSheet', sheet: 'research' })}>
     <ArtCanvas w={16} h={16} n={n} artKey="flask" draw={drawFlask} />
     <i className="research-dock-progress" data-free="art" aria-hidden="true"><i style={{ width: `${r.progress * 100}%` }} /></i>
@@ -58,7 +60,7 @@ function ResearchKey() {
     {!textOnly && <span className="aic" style={{ left: compact ? Math.floor((k.w - icon) / 16) * 8 : pad, top: d ? (k.h - icon) / 2 : pad }}><ArtCanvas w={16} h={16} n={n} artKey="flask" draw={drawFlask} /></span>}
     <T x={tx} y={d ? y1 : flat ? pad : compact ? 40 : 16} w={k.w - tx - 4}>{r.stopped ? <b className="warn">Stopped</b> : <b>Research</b>}</T>
     <T x={d || flat ? tx : pad} y={line2} w={k.w - (d || flat ? tx : pad) - pad}>{r.stopped ? <span className="warn">no Credits</span>
-      : r.active ? <span className="rnd">{r.waiting ? fits('In line') ? 'In line' : 'Next' : fits(`Running ${pct}`) ? `Running ${pct}` : fits(`${pct} done`) ? `${pct} done` : pct}</span>
+      : r.active ? <span className="rnd">{r.waiting ? r.between ? r.requested ? fits('No server ready') ? 'No server ready' : 'No server' : fits('After Return') ? 'After Return' : 'Waiting' : fits('In line') ? 'In line' : 'Next' : fits(`Running ${pct}`) ? `Running ${pct}` : fits(`${pct} done`) ? `${pct} done` : pct}</span>
       : r.paused && !ready ? <span className="mute">Paused</span> : idle}</T>
   </button>;
 }

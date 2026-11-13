@@ -2,7 +2,7 @@ import type { Amount } from '../amount';
 import type { FilterId, QueueStrategyId, RegionId, RouteStrategyId } from './catalog';
 import type { RackId, RoomId, SiteId, SystemId } from './ids';
 import type { AccelBuild } from './gpu';
-export type { AccelBuild, GpuBuild, NpuBuild } from './gpu';
+export type { AccelBuild } from './gpu';
 
 /**
  * The player's configuration tree (architecture §1.3 `build`). Plain immutable objects.
@@ -13,10 +13,7 @@ export interface PartLevel { readonly gen: number; readonly level: number }
 export type MemoryUpgrade = 'capacity' | 'speed';
 /** Capacity and bandwidth/IO have independent levels within one hardware generation. */
 export interface MemoryBuild extends PartLevel { readonly speedLevel: number }
-export interface SupplyBuild extends PartLevel {
-  /** Power-cap switch (spec §9.5); only meaningful with the `powerCap` rule. */
-  readonly capped: boolean;
-}
+export type SupplyBuild = PartLevel;
 /** One CPU. Every socket of a system holds an identical copy (D7.3); `cores` has at most 32 entries. */
 export interface CpuBuild {
   readonly cpu: PartLevel;
@@ -60,7 +57,6 @@ export interface SystemSpec {
   readonly ram: readonly RamModuleBuild[];
   readonly accels: readonly AccelBuild[];
   readonly drives: readonly MemoryBuild[];
-  readonly psu: SupplyBuild;
   readonly settings: SystemSettings;
 }
 export interface SystemBuild {

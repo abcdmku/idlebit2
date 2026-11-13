@@ -1,7 +1,7 @@
 // Room level of detail for the global map (mockup datacenter/mini.js drawFloorLOD): the hall
 // seen from above with the roof off. Walls, floor, the network rack and UPS against the back
 // wall, rows of cabinets whose lights follow the zone's real load, exhaust tinted by the real
-// temperature, CRACs at the row ends. Dark zones have no lights; crashed zones show red rows.
+// temperature, CRACs at the row ends. Unpowered zones have no lights.
 // No closures, no strings: the global map draws up to 24 of these a frame.
 import { P, R, mix, px } from '../../core';
 import type { Rect } from '../../core';
@@ -29,20 +29,20 @@ const exhaustCol = (tempF: number): string => tempF >= 100 ? P.fault : tempF > 9
 export function drawRoomMini(g: G, z: ZoneView, r: Rect): void {
   m.k = Math.min(r.w / W, r.h / H); m.ox = r.x + (r.w - W * m.k) / 2; m.oy = r.y + (r.h - H * m.k) / 2;
   // D31: a standby zone (the global start controller has not brought it online) draws 0 W: dark.
-  const dark = z.state === 'dark' || z.state === 'offline' || z.state === 'empty' || z.state === 'standby' || z.powered === false, crashed = z.state === 'crashed';
+  const dark = z.state === 'offline' || z.state === 'empty' || z.state === 'standby' || z.powered === false;
   const ox = X(HX), oy = Y(HY), ow = Math.max(1, X(HX + HW) - ox), oh = Math.max(1, Y(HY + HH) - oy);
   if (ow >= 7) box(g, HX - 6, IY - 34, HW + 12, HALL.ib + 12 - (IY - 34), APRON);
   R(g, ox - 1, oy - 1, ow + 2, oh + 2, P.ink);
   R(g, ox, oy, ow, oh, FACADE);
   // a zone powering on: one steady amber line along its facade until it is up (real wakeMs)
   if (z.wakeMs != null && z.wakeMs > 0) R(g, ox, oy, ow, 1, P.amber);
-  if (ow < 7) { R(g, ox + 1, oy + 1, Math.max(1, ow - 2), Math.max(1, oh - 2), dark ? P.ink : crashed ? P.fault : P.wafer); return; }
+  if (ow < 7) { R(g, ox + 1, oy + 1, Math.max(1, ow - 2), Math.max(1, oh - 2), dark ? P.ink : P.wafer); return; }
   box(g, HALL.ix, IY, HALL.iw, HALL.ib - IY, dark ? mix(P.wafer, P.ink, 0.5) : P.wafer);
   box(g, NET_FOOT.x, IY - 18, 16, 28, CAB);
   box(g, upsX(HALL, UPS_MAX - 4, UPS_MAX), IY - 16, 43, 26, P.steelLo);
   if (!dark) {
     const nx = X(NET_FOOT.x + 8), ny = Y(IY - 4);
-    px(g, nx, ny, crashed ? P.fault : P.led);
+    px(g, nx, ny, P.led);
   }
   // Lights per row: the zone's real load lights that share of each row's cabinets.
   const lit = Math.round(Math.max(0, Math.min(1, z.load)) * COLS);
@@ -59,13 +59,13 @@ export function drawRoomMini(g: G, z: ZoneView, r: Rect): void {
       const lx = X(rackX(c) + 8);
       for (let j = 0; j < rowsL; j++) {
         const ly = Math.max(by, by + bh - 1 - Math.floor(((j + 0.5) * bh) / rowsL));
-        px(g, lx, ly, crashed ? P.fault : c < lit ? ((c + j) % 4 ? P.led : P.bit) : P.ledOff);
+        px(g, lx, ly, c < lit ? ((c + j) % 4 ? P.led : P.bit) : P.ledOff);
       }
     }
   }
   for (let i = 0; i < 2; i++) {
     const f = CRAC_FEET[i]!;
     box(g, f.x, f.y - CRAC.z, f.w, f.h + CRAC.z, P.steel, 1, 2);
-    if (!dark) px(g, X(f.x + (f.w >> 1)), Y(f.y - CRAC.z) + 1, crashed ? P.fault : P.cool);
+    if (!dark) px(g, X(f.x + (f.w >> 1)), Y(f.y - CRAC.z) + 1, P.cool);
   }
 }

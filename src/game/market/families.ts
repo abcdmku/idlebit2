@@ -176,5 +176,4 @@ export const payloadAt = (f: FamilyDef, size: number): number => Number(recipeTo
 
 /** Gate quantities of a shard of `size` units (bits, spec §6.3). */
 export const workingSetAt = (f: FamilyDef, size: number) => Math.ceil(f.workingSet.fixed + f.workingSet.perSize * size);
-export const vramAt = (f: FamilyDef, size: number) => f.vramBits.fixed + f.vramBits.perSize * size;
 

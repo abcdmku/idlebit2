@@ -4,7 +4,7 @@ import {
   EFF_FLAT_HIGH_F, EFF_FLAT_LOW_F, EFF_GAIN_PER_F, EFF_LOSS_PER_F, EFF_MAX, EFF_MIN, THROTTLE_AT_F, THROTTLE_UNTIL_F,
 } from './constants';
 import { publishClockFactor } from './draw';
-import { forRackSystems, syncRack, syncRoom } from './modes';
+import { forRackSystems } from './modes';
 
 /**
  * e(T) (spec §10.4): 1.10 at or below 50 °F, +0.5%/°F below 70, flat 70–80, −2.5%/°F above 80
@@ -22,21 +22,12 @@ export function efficiency(tempF: number): number {
 export const nextThrottle = (on: boolean, tempF: number, researched: boolean): boolean =>
   researched && (tempF >= THROTTLE_AT_F || (on && tempF >= THROTTLE_UNTIL_F));
 
-/** Heat reduces rates through e(T); cooling never kills tasks or powers hardware off. */
-export function rackHealth(w: World, r: number, tempF: number, throttleResearched: boolean): void {
+/** Heat reduces rates through e(T) and the throttle; cooling never kills tasks or powers hardware off (spec §10.7). */
+export function rackThrottle(w: World, r: number, tempF: number, throttleResearched: boolean): void {
   const h = w.hot.rack;
-  const wasCrashed = h.crashed[r] === 1;
-  h.crashed[r] = 0; h.crashTicks[r] = 0; h.recoverTicks[r] = 0;
-  if (wasCrashed) syncRack(w, r);
   const throttled = nextThrottle(h.throttled[r] === 1, tempF, throttleResearched) ? 1 : 0;
   if (throttled !== h.throttled[r]) {
     h.throttled[r] = throttled;
     forRackSystems(w, r, (s) => publishClockFactor(w, s));
   }
-}
-
-export function roomHealth(w: World, m: number, _tempF: number): void {
-  const h = w.hot.room, wasCrashed = h.crashed[m] === 1;
-  h.crashed[m] = 0; h.crashTicks[m] = 0; h.recoverTicks[m] = 0;
-  if (wasCrashed) syncRoom(w, m);
 }

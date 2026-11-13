@@ -2,7 +2,7 @@
 // Wide rects get the server front panel (racks); squarish rects get a top view of the board.
 // Every light is real slot state; paused shows power only.
 import type { ServerSlotView } from '../../../game';
-import { P, R, frame as outline, lampState, mix, px } from '../../core';
+import { P, R, frame as outline, lampState, px } from '../../core';
 import type { Rect, WorldFrame } from '../../core';
 import { boardOf, packageRect } from './layout';
 
@@ -14,13 +14,12 @@ function powerColour(slot: ServerSlotView, paused: boolean): string {
   switch (lampState(slot.state)) {
     case 'online': return paused ? P.ledOff : P.led;
     case 'switching': return P.amber;
-    case 'fault': return P.fault;
     case 'offline': return P.lampOff;
   }
 }
 
 export function drawSystemMini(g: G, slot: ServerSlotView, r: Rect, frame: WorldFrame): void {
-  if (r.w >= r.h * 2.2) frontPanel(g, slot, r, frame); else topView(g, slot, r);
+  if (r.w >= r.h * 2.2) frontPanel(g, slot, r, frame); else topView(g, r);
 }
 
 function frontPanel(g: G, slot: ServerSlotView, r: Rect, frame: WorldFrame): void {
@@ -47,7 +46,7 @@ function frontPanel(g: G, slot: ServerSlotView, r: Rect, frame: WorldFrame): voi
 }
 
 /** The board seen from above, at the full world's own proportions, so a zoom dissolves into it. */
-function topView(g: G, slot: ServerSlotView, r: Rect): void {
+function topView(g: G, r: Rect): void {
   // the general board on the floorplan it rests on now (layout.ts boardOf)
   const b = boardOf('general'), WORLD = b.world, BOARD = b.board;
   packageRect(b, 0, PKG);
@@ -58,5 +57,4 @@ function topView(g: G, slot: ServerSlotView, r: Rect): void {
   R(g, bx, by, bw, bh, P.mask); outline(g, bx - 1, by - 1, bw + 2, bh + 2, P.ink);
   const cx = X(PKG.x), cy = Y(PKG.y), cw = Math.max(1, X(PKG.x + PKG.w) - cx), ch = Math.max(1, Y(PKG.y + PKG.h) - cy);
   R(g, cx, cy, cw, ch, '#2b2550');
-  if (lampState(slot.state) === 'fault') R(g, cx, cy, cw, ch, mix(P.fault, P.ink, 0.5));
 }

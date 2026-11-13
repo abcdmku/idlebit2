@@ -66,7 +66,7 @@ export function boardLimit(spec: SystemSpec, u: Unlocks, kind: 'socket' | 'ram' 
 /** Hot level + 1 (spec §4.5). Chip parts apply to every CPU at price × CPU count (D7.3). */
 export function planUpgrade(state: GameState, ref: PartRef, axis: MemoryUpgrade = 'capacity'): Plan {
   if (ref.slot.kind === 'ram' || ref.slot.kind === 'drive') return planMemoryUpgrade(state, ref, axis);
-  if (ref.slot.kind === 'psu') return fail('locked', 'Power upgrades at Rack');
+
   if (ref.slot.kind === 'pdu' && !state.research.unlocks.levels.rack) return locked({ code: 'research', node: researchId('rack'), text: 'Needs Rack' });
   const part = readPart(state.build, ref);
   if (!part) return fail('invalid', 'No such part');
@@ -110,7 +110,7 @@ export function planUpgrade(state: GameState, ref: PartRef, axis: MemoryUpgrade 
  */
 export function planUpgradeTo(state: GameState, ref: PartRef, level: number, axis: MemoryUpgrade = 'capacity'): Plan {
   if (ref.slot.kind === 'ram' || ref.slot.kind === 'drive') return planMemoryUpgrade(state, ref, axis, level);
-  if (ref.slot.kind === 'psu') return fail('locked', 'Power upgrades at Rack');
+
   if (ref.slot.kind === 'pdu' && !state.research.unlocks.levels.rack) return locked({ code: 'research', node: researchId('rack'), text: 'Needs Rack' });
   const part = readPart(state.build, ref);
   if (!part) return fail('invalid', 'No such part');
@@ -137,7 +137,7 @@ export function planUpgradeTo(state: GameState, ref: PartRef, level: number, axi
 export function planReplace(state: GameState, ref: PartRef, g: number, preserveCapacity: boolean, minimumCapacity = 0): Plan {
   if (!Number.isFinite(minimumCapacity) || minimumCapacity < 0) return fail('invalid', 'Invalid capacity');
   if (POWER_SLOTS.includes(ref.slot.kind)) return planPowerPart(state, ref, g);
-  if (ref.slot.kind === 'psu') return fail('locked', 'Power upgrades at Rack');
+
   if (ref.slot.kind === 'pdu' && !state.research.unlocks.levels.rack) return locked({ code: 'research', node: researchId('rack'), text: 'Needs Rack' });
   const part = readPart(state.build, ref);
   if (!part) return fail('invalid', 'No such part');

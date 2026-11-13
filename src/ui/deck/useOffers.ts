@@ -18,7 +18,7 @@ export function wallKey(s: RenderSnapshot): string {
     : top ? WALL_ROWS[top.detail] ?? (top.cause === 'timeout' || top.cause === 'late' ? SLOW_ROWS : [])
     : report && (report.failedByCause.timeout > 0 || report.failedByCause.late > 0) ? SLOW_ROWS : [];
   const f = s.focus, near: string[] = [];
-  if ((f.level === 'system' || f.level === 'chip') && f.psu.usage >= NEAR) near.push('psu');
+
   if (f.level === 'rack') { if (f.pdu.usage >= NEAR) near.push('pdu'); if (f.tempF >= HOT_F || f.throttled) near.push('rackCooler'); }
   if (f.level === 'room') { if (f.ups.some(u => u.usage >= NEAR)) near.push('ups'); if (f.tempF >= HOT_F) near.push('roomCooler'); }
   return `${wall.join(',')}|${near.join(',')}`;
@@ -26,7 +26,7 @@ export function wallKey(s: RenderSnapshot): string {
 
 /**
  * The visible level's offers: tray quotes (R13 order), the inbound link and the level's other parts
- * (the System's PSU, a router's queue), with their effects. Quotes are lazy and refresh at most 2 Hz (useQuote). The
+ * (a router's queue), with their effects. Quotes are lazy and refresh at most 2 Hz (useQuote). The
  * world prices its build ghosts with the same tray quotes.
  */
 export function useOffers(): Offers {

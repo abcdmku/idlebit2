@@ -8,10 +8,10 @@ import { MAX_ZONES_PER_SITE, RACK_SLOTS_PER_ROW, SERVERS_PER_RACK, SETPOINT_DEFA
 
 /**
  * Barebones units (spec §13.2) as plain build objects: the boot machine, the hidden containers and
- * the testkit fleets use them. Prices and PSU sizing are S5's (build/configs); these carry only shape.
+ * the testkit fleets use them. Prices are S5's (build/configs); these carry only shape.
  */
 export const levelOne = (gen: number): PartLevel => ({ gen, level: 1 });
-const supply = (gen: number): SupplyBuild => ({ gen, level: 1, capped: false });
+const supply = (gen: number): SupplyBuild => ({ gen, level: 1 });
 const cooler = (gen: number): CoolerBuild => ({ gen, level: 1, setpointF: SETPOINT_DEFAULT_F });
 export const baseRouter = (gen = 0): RouterBuild => ({ gen, level: 1, strategy: 'firstFit', filters: [], queueLevel: 1 });
 /**
@@ -33,7 +33,7 @@ export function barebonesSpec(tier = 0, board: BoardKind = 'general'): SystemSpe
   if (!spec) {
     spec = {
       kind: 'server', board, cpu: { cpu: levelOne(tier), cores: [levelOne(tier)], clock: levelOne(tier), cache: levelOne(tier), }, cpuCount: 1,
-      scheduler: null, ram: [], accels: [], drives: [], psu: supply(0), settings: { dvfs: false, turbo: false, cStateLimit: 1 },
+      scheduler: null, ram: [], accels: [], drives: [], settings: { dvfs: false, turbo: false, cStateLimit: 1 },
     };
     BAREBONES_SPECS.set(key, spec);
   }

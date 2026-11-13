@@ -10,7 +10,6 @@ import type { LinkView, SiteView, ZoneView } from '../types/views';
 import { containerMode, lbView, ladderHz, probeTimerS, roomProbe, siteProbe, supplyView } from './common';
 import { globalFlows } from './flows';
 import { generationView, globalStartView, sitePowerFields, zonePowerFields } from './power';
-import { roomDark } from './room';
 
 const linkActive = (state: GameState, link: number): boolean => link >= 0 && (state.hot.link.head[link] ?? -1) >= 0;
 
@@ -33,7 +32,7 @@ function zoneView(state: GameState, room: number, zone: number): ZoneView & { ho
   for (let u = 0; u < MAX_UPS; u += 1) ups = Math.max(ups, h.upsUsage[room * MAX_UPS + u] ?? 0);
   return {
     roomId: roomId(room), zone,
-    state: containerMode(state, c.alive[room], c.intent[room], roomDark(state, room), (h.crashed[room] ?? 0) === 1, roomProbe(state, room)),
+    state: containerMode(state, c.alive[room], c.intent[room], roomProbe(state, room)),
     tempF: h.tempF[room] ?? 70, load: n > 0 ? load / n : 0, upsUsage: ups, hottestF: hottest,
     ...zonePowerFields(state, room),
   };
@@ -56,15 +55,11 @@ function siteView(state: GameState, regionIndex: number, site: number): SiteView
     hottest = Math.max(hottest, hottestF);
     dpActive ||= linkActive(state, c.dpLink[site * MAX_ZONES_PER_SITE + z] ?? -1);
   }
-  const failed = (h.gridFailed[site] ?? 0) === 1;
   const probe = siteProbe(state, site);
   return {
     siteId: siteId(site), region: region.id, open: c.opened[site] === 1,
-    online: containerMode(state, c.alive[site], c.intent[site], failed, false, probe), zones, timerS: probeTimerS(state, probe),
-    grid: supplyView('grid', b.grid, {
-      capacityW: c.gridCapW[site] ?? 0, usage: h.gridUsage[site] ?? 0, overTicks: h.gridOverTicks[site] ?? 0, failed,
-      rebootTicks: h.gridRebootTicks[site] ?? 0, loss: c.gridLoss[site] ?? 0, capSwitch: b.grid.capped, capFactor: 1,
-    }, region.energyPrice),
+    online: containerMode(state, c.alive[site], c.intent[site], probe), zones, timerS: probeTimerS(state, probe),
+    grid: supplyView('grid', b.grid, { capacityW: c.gridCapW[site] ?? 0, usage: h.gridUsage[site] ?? 0, loss: c.gridLoss[site] ?? 0 }, region.energyPrice),
     dataPlane: {
       generation: b.dataPlane.gen, bitsPerSec: c.dpSpeed[site] || ladderHz(b.dataPlane.k),
       latencyMs: (c.dpLatencyTicks[site] ?? 0) * TICK_MS, active: dpActive,

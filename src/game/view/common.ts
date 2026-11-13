@@ -3,7 +3,7 @@ import { viewW } from '../core/constants';
 import type { CompiledBuffers, HotBuffers } from '../core/buffers';
 import { HOME_TEMP_F, MAX_ZONES_PER_SITE, RACKS_PER_ROOM, REGIONS, SERVERS_PER_RACK, TICK_MS } from '../core/constants';
 import { MODE } from '../core/timers';
-import type { CoolerBuild, PartLevel, RouterBuild, SupplyBuild, SwitchBuild } from '../types/build';
+import type { CoolerBuild, PartLevel, RouterBuild, SwitchBuild } from '../types/build';
 import { FILTER_IDS, ROUTE_STRATEGY_IDS, type CoolTech, type FilterId } from '../types/catalog';
 import { rqAt, rqLen, rqRow } from '../core/routerQueue';
 import { familyId } from '../types/ids';
@@ -86,14 +86,12 @@ export function systemTimerS(hot: HotBuffers, s: number): number | null {
 }
 
 /**
- * Mode of a container (rack, zone, site): its own failure first (spec §4.3 order), then a boot-time
+ * Mode of a container (rack, zone, site): a boot-time
  * transition read from its probe system (every system below a toggled container shares the
  * transition), then the switch, then the round. Systems inside carry their own exact modes.
  */
-export function containerMode(state: GameState, alive: number | undefined, intent: number | undefined, dark: boolean, crashed: boolean, probe = -1): UnitMode {
+export function containerMode(state: GameState, alive: number | undefined, intent: number | undefined, probe = -1): UnitMode {
   if (alive !== 1) return 'empty';
-  if (dark) return 'dark';
-  if (crashed) return 'crashed';
   if (probe >= 0 && systemTimerS(state.hot, probe) !== null) return modeName(state.hot.sys.mode[probe]);
   if (intent !== 1) return 'offline';
   return state.round.phase === 'running' ? 'onMarket' : 'paused';
@@ -130,28 +128,16 @@ export const probeTimerS = (state: GameState, probe: number): number | null => (
 /** 1-2-5 ladder (spec §7.3): speed(k) = [1, 2, 5][k mod 3] × 10^(3 + floor(k / 3)) bit/s. */
 export const ladderHz = (k: number): number => [1, 2, 5][k % 3]! * 10 ** (3 + Math.floor(k / 3));
 
-export interface SupplyNumbers {
-  readonly capacityW: number; readonly usage: number; readonly overTicks: number; readonly failed: boolean;
-  readonly rebootTicks: number; readonly loss: number; readonly capSwitch: boolean; readonly capFactor: number;
-}
+export interface SupplyNumbers { readonly capacityW: number; readonly usage: number; readonly loss: number }
 export function supplyView(kind: SupplyKind, part: PartLevel, n: SupplyNumbers, energyPrice: number): SupplyView {
-  const deliveredW = n.failed ? 0 : n.usage * n.capacityW;
+  const deliveredW = n.usage * n.capacityW;
   const lossW = deliveredW * n.loss;
   return {
-    kind, generation: part.gen, level: part.level, capacityW: viewW(n.capacityW), deliveredW: viewW(deliveredW), usage: n.failed ? 0 : n.usage,
-    overloadS: ticksToS(n.overTicks), failed: n.failed, rebootMs: n.failed ? n.rebootTicks * TICK_MS : null,
-    loss: n.loss, lossW: viewW(lossW), capped: n.capSwitch, capFactor: n.capFactor,
+    kind, generation: part.gen, level: part.level, capacityW: viewW(n.capacityW), deliveredW: viewW(deliveredW), usage: n.usage,
+    loss: n.loss, lossW: viewW(lossW),
     creditsPerMinute: (deliveredW + lossW) * energyPrice * 60, };
 }
 
-export function psuView(state: GameState, s: number, part: SupplyBuild): SupplyView {
-  const c = state.compiled.sys, h = state.hot.sys;
-  const rebootTicks = h.psuRebootTicks[s] ?? 0;
-  return supplyView('psu', part, {
-    capacityW: c.psuCapW[s] ?? 0, usage: h.psuUsage[s] ?? 0, overTicks: h.psuOverTicks[s] ?? 0, failed: rebootTicks > 0,
-    rebootTicks, loss: c.psuLoss[s] ?? 0, capSwitch: (c.psuCapSwitch[s] ?? 0) === 1 && part.capped, capFactor: h.capFactor[s] ?? 1,
-  }, siteEnergyPrice(state, c.site[s] ?? 0));
-}
 
 /** Lump columns shared by racks and rooms. */
 interface LumpCompiled { coolerQc: Float64Array; coolerTech: Uint8Array; setpointF: Float64Array; hasSetpoint: Uint8Array; leak: Float64Array }

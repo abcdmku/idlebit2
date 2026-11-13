@@ -28,7 +28,7 @@ function roofTint(T: number): string {
 /** Between rounds: a sled row that runs next round (ready, dim green) or sits out (unlit). */
 const READY = mix(P.led, P.ink, 0.55), OUT = mix(FRONT, P.ink, 0.45);
 /** D31: a standby rack (its room's start controller has not powered it) draws 0 W: dark like an off rack. */
-const powered = (v: RackSlotView): boolean => v.state !== 'dark' && v.state !== 'offline' && v.state !== 'empty' && v.state !== 'standby' && v.powered !== false;
+const powered = (v: RackSlotView): boolean => v.state !== 'offline' && v.state !== 'empty' && v.state !== 'standby' && v.powered !== false;
 const ASLEEP = UNIT_MODES.indexOf('asleep'), SLEEP_ROW = mix(P.ledOff, P.ink, 0.5);
 const m = { kx: 1, ky: 1, ox: 0, oy: 0 };
 const X = (v: number): number => Math.round(m.ox + v * m.kx), Y = (v: number): number => Math.round(m.oy + v * m.ky);
@@ -45,7 +45,7 @@ function markBusy(v: RackSlotView): void {
 export function drawRackMini(g: G, v: RackSlotView, rect: Rect, paused: boolean): void {
   m.kx = rect.w / WORLD.w; m.ky = rect.h / WORLD.h; m.ox = rect.x; m.oy = rect.y;
   const x0 = X(CAB.x), x1 = X(CAB.x + CAB.w), y0 = Y(CAB.roofY), y1 = Y(CAB.ground), yf = Math.max(y0 + 2, Y(CAB.frontY));
-  const w = x1 - x0, h = y1 - y0, on = powered(v) && !paused, crashed = v.state === 'crashed', ready = paused && powered(v) && !crashed;
+  const w = x1 - x0, h = y1 - y0, on = powered(v) && !paused, ready = paused && powered(v);
   if (w < 4 || h < 6) { R(g, x0, y0, Math.max(1, w), Math.max(2, h), P.ink); return; }
   const alpha = g.globalAlpha;
   g.globalAlpha = alpha * 0.34; R(g, x0 + 1, y0 + 1, w, h, P.ink); g.globalAlpha = alpha;
@@ -62,7 +62,7 @@ export function drawRackMini(g: G, v: RackSlotView, rect: Rect, paused: boolean)
   // PDU load up the right post: green, amber above 90%, red over capacity
   if (w >= 14 && powered(v) && v.pduUsage > 0) {
     const hh = y1 - 2 - yf, lit = Math.max(1, Math.round(Math.min(1, v.pduUsage) * hh));
-    R(g, x1 - 3, y1 - 1 - lit, 2, lit, v.pduUsage > 1 ? P.fault : v.pduUsage > 0.9 ? P.amber : P.led);
+    R(g, x1 - 3, y1 - 1 - lit, 2, lit, v.pduUsage > 0.9 ? P.amber : P.led);
   }
   if (!on && !ready) return;
   if (on) markBusy(v);
@@ -72,7 +72,7 @@ export function drawRackMini(g: G, v: RackSlotView, rect: Rect, paused: boolean)
     const u = Math.floor((wy - U0) / U), slot = u - SRV_U0;
     if (u < SRV_U0) { for (let x = ix0; x < ix1; x += 2) px(g, x, y, mix(P.net, P.ink, 0.6)); continue; }
     if (slot >= SERVER_SLOTS || !v.servers[slot]) continue;
-    const c = ready ? ((v.serversOnMarket?.[slot] ?? 1) ? READY : OUT) : crashed ? mix(P.fault, P.ink, 0.3) : v.servers[slot] === ASLEEP ? SLEEP_ROW : busy[slot] ? P.led : P.ledOff;
+    const c = ready ? ((v.serversOnMarket?.[slot] ?? 1) ? READY : OUT) : v.servers[slot] === ASLEEP ? SLEEP_ROW : busy[slot] ? P.led : P.ledOff;
     for (let x = ix0; x < ix1; x += 2) px(g, x, y, c);
   }
 }

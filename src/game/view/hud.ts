@@ -8,7 +8,6 @@ import { recentIncome, roundIncome } from './research';
 import type { GameState } from '../types/state';
 import { frontierView } from './frontier';
 
-export { slaPercent };
 
 const autoReturnInMs = (state: GameState): number | null => {
   const at = state.round.autoReturnTick;

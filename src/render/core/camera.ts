@@ -4,7 +4,6 @@ import type { Point, Rect } from './geom';
 export interface Camera { cx: number; cy: number; s: number }
 export interface ContainMap { ox: number; oy: number; k: number }
 export interface PixelRatio { x: number; y: number }
-export const IDENTITY: Readonly<ContainMap> = { ox: 0, oy: 0, k: 1 };
 export const camera = (): Camera => ({ cx: 0, cy: 0, s: 1 });
 export const contain = (): ContainMap => ({ ox: 0, oy: 0, k: 1 });
 export const clamp01 = (v: number): number => Math.max(0, Math.min(1, v));

@@ -16,10 +16,6 @@ export const GRACE_WINDOW = 5;
 
 /** Base boot latency; Boot loader levels lower it. */
 export const BOOT_TICKS_BASE = secondsToTicks(10);
-export const OVERLOAD_FAIL_TICKS = secondsToTicks(10);
-export const CRASH_TICKS = secondsToTicks(10);
-export const CRASH_TEMP_F = 100;
-export const RECOVER_TEMP_F = 90;
 export const FLOOR_TEMP_F = 50;
 export const HOME_TEMP_F = 70;
 /** A lump within this of its equilibrium snaps to it (spec §10.5), enabling the quiescent skip. */
@@ -64,10 +60,6 @@ export const MAX_ACCELS = 8;
 export const POOL_DOMAIN = 8;
 export const ACCEL_DOMAINS = 9;
 export const ACCEL_CLOCKS = 18;
-/** η_cfg = SOCKET_FACTOR[cpus − 1] × dimmFactor (spec §6.2, starting values). */
-export const SOCKET_FACTOR: readonly number[] = [1, 0.92, 0.85, 0.78];
-/** dimmFactor by RAM modules on a general board: 0–2 → 1, 3 → 0.95, 4 → 0.9; an accelerator board is 1 up to 8. */
-export const DIMM_FACTOR: readonly number[] = [1, 1, 1, 0.95, 0.9];
 /** D25.1: a task has at most this many shards; also the largest minimum split (members). */
 export const MAX_SHARDS = 256;
 /** Resource clocks per system (exec/shape): CPU, RAM, GPU, IO (the disk tier). Stride of every per-resource column. */

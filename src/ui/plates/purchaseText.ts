@@ -15,7 +15,7 @@ export function purchaseGain(q: Quote): string {
   let gain = before === after ? after : `${before} → ${after}`;
   if (e.capacityLabel) gain = `${e.capacityLabel} ${gain}`;
   if (e.throughputAfter !== undefined) gain += ` · ${bitRate(e.throughputAfter)}${e.throughputBefore !== undefined && e.throughputAfter < e.throughputBefore ? ' ↓' : ''}`;
-  if (e.lossPctAfter !== undefined && before === after) gain = `${Math.round(e.lossPctBefore ?? 0)}% → ${Math.round(e.lossPctAfter)}% loss`;
+
   return gain;
 }
 

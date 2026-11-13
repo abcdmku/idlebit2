@@ -33,7 +33,7 @@ for (const seed of diagnostic || seed42Only ? [42] : [42, 7]) {
   const marks: Record<string, number | null> = { firstGpuS: null, gpuGen2StartedS: null, gpuGen2CompletedS: null };
   let researchWindowEnergy = 0n, activeTicks = 0, checks = 0, feeErrors = 0, negativeWalletDecisions = 0;
   const failures = Object.fromEntries(FAIL_CAUSES.map((c) => [c, 0]));
-  const peaks = { psuUsage: 0, pduUsage: 0, rackTempF: 70, roomTempF: 70, drawW: 0, minCredits: '0' };
+  const peaks = { pduUsage: 0, rackTempF: 70, roomTempF: 70, drawW: 0, minCredits: '0' };
   let previousGpu = '[]';
   let reachable = false;
   const pausedDecisions: unknown[] = [];
@@ -44,48 +44,29 @@ for (const seed of diagnostic || seed42Only ? [42] : [42, 7]) {
     if (diagnostic && s.round.phase !== 'running' && s.research.completed.some((id) => id === 'gpuGen1')) {
       const qs = candidateRequests(s).flatMap((r) => quote(s, r).quotes);
       const gpu = buyable(s, qs).filter((q) => q.gpu).sort((a, b) => Number(a.cost) - Number(b.cost))[0];
-      let branch = s, option = gpu;
-      const preparation: unknown[] = [];
-      if (!reachable && !option) {
-        const psu = qs.find((q) => q.action.type === 'replacePart' && q.action.part.slot.kind === 'psu'
-          && q.action.generation === 1 && q.affordable && !q.locked);
-        if (psu) {
-          const r = applyAction(branch, psu.action);
-          if (r.ok) { branch = r.state; preparation.push({ label: psu.label, cost: psu.cost, action: psu.action }); }
-        }
-        for (let i = 0; i < 12; i++) {
-          const options = candidateRequests(branch).flatMap((r) => quote(branch, r).quotes);
-          option = buyable(branch, options).filter((q) => q.gpu).sort((a, b) => Number(a.cost) - Number(b.cost))[0];
-          if (option) break;
-          const up = options.find((q) => q.action.type === 'upgradePart' && q.action.part.slot.kind === 'psu' && q.affordable && !q.locked);
-          if (!up) break;
-          const result = applyAction(branch, up.action); if (!result.ok) break;
-          branch = result.state; preparation.push({ label: up.label, cost: up.cost, action: up.action });
-        }
-      }
+      const option = gpu;
       if (option && !reachable) {
-        const purchased = applyAction(branch, option.action);
+        const purchased = applyAction(s, option.action);
         if (!purchased.ok) throw new Error('Reachable quote rejected');
         const returned = applyAction(purchased.state, { type: 'returnToMarket' });
         if (!returned.ok) throw new Error('Counterfactual round rejected');
         const advanced = advanceGame(returned.state, 60_000);
         const c = purchased.state.compiled.sys;
-        save('legal-gpu-counterfactual', { evidence: 'Legal existing-bot prefix followed by quoted PSU preparation, GPU purchase and return, then 60 seconds of real work. Original bot continues unchanged.',
-          seed, timeS: s.clock.tick / 10, creditsBefore: s.wallet.credits, preparation, quote: option, creditsAfter: purchased.state.wallet.credits,
-          system: purchased.state.build.systems[0], psuCapW: c.psuCapW[0],
+        save('legal-gpu-counterfactual', { evidence: 'Legal existing-bot prefix followed by a quoted GPU purchase and return, then 60 seconds of real work. Original bot continues unchanged.',
+          seed, timeS: s.clock.tick / 10, creditsBefore: s.wallet.credits, quote: option, creditsAfter: purchased.state.wallet.credits,
+          system: purchased.state.build.systems[0],
           fullSystemW: c.coreIdleW[0]! + c.coreLoadW[0]! + c.clockIdleW[0]! + [0, 1, 2, 3].reduce((n, r) => n + c.idleW[r]! + c.loadW[r]!, 0),
-          minuteReport: advanced.report, minuteWallet: advanced.state.wallet, minutePsuUsage: advanced.state.hot.sys.psuUsage[0],
+          minuteReport: advanced.report, minuteWallet: advanced.state.wallet,
           minuteRound: advanced.state.round, minuteGpuTaskSecondsLastTick: advanced.state.hot.sys.accelTaskS[0],
         });
         reachable = true;
       }
-      pausedDecisions.push({ timeS: s.clock.tick / 10, credits: s.wallet.credits,
-        beforePsu: s.build.systems[0]!.spec.psu, firstAffordableFitGpu: gpu?.label ?? null });
+      pausedDecisions.push({ timeS: s.clock.tick / 10, credits: s.wallet.credits, firstAffordableFitGpu: gpu?.label ?? null });
     }
     s = decide(s, POLICIES.active, events);
     const fresh = events.slice(first);
     if (diagnostic && old.round.phase !== 'running' && old.research.completed.some((id) => id === 'gpuGen1')) {
-      Object.assign(pausedDecisions.at(-1) as object, { afterPsu: s.build.systems[0]!.spec.psu, actions: fresh });
+      Object.assign(pausedDecisions.at(-1) as object, { actions: fresh });
     }
     for (const e of fresh.filter((e) => e.kind === 'research')) {
       const expectedFee = /^gpuGen[2-9]$/.test(e.label) ? (64_000_000n * 10n ** BigInt(Number(e.label.slice(-1)) - 1)).toString() : '0';
@@ -98,8 +79,7 @@ for (const seed of diagnostic || seed42Only ? [42] : [42, 7]) {
     const cards = s.build.systems.flatMap((sys) => sys?.spec.accels.map((a, slot) => ({ system: sys.id, slot, ...a })) ?? []);
     const fingerprint = JSON.stringify(cards);
     if (fingerprint !== previousGpu) {
-      gpuChanges.push({ timeS: s.clock.tick / 10, cards,
-        systems: cards.map((a) => ({ id: a.system, psu: s.build.systems[a.system]!.spec.psu, psuCapW: s.compiled.sys.psuCapW[a.system] })) });
+      gpuChanges.push({ timeS: s.clock.tick / 10, cards });
       previousGpu = fingerprint;
       if (marks.firstGpuS === null && cards.some((a) => a.kind === 'gpu')) marks.firstGpuS = s.clock.tick / 10;
     }
@@ -119,7 +99,6 @@ for (const seed of diagnostic || seed42Only ? [42] : [42, 7]) {
     s = next.state;
     if (BigInt(s.wallet.credits) < 0n) negativeWalletDecisions++;
     if (BigInt(s.wallet.credits) < BigInt(peaks.minCredits)) peaks.minCredits = s.wallet.credits;
-    peaks.psuUsage = Math.max(peaks.psuUsage, max(s.hot.sys.psuUsage));
     peaks.pduUsage = Math.max(peaks.pduUsage, max(s.hot.rack.pduUsage));
     peaks.rackTempF = Math.max(peaks.rackTempF, max(s.hot.rack.tempF));
     peaks.roomTempF = Math.max(peaks.roomTempF, max(s.hot.room.tempF));
@@ -137,7 +116,6 @@ for (const seed of diagnostic || seed42Only ? [42] : [42, 7]) {
   else if (s.clock.tick < campaignTicks) record(`${seed}-partial`);
   console.log(JSON.stringify({ seed, simulatedS: s.clock.tick / 10, wallS: (performance.now() - wallStart) / 1000,
     budgetExceeded: performance.now() >= deadline, ...marks,
-    psuPurchases: events.filter((e) => e.psu).map((e) => ({ timeS: e.tick / 10, label: e.label, cost: e.cost, ...e.psu })),
   }));
   function record(name: string) {
     const actionTicks = [...new Set(events.map((e) => e.tick))];

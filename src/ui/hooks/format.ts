@@ -21,8 +21,3 @@ export function clockText(ms: number): string {
 export function slaText(percent: number): string {
   return percent.toFixed(1) + '%';
 }
-
-/** The gauge fill: the 60–100% band, so the 80% floor sits at the middle. */
-export function slaFill(percent: number): number {
-  return Math.max(0, Math.min(100, (percent - 60) / 40 * 100));
-}

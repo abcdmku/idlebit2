@@ -3,18 +3,18 @@ import type { World } from '../core/world';
 import { canRunOn } from '../market/fleet';
 import { canAdmit } from '../exec/slots';
 import { shapeOf } from '../exec/shape';
-import { someAdmitting, supplyOver, supplyUsage } from './metrics';
+import { someAdmitting, supplyUsage } from './metrics';
 import { memo } from './routeMemo';
 import { summaryCapable } from './summary';
 import { GLOBAL, RACK, ROOM, SITE } from './scope';
 
 /**
  * Filters (spec §8.4), applied in FILTER_IDS order before the strategy. Each removes candidates;
- * a filter that would remove every candidate is skipped for that decision. Health, power and
- * thermal read the previous tick's phys state.
+ * a filter that would remove every candidate is skipped for that decision. Power and thermal
+ * read the previous tick's phys state.
  */
 /** FILTER_IDS bits. `local` (D25.9) needs the split's shard count, so net/split.ts applies it after the rest. */
-export const FILTER_BIT = { region: 1, capability: 2, health: 4, power: 8, thermal: 16, local: 32 } as const;
+export const FILTER_BIT = { region: 1, capability: 2, power: 4, thermal: 8, local: 16 } as const;
 export const POWER_LIMIT = 0.9;
 export const THERMAL_LIMIT_F = 90;
 
@@ -35,19 +35,8 @@ export const capable = (w: World, kind: number, u: number, r: number): boolean =
     ? summaryCapable(w, kind, u, r)
     : someAdmitting(w, kind, u, (s) => canAdmit(w, s) && canRunOn(w, s, r) === 0);
 
-/** health: no supply overload timer and no crash timer on the candidate's own chain. */
-function healthy(w: World, kind: number, u: number): boolean {
-  const h = w.hot;
-  switch (kind) {
-    case RACK: { const rack = w.compiled.sys.rack[u]!; return h.sys.psuOverTicks[u]! <= 0 && h.rack.pduOverTicks[rack]! <= 0 && h.rack.crashTicks[rack]! <= 0; }
-    case ROOM: return !supplyOver(w, ROOM, u) && h.rack.crashTicks[u]! <= 0;
-    case SITE: return !supplyOver(w, SITE, u) && h.room.crashTicks[u]! <= 0;
-    default: return !supplyOver(w, GLOBAL, u);
-  }
-}
-
-/** power: the candidate's own supply is below 90% and not counting down. */
-const powered = (w: World, kind: number, u: number): boolean => supplyUsage(w, kind, u) < POWER_LIMIT && !supplyOver(w, kind, u);
+/** power: the candidate's own supply is below 90%. */
+const powered = (w: World, kind: number, u: number): boolean => supplyUsage(w, kind, u) < POWER_LIMIT;
 
 /** thermal (room scope and up): racks, zones, or a site's hottest zone below 90 °F. */
 function cool(w: World, kind: number, u: number): boolean {
@@ -69,7 +58,6 @@ function passes(w: World, bit: number, kind: number, u: number, r: number): bool
   switch (bit) {
     case FILTER_BIT.region: return regionOk(w, kind, u, r);
     case FILTER_BIT.capability: return capable(w, kind, u, r);
-    case FILTER_BIT.health: return healthy(w, kind, u);
     case FILTER_BIT.power: return powered(w, kind, u);
     default: return cool(w, kind, u);
   }

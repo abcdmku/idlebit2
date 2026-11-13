@@ -21,7 +21,6 @@ import { GLOBAL, noteRoute, RACK, resetRouted, ROOM, routerOf, SITE, topRouter }
 import { queueFree, split, splitMiss, tree } from './split';
 import { gateBelow } from './stuck';
 
-export { canTake, firstLinkRoom, linkRoom } from './split';
 
 /**
  * Route phase (tick step 4, spec §7.6, D25.7). From Rack on: rebalancing (shard stealing,
@@ -115,8 +114,8 @@ function materialize(w: World, e: Commit): number {
 
 const e: Commit = { taskId: 0, family: 0, units: 0, parent: -1, record: -1, taken: 0, deadline: -1 };
 
-/** Filters whose verdicts move with phys state between router wakes (health, power, thermal). */
-const DRIFTING = FILTER_BIT.health | FILTER_BIT.power | FILTER_BIT.thermal;
+/** Filters whose verdicts move with phys state between router wakes (power, thermal). */
+const DRIFTING = FILTER_BIT.power | FILTER_BIT.thermal;
 const cols = { strategy: 0, filters: 0 };
 
 /**

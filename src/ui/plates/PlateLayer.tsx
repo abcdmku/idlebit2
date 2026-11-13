@@ -100,15 +100,6 @@ const partKindOf = (q: { action: { type: string } }): string | undefined => {
   return a.part?.slot.kind ?? a.kind;
 };
 
-/** D31: the optional power part a plate also sells: the room start controller on the UPS, the global one on the scheduler, a site's generation. */
-export function powerScope(t: HitTarget, focus: LevelSnapshot): ScopeRef | null {
-  const s = t.part?.slot.kind;
-  if (s === 'roomStart' && focus.level === 'room') return { kind: 'room', id: focus.roomId };
-  if (s === 'globalStart' && focus.level === 'global') return { kind: 'global' };
-  if (s === 'generation' && t.part?.unit.kind === 'site') return t.part.unit;
-  return null;
-}
-
 /**
  * The target opens a plate on its first tap (user, 26 Oct). Not: the global scheduler before it exists
  * (A23), an empty CPU or board site (bought from its callout, QA-10; a GPU bay opens the picker), and units
@@ -310,9 +301,9 @@ function TargetPlate({ target: t, focus }: { target: HitTarget; focus: LevelSnap
       if (site?.grid) return <SupplyPlate {...common} quotes={quotes} supply={site.grid} />;
     }
     if (s.kind === 'rackCooler' && focus.level === 'rack') return <CoolerPlate {...common} quotes={quotes} unit={{ kind: 'rack', id: focus.rackId }}
-      cooler={focus.cooler} lump={{ tempF: focus.tempF, crashS: focus.crashS, crashed: focus.crashed, eff: focus.eff }} />;
+      cooler={focus.cooler} lump={{ tempF: focus.tempF, eff: focus.eff }} />;
     if (s.kind === 'roomCooler' && focus.level === 'room') return <CoolerPlate {...common} quotes={quotes} unit={{ kind: 'room', id: focus.roomId }}
-      cooler={focus.cooler} lump={{ tempF: focus.tempF, crashS: focus.crashS, crashed: focus.crashed, outsideF: focus.outsideF }} />;
+      cooler={focus.cooler} lump={{ tempF: focus.tempF, outsideF: focus.outsideF }} />;
     if (s.kind === 'lb' && focus.level === 'rack') return <LbPlate {...common} quotes={quotes} queueQuote={queueQuote} unit={{ kind: 'rack', id: focus.rackId }} view={focus.lb} />;
     if (s.kind === 'switch' && focus.level === 'rack') return <SwitchPlate {...common} quotes={quotes} sw={{ kind: 'rack', id: focus.rackId }}
       view={focus.switch} units={focus.servers.filter((x) => x.systemId !== null).length} />;

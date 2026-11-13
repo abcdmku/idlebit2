@@ -82,8 +82,12 @@ export function globalTargets(s: GlobalSnapshot, out: HitTarget[], from: number)
       const t = locked ? null : put('locked', 'slot', p.lock);
       if (t) { t.slot = i; locked = true; }
     }
-    // a region without a site: its build pad, open or not (the UI prints the price on it, or the research that opens it)
-    else { const t = put(REGION_IDS_T[i], 'slot', p.pads[i]!); if (t) t.slot = i; }
+    // a region without a site: its build pad (the UI prints the price on an open one; a closed one opens its research)
+    else {
+      const t = put(REGION_IDS_T[i], 'slot', p.pads[i]!); if (t) t.slot = i;
+      // the grid's closed regions share one legend, where the UI prints the research that opens them
+      if (!site.open && p.legend && !locked) { const l = put('locked', 'slot', p.legend); if (l) { l.slot = i; locked = true; } }
+    }
   }
   for (let i = 0; i < s.backbone.links.length; i++) {
     const L = s.backbone.links[i], r = regionOfSite(s, L.siteId);
@@ -151,15 +155,6 @@ export function createGlobalRenderer(registry: LevelRegistry): LevelRenderer<'gl
       return -1;
     },
     targets: (s, _view, out, from) => globalTargets(s, out, from),
-    faults(s, out: Rect[]) {
-      let n = 0;
-      for (let i = 0; i < s.sites.length && i < CELLS.length && n < out.length; i++) {
-        const site = s.sites[i];
-        if (site.siteId === null || (site.online !== 'dark' && site.online !== 'crashed')) continue;
-        copyRect(tilesOf(plan(), i, site)[0]!, out[n++]);
-      }
-      return n;
-    },
     icon(g) { R(g, 2, 2, 12, 12, P.ink); R(g, 3, 3, 10, 10, P.sea); R(g, 4, 4, 3, 5, P.land); R(g, 8, 4, 4, 3, P.land); R(g, 9, 9, 3, 3, P.land); },
   };
 }

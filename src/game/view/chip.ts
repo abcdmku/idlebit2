@@ -8,7 +8,7 @@ import { DRAW_NONE, DRAW_SLEEP, drawKind } from '../phys/draw';
 import type { ChipSnapshot, CoreSleep, CoreView, SchedulerView } from '../types/snapshot';
 import type { GameState } from '../types/state';
 import type { BuildSlotView } from '../types/views';
-import { coreDuty, modeName, psuView, systemTimerS } from './common';
+import { coreDuty, modeName, systemTimerS } from './common';
 import { inboundTransfer, shardOf } from './flows';
 import { forEachRunning, stageProgress } from './tasks';
 
@@ -120,7 +120,7 @@ export function chipSnapshot(state: GameState, id: SystemId, parent: NodeRef | n
 
   const cstate = cstateOf(h.cstate[id]);
   const hz = c.clockHz[id] ?? 0;
-  // Live clock (spec §9.3): the socket clock × clockFactor (P-state, thermal throttle, power caps).
+  // Live clock (spec §9.3): the socket clock × clockFactor (P-state, thermal throttle).
   // Unpowered modes run no clock; an S3-asleep system's cores all sleep; an idle core sinks to the C-state.
   const draw = drawKind(h.mode[id] ?? MODE.empty, (state.hot.g[G.researchHolders] ?? 0) > 0);
   // Paused between rounds: the ready clock (nominal); its real speed returns when the round starts.
@@ -167,6 +167,5 @@ export function chipSnapshot(state: GameState, id: SystemId, parent: NodeRef | n
     pipe: {
       speed: c.pipeSpeed[id] ?? 0, transfer: inboundTransfer(state, id),
       waiting: (h.pipeRec[id] ?? -1) >= 0 && (h.running[id] ?? 0) === 0 && (h.queueLen[id] ?? 0) === 0,
-    },
-    psu: psuView(state, id, spec?.psu ?? { gen: 0, level: 1, capped: false }), };
+    }, };
 }

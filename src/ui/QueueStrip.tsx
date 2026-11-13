@@ -15,7 +15,6 @@ import { shallowEqual, useGameSelector, useShell, useViewState } from './storeHo
 import { useQueueSlide } from './queue/useQueueSlide';
 import './styles/task-cards.css';
 
-export { TaskIcon } from './queue/taskText';
 
 function Tag({ L, task, head = false, running }: { L: ShellLayout; task: QueueEntryView; head?: boolean; running: boolean }) {
   const { view } = useShell(), open = useViewState().task === taskKey(task.task);
@@ -29,10 +28,12 @@ function Tag({ L, task, head = false, running }: { L: ShellLayout; task: QueueEn
   </button>;
 }
 
-function ResearchTag({ L, research }: { L: ShellLayout; research: ResearchQueueEntryView }) {
-  return <div className="market-task research-market" data-k="head-task" data-testid="research-head" title={`${research.name}: next in line`}>
+/** The research task at the head: in line while a round runs; between rounds it waits for Return to market (spec §11.3). */
+function ResearchTag({ L, research, running }: { L: ShellLayout; research: ResearchQueueEntryView; running: boolean }) {
+  const state = running ? 'Next in line' : research.breakRequested ? 'No server ready' : 'After Return';
+  return <div className="market-task research-market" data-k="head-task" data-testid="research-head" title={`${research.name}: ${running ? 'next in line' : research.breakRequested ? 'no server ready' : 'after Return'}`}>
     <span className="market-task-heading"><ArtCanvas w={16} h={16} n={L.N} artKey="flask" draw={drawFlask} /><b>{research.name}</b></span>
-    <span className="rnd">Next in line</span>
+    <span className="rnd">{state}</span>
   </div>;
 }
 
@@ -53,7 +54,7 @@ export function QueueStrip() {
     <div className={`panel head-slot${blocked ? ' blocked' : ''}${risk ? ' risk' : ''}${research ? ' research-head' : ''}`}
       style={{ ...box(L.headSlot), ...taskTypeStyle(head?.family), ...(risk ? { '--rim': 'var(--fault)' } as CSSProperties : {}) }}
       data-k="head-slot" data-testid="head-slot" aria-label="Next task">
-      {research ? <ResearchTag L={L} research={research} /> : head && <Tag L={L} task={head} head running={running} />}
+      {research ? <ResearchTag L={L} research={research} running={running} /> : head && <Tag L={L} task={head} head running={running} />}
       <RimClock w={L.headSlot.w} n={L.N} blocked={blocked} top={L.headSlot.h - 3 * L.N} />
     </div>
     <ol className="panel slots market-incoming" aria-label="Next 50 market tasks. Swipe, drag or use arrow keys to browse." tabIndex={0}

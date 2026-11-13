@@ -30,7 +30,7 @@ const MID_SPEC: SystemSpec = {
   ram: [{ gen: 1, level: 8, speedLevel: 8, ecc: false }, { gen: 1, level: 8, speedLevel: 8, ecc: false }],
   accels: [{ kind: 'gpu', model: '1330' }],
   drives: [{ ...lvl(1, 2), speedLevel: 2 }],
-  psu: { gen: 1, level: 8, capped: false },
+
   settings: { dvfs: false, turbo: false, cStateLimit: 0 },
 };
 const NO_GPU: SystemSpec = { ...MID_SPEC, accels: [] };
@@ -43,13 +43,13 @@ const router = (queueLevel: number): RouterBuild => ({ ...baseRouter(1), level: 
 /** Ports at rung `port` (1-2-5 ladder from 1 kHz: 2 = 5 kHz, 3 = 10 kHz, 5 = 50 kHz), one uplink at rung `uplink`. */
 const midRack = (ports: number, port: number, uplink: number, queue: number) => (rack: RackBuild): RackBuild => ({
   ...rack,
-  cooler: { gen: 1, level: 8, setpointF: 70 }, pdu: { gen: 1, level: 8, capped: false }, lb: router(queue),
+  cooler: { gen: 1, level: 8, setpointF: 70 }, pdu: { gen: 1, level: 8 }, lb: router(queue),
   switch: { gen: 0, ports: Array(ports).fill(port), uplinks: [uplink], sameSpeed: true },
 });
 /** Starter room infrastructure: enough for kHz racks, and cheap (a gen 1 L10 cooler alone draws 1.5 MW). */
 const midRoom = (racks: number, port: number, uplink: number, queue: number) => (room: RoomBuild): RoomBuild => ({
   ...room,
-  cooler: { gen: 0, level: 1, setpointF: 70 }, ups: [{ gen: 0, level: 1, capped: false }], lb: router(queue),
+  cooler: { gen: 0, level: 1, setpointF: 70 }, ups: [{ gen: 0, level: 1 }], lb: router(queue),
   switch: { gen: 0, ports: Array(racks).fill(port), uplinks: [uplink], sameSpeed: true },
 });
 

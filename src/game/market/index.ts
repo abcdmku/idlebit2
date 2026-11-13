@@ -4,4 +4,3 @@
  */
 export { deadlinePhase, marketPhase, promoteHead } from './queue';
 export { roundPhase, startRound } from './rounds';
-export { canRunOn } from './fleet';

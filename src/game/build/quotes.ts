@@ -50,7 +50,7 @@ function quotesFor(state: GameState, r: QuoteRequest): Quote[] {
   switch (r.kind) {
     case 'gpuModels': return gpuOffers(state, r.system, r.index, r.generation).map((model) =>
       toQuote(state, { type: 'installGpu', system: r.system, index: r.index, model }, planInstallGpu(state, r.system, model, r.index)));
-    case 'part': if (r.part.slot.kind === 'psu') return []; return r.minimumCapacity ? supplyPlans(state, r.part, r.minimumCapacity).map(({ action, plan }) => toQuote(state, action, plan, effectOf(state, r.part, plan))) : partQuotes(state, r.part);
+    case 'part': return r.minimumCapacity ? supplyPlans(state, r.part, r.minimumCapacity).map(({ action, plan }) => toQuote(state, action, plan, effectOf(state, r.part, plan))) : partQuotes(state, r.part);
     case 'switch': return switchQuotes(state, r.sw);
     case 'infra': return infraQuotes(state, r.unit, r.slot);
     case 'add': return addQuotes(state, r.parent, r.slot);

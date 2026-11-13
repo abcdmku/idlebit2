@@ -44,6 +44,11 @@ export interface Plan {
    * the desktop grid.
    */
   readonly lock: Rect | null;
+  /**
+   * The desktop grid's legend for its closed regions, in the header strip at the map's east end: the UI prints the
+   * research that opens them there, once. A closed cell keeps its name and climate, dimmed under a lock. Null on the list.
+   */
+  readonly legend: Rect | null;
   /** Where a build pad sits in an empty cell (the UI prints its name and price on it). */
   readonly pads: readonly Rect[];
   /** The widest a site's zone add pad gets (art px). */

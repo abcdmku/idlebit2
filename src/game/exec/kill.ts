@@ -1,44 +1,25 @@
-import { FAIL_DETAILS, NO_DETAIL, type FailDetail } from '../types/events';
+import { NO_DETAIL } from '../types/events';
 import { G, LOC } from '../core/buffers';
-import { ACCEL_CLOCKS, MAX_ZONES_PER_SITE, RACKS_PER_ROOM, SERVERS_PER_RACK } from '../core/constants';
-import { allocRecord, freeRecord } from '../core/pool';
-import { rqAt, rqClear, rqLen, rqRemove, rqRow } from '../core/routerQueue';
+import { ACCEL_CLOCKS } from '../core/constants';
+import { freeRecord } from '../core/pool';
+import { rqClear } from '../core/routerQueue';
 import { dirtyAll, dirtySystem } from '../core/touch';
 import type { World } from '../core/world';
 import { dropBacklog } from './backlog';
 import { returnToFront } from '../market/queue';
-import { payoutAt, FAMILIES } from '../market/families';
 import { leaveLink, addTransit } from '../net/fifo';
 import type { FailCause } from '../types/events';
-import type { UnitRef } from '../types/ids';
 import { resetClocks } from './clocks';
-import { CAUSE, failRecord, releaseReservation, returnParent, returnTask } from './outcome';
+import { CAUSE, failRecord, releaseReservation, returnTask } from './outcome';
 import { noteRelease, recountSummaries } from './slots';
 import { recountResearchThreads } from './researchTask';
 import { NRES } from './shape';
 
 /**
- * Lost work (spec §6.9, D25.5): every queued and running shard on the systems under `unit` fails
- * its task with `cause` (once, with this root cause, D4.1); transfers heading there return their
- * whole task to the queue front, still committed (spec §5.2), or fail it when a sibling shard
- * already finished. Router-queue entries of the routers in `unit` return to the front too.
+ * Lost work (spec §6.9, D25.5): every queued and running shard on system `s` fails its task with
+ * `cause` (once, with this root cause, D4.1); transfers heading there return their whole task to
+ * the queue front, still committed (spec §5.2), or fail it when a sibling shard already finished.
  */
-
-let mark = new Uint8Array(0);
-
-function markSystems(w: World, unit: UnitRef): void {
-  const c = w.compiled;
-  if (mark.length < c.sys.len) mark = new Uint8Array(c.sys.len * 2);
-  mark.fill(0);
-  const rack = (id: number) => { for (let k = 0; k < SERVERS_PER_RACK; k += 1) { const s = c.rack.servers[id * SERVERS_PER_RACK + k]!; if (s >= 0) mark[s] = 1; } };
-  const room = (id: number) => { for (let k = 0; k < RACKS_PER_ROOM; k += 1) { const r = c.room.racks[id * RACKS_PER_ROOM + k]!; if (r >= 0) rack(r); } };
-  switch (unit.kind) {
-    case 'system': mark[unit.id] = 1; break;
-    case 'rack': rack(unit.id); break;
-    case 'room': room(unit.id); break;
-    case 'site': for (let z = 0; z < MAX_ZONES_PER_SITE; z += 1) { const m = c.site.zones[unit.id * MAX_ZONES_PER_SITE + z]!; if (m >= 0) room(m); } break;
-  }
-}
 
 /** Cancels a transfer: its slot reservation is released and the task goes back to the queue front. */
 function returnTransfer(w: World, r: number, cause: number): void {
@@ -52,66 +33,21 @@ function returnTransfer(w: World, r: number, cause: number): void {
   returnToFront(w, r);
 }
 
-/** Returns every entry of router (kind, id)'s queue to the queue front, oldest first (spec §6.9, D25.7). */
-export function returnRouterQueue(w: World, kind: number, id: number, cause: number): void {
-  const hot = w.hot, q = hot.rq, row = rqRow(hot, kind, id);
-  if (row >= q.len) return;
-  while (rqLen(hot, row) > 0) {
-    const at = rqAt(hot, row, 0);
-    const p = q.rqParent[at]!, task = q.rqTask[at]!, units = q.rqUnits[at]!, family = q.rqFamily[at]!, since = q.rqSince[at]!;
-    rqRemove(w, row, 0);
-    if (p >= 0) {
-      hot.parent.pending[p] = hot.parent.pending[p]! - 1;
-      returnParent(w, p, cause);
-      continue;
-    }
-    const t = allocRecord(hot), rec = hot.rec;
-    rec.family[t] = family; rec.count[t] = 1; rec.units[t] = units; rec.payout[t] = payoutAt(FAMILIES[family]!, units);
-    rec.taskId[t] = task; rec.taken[t] = since;
-    returnToFront(w, t);
-  }
-}
-
-/** The router queues inside `unit`: its rack LBs, room LBs and the site's data plane. */
-function returnQueuesUnder(w: World, unit: UnitRef, cause: number): void {
-  const c = w.compiled;
-  const rack = (id: number) => returnRouterQueue(w, 0, id, cause);
-  const room = (id: number) => {
-    returnRouterQueue(w, 1, id, cause);
-    for (let k = 0; k < RACKS_PER_ROOM; k += 1) { const r = c.room.racks[id * RACKS_PER_ROOM + k]!; if (r >= 0) rack(r); }
-  };
-  switch (unit.kind) {
-    case 'rack': rack(unit.id); break;
-    case 'room': room(unit.id); break;
-    case 'site':
-      returnRouterQueue(w, 2, unit.id, cause);
-      for (let z = 0; z < MAX_ZONES_PER_SITE; z += 1) { const m = c.site.zones[unit.id * MAX_ZONES_PER_SITE + z]!; if (m >= 0) room(m); }
-      break;
-  }
-}
-
-/** `detail` names what failed (QA-02: a power failure says which supply), shown as "Power · PSU". */
-export function killSubtree(w: World, unit: UnitRef, cause: FailCause, detail: FailDetail | null = null): void {
-  markSystems(w, unit);
-  const rec = w.hot.rec, h = w.hot.sys, c = w.compiled;
+export function killSystem(w: World, s: number, cause: FailCause): void {
+  const rec = w.hot.rec, h = w.hot.sys;
   const causeIndex = CAUSE[cause];
-  const d = detail === null ? NO_DETAIL : FAIL_DETAILS.indexOf(detail);
-  for (let s = 0; s < c.sys.len; s += 1) {
-    if (mark[s] !== 1) continue;
-    for (let res = 0; res < NRES; res += 1) {
-      for (let r = h.head[s * NRES + res]!; r >= 0; r = h.head[s * NRES + res]!) failRecord(w, r, causeIndex, d);
-    }
-    for (let a = 0; a < ACCEL_CLOCKS; a += 1) {
-      for (let r = h.accelHead[s * ACCEL_CLOCKS + a]!; r >= 0; r = h.accelHead[s * ACCEL_CLOCKS + a]!) failRecord(w, r, causeIndex, d);
-    }
-    for (let r = h.queueHead[s]!; r >= 0; r = h.queueHead[s]!) failRecord(w, r, causeIndex, d);
-    resetClocks(w, s);
-    dirtySystem(w, s);
+  for (let res = 0; res < NRES; res += 1) {
+    for (let r = h.head[s * NRES + res]!; r >= 0; r = h.head[s * NRES + res]!) failRecord(w, r, causeIndex, NO_DETAIL);
   }
+  for (let a = 0; a < ACCEL_CLOCKS; a += 1) {
+    for (let r = h.accelHead[s * ACCEL_CLOCKS + a]!; r >= 0; r = h.accelHead[s * ACCEL_CLOCKS + a]!) failRecord(w, r, causeIndex, NO_DETAIL);
+  }
+  for (let r = h.queueHead[s]!; r >= 0; r = h.queueHead[s]!) failRecord(w, r, causeIndex, NO_DETAIL);
+  resetClocks(w, s);
+  dirtySystem(w, s);
   for (let r = 0; r < rec.len; r += 1) {
-    if (rec.loc[r] === LOC.link && mark[rec.target[r]!] === 1) returnTransfer(w, r, causeIndex);
+    if (rec.loc[r] === LOC.link && rec.target[r] === s) returnTransfer(w, r, causeIndex);
   }
-  returnQueuesUnder(w, unit, causeIndex);
 }
 
 /**

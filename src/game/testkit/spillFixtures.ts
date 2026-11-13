@@ -19,7 +19,7 @@ const router = (queueLevel: number): RouterBuild => ({ ...baseRouter(1), level: 
 const rack = (ports: number, port: number, uplink: number, queue: number) => (r: RackBuild): RackBuild => ({
   ...r,
   // Rear-door water: native MHz servers under the CSV energy ratio put out several GW.
-  cooler: { gen: 2, level: 1, setpointF: 70 }, pdu: { gen: 1, level: 8, capped: false }, lb: router(queue),
+  cooler: { gen: 2, level: 1, setpointF: 70 }, pdu: { gen: 1, level: 8 }, lb: router(queue),
   switch: { gen: 0, ports: Array(ports).fill(port), uplinks: [uplink], sameSpeed: true }, });
 
 /**
@@ -34,7 +34,7 @@ const SMALL_RAM: SystemSpec = {
   ram: [{ gen: 1, level: 4, speedLevel: 4, ecc: false }],
   accels: [],
   drives: [{ ...lvl(1, 1), speedLevel: 1 }],
-  psu: { gen: 1, level: 8, capped: false },
+
   settings: { dvfs: false, turbo: false, cStateLimit: 0 },
 };
 /** Data-heavy (storage band) families are in the mix and a task is about 16k units. */
@@ -54,8 +54,7 @@ const ECC_SPEC: SystemSpec = {
   ram: [{ gen: 2, level: 5, speedLevel: 5, ecc: true }, { gen: 2, level: 5, speedLevel: 5, ecc: true }],
   accels: [],
   drives: [],
-  // Four native MHz cores draw about 5.3e8 W under the CSV energy ratio (hardware-progression.md §3).
-  psu: { gen: 3, level: 11, capped: false },
+
   settings: { dvfs: false, turbo: false, cStateLimit: 0 }, };
 const ECC_DRIVE: SystemSpec = { ...ECC_SPEC, ram: [{ gen: 2, level: 2, speedLevel: 2, ecc: true }, { gen: 2, level: 2, speedLevel: 2, ecc: true }], drives: [{ ...lvl(1, 4), speedLevel: 4 }] };
 /** Rack-scale families (D26.5 windows) are in the mix. */

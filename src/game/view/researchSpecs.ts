@@ -60,7 +60,7 @@ export function researchPartSpecs(state: GameState, at: NodeRef | null = null): 
     drive: line(spec?.drives[0] && s >= 0 ? `${partName('storage', spec.drives[0].gen)} · ${formatSize(c.sys.storageCap[s] ?? 0)}` : NONE),
     gpu: line(models.length ? `GPU ${gpuText}`
       : npus[0]?.kind === 'npu' ? partName('npu', npus[0].gen) : NONE),
-    psu: line(NONE),
+
     board: line(spec ? (spec.board === 'accelerator' ? 'Accelerator board' : 'General board') : NONE),
     switch: line(openRack ? switchSpec(openRack.switch) : NONE),
     lb: line(openRack ? routerSpec(openRack.lb) : NONE),

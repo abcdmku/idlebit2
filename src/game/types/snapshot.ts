@@ -135,6 +135,8 @@ export interface ResearchBadge {
   readonly needsData: boolean;
   readonly queued: number;
   readonly opsPerSec: number;
+  /** Between rounds: the player asked for this break's run (spec §11.3). Always false while a round runs. */
+  readonly breakRequested: boolean;
 }
 
 export type LevelSnapshot = ChipSnapshot | SystemSnapshot | RackSnapshot | RoomSnapshot | GlobalSnapshot;
@@ -146,7 +148,7 @@ export interface CoreView {
   readonly rate: number;
   /**
    * The core's live clock in Hz: the socket clock × its active modifiers (spec §9.3: DVFS or turbo,
-   * thermal throttle, power caps). Paused between rounds: the nominal (ready) clock. 0 while it sleeps,
+   * thermal throttle). Paused between rounds: the nominal (ready) clock. 0 while it sleeps,
    * and while its system is asleep or powered off.
    */
   readonly hz: number;
@@ -207,8 +209,6 @@ export interface ChipSnapshot {
    * `waiting` is true while the cores sit idle on its transfer.
    */
   readonly pipe: { readonly speed: number; readonly transfer: TransferView | null; readonly waiting: boolean };
-  /** The system's board PSU (the CPU has no supply of its own). */
-  readonly psu: SupplyView;
   readonly slots: readonly BuildSlotView[];
 }
 
@@ -238,7 +238,6 @@ export interface SystemSnapshot {
   readonly ram: readonly PartView[];
   readonly gpu: readonly PartView[];
   readonly storage: readonly PartView[];
-  readonly psu: SupplyView;
   readonly running: readonly TaskView[];
   readonly queue: { readonly cap: number; readonly count: number; readonly sample: readonly TaskView[] };
   readonly reserved: number;
@@ -266,8 +265,6 @@ export interface RackSnapshot {
   readonly timerS: number | null;
   readonly tempF: number;
   readonly eff: number;
-  readonly crashS: number;
-  readonly crashed: boolean;
   readonly throttled: boolean;
   readonly cooler: CoolerView;
   readonly pdu: SupplyView;
@@ -299,8 +296,6 @@ export interface RoomSnapshot {
   readonly timerS: number | null;
   readonly tempF: number;
   readonly outsideF: number;
-  readonly crashS: number;
-  readonly crashed: boolean;
   readonly cooler: CoolerView;
   readonly ups: readonly SupplyView[];
   /** D31.2: the room start controller on the UPS, or null (optional until fixtures add it). */

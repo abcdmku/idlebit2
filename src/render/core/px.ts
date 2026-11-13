@@ -5,10 +5,6 @@ import type { Point, Rect } from './geom';
 
 type G = CanvasRenderingContext2D;
 export type PixelPath = readonly (readonly [number, number])[];
-let still = false;
-/** The renderer supplies the preference; no listeners or browser globals at import. */
-export function setReducedMotion(value: boolean): void { still = value; }
-export function isReducedMotion(): boolean { return still; }
 
 export function R(g: G, x: number, y: number, w: number, h: number, c: string): void {
   if (w <= 0 || h <= 0) return;
@@ -19,20 +15,6 @@ export function frame(g: G, x: number, y: number, w: number, h: number, c: strin
   R(g, x, y, w, 1, c); R(g, x, y + h - 1, w, 1, c); R(g, x, y, 1, h, c); R(g, x + w - 1, y, 1, h, c);
 }
 const EMPTY = Object.freeze({});
-export interface BlockStyle { top?: string; hi?: string; lo?: string; face?: string; lip?: number; ol?: string | null }
-export function block(g: G, x: number, y: number, w: number, h: number, o: BlockStyle = EMPTY): void {
-  const top = o.top ?? P.logic, lip = o.lip ?? 2;
-  if (o.ol !== null) R(g, x - 1, y - 1, w + 2, h + lip + 2, o.ol ?? P.ink);
-  R(g, x, y, w, h, top); R(g, x, y, w, 1, o.hi ?? mix(top, '#ffffff', 0.18));
-  R(g, x, y, 1, h, o.hi ?? mix(top, '#ffffff', 0.18));
-  R(g, x + w - 1, y + 1, 1, h - 1, o.lo ?? mix(top, '#000000', 0.28));
-  R(g, x + 1, y + h - 1, w - 1, 1, o.lo ?? mix(top, '#000000', 0.28));
-  R(g, x, y + h, w, lip, o.face ?? mix(top, '#000000', 0.45));
-}
-export function inset(g: G, x: number, y: number, w: number, h: number, fill = P.substrate, sh = P.ink, li = P.maskHi): void {
-  R(g, x, y, w, h, fill); R(g, x, y, w, 1, sh); R(g, x, y, 1, h, sh);
-  R(g, x + 1, y + h - 1, w - 1, 1, li); R(g, x + w - 1, y + 1, 1, h - 1, li);
-}
 /** A dotted outline. `phase` is static art, never a clock. */
 export function dotted(g: G, x: number, y: number, w: number, h: number, c: string, phase = 0, on = 2, off = 2): void {
   const per = on + off;
@@ -50,8 +32,6 @@ export function brackets(g: G, x: number, y: number, w: number, h: number, c: st
 export function dither(g: G, x: number, y: number, w: number, h: number, c: string, phase = 0): void {
   for (let j = 0; j < h; j++) for (let i = (j + phase) & 1; i < w; i += 2) px(g, x + i, y + j, c);
 }
-export function hline(g: G, x0: number, x1: number, y: number, c: string): void { R(g, Math.min(x0, x1), y, Math.abs(x1 - x0) + 1, 1, c); }
-export function vline(g: G, x: number, y0: number, y1: number, c: string): void { R(g, x, Math.min(y0, y1), 1, Math.abs(y1 - y0) + 1, c); }
 /** Orthogonal trace through pixel points. */
 export function trace(g: G, pts: PixelPath, c: string, w = 1): void {
   for (let i = 1; i < pts.length; i++) {
@@ -79,10 +59,6 @@ export function pathAt(pts: PixelPath, u: number, out: Point): Point {
 }
 /** Seeded static variation (terrain, wear). Never index it by time. */
 export function hash(n: number): number { const s = Math.sin(n * 127.1 + 311.7) * 43758.5453; return s - Math.floor(s); }
-export function rng(seed: number): () => number {
-  let a = seed >>> 0;
-  return () => { a = (a + 0x6D2B79F5) >>> 0; let t = a; t = Math.imul(t ^ t >>> 15, t | 1); t ^= t + Math.imul(t ^ t >>> 7, t | 61); return ((t ^ t >>> 14) >>> 0) / 4294967296; };
-}
 
 // ---------- 3/4 oblique projection ----------
 // A footprint (x, y, w, h) rises z px: top face at (x, y - z), front face below it.

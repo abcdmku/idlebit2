@@ -84,7 +84,7 @@ export function drawBoard(g: G, s: SystemSnapshot, view: ViewPresentation, frame
   }
   if (s.saveable) drawSaveIcon(g, b.save.x, b.save.y);
   drawUnitLamp(g, LAMP.x, LAMP.y, LAMP.w, lampState(s.online), (s.timerS ?? 0) * 1000, Math.max(BOOT_MS, (s.timerS ?? 0) * 1000), frame.paused);
-  if (s.online === 'offline' || s.online === 'dark' || s.online === 'crashed') darkFx(g, b.powered.x, b.powered.y, b.powered.w, b.powered.h);
+  if (s.online === 'offline') darkFx(g, b.powered.x, b.powered.y, b.powered.w, b.powered.h);
   drawTiles(g, s, m, view);
   drawMemoryRows(g, s, frame, b);
   // Leaders belong to the labels: desktop only, and like the labels never during a zoom.

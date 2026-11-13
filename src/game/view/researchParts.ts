@@ -13,7 +13,7 @@ import type { ResearchPartId, ResearchTabId } from '../types/views';
 /** The hardware level of each part: the tab its research sits on. */
 export const PART_TAB: Readonly<Record<Exclude<ResearchPartId, 'structure'>, ResearchTabId>> = {
   cores: 'cpu', clock: 'cpu', cache: 'cpu', queue: 'cpu', fab: 'cpu',
-  cpu: 'system', ram: 'system', drive: 'system', gpu: 'system', psu: 'system', board: 'system',
+  cpu: 'system', ram: 'system', drive: 'system', gpu: 'system', board: 'system',
   switch: 'rack', lb: 'rack', rackCooling: 'rack', rackPower: 'rack',
   netRack: 'room', roomCooling: 'room', ups: 'room',
   dataPlane: 'global', backbone: 'global', site: 'global', globalScheduler: 'global',
@@ -22,7 +22,7 @@ export const PART_TAB: Readonly<Record<Exclude<ResearchPartId, 'structure'>, Res
 /** Generation effects: the part a new generation installs into. */
 const GEN: Readonly<Record<string, ResearchPartId>> = {
   core: 'cores', clock: 'clock', cache: 'cache', scheduler: 'queue',
-  ram: 'ram', gpu: 'gpu', npu: 'gpu', storage: 'drive', storageNode: 'drive', psu: 'psu',
+  ram: 'ram', gpu: 'gpu', npu: 'gpu', storage: 'drive', storageNode: 'drive',
   switch: 'switch', lb: 'lb', rackCooler: 'rackCooling', pdu: 'rackPower',
   roomCooler: 'roomCooling', ups: 'ups', dataPlane: 'dataPlane', backbone: 'backbone', grid: 'site',
   cpu: 'structure', row: 'structure', zone: 'structure', site: 'structure',
@@ -38,20 +38,19 @@ const CEILING: Readonly<Record<string, ResearchPartId>> = {
 };
 /** Rules: the part whose behaviour they change. */
 const RULE: Readonly<Record<string, ResearchPartId>> = {
-  coreIdle: 'psu', workStealing: 'cores',
-  packageIdle: 'cpu', dvfs: 'cpu', turbo: 'cpu', numaAware: 'cpu',
-  dma: 'ram', prefetch: 'ram', multiChannel: 'ram', ramWatts: 'ram', hotPages: 'ram', ecc: 'ram',
+  workStealing: 'cores',
+  coreIdle: 'cpu', packageIdle: 'cpu', dvfs: 'cpu', turbo: 'cpu',
+  dma: 'ram', multiChannel: 'ram', ramWatts: 'ram', hotPages: 'ram', ecc: 'ram',
   tensorRate: 'gpu', vramPerLevel: 'gpu', vramScale: 'gpu', unifiedMemory: 'gpu', gpuLink: 'gpu',
-  ncq: 'drive', sharedStorage: 'drive', hotPlug: 'drive',
-  powerCap: 'psu', s3Sleep: 'psu',
-  accelBoard: 'board', telemetry: 'board', autoReturn: 'board', offlineCap: 'board', bootSeconds: 'board',
-  configSave: 'board', rollingUpgrade: 'board', liveMigration: 'board', hotSwap: 'board', gracefulDrain: 'board',
-  cutThrough: 'switch', qos: 'switch',
+  ncq: 'drive', sharedStorage: 'drive',
+  s3Sleep: 'board', accelBoard: 'board', telemetry: 'board', autoReturn: 'board', offlineCap: 'board', bootSeconds: 'board',
+  configSave: 'board', gracefulDrain: 'board',
+  qos: 'switch',
   shardSteal: 'lb', gather: 'lb', checkpointing: 'lb',
-  thermalThrottle: 'rackCooling', rackSetpoint: 'rackCooling', rackWater: 'rackCooling',
+  thermalThrottle: 'rackCooling', rackSetpoint: 'rackCooling',
   stealRoom: 'netRack',
   roomLeak: 'roomCooling', roomSetpoint: 'roomCooling', economizer: 'roomCooling',
-  loadShed: 'ups', dualFeed: 'ups', upsRideThrough: 'ups',
+  dualFeed: 'ups',
   subseaLatency: 'backbone',
 };
 /** Strategy and filter scopes: the router (or scheduler) they configure. */

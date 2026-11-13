@@ -123,7 +123,7 @@ function heldOpsPerSec(state: GameState, roomNow: boolean): number {
   if ((state.hot.g[G.researchHolders] ?? 0) > 0) return researchOpsPerSec(state);
   const c = state.compiled.sys, h = state.hot.sys, running = state.round.phase === 'running';
   // A project carried over from the round waits for Return to market (spec §11.3): it will run at the round's rate.
-  const waits = !running && state.research.active !== null && state.hot.g[G.researchBreak] !== 1;
+  const waits = !running && state.research.active !== null && !breakRequested(state);
   let ops = 0;
   for (let s = 0; s < c.len; s += 1) {
     if (c.alive[s] !== 1 || c.kind[s] !== 0 || c.intent[s] !== 1) continue;
@@ -153,8 +153,13 @@ export function researchBadge(state: GameState): ResearchBadge {
   return {
     active: r.active, name: def?.name ?? r.active, progress: progressOf(def, r.activeProgress),
     stoppedInsolvent: r.stoppedInsolvent, needsData: r.needsData, queued: r.queue.length, opsPerSec: researchOpsPerSec(state),
+    breakRequested: breakRequested(state),
   };
 }
+
+/** The break-run request of exec/researchTask: set by starting or resuming a project between rounds. */
+export const breakRequested = (state: GameState): boolean =>
+  state.round.phase !== 'running' && state.research.active !== null && state.hot.g[G.researchBreak] === 1;
 
 export function nodeState(r: ResearchState, done: ReadonlySet<string>, def: ResearchDef): ResearchNodeState {
   if (done.has(def.id)) return 'done';
@@ -181,7 +186,6 @@ export function researchTree(state: GameState, at: NodeRef | null = null): Resea
   const levels = new Map<string, number>();
   for (const def of RESEARCH) if (def.purchase && done.has(def.id)) levels.set(def.purchase.series, Math.max(levels.get(def.purchase.series) ?? 0, def.purchase.level));
   for (const def of RESEARCH) {
-    if (!def.implemented) continue;
     if (def.purchase && def.purchase.level !== Math.min(def.purchase.maxLevel, (levels.get(def.purchase.series) ?? 0) + 1)) continue;
     const rewardMilestone = def.rewardMilestone && !state.roundRewards.claimed.includes(def.rewardMilestone) ? def.rewardMilestone : null;
     const st = rewardMilestone && !done.has(def.id) ? 'locked' : nodeState(r, done, def);

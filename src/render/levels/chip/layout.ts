@@ -155,8 +155,6 @@ export function gridCells(f: Floor, count: number): readonly Rect[] {
   cells.set(key, out);
   return out;
 }
-/** Wide enough for per-core labels (the two big sites). */
-export const labelledSites = (count: number): boolean => count <= 2;
 
 const wells = new Map<string, readonly Rect[]>();
 /** Eight readable family icons below the queue label, on the native art grid. */

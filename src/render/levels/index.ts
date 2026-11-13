@@ -75,6 +75,3 @@ export function createGameRegistry(found?: ReadyModules): LevelRegistry | Promis
   registerLevels(registry, found);
   return registry;
 }
-export function registeredLevelIds(registry: LevelRegistry): readonly LevelId[] {
-  return registry.allLevels().map(level => level.id);
-}

@@ -59,7 +59,6 @@ export function compileInfra(c: CompiledBuffers, build: BuildState, u: Unlocks):
     writeCooler(t, i, PARTS.rackCooler, rack.cooler, hasRule(u, 'rackSetpoint'), rackLeak);
     t.pduCapW[i] = capacity(PARTS.pdu, rack.pdu.gen, rack.pdu.level);
     t.pduLoss[i] = lossFraction(PARTS.pdu, rack.pdu.gen, rack.pdu.level);
-    t.pduCapSwitch[i] = rack.pdu.capped && hasRule(u, 'powerCap') ? 1 : 0;
     writeRouter(t, i, PARTS.lb, rack.lb);
     t.ports[i] = rack.opened ? rack.switch.ports.length : 0;
     t.uplinks[i] = rack.opened ? rack.switch.uplinks.length : 0;

@@ -12,7 +12,9 @@ export const SAVE_SCHEMA = 'bitrouge-v3' as const;
 // Wallet history is now saved. Earlier pre-live saves reset.
 // Independent RAM and drive speed levels. Earlier pre-live saves reset.
 // Paid hardware histories support 50% Credit refunds. Earlier pre-live saves reset.
-export const SAVE_VERSION = 37;
+// Supply overload, failure, crash and power-cap state, the dark and crashed modes, the power and heat
+// failure causes, the health filter and the first-taken list are removed (D79). Earlier pre-live saves reset.
+export const SAVE_VERSION = 38;
 
 export interface SaveEnvelope {
   readonly schema: typeof SAVE_SCHEMA;

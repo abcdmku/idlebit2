@@ -47,7 +47,7 @@
 .lr-bar, .ld-bar { display: block; background: #100c22; }
 .lr-bar { position: absolute; left: 3px; right: 0; bottom: 0; height: 2px; }
 .lr-bar > i, .ld-bar > i { display: block; height: 100%; max-width: 100%; background: var(--run); }
-.rw.paused .lr-bar > i, .ld-bar.paused > i { background: var(--muted); }
+.rw.paused .lr-bar > i, .ld-bar.paused > i, .rw.waiting .lr-bar > i, .ld-bar.waiting > i, .rw.idle .lr-bar > i, .ld-bar.idle > i { background: var(--muted); }
 .rw.stopped .lr-bar > i, .ld-bar.stopped > i { background: var(--short); }
 
 /* A wide dialog lines the tags and both currencies up as columns. */
@@ -75,7 +75,7 @@
 .lab .rw.ready .lr, .lab .rw.after .lr:has(.lr-tag.go) { background: var(--hi); box-shadow: inset 3px 0 var(--go); }
 .lab .rw.running .lr, .lab .rw.next .lr, .lab .rw.queued .lr { background: var(--hi); box-shadow: inset 3px 0 var(--run); }
 .lab .rw.stopped .lr { background: var(--hi); box-shadow: inset 3px 0 var(--short); }
-.lab .rw.paused .lr { box-shadow: inset 3px 0 var(--muted); }
+.lab .rw.paused .lr, .lab .rw.waiting .lr, .lab .rw.idle .lr { box-shadow: inset 3px 0 var(--muted); }
 .lab .rw.locked .lr, .lab .rw.milestone .lr, .lab .rw.done .lr { color: var(--muted); background: var(--well); box-shadow: inset 3px 0 var(--lo); }
 .lab .rw.locked .pt, .lab .rw.milestone .pt { opacity: .55; }
 .lab .rw.open .lr { background: var(--hi); }
@@ -105,6 +105,7 @@
 .ld-needs { display: flex; flex-wrap: wrap; align-items: center; gap: 0 12px; }
 .lab .rlink { min-height: 44px; padding: 0; background: none; text-decoration: underline; color: var(--link); text-align: left; }
 .ld-key { flex: none; width: 100%; min-height: 44px; padding: 8px 12px; text-align: center; font-weight: 600; }
+.ld-keys { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
 .ld-key.go { background: #1f7a52; box-shadow: inset 0 2px #57f0b4, inset 0 -3px #0f4a31; }
 .ld-key.quiet { background: var(--hi); box-shadow: inset 0 2px var(--rail), inset 0 -3px #1c1838; }
 .lab .ld-key.off { color: var(--short); background: var(--well); box-shadow: inset 0 0 0 2px var(--lo); font-weight: 400; }

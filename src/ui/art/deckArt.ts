@@ -1,7 +1,7 @@
 // Control deck shell art in art px (control-deck/art.js partIcon, deck-art.js mini, flask). The deck draws these
 // at the art scale N, one canvas per icon. Level art and the zoom-rung icons belong to the renderer.
 import type { FamilyId } from '../../game';
-import { P, R, drawFamilyIcon, mix, px } from '../../render/core';
+import { P, R, drawFamilyIcon, px } from '../../render/core';
 
 type G = CanvasRenderingContext2D;
 const FILL = '#1b1437';
@@ -9,50 +9,6 @@ const FILL = '#1b1437';
 /** Part icon kinds the deck shows; every build row and callout maps to one. */
 export type PartIconKind = 'core' | 'clock' | 'cache' | 'queue' | 'pipe' | 'cpu' | 'ram' | 'gpu' | 'stor'
   | 'cool' | 'power' | 'lb' | 'switch' | 'rack' | 'site';
-
-/** 16 × 16. `dim` greys a locked or unaffordable part. */
-export function drawPartIcon(g: G, kind: PartIconKind, dim = false): void {
-  g.clearRect(0, 0, 16, 16);
-  switch (kind) {
-    case 'core':
-      R(g, 2, 2, 12, 12, P.ink); R(g, 3, 3, 10, 9, P.logicHi); R(g, 3, 3, 10, 1, '#8a74d8'); R(g, 3, 12, 10, 1, P.logicLo); R(g, 5, 9, 6, 1, P.op); break;
-    case 'clock':
-      R(g, 1, 4, 14, 9, P.ink); R(g, 2, 5, 12, 7, P.steel); R(g, 2, 5, 12, 1, P.steelHi); R(g, 2, 11, 12, 1, P.steelLo);
-      R(g, 4, 7, 8, 3, mix(P.steel, P.steelHi, 0.4)); R(g, 12, 2, 2, 2, P.amber); break;
-    case 'cache':
-      R(g, 1, 3, 14, 10, P.ink); R(g, 2, 4, 12, 8, P.sram); R(g, 2, 4, 12, 1, mix(P.sram, '#ffffff', 0.2));
-      for (let i = 0; i < 4; i++) R(g, 3 + i * 3, 7, 2, 3, i < 2 ? P.cacheOn : P.sramLo);
-      break;
-    case 'queue':
-      R(g, 1, 3, 14, 10, P.ink); R(g, 2, 4, 12, 8, P.logicLo); R(g, 2, 4, 12, 1, P.logic);
-      for (let i = 0; i < 3; i++) { R(g, 3 + i * 4, 7, 3, 4, P.ink); R(g, 4 + i * 4, 8, 1, 2, i < 2 ? P.bit : P.logicLo); }
-      break;
-    case 'pipe':
-      R(g, 0, 7, 16, 4, P.ink); R(g, 1, 8, 14, 2, P.net); R(g, 1, 9, 14, 1, '#3f8f54');
-      R(g, 10, 4, 6, 10, P.ink); R(g, 11, 5, 4, 8, P.steel); R(g, 12, 7, 2, 1, P.led); break;
-    case 'cpu':
-      R(g, 2, 2, 12, 12, P.ink); R(g, 3, 3, 10, 10, '#1d3a2e'); R(g, 5, 5, 6, 6, P.wafer); R(g, 6, 6, 4, 4, P.logicHi); break;
-    case 'ram':
-      R(g, 0, 5, 16, 7, P.ink); R(g, 1, 6, 14, 5, '#3a3256'); for (let i = 0; i < 4; i++) R(g, 2 + i * 3, 7, 2, 3, P.ram); break;
-    case 'gpu':
-      R(g, 0, 3, 16, 10, P.ink); R(g, 1, 4, 14, 8, P.steelLo); R(g, 3, 5, 6, 6, P.ink); R(g, 4, 6, 4, 4, P.steel); R(g, 11, 5, 3, 6, P.gpu); break;
-    case 'stor':
-      R(g, 2, 2, 12, 12, P.ink); R(g, 3, 3, 10, 10, P.steel); R(g, 5, 5, 6, 6, P.steelLo); R(g, 7, 7, 2, 2, P.steelHi); break;
-    case 'switch':
-      R(g, 0, 5, 16, 7, P.ink); R(g, 1, 6, 14, 5, P.steelLo); for (let i = 0; i < 6; i++) R(g, 2 + i * 2, 8, 1, 2, i % 2 ? P.led : P.net); break;
-    case 'lb':
-      R(g, 0, 5, 16, 7, P.ink); R(g, 1, 6, 14, 5, '#2b2550'); R(g, 3, 7, 5, 3, P.bit); for (let i = 0; i < 3; i++) R(g, 10 + i * 2, 8, 1, 2, P.led); break;
-    case 'cool':
-      R(g, 1, 1, 14, 14, P.ink); R(g, 2, 2, 12, 12, P.steel); R(g, 4, 4, 8, 8, P.coolLo); R(g, 7, 4, 2, 8, P.coolHi); R(g, 4, 7, 8, 2, P.coolHi); break;
-    case 'power':
-      R(g, 0, 5, 16, 7, P.ink); R(g, 1, 6, 14, 5, '#2b2550'); R(g, 2, 7, 4, 3, P.led); for (let i = 0; i < 4; i++) R(g, 8 + i * 2, 8, 1, 2, P.amber); break;
-    case 'rack':
-      R(g, 3, 0, 10, 16, P.ink); R(g, 4, 1, 8, 14, '#2b2550'); for (let i = 0; i < 4; i++) { R(g, 5, 2 + i * 3, 6, 2, P.steelLo); px(g, 6, 2 + i * 3, P.led); } break;
-    case 'site':
-      R(g, 1, 2, 14, 12, P.ink); R(g, 2, 3, 12, 10, P.landLo); R(g, 5, 5, 6, 6, P.ink); R(g, 6, 6, 4, 4, P.steelLo); px(g, 7, 7, P.led); px(g, 8, 8, P.led); break;
-  }
-  if (dim) { g.globalAlpha = 0.55; R(g, 0, 0, 16, 16, FILL); g.globalAlpha = 1; }
-}
 
 /** 8 × 8 row icon for the desktop build rows. */
 export function drawMiniIcon(g: G, kind: PartIconKind, dim = false): void {

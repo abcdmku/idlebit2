@@ -11,7 +11,7 @@ export const ROUTE_STRATEGY_IDS = ['firstFit', 'roundRobin', 'leastConn', 'weigh
 export type RouteStrategyId = (typeof ROUTE_STRATEGY_IDS)[number];
 export type StrategyId = QueueStrategyId | RouteStrategyId;
 /** Filters in application order (spec §8.4). Bit i of a filter mask = FILTER_IDS[i]. */
-export const FILTER_IDS = ['region', 'capability', 'health', 'power', 'thermal', 'local'] as const;
+export const FILTER_IDS = ['region', 'capability', 'power', 'thermal', 'local'] as const;
 export type FilterId = (typeof FILTER_IDS)[number];
 
 export const REGION_IDS = ['us-east', 'us-west', 'eu-west', 'eu-north', 'sa-east', 'af-south', 'ap-southeast', 'ap-northeast'] as const;
@@ -44,7 +44,7 @@ export type MemTier = (typeof MEM_TIERS)[number];
 /* ---------- Parts (spec Appendix A) ---------- */
 
 export const PART_IDS = [
-  'core', 'clock', 'cache', 'scheduler', 'cpu', 'psu',
+  'core', 'clock', 'cache', 'scheduler', 'cpu',
   'ram', 'gpu', 'npu', 'storage', 'storageNode',
   'rackCooler', 'pdu', 'lb', 'switch', 'roomCooler', 'ups', 'row', 'roomLb', 'roomSwitch',
   'dataPlane', 'grid', 'zone', 'site', 'backbone', 'globalScheduler', 'rack', 'acceleratorBoard',
@@ -127,13 +127,13 @@ export type CeilingId =
 /** "net" = every network scope the player has opened. */
 export type Scope = 'system' | 'rack' | 'room' | 'site' | 'global' | 'net';
 export const RULE_IDS = [
-  'workStealing', 'numaAware', 'dma', 'prefetch', 'multiChannel', 'ecc',
+  'workStealing', 'dma', 'multiChannel', 'ecc',
   'hotPages', 'tensorRate', 'gpuLink', 'vramPerLevel', 'vramScale', 'ramWatts', 'ncq',
-  'sharedStorage', 'cutThrough', 'qos', 'routingCapacity', 'linkScale', 'subseaLatency',
-  'coreIdle', 'packageIdle', 's3Sleep', 'dvfs', 'turbo', 'powerCap', 'loadShed', 'lossFraction',
-  'supplyCapacity', 'dualFeed', 'upsRideThrough', 'thermalThrottle', 'rackSetpoint', 'rackWater', 'roomLeak',
+  'sharedStorage', 'qos', 'subseaLatency',
+  'coreIdle', 'packageIdle', 's3Sleep', 'dvfs', 'turbo',
+  'dualFeed', 'thermalThrottle', 'rackSetpoint', 'roomLeak',
   'roomSetpoint', 'economizer', 'telemetry', 'autoReturn', 'gracefulDrain', 'bootSeconds', 'offlineCap',
-  'configSave', 'rollingUpgrade', 'hotPlug', 'liveMigration', 'hotSwap', 'checkpointing',
+  'configSave', 'checkpointing',
   /** D25.9 split rules (spec §8.5). */
   'gather', 'shardSteal', 'stealRoom',
   /** D26.4: VRAM overflows to RAM, then disk. */
@@ -173,6 +173,4 @@ export interface ResearchDef {
   /** R45: the short effect line, at most about 40 characters (§5 Short column). */
   readonly summary: string;
   readonly answers: readonly AnswerCode[];
-  /** False hides the node until its mechanic lands (architecture §8 risk 2). */
-  readonly implemented: boolean;
 }

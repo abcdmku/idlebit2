@@ -7,7 +7,6 @@ import { camera, lerpCam, projectRect, restFor, toScreen, toWorld } from './came
 import type { Camera, PixelRatio, RestFraming, WorldForm } from './camera';
 import { ZoomChain } from './chain';
 import { SiteClaims } from './claims';
-import { createEffectPool } from './fx';
 import { loadCanvasFont } from './fonts';
 import { copyRect, contains, rect } from './geom';
 import { arbitrateHit } from './hit';
@@ -22,24 +21,21 @@ import { Feedback } from './feedback';
 import { RestAreas } from './restArea';
 import { drawPanCue, frameRest, homeBelow, restPan } from './restPan';
 import { WorldBuffers, blitBuffer, drawBrackets } from './worldBuffers';
-export { HOVER_ALPHA } from './worldBuffers';
 import { drawZoomLayer, drawZoomWorlds } from './zoomLayer';
 import type { ZoomLayer, ZoomWorlds } from './zoomLayer';
-import { setReducedMotion } from './px';
 import { depth } from './registry';
 import { clearSpriteCache, context2d } from './sprites';
 import { ZoomTransition } from './transition';
 import { copyHitTarget, createHitTarget, isRef, refKey, refOf, resetHitTarget } from './types';
 import type { CanvasRendererDebug, ChildView, FrameClock, HitTarget, LevelId, LevelRegistry, LevelSnapshot,
-  Rect, RenderSnapshot, TransitionInfo, ViewPresentation, WorldFrame } from './types';
+  RenderSnapshot, TransitionInfo, ViewPresentation, WorldFrame } from './types';
 import { drawVeil } from './unit';
 
-export const MAX_CHILDREN = 32, MAX_TARGETS = 272, MAX_FAULTS = 16;
+export const MAX_CHILDREN = 32, MAX_TARGETS = 272;
 const CHILD_IDS = Array.from({ length: MAX_CHILDREN }, (_, i) => `child${i}`);
 type MutableFrame = { -readonly [K in keyof WorldFrame]: WorldFrame[K] };
 
 import { reportRenderError } from './errors';
-export { reportRenderError } from './errors';
 
 export function createCanvasRenderer(canvas: HTMLCanvasElement, registry: LevelRegistry): CanvasRendererDebug {
   const g = context2d(canvas), viewport = rect(), ratio: PixelRatio = { x: 1, y: 1 };
@@ -47,12 +43,11 @@ export function createCanvasRenderer(canvas: HTMLCanvasElement, registry: LevelR
   let labelType: Typography | null = null, labelsSince = -Infinity, pressedId: string | null = null;
   const frozen = new FrozenLabels();
   const artRect = rect(), artSrc = rect();
-  const focusRect = rect(), visible = rect(), entry = { x: 0, y: 0 }, corner = { x: 0, y: 0 }, scratch = rect(), hitOut = createHitTarget(), zoom = new ZoomTransition(), effects = createEffectPool(1), fb = new Feedback(), popClip = rect();
+  const focusRect = rect(), visible = rect(), entry = { x: 0, y: 0 }, corner = { x: 0, y: 0 }, hitOut = createHitTarget(), zoom = new ZoomTransition(), fb = new Feedback(), popClip = rect();
   const chain = new ZoomChain(), labels = new LabelBuffer(), rests = new RestAreas(), claims = new SiteClaims();
   const buffers = new WorldBuffers(canvas.ownerDocument);
   const children: ChildView[] = Array.from({ length: MAX_CHILDREN }, () => ({ ref: { level: 'chip', id: 0 } as ChildView['ref'], rect: rect() }));
   const targets: HitTarget[] = Array.from({ length: MAX_TARGETS }, createHitTarget);
-  const faults: Rect[] = Array.from({ length: MAX_FAULTS }, () => rect());
   let snapshot: RenderSnapshot | null = null, view: ViewPresentation | null = null, shown: ViewPresentation | null = null, frame: MutableFrame | null = null;
   let parentIsFocus = false, framing: RestFraming | null = null, form: WorldForm = 'desktop';
   let hint: ReturnType<typeof refOf> | null = null, current: ReturnType<typeof refOf> | null = null, epoch = -1, partsFor: LevelSnapshot | null = null, disposed = false, pausedAt: number | null = null;
@@ -152,7 +147,7 @@ export function createCanvasRenderer(canvas: HTMLCanvasElement, registry: LevelR
     visible.w = corner.x - visible.x; visible.h = corner.y - visible.y; frame!.visible = visible;
     fill(s.level, 1); blit(s, cam, 1, true);
     const lv = level(s), type = form === 'phone' ? PHONE_TYPE : DESKTOP_TYPE;
-    // The level's labels are written here and drawn after the world art and fault marks (drawWorldLabels).
+    // The level's labels are written here and drawn after the world art (drawWorldLabels).
     labels.clear(); labelType = null;
     if (lv.labels) {
       const worldType = typeForScale(frame!.scale ?? framing?.scale ?? 3);
@@ -182,13 +177,6 @@ export function createCanvasRenderer(canvas: HTMLCanvasElement, registry: LevelR
     drawZoomLayer(layer(), s, snaps, view!, frame!);
     return true;
   }
-  function drawFaults(s: LevelSnapshot): void {
-    let count = 0;
-    try { count = Math.min(MAX_FAULTS, level(s).faults?.(s, faults) ?? 0); } catch (error) { reportRenderError(`${s.level} faults`, error); }
-    for (let i = 0; i < count; i++) {
-      projectRect(cam, viewport, ratio, faults[i], scratch); effects.smoke(i, scratch.x + scratch.w / 2, scratch.y);
-    }
-  }
   const worlds: ZoomWorlds = { zoom, ratio, fill, blit };
   let zoomLayer: ZoomLayer | null = null;
   function layer(): ZoomLayer {
@@ -213,7 +201,7 @@ export function createCanvasRenderer(canvas: HTMLCanvasElement, registry: LevelR
   function drawFrame(next: RenderSnapshot, nextView: ViewPresentation, clock: FrameClock): void {
     if (epoch !== next.epoch) {
       // A load or reset: its completions and failures are history, consumed without drawing.
-      epoch = next.epoch; effects.clear(); fb.reset(next); partsFor = null;
+      epoch = next.epoch; fb.reset(next); partsFor = null;
       endZoom(clock.nowS); chain.reset(); current = null; pausedAt = null;
     }
     const paused = next.round.state !== 'running' && !(next.feed.research?.running && next.feed.research.opsPerSec > 0);
@@ -234,16 +222,14 @@ export function createCanvasRenderer(canvas: HTMLCanvasElement, registry: LevelR
     try { fb.take(next, level(next.focus), form, frame.timeMs, clock.nowS, !zoom.active && !paused); }
     catch (error) { reportRenderError(`${next.focus.level} payoutAnchor`, error); }
     if (!zoom.active) {
-      drawRest(next.focus, clock.nowS); drawFaults(next.focus); drawWorldLabels(clock.nowS);
+      drawRest(next.focus, clock.nowS); drawWorldLabels(clock.nowS);
       if (level(next.focus).panCue) drawPanCue(g, restPan, viewport, framing?.top ?? 0, ratio, frame.scale ?? 2);
     }
     if (framing) fb.drawFailure(g, clock.nowS, framing, viewport, ratio);
     if (next.round.state !== 'running') { g.save(); g.translate(viewport.x * ratio.x, viewport.y * ratio.y); drawVeil(g, viewport.w * ratio.x, viewport.h * ratio.y); g.restore(); }
-    effects.update(Math.max(0, clock.nowS - lastNow)); lastNow = clock.nowS;
-    g.setTransform(ratio.x, 0, 0, ratio.y, 0, 0);
-    if (!zoom.active) effects.draw(g, nextView.reducedMotion);
+    lastNow = clock.nowS;
     g.setTransform(1, 0, 0, 1, 0, 0);
-    // Payout pops go last (user): above the world art, labels, pipe tags, fault marks, the failure
+    // Payout pops go last (user): above the world art, labels, pipe tags, the failure
     // beat and the purchase flash, clipped to the world. Only the DOM menus sit over them.
     if (!zoom.active && !paused) { drawPops(); g.setTransform(1, 0, 0, 1, 0, 0); }
   }
@@ -259,12 +245,12 @@ export function createCanvasRenderer(canvas: HTMLCanvasElement, registry: LevelR
       canvas.width = Math.round(widthCss * dpr); canvas.height = Math.round(heightCss * dpr);
       canvas.style.width = `${widthCss}px`; canvas.style.height = `${heightCss}px`; canvas.style.imageRendering = 'pixelated';
       ratio.x = canvas.width / widthCss; ratio.y = canvas.height / heightCss;
-      copyRect(worldViewport, viewport); effects.resize(viewport); g.imageSmoothingEnabled = false;
+      copyRect(worldViewport, viewport); g.imageSmoothingEnabled = false;
       endZoom(lastNow); chain.reset();
     },
     draw(next, nextView, clock: FrameClock) {
       if (disposed) return;
-      snapshot = next; shown = nextView; view = claims.view(nextView); setReducedMotion(nextView.reducedMotion); lastClock = clock;
+      snapshot = next; shown = nextView; view = claims.view(nextView); lastClock = clock;
       if (!fontReady) return;
       try { drawFrame(next, nextView, clock); } catch (error) {
         reportRenderError('frame', error);
@@ -292,7 +278,7 @@ export function createCanvasRenderer(canvas: HTMLCanvasElement, registry: LevelR
     labelRects: () => (labelType && !zoom.active ? labelRects(g, labels, cam, viewport, ratio, labelType) : []),
     press(target) { pressedId = target ? target.id : null; },
     claim(id, on) { if (claims.set(id, on) && snapshot && shown && lastClock) renderer.draw(snapshot, shown, lastClock); },
-    dispose() { disposed = true; buffers.clear(); effects.clear(); snapshot = null; view = null; canvas.width = 0; canvas.height = 0; },
+    dispose() { disposed = true; buffers.clear(); snapshot = null; view = null; canvas.width = 0; canvas.height = 0; },
   };
   return renderer;
 }

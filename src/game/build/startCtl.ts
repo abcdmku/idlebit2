@@ -13,7 +13,7 @@ export const START_ORDERS: Readonly<Record<'rack' | 'room' | 'global', readonly 
   rack: ['slot', 'fastest'], room: ['slot', 'coolest'], global: ['slot', 'cheapest', 'nearest'],
 };
 export const HEAD_WAIT_MIN_S = 1, HEAD_WAIT_MAX_S = 9, HEAD_WAIT_DEFAULT_S = 2;
-export const BUSY_PCT_MIN = 50, BUSY_PCT_MAX = 95, BUSY_PCT_DEFAULT = 75;
+export const BUSY_PCT_MIN = 50, BUSY_PCT_MAX = 95;
 
 /** A freshly installed controller: start with 1, wake when the head waits 2 s, slot order. */
 export const defaultStartCtl = (gen: number, level = 1): StartCtl =>

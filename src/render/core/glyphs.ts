@@ -2,7 +2,7 @@ import { P } from './palette';
 import { CANVAS_FONT } from './fonts';
 
 // Preserve existing world geometry and LCD scroll spacing after the D11 typeface change.
-export const GLYPH_WIDTH = 3, GLYPH_HEIGHT = 5, GLYPH_ADVANCE = 4;
+export const GLYPH_HEIGHT = 5, GLYPH_ADVANCE = 4;
 function characterCount(value: string): number {
   let count = 0;
   for (let i = 0; i < value.length; i++, count++) if (value.codePointAt(i)! > 0xffff) i++;

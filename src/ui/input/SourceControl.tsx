@@ -17,7 +17,7 @@ export function SourceControl({ target }: { target: HitTarget }) {
   const model = sourceAction(target, focus, extra ? [...result?.quotes ?? [], ...extra.quotes] : result?.quotes ?? []);
   const socket = /^add:cpu\d+$/.test(target.id), compute = socket || target.id === 'add:core';
   const foot = focus.level === 'global';
-  // The World list's closed regions share one plate: its head line says what opens them, once.
+  // The World's closed regions share one plate (phone list) or legend (desktop grid): it says what opens them, once.
   const group = target.id === 'locked';
   const board = focus.level === 'system';
   const textKey = model ? `${model.name}|${model.quote.cost}|${model.choice}|${model.quote.locked?.code ?? ''}` : '';
@@ -50,7 +50,7 @@ export function SourceControl({ target }: { target: HitTarget }) {
       const w = link ? Math.min(256, L.view.w - 16) : add ? Math.max(44, r.w) : Math.min(r.w, L.view.w - 16);
       // An empty site is its own key: the whole site, with what it adds and the price centred in it.
       const h = add ? Math.max(44, r.h) : model.kind === 'part' && narrow ? 80 : 44;
-      const desiredX = link ? r.x + r.w / 2 - w / 2 : r.x + (r.w - w) / 2, desiredY = link ? r.y - h - 4 : add || flat ? r.y + (r.h - h) / 2 : r.y;
+      const desiredX = link ? r.x + r.w / 2 - w / 2 : r.x + (r.w - w) / 2, desiredY = link ? r.y - h - 4 : group ? r.y : add || flat ? r.y + (r.h - h) / 2 : r.y;
       // An empty site's text stays on the site: panned half out of view it goes with it, never onto a neighbour.
       const x = add ? desiredX : Math.max(L.view.x + 8, Math.min(L.view.x + L.view.w - w - 8, desiredX));
       const y = add ? desiredY : Math.max(L.view.y + 4, Math.min(L.view.y + L.view.h - h - 4, desiredY));
@@ -71,8 +71,11 @@ export function SourceControl({ target }: { target: HitTarget }) {
         flatNeed ??= (nameEl?.offsetWidth ?? 0) + (priceEl?.offsetWidth ?? 0) + (el.querySelector<HTMLElement>('.source-gain')?.scrollWidth ?? 0) + 32;
         el.dataset.gain = String(flatNeed <= w);
       }
-      if (group) el.dataset.mode = 'head';
-      else if (add) {
+      if (group) {
+        el.dataset.mode = 'head';
+        // The head line: the grid's legend is all head; the list's plate has it (24 px) over its region lines.
+        el.style.setProperty('--head-y', `${Math.max(0, Math.round(((L.kind === 'desktop' ? r.h : 24) - L.lh) / 2))}px`);
+      } else if (add) {
         const wording = `${tight}|${brief}`;
         let widths = need.get(wording);
         if (!widths && el.dataset.mode) {
@@ -113,6 +116,8 @@ export function SourceControl({ target }: { target: HitTarget }) {
   }, [shell, target.id, model?.kind, compute, textKey, foot, board]);
   if (!model) return null;
   const q = model.quote, research = q.locked?.code === 'research' ? q.locked.node : null;
+  // A closed region's cell prints nothing: its name and climate are the map's, and what opens it is on the group's head.
+  if (foot && research && /^region\d+$/.test(target.id)) return null;
   // A choice never spends at the site, so it stays a live key whatever its cheapest build costs.
   const reason = purchaseReason(q), disabled = !model.choice && !research && !!reason;
   const researchName = (id: ResearchId) =>

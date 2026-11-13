@@ -62,10 +62,6 @@ export const CASES: Readonly<Record<string, (timeMs: number) => GlobalSnapshot>>
   },
   /** The largest fleet: 8 sites × 3 zones, every link busy. */
   max: () => world(REGIONS.map((_, i) => site(i, 3, { hottestF: 76 })), REGIONS.map((_, i) => link(i, true, 3)).slice(1), 8, true),
-  /** A site's grid failed: everything below it is dark. */
-  dark: () => world(REGIONS.map((_, i) => (i === 0
-    ? site(0, 3, { online: 'dark', grid: { ...BASE.sites[0]!.grid!, failed: true, usage: 0, rebootMs: 6000 } })
-    : closed(i))), [], 1),
   /** Between rounds: us-west is off market (sits out); the other sites are ready. Use with ?paused. */
   sitout: () => {
     const built = new Set(ACTIVE_BUILD.map(idx)), usw = idx('us-west');
@@ -91,11 +87,5 @@ export const CASES: Readonly<Record<string, (timeMs: number) => GlobalSnapshot>>
       return up ? s : { ...s, zones: s.zones.map(z => ({ ...z, state: 'standby' as const, powered: false, load: 0 })) };
     });
     return { ...world(sites, [...built].filter(i => i !== 0).map(i => link(i, on.has(i), 2)), 5, true), start: startView(2, 5, 1, 'cheapest') };
-  },
-  /** Zone B crashed on heat; zone A runs hot. */
-  crash: () => {
-    const s = site(0, 3, { hottestF: 101 });
-    const zones = [zone(0, 0, 0.9, 88), { ...zone(0, 1, 0, 104), state: 'crashed' as const }, zone(0, 2, 0.2)];
-    return world(REGIONS.map((_, i) => (i === 0 ? { ...s, zones } : closed(i))), [], 1);
   },
 };

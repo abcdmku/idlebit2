@@ -13,14 +13,13 @@ import { summarize } from './stats';
 export function gpuActivity(state: GameState) {
   const h = state.hot.sys, c = state.compiled.sys;
   let poweredSystems = 0, runningSystems = 0, runningTasks = 0, gpuStageTasks = 0, busyCards = 0, taskDuty = 0;
-  let maxPsuUsage = 0, maxRackPduUsage = 0, maxRackTempF = 0;
+  let maxRackPduUsage = 0, maxRackTempF = 0;
   let maxUpsUsage = 0, maxGridUsage = 0, maxRoomTempF = 0, queuedTasks = 0;
   for (let sys = 0; sys < c.len; sys++) {
     if (h.drawW[sys]! > 0) poweredSystems++;
     if (h.running[sys]! > 0) runningSystems++;
     runningTasks += h.running[sys]!;
     queuedTasks += h.queueLen[sys]!;
-    maxPsuUsage = Math.max(maxPsuUsage, h.psuUsage[sys]!);
     for (let clock = 0; clock < ACCEL_CLOCKS; clock++) gpuStageTasks += h.accelActive[sys * ACCEL_CLOCKS + clock]!;
     for (let slot = 0; slot < MAX_ACCELS; slot++) {
       const seconds = h.accelTaskS[sys * MAX_ACCELS + slot]!;
@@ -39,7 +38,7 @@ export function gpuActivity(state: GameState) {
     onMarketSystems: h.mode.subarray(0, c.len).filter((mode) => mode === MODE.onMarket).length,
     queuedTasks, met: state.hot.g[G.met]!, failed: state.hot.g[G.failed]!,
     slaPercent: slaPercent(state.hot.g[G.met]!, state.hot.g[G.failed]!),
-    maxPsuUsage, maxRackPduUsage, maxUpsUsage, maxGridUsage, maxRackTempF, maxRoomTempF,
+    maxRackPduUsage, maxUpsUsage, maxGridUsage, maxRackTempF, maxRoomTempF,
     round: state.round.phase, tick: state.clock.tick };
 }
 
@@ -78,7 +77,7 @@ export function benchPoweredGpu(gate: Gate, maxWallMs = 30_000) {
     && a.poweredSystems === a.systems && a.runningSystems === a.systems
     && a.gpuStageTasks === a.systems * MAX_ACCELS && a.busyCards === a.systems * MAX_ACCELS
     && Math.abs(a.taskDuty - a.busyCards) < 1e-6
-    && a.maxPsuUsage < 1 && a.maxRackPduUsage < 1 && a.maxUpsUsage < 1 && a.maxGridUsage < 1
+    && a.maxRackPduUsage < 1 && a.maxUpsUsage < 1 && a.maxGridUsage < 1
     && a.maxRackTempF < 100 && a.maxRoomTempF < 100);
   return judge({ ...BUDGETS.fleetMax, id: 'gpuPowered', label: 'Powered GPU fleet frame p95' }, gate,
     stats?.p95 ?? maxWallMs, valid, `synthetic actual-card load; ${frames}/1260 frames, ${failed} failures, ${roundsEnded} ended rounds`,

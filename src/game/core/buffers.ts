@@ -24,8 +24,8 @@ import { copyCompletionLog } from './completions';
  * | queue front list, record taken/payout, rate ring, family      | market (S2)                    |
  * |   jitter, round counters (G met/failed/work/taken/dismissed), |                                |
  * |   rng; zeroes detailRound at round start                      |                                |
- * | drawW, supply usage/timers/flags, capFactor, clockFactor,     | phys (S4)                      |
- * |   emptySinceTick, temps, eff, effClock, crash timers, cooler  |                                |
+ * | drawW, supply usage, clockFactor, emptySinceTick, temps,      | phys (S4)                      |
+ * |   eff, effClock, throttle, cooler                             |                                |
  * |   duty/W, region bill W                                       |                                |
  * | per-family tallies (fam.*Tick, metSys, failDetail), tally     | exec/market/phys add through   |
  * |   pairs, detailRound                                          |   core/events; core clears     |
@@ -70,7 +70,7 @@ export const SYS_COMPILED = {
   idleW: { t: 'f64', stride: R }, loadW: { t: 'f64', stride: R },
   /** Cores and clock watts over every socket at their gen and level, before §9.3 factors; idleW/loadW[cpu] hold only the uncore. */
   coreIdleW: f64, coreLoadW: f64, clockIdleW: f64, clockLoadW: f64,
-  psuCapW: f64, psuLoss: f64, psuCapSwitch: u8, rules: u32,
+
   /** D7: board (0 general, 1 accelerator; `sockets` = CPU count) and configuration efficiency η_cfg (× rate, ÷ heat, with e(T)). */
   board: u8, etaCfg: { t: 'f64', fill: 1 },
   /** D10.4: the inbound pipe in bit/s. Before Rack it carries every task; from Rack on the switch port does. */
@@ -80,7 +80,7 @@ export const SYS_COMPILED = {
 } as const satisfies Layout;
 export const RACK_COMPILED = {
   alive: u8, opened: u8, intent: u8, room: i32, slot: u8, servers: { t: 'i32', stride: SERVERS_PER_RACK, fill: -1 },
-  ...COOLER, pduCapW: f64, pduLoss: f64, pduCapSwitch: u8, ...ROUTER,
+  ...COOLER, pduCapW: f64, pduLoss: f64, ...ROUTER,
   ports: u8, uplinks: u8, portLink: { t: 'i32', stride: MAX_RACK_PORTS, fill: -1 }, uplinkLink: { t: 'i32', stride: MAX_UPLINKS, fill: -1 },
 } as const satisfies Layout;
 export const ROOM_COMPILED = {
@@ -122,9 +122,8 @@ export const SYS_HOT = {
   researchThreads: u16,
   /** Σ est seconds of admitted + reserved tasks (leastWork); busy threads per socket; research ops/s at e = 1. */
   estS: f64, sockBusy: { t: 'u16', stride: MAX_CPUS }, researchRate: f64,
-  drawW: f64, psuUsage: f64, psuOverTicks: i32, psuRebootTicks: i32, capFactor: { t: 'f64', fill: 1 },
-  idleSinceTick: i32, cstate: u8, turboOn: u8, dvfsOn: u8, wakeTicks: i32, failedTick: neg1,
-  /** DVFS × turbo × throttle × PSU and PDU cap, set by phys for the next tick; exec multiplies it into the clock. */
+  drawW: f64, idleSinceTick: i32, cstate: u8, turboOn: u8, dvfsOn: u8, wakeTicks: i32,
+  /** DVFS × turbo × throttle, set by phys for the next tick; exec multiplies it into the clock. */
   clockFactor: { t: 'f64', fill: 1 },
   /** Last tick the system held an admitted or reserved task (S3 sleep). */
   emptySinceTick: i32,
@@ -137,8 +136,7 @@ export const SYS_HOT = {
   takeTick: neg1, takes: u16,
 } as const satisfies Layout;
 const LUMP = {
-  tempF: { t: 'f64', fill: 70 }, crashTicks: i32, crashed: u8, recoverTicks: i32,
-  coolerDuty: f64, coolerW: f64, heatW: f64, drawW: f64, failedTick: neg1,
+  tempF: { t: 'f64', fill: 70 }, coolerDuty: f64, coolerW: f64, heatW: f64, drawW: f64,
 } as const;
 const ROUTER_HOT = { lbCursor: i32, lbRouted: u32, lbLast: neg1 } as const;
 /**
@@ -149,20 +147,19 @@ const ROUTER_HOT = { lbCursor: i32, lbRouted: u32, lbLast: neg1 } as const;
 const START_HOT = { powered: { t: 'u8', fill: 1 }, wakeTicks: i32, ctlBusy: f64, ctlTriggerTick: neg1, offSinceTick: neg1 } as const;
 export const RACK_HOT = {
   ...LUMP, eff: { t: 'f64', fill: 1 }, effClock: f64, throttled: u8,
-  pduUsage: f64, pduOverTicks: i32, pduRebootTicks: i32, pduFailed: u8, capFactor: { t: 'f64', fill: 1 },
+  pduUsage: f64,
   nextDue: { t: 'f64', fill: Infinity }, dirty: u8, freeSlots: u16, admitted: u32, estS: f64, researchRate: f64,
   ...ROUTER_HOT, wrr: { t: 'f64', stride: SERVERS_PER_RACK },
   /** D31.3: Power control battery charge (J), unbilled draw left this round. */
   ...START_HOT, batteryJ: f64,
 } as const satisfies Layout;
 export const ROOM_HOT = {
-  ...LUMP, upsUsage: { t: 'f64', stride: MAX_UPS }, upsOverTicks: { t: 'i32', stride: MAX_UPS },
-  upsRebootTicks: { t: 'i32', stride: MAX_UPS }, upsFailed: { t: 'u8', stride: MAX_UPS }, rideTicks: i32,
+  ...LUMP, upsUsage: { t: 'f64', stride: MAX_UPS },
   freeSlots: u32, admitted: u32, estS: f64, ...ROUTER_HOT, wrr: { t: 'f64', stride: RACKS_PER_ROOM },
   ...START_HOT,
 } as const satisfies Layout;
 export const SITE_HOT = {
-  drawW: f64, gridUsage: f64, gridOverTicks: i32, gridRebootTicks: i32, gridFailed: u8, failedTick: neg1,
+  drawW: f64, gridUsage: f64,
   freeSlots: u32, admitted: u32, estS: f64, ...ROUTER_HOT, wrr: { t: 'f64', stride: MAX_ZONES_PER_SITE },
   /** D31.4: generation output used this tick (W). */
   ...START_HOT, genUsedW: f64,
@@ -262,48 +259,48 @@ export const RING_HOT = {
 export const G = {
   /** The queue front: taken work returned to the market (spec §5.2), a record list. */
   frontHead: 0, frontTail: 1, frontLen: 2, transitCount: 3, nextTaskId: 4, rngDraws: 5, met: 6, failed: 7,
-  /** failByCause: G.fail + FAIL_CAUSES index (7 slots, 8..14; D26.5 added late). */
-  fail: 8, running: 15, researchOps: 16, recFree: 17, parentFree: 18,
+  /** failByCause: G.fail + FAIL_CAUSES index (5 slots, 8..12). */
+  fail: 8, running: 13, researchOps: 14, recFree: 15, parentFree: 16,
   /** Round SLA sums in ops (spec §4.2). */
-  deliveredWork: 19, globalCursor: 20, globalRouted: 21, utilityW: 22, onlineThreads: 23, busyThreads: 24,
+  deliveredWork: 17, globalCursor: 18, globalRouted: 19, utilityW: 20, onlineThreads: 21, busyThreads: 22,
   /** Live rows in rec / parent (core/pool). */
-  recUsed: 25, parentUsed: 26,
+  recUsed: 23, parentUsed: 24,
   /** Exec: build revision + research mode it last anchored rates against; the global scheduler's last pick. */
-  execStamp: 27, globalLast: 28,
+  execStamp: 25, globalLast: 26,
   /** 1 while the active project may run between rounds: the player started it during this break (spec §11.3). */
-  researchBreak: 29,
-  failedWork: 30,
+  researchBreak: 27,
+  failedWork: 28,
   /** This tick's met and failed work; the SLA step folds them into the round sums. */
-  metWorkTick: 31, failWorkTick: 32,
+  metWorkTick: 29, failWorkTick: 30,
   /** Tasks taken and dismissed this round. */
-  taken: 33, dismissed: 34,
+  taken: 31, dismissed: 32,
   /** The site and room counts hot.rq rows are laid out for (rqRow); syncHotSizes moves rows when they change. */
-  rqSites: 35, rqRooms: 36,
+  rqSites: 33, rqRooms: 34,
   /** Router-queue entries over every router (feed counts). */
-  rqTotal: 37,
+  rqTotal: 35,
   /** Parent rows waiting for a checkpoint replacement shard (net scans them only when > 0). */
-  replacing: 38,
+  replacing: 36,
   /** Build revision and research count the router-queue waits were last valid for (net/hops.ts). */
-  routeStamp: 39,
+  routeStamp: 37,
   /** D26 round spill sums: bits met tasks' shards touched in RAM and on disk (RoundReport.spill). */
-  ramWork: 40, diskWork: 41,
-  /** Queued tasks over every system (moved here when late took slot 14). */
-  queued: 42,
+  ramWork: 38, diskWork: 39,
+  /** Queued tasks over every system. */
+  queued: 40,
   /** D27: systems holding the research task, and the TREE_INDEX of the project they hold it for (-1 none). */
-  researchHolders: 43, researchProject: 44,
+  researchHolders: 41, researchProject: 42,
   /**
    * D28 rolling SLA window: the last SLA_WINDOW resolved tasks of the round as a bit ring (1 = met, newest
    * in bit 0, exact in a float64 below 2^53), how many it holds, and how many of them were met.
    */
-  slaRing: 45, slaLen: 46, slaMet: 47,
+  slaRing: 43, slaLen: 44, slaMet: 45,
   /** D31.2: the global start controller's busy EMA and first trigger tick (-1 none). */
-  startBusy: 48, startTriggerTick: 49,
+  startBusy: 46, startTriggerTick: 47,
   /** D31: this round's energy lines in Credits (float sums, exact below 2^53): from batteries, refills, from generation, fuel. */
-  roundFromBattery: 50, roundBatteryRefill: 51, roundFromGeneration: 52, roundFuel: 53,
+  roundFromBattery: 48, roundBatteryRefill: 49, roundFromGeneration: 50, roundFuel: 51,
   /** D33: the last tick a task was met this round (-1 none; the round start counts as one). */
-  lastMetTick: 54,
+  lastMetTick: 52,
 } as const;
-export const G_SIZE = 55;
+export const G_SIZE = 53;
 
 export interface CompiledBuffers {
   readonly sys: Table<typeof SYS_COMPILED>;

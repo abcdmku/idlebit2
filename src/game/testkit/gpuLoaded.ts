@@ -25,13 +25,13 @@ export function gpuLoadedState(fullFleet = false): GameState {
         cpu: { ...bare.spec.cpu!, cores: Array.from({length:8},()=>({gen:0,level:1})) },
         scheduler: { gen: 1, level: 4, strategy: 'fifo' },
         accels: Array.from({ length: MAX_ACCELS }, () => ({ kind: 'gpu', model: '1590' })),
-        psu: { gen: 4, level: 1, capped: false },
+
       } };
     },
     // D8 card watts: one G1590 server draws about 14 MW, a full rack about 0.17 GW. These real
     // catalog tiers leave headroom, so every card stays powered and every lump stays cool.
-    rack: (r) => ({ ...r, cooler: { gen: 2, level: 1, setpointF: 70 }, pdu: { gen: 2, level: 1, capped: false } }),
-    room: (m) => ({ ...m, cooler: { gen: 2, level: 1, setpointF: 70 }, ups: [{ gen: 2, level: 1, capped: false }] }),
+    rack: (r) => ({ ...r, cooler: { gen: 2, level: 1, setpointF: 70 }, pdu: { gen: 2, level: 1 } }),
+    room: (m) => ({ ...m, cooler: { gen: 2, level: 1, setpointF: 70 }, ups: [{ gen: 2, level: 1 }] }),
   });
   // Independent cards exercise real concurrency; keep all other fixture unlocks unchanged.
   const research = { ...base.research, completed: base.research.completed.filter((id) => id !== 'gpuLink'), unlocks: { ...base.research.unlocks,

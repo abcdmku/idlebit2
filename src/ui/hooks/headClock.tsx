@@ -59,12 +59,6 @@ export function RimClock({ w, n, blocked, top }: { w: number; n: number; blocked
     <b ref={ref} className="rim-fill" style={{ height: 2 * n }} /></i>;
 }
 
-/** "2 min", "45 s": a completion window (D26.5), floored to whole minutes from 90 s so it never overstates. */
-export function windowText(ticks: number): string {
-  const s = ticks * TICK_MS / 1000;
-  return s < 90 ? `${Math.max(1, Math.round(s))} s` : `${Math.floor(s / 60)} min`;
-}
-
 /**
  * Seconds left in a taken task's completion window (D26.5), from `windowEndTick` (the last tick it may
  * be met in) at the presentation time the world draws with. Re-renders only when the number changes.

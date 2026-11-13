@@ -20,13 +20,8 @@ export function createRateAnimation(): RateAnimation {
   return { active: false, saturated: false, ratePerSecond: 0, step: 0, phase: 0 };
 }
 
-/** Presentation time: the published sim time plus wall time since that publish, capped. */
-export function presentationMs(simTimeMs: number, wallSincePublishMs: number): number {
-  return simTimeMs + Math.max(0, Math.min(MAX_EXTRAPOLATION_MS, wallSincePublishMs));
-}
-
 /** A lane, clock LED or meter that steps once per real event (1 Hz = one step a second).
- * `active` false (idle, dark, crashed, paused) stops it on step 0.
+ * `active` false (idle, unpowered, paused) stops it on step 0.
  */
 export function rateAnimation(ratePerSecond: number, timeMs: number, cells: number, active: boolean,
   out: RateAnimation): RateAnimation {
@@ -65,25 +60,3 @@ export function fanAnimation(key: string | number, timeMs: number, duty: number,
 }
 /** Blade angle in radians; 0 when stopped. */
 export function fanAngle(fan: FanAnimation): number { return fan.active ? fan.phase * Math.PI * 2 : 0; }
-
-/** Seconds left on a real deadline. `deadlineMs` is the sim time at which the task fails. */
-export function secondsLeft(deadlineMs: number, timeMs: number): number {
-  return Math.max(0, (deadlineMs - timeMs) / 1000);
-}
-/** Pixels of a countdown bar of width `w` for a `totalS` window. Rounds up so a live bar
- * keeps one pixel until the deadline passes.
- */
-export function countdownWidth(leftS: number, totalS: number, w: number): number {
-  if (totalS <= 0 || leftS <= 0) return 0;
-  return Math.max(0, Math.min(w, Math.ceil(w * leftS / totalS)));
-}
-/** Remaining fraction of a real timer (boot, overload, crash), 0..1. */
-export function timerFraction(remainingMs: number, totalMs: number): number {
-  if (!(totalMs > 0) || !(remainingMs > 0)) return 0;
-  return Math.min(1, remainingMs / totalMs);
-}
-/** Glow = temperature: 0 at or below `coolF`, 1 at or above `hotF`. */
-export function heatFraction(tempF: number, coolF: number, hotF: number): number {
-  if (!Number.isFinite(tempF) || hotF <= coolF) return 0;
-  return Math.max(0, Math.min(1, (tempF - coolF) / (hotF - coolF)));
-}

@@ -110,11 +110,11 @@ export function slotOf(s: SystemSnapshot, site: Site): BuildSlotView | null {
 
 // Stable PartRefs per system and slot, so hit targets never allocate per frame.
 const refs = new Map<string, PartRef>();
-export function boardPartRef(system: SystemId, kind: 'cpu' | 'psu' | 'ram' | 'gpu' | 'drive', index = 0): PartRef {
+export function boardPartRef(system: SystemId, kind: 'cpu' | 'ram' | 'gpu' | 'drive', index = 0): PartRef {
   const key = `${system}:${kind}:${index}`;
   let ref = refs.get(key);
   if (!ref) {
-    const slot: PartRef['slot'] = kind === 'cpu' ? { kind: 'cpu', socket: index } : kind === 'psu' ? { kind: 'psu' } : { kind, index };
+    const slot: PartRef['slot'] = kind === 'cpu' ? { kind: 'cpu', socket: index } : { kind, index };
     ref = { unit: { kind: 'system', id: system }, slot }; refs.set(key, ref);
   }
   return ref;

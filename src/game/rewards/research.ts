@@ -8,7 +8,7 @@ function blueprint(id: string, name: string, milestone: number, requires: string
   return { id: researchId(id), name, rewardMilestone: milestone, requires: requires.map(researchId),
     category: 'compute', level: 'chip', era: 'hz', tier: milestone === 50 ? 2 : milestone === 150 ? 3 : 5,
     data, creditCost: amount((BigInt(data) * 10n).toString()), work, effects: [], effect, summary,
-    answers: ['threads', 'pickup'], implemented: true };
+    answers: ['threads', 'pickup'] };
 }
 
 export const REWARD_RESEARCH: readonly ResearchDef[] = [

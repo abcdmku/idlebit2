@@ -62,11 +62,9 @@ export function fullSystemEnergy(state: GameState, id: number): number {
 }
 
 function inputEnergy(state: GameState, id: number, w: number): number {
-  const c = state.compiled.sys;
-  const loss = state.research.unlocks.levels.rack ? supplyLossW(w, c.psuCapW[id] ?? 0, c.psuLoss[id] ?? 0) : 0;
   const rack = state.build.systems[id]?.rack ?? 0, room = state.build.racks[rack]?.room ?? 0;
   const site = state.build.rooms[room]?.site ?? 0, region = state.build.sites[site]?.region;
-  return (w + loss) * (REGIONS.find(r => r.id === region)?.energyPrice ?? REGIONS[0]!.energyPrice);
+  return w * (REGIONS.find(r => r.id === region)?.energyPrice ?? REGIONS[0]!.energyPrice);
 }
 
 /** D27 research uses CPU threads, not GPU, RAM or drive load power. */
@@ -88,11 +86,11 @@ export function workEnergyChange(state: GameState, id: number, next: WorkProfile
   const base = workProfile(state.compiled.sys, id, state.build.systems[id]!.spec, state.research.unlocks);
   const paid = paidCapacity(state, id), demand = paid > 0 ? afterPaid / paid : 1;
   const duty = workDuty(state), watts = fullSystemWatts(state, id);
-  const price = watts > 0 ? fullSystemEnergy(state, id) / (watts + supplyLossW(watts, base.cap, base.loss)) : 0;
+  const price = watts > 0 ? fullSystemEnergy(state, id) / watts : 0;
   return (workInputWatts(base, next, duty, demand) - workInputWatts(base, base, duty, 1)) * price;
 }
 
-/** Sustained paused-research heat, including the power supply and PDU losses. */
+/** Sustained paused-research heat, including the PDU loss. */
 export function researchRackHeat(state: GameState, rack: number, replacement?: { readonly id: number; readonly profile: WorkProfile }): number {
   let watts = 0;
   for (const id of state.build.racks[rack]?.servers ?? []) {

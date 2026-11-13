@@ -7,7 +7,7 @@ import type { World } from './world';
  * hand) makes every reader fall back to its full scan, as does the first tick of each call.
  *
  * - Power (phys/powerCache.ts): systems whose power inputs moved without dirtying their rack
- *   (reservations and queue length in exec slots, wake timers, PSU failures) and the racks the run
+ *   (reservations and queue length in exec slots, wake timers) and the racks the run
  *   phase visited. Rack dirty flags, rack contexts and phys's own unstable and timer-due systems
  *   cover the rest.
  * - Free-slot summaries (exec/slots.ts): racks with an unseen can-admit change.

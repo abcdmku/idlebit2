@@ -2,16 +2,16 @@
 // pays and needs, and whether it can run. A plate right under the tapped card, with a pointer to it (user, 26 Oct); over the
 // bottom of the world. Back and Escape close it (viewState 'back'). No task numbers (D22).
 import { useMemo } from 'react';
-import { formatHertz, formatOps, type QueueEntryView } from '../../game';
+import type { QueueEntryView } from '../../game';
 import { typeColor, typeName, typeOf, type Rect } from '../../render/core';
 import { CoinIcon, GemIcon } from '../plates/icons';
 import { useShellOffers } from '../deck/useOffers';
 import { actionable, WALL_ROWS, type Offer, type Offers } from '../deck/offers';
 import { offerAction, useTapOffer } from '../deck/offerUi';
-import { familyName, taskKey, transferText } from '../hooks/feedModel';
+import { familyName, taskKey } from '../hooks/feedModel';
 import { wholeText } from '../hooks/format';
 import { blockedText, taskBits, waitingText } from '../hooks/taskRequirements';
-import { pointAt, pointFix } from '../input/pointAt';
+
 import { PlateFrame } from '../plates/PlateFrame';
 import { useLayout } from '../shell/geometry';
 import { hasTaskDock } from '../layout';
@@ -37,21 +37,10 @@ export function needLines(t: QueueEntryView): string[] {
   return (out.length ? out : ['CPU']).map(keepUnits);
 }
 
-/** "1,000 ops · lands in 1 s on 1 kHz": its work, and its input over the current first link. */
-export function workLine(t: QueueEntryView): string {
-  const work = `${formatOps(t.work)}`;
-  if (t.transferS === null || !(t.transferS > 0)) return keepUnits(work);
-  return keepUnits(`${work} · lands in ${transferText(t.transferS)} on ${formatHertz(t.payloadBits / t.transferS)}`);
-}
-
 /** Whole Data contribution; fractions carry across tasks in the simulation's meter. */
 export const dataOf = (t: QueueEntryView): number => Math.floor(t.dataReward);
 
-/** How many online systems could run it at all (its fixed hardware, ignoring load). */
-export const capableText = (n: number): string =>
-  n === 0 ? 'No system can run it' : `${n} of your systems can run it`;
-
-/** "Needs …" → "needs …", "Power supply down" → "power supply down"; "UPS down" keeps its capitals. */
+/** "Needs …" → "needs …"; a leading acronym keeps its capitals. */
 const lowerFirst = (s: string) => (/^[A-Z][a-z]/.test(s) ? s[0]!.toLowerCase() + s.slice(1) : s);
 
 /** Status in plain words. */
@@ -108,9 +97,7 @@ function OpenTask({ taskKey: key }: { taskKey: string }) {
   if (!f.t) { queueMicrotask(() => { if (shell.view.getState().task === key) shell.view.dispatch({ type: 'back' }); }); return null; }
   const t = f.t, head = f.slot === 0, color = typeColor(typeOf(t.family));
   // The meet lines; when the sim has none for this gate (a link, zones), the Fix line's own rule.
-  // A down power supply or a hot rack is a part to look at: its plate, not a row to buy (lead, 26 Oct).
-  const point = pointFix(t.blockedBy);
-  const status = statusLine(t, f.running), fixes = t.blockedBy && !meet.length && !point ? fixLines(t, offers) : [];
+  const status = statusLine(t, f.running), fixes = t.blockedBy && !meet.length ? fixLines(t, offers) : [];
   const needs = needLines(t).filter((_, i) => !(i === 0 && t.workingSetBits > 0 && ['cache', 'ram', 'disk'].includes(t.blockedBy ?? '')));
   const close = () => shell.view.dispatch({ type: 'back' });
   // Desktop docks it in the right gutter, clear of the hardware the task runs on; the strip marks the open card.
@@ -139,8 +126,8 @@ function OpenTask({ taskKey: key }: { taskKey: string }) {
         onResearch={id => shell.view.dispatch({ type: 'openResearch', project: id })} />}
       {fixes.map(o => <button key={o.key} type="button" className="key" data-qa-target data-testid="td-fix" disabled={!offerAction(o)} onClick={() => tap(o)}>
         {fixLabel(o)}{o.right.kind !== 'research' && o.price !== null && <span className="pz"> <CoinIcon />{wholeText(o.price)}</span>}</button>)}
-      {point && !meet.length && <button type="button" className="key" data-qa-target data-testid="td-point" onClick={() => pointAt(shell, point.kind)}>Open {point.name}</button>}
-      {t.blockedBy && !fixes.length && !meet.length && !point && <p className="key-slot">No fix yet</p>}
+
+      {t.blockedBy && !fixes.length && !meet.length && <p className="key-slot">No fix yet</p>}
       {/* Every way to fix it is its own key here (R16: two taps from play), not behind Details. */}
       {meet.filter(q => q !== primaryMeet).map((q, i) => <MeetKey key={i} quote={q} n={L.N} onAction={a => shell.dispatch(a)}
         onResearch={id => shell.view.dispatch({ type: 'openResearch', project: id })} />)}

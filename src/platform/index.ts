@@ -1,9 +1,6 @@
-export { createGameStore, DEFAULT_SCOPE, type CatchUpProgress, type GameStore, type Lifecycle, type OfflineAbsence, type RuntimeStore, type StoreOptions } from './store';
-export { createRuntime, type GameRuntime, type RuntimeOptions } from './runtime';
-export { DURABILITY_NOTICE, LEGACY_RESET_NOTICE, SAVE_KEY, clearSave, loadGame, saveGame, type LoadedGame, type PendingAbsence } from './saveGame';
-export { createGameOfflineRunner, gameOfflineEngine, type GameOfflineRunner } from './offline';
-export { mergeReports } from './reports';
-export { bitRougePersistence, createPersistenceAdapter, type PersistenceAdapter, type PersistenceDriver } from './persistence';
+export { createGameStore, type CatchUpProgress, type GameStore, type Lifecycle, type RuntimeStore } from './store';
+export { createRuntime, type GameRuntime } from './runtime';
+export { bitRougePersistence, createPersistenceAdapter, type PersistenceAdapter } from './persistence';
 export { createMusicPlayer, type MusicPlayer, type MusicSnapshot } from './music';
 export { readMusicPreferences, type MusicPreferences } from './musicPreferences';
-export { createSfx, sfxPreferences, type Sfx, type SfxPreferences } from './sfx';
+export { createSfx, sfxPreferences, type SfxPreferences } from './sfx';

@@ -6,6 +6,8 @@ import type { CeilingId, FilterId, PartId, QueueStrategyId, RouteStrategyId, Rul
 import type { LevelId, ResearchId } from '../../types/ids';
 import type { GameState, Unlocks } from '../../types/state';
 import { researchDef, TREE_INDEX } from './tree';
+import { capacity, levelMax, PARTS, type CatalogRow } from '../catalog';
+import { roomPowerBudget, sitePowerBudget } from '../powerBudget';
 
 /** Offline catch-up cap: 8 h, raised by research to 12 h and 24 h (D1.10). */
 export const offlineCapMs = (state: GameState): number => state.research.unlocks.offlineCapHours * 3_600_000;
@@ -66,6 +68,34 @@ export function deriveUnlocks(completed: readonly ResearchId[]): Unlocks {
   };
 }
 
+/** The lowest level from `from` whose capacity carries `needW` (the row's top level when none does). */
+function levelFor(row: CatalogRow, gen: number, from: number, needW: number): number {
+  let level = from;
+  const top = levelMax(row, gen);
+  while (level < top && capacity(row, gen, level) < needW) level += 1;
+  return level;
+}
+
+/**
+ * A zone or site opens with its starter supply raised to carry the allocation it inherits (spec
+ * §9.2): the limits are checked only from the moment a level opens, and a Rack-era PDU can hold
+ * more than a level 1 UPS. Without this, opening Room could put a legal build over its UPS.
+ */
+function sizeStarterUps(build: BuildState, u: Unlocks): BuildState {
+  const room = build.rooms[0], ups = room?.ups[0];
+  if (!room || !ups) return build;
+  const level = levelFor(PARTS.ups, ups.gen, ups.level, roomPowerBudget(build, 0, u).reserved / room.ups.length);
+  if (level === ups.level) return build;
+  return { ...build, rooms: build.rooms.map((m, i) => (i === 0 && m ? { ...m, ups: m.ups.map((x) => ({ ...x, level: Math.max(x.level, level) })) } : m)) };
+}
+function sizeStarterGrid(build: BuildState, u: Unlocks): BuildState {
+  const site = build.sites[0];
+  if (!site) return build;
+  const level = levelFor(PARTS.grid, site.grid.gen, site.grid.level, sitePowerBudget(build, 0, u).reserved);
+  if (level === site.grid.level) return build;
+  return { ...build, sites: build.sites.map((s, i) => (i === 0 && s ? { ...s, grid: { ...s.grid, level } } : s)) };
+}
+
 /**
  * Applies the structural part of the unlocks to the build (spec §3.2): a `view` effect opens its
  * hidden container (rack 0 with system 0 in server slot 1, room 0, site 0) and `gen: site 0`
@@ -79,8 +109,11 @@ export function openContainers(build: BuildState, unlocks: Unlocks): BuildState 
     next = { ...next, [key]: list.map((x, i) => (i === 0 && x ? { ...x, opened: true } : x)) };
   };
   open(build.racks, 'racks', unlocks.levels.rack);
+  const rooms = next.rooms, sites = next.sites;
   open(build.rooms, 'rooms', unlocks.levels.room);
+  if (next.rooms !== rooms) next = sizeStarterUps(next, unlocks);
   open(build.sites, 'sites', unlocks.levels.global);
+  if (next.sites !== sites) next = sizeStarterGrid(next, unlocks);
   if (!next.global.scheduler && (unlocks.gens.site & 1) !== 0) next = { ...next, global: { ...next.global, scheduler: baseRouter(0) } };
   return next === build ? build : { ...next, revision: build.revision + 1 };
 }

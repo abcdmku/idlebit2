@@ -2,10 +2,10 @@
 // (room switch + built-in load balancer), thermostat, zone sign with save icon and lamp,
 // the door to the next zone, UPS bank, cooling plumbing and the site data plane.
 import { drawWells } from '../rack/flowkit';
-import { P, R, frame as outline, drawSaveIcon, drawUnitLamp, glowBit, lampState, mix, pathAt, prism, px, rateAnimation, createRateAnimation, silk } from '../../core';
+import { P, R, drawSaveIcon, drawUnitLamp, glowBit, lampState, mix, pathAt, prism, px, rateAnimation, createRateAnimation, silk } from '../../core';
 import type { Point, PrismStyle } from '../../core';
 import type { RoomSnapshot, SupplyView } from '../../../game';
-import { drawUps, overloadMark } from './sprites';
+import { drawUps } from './sprites';
 import { BOH, COLS, G, SPINE, UPS_MAX, WALL, ZONE_LETTERS, exhaustY, rackX, rowY, upsX } from './layout';
 
 type G = CanvasRenderingContext2D;
@@ -34,10 +34,10 @@ export function builtZones(s: RoomSnapshot): number {
 }
 
 /** Network rack: LB strategy display, one decision light at the real routing rate, one jack light per port. */
-export function drawNetRack(g: G, s: RoomSnapshot, live: boolean, powered: boolean, timeMs: number): void {
+export function drawNetRack(g: G, s: RoomSnapshot, live: boolean, timeMs: number): void {
   const f = G.net, z = SPINE.z, sw = s.network.switch, lb = s.network.lb;
   const t = prism(g, f.x, f.y, f.w, f.h, z, NET_STYLE, top);
-  R(g, t.x + 1, t.y + 1, t.w - 2, 1, powered ? P.net : mix(P.net, P.ink, 0.6));
+  R(g, t.x + 1, t.y + 1, t.w - 2, 1, P.net);
   const fy = t.y + t.h;
   // the LCD spans the face so a four-letter strategy (FIFO, PACK) fits whole (QA-20); the decision light sits by the port lights
   R(g, t.x + 1, fy + 1, t.w - 1, 6, P.ink);
@@ -46,22 +46,19 @@ export function drawNetRack(g: G, s: RoomSnapshot, live: boolean, powered: boole
   const n = Math.min(sw.ports.length, 28);
   for (let i = 0; i < n; i++) {
     const p = sw.ports[i], x = t.x + 1 + (i % 7) * 2, y = fy + 8 + Math.floor(i / 7) * 2;
-    px(g, x, y, live && p.active ? P.net : p.peer !== null && powered ? mix(P.net, P.ink, 0.7) : P.ink);
+    px(g, x, y, live && p.active ? P.net : p.peer !== null ? mix(P.net, P.ink, 0.7) : P.ink);
   }
   // D25.7: the room LB's queue wells, in the band under the port lights
-  drawWells(g, lb.queue, t.x, fy + LB_WELLS_DY, t.w, z - 2 - LB_WELLS_DY, powered && !s.crashed);
+  drawWells(g, lb.queue, t.x, fy + LB_WELLS_DY, t.w, z - 2 - LB_WELLS_DY, true);
   R(g, t.x + 1, fy + z - 2, t.w - 2, 1, P.ink);
 }
 /** The wells sit 15 px down the network rack's front: under its 4 rows of port lights. */
 export const LB_WELLS_DY = 15;
 
-/** The thermostat on the back wall: its °F is the core's crisp label (labels.ts); red-framed while crashed, a red bar while crash time builds. */
-export function drawThermo(g: G, s: RoomSnapshot, quiet: boolean, powered: boolean): void {
+/** The thermostat on the back wall: its °F is the core's crisp label (labels.ts). */
+export function drawThermo(g: G): void {
   const r = G.thermo;
-  R(g, r.x, r.y, r.w, r.h, P.ink); R(g, r.x + 1, r.y + 1, r.w - 2, r.h - 2, powered ? mix(P.ledOff, P.ink, 0.45) : P.ink);
-  if (quiet || !powered) return;
-  if (s.crashed) outline(g, r.x, r.y, r.w, r.h, P.fault);
-  if (!s.crashed && s.crashS > 0) R(g, r.x + 1, r.y + r.h - 1, Math.max(1, Math.ceil((r.w - 2) * Math.min(1, s.crashS / 10))), 1, P.fault);
+  R(g, r.x, r.y, r.w, r.h, P.ink); R(g, r.x + 1, r.y + 1, r.w - 2, r.h - 2, mix(P.ledOff, P.ink, 0.45));
 }
 
 /** Zone sign, save icon, the room's lamp and, with another zone built, the lit corridor sign over the door. */
@@ -87,8 +84,8 @@ export function upsCabinets(ups: readonly SupplyView[]): number {
 }
 /** Power in the NE: the utility feed drops from the top onto the UPS bank; a busway runs from the bank
  * down the east side of the rows, with a tap into each row that holds racks. Copper, no motion. */
-export function drawPowerPath(g: G, s: RoomSnapshot, powered: boolean): void {
-  const n = Math.max(1, upsCabinets(s.ups)), IY = G.iy, FEED_X = G.feedX, BUS_X = G.busX, top = IY - 4 - WALL.z, cu = powered ? P.copper : P.copperLo, lo = P.copperLo, alpha = g.globalAlpha;
+export function drawPowerPath(g: G, s: RoomSnapshot): void {
+  const n = Math.max(1, upsCabinets(s.ups)), IY = G.iy, FEED_X = G.feedX, BUS_X = G.busX, top = IY - 4 - WALL.z, cu = P.copper, lo = P.copperLo, alpha = g.globalAlpha;
   for (let y = 0; y < top; y++) { g.globalAlpha = alpha * Math.min(1, (y + 4) / 20); R(g, FEED_X - 1, y, 4, 1, P.ink); R(g, FEED_X, y, 2, 1, cu); px(g, FEED_X + 1, y, lo); }
   g.globalAlpha = alpha;
   const rows = Math.max(1, s.rows), yb = IY + 4, ye = rowY(rows - 1) - 6, bank = upsX(G, 0, n);
@@ -105,11 +102,7 @@ export function drawUpsBank(g: G, s: RoomSnapshot): void {
   const n = upsCabinets(s.ups), feeds = Math.max(1, s.ups.length), per = Math.max(1, Math.floor(n / feeds));
   for (let k = 0; k < n; k++) {
     const u = s.ups[Math.min(feeds - 1, Math.floor(k / per))];
-    drawUps(g, upsFoot(k, n), u.usage, u.failed, u.generation >= 2);
-  }
-  for (let i = 0; i < feeds; i++) {
-    const u = s.ups[i], f = upsFoot(i * per, n);
-    if (u && f && !u.failed && u.overloadS > 0) overloadMark(g, f.x, f.y - BOH.z - 9, u.overloadS);
+    drawUps(g, upsFoot(k, n), u.usage, u.generation >= 2);
   }
 }
 

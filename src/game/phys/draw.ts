@@ -1,10 +1,11 @@
+import { LINK_KIND, type CompiledBuffers, type HotBuffers } from '../core/buffers';
 import { DT_S, MAX_ACCELS } from '../core/constants';
 import { MODE } from '../core/timers';
 import { dirtySystem } from '../core/touch';
 import type { World } from '../core/world';
 import {
-  CAP_STEPS_MAX, CSTATES, DVFS_CLOCK, DVFS_LOAD, EFF_FLAT_HIGH_F, EFF_LOSS_PER_F, PACKAGE_IDLE_FACTOR, S3_FACTOR, THROTTLE_CLOCK,
-  THROTTLE_LOAD, TURBO_CLOCK, TURBO_LOAD, TURBO_MAX_F, TURBO_MAX_USAGE,
+  CSTATES, DVFS_CLOCK, DVFS_LOAD, EFF_FLAT_HIGH_F, EFF_LOSS_PER_F, EFF_MIN, PACKAGE_IDLE_FACTOR, S3_FACTOR, THROTTLE_CLOCK,
+  THROTTLE_LOAD, TURBO_CLOCK, TURBO_LOAD, TURBO_MAX_F,
 } from './constants';
 import { SYS_DVFS, SYS_TURBO, type PhysSettings } from './settings';
 
@@ -23,47 +24,54 @@ export function drawKind(mode: number, researchOn: boolean): number {
   }
 }
 
-/** One system's draw this tick. Reused output: read it before the next call. */
-export interface SystemDraw {
-  /** Watts the board PSU delivers: Σ actualW of the system's parts (spec §9.1). */
-  deliveredW: number;
-  /** Idle watts alone, before RAM, accelerator, IO and CPU load. */
-  idleW: number;
-  /** Core load at cap factor 1; the capped share is capLoadW × capFactor. */
-  capLoadW: number;
-}
-const out: SystemDraw = { deliveredW: 0, idleW: 0, capLoadW: 0 };
 /** D38: the CPU's fixed draw before System (W, internal units), billed as energy; the real model takes over at System. */
 export const PRE_SYSTEM_CPU_W = 10;
 
 /**
- * Thermal duty (spec §10.4): above 80 °F a rack's systems duty-cycle. Every watt they draw is
- * multiplied by 1 − 0.025 × (T − 80), down to 0 at 120 °F, so a hot rack makes less heat the
- * hotter it gets and settles below 120 °F whatever its cooler. Compute rates follow e(T), the
- * same line. The power phase applies it per rack, to its systems' summed draw (systemDraw is
- * the draw at duty 1), so a moving temperature re-runs no system step.
+ * Thermal duty (spec §10.4): above 80 °F everything powered inside a lump duty-cycles on one line.
+ * Every watt is multiplied by 1 − 0.025 × (T − 80), down to 0 at 120 °F, so a hot lump makes less
+ * heat the hotter it gets and settles below 120 °F whatever its cooler. In a rack that is its
+ * systems, switch and load balancer (the PDU loss follows what it delivers); in a zone it is the
+ * network rack and the rack coolers, which stand in the zone's air. What the equipment does falls
+ * on the same line: compute rates follow e(T), links send at thermalRate and a rack cooler moves
+ * that share of its heat. The power phase applies it per rack, to its systems' summed draw
+ * (systemDraw is the draw at duty 1), so a moving temperature re-runs no system step.
  */
 export const thermalDuty = (tempF: number): number =>
   tempF <= EFF_FLAT_HIGH_F ? 1 : Math.max(0, 1 - EFF_LOSS_PER_F * (tempF - EFF_FLAT_HIGH_F));
 
+/** What a hot link sends: its speed × the duty line, with e(T)'s rate floor so a transfer always moves. */
+export const thermalRate = (tempF: number): number =>
+  tempF <= EFF_FLAT_HIGH_F ? 1 : Math.max(EFF_MIN, 1 - EFF_LOSS_PER_F * (tempF - EFF_FLAT_HIGH_F));
+
+/**
+ * The share of its compiled speed link l sends this tick (spec §10.4): a rack switch port follows
+ * its rack's temperature, a rack uplink the zone's (the network rack). Data plane and backbone
+ * links sit in no lump. Hidden containers stay at 70 °F, so their links send at full speed.
+ */
+export function linkThermalRate(compiled: CompiledBuffers, hot: HotBuffers, l: number): number {
+  const kind = compiled.link.kind[l], owner = compiled.link.owner[l]!;
+  if (kind !== LINK_KIND.server && kind !== LINK_KIND.rack) return 1;
+  if (owner < 0 || owner >= compiled.rack.len) return 1;
+  if (kind === LINK_KIND.server) return thermalRate(hot.rack.tempF[owner]!);
+  const room = compiled.rack.room[owner]!;
+  return room >= 0 && room < compiled.room.len ? thermalRate(hot.room.tempF[room]!) : 1;
+}
+
 const cstateFactor = (w: World, depth: number): number => depth > 0 ? w.research.unlocks.ruleParams.coreIdle?.factor ?? 1 : 1;
 
-/** Load factor of core watts from DVFS, turbo and throttle (spec §9.3), before the cap. */
+/** Load factor of core watts from DVFS, turbo and throttle (spec §9.3). */
 export function loadFactorOf(w: World, sys: number): number {
   const h = w.hot.sys;
   const pstate = h.dvfsOn[sys] === 1 ? DVFS_LOAD : h.turboOn[sys] === 1 ? TURBO_LOAD : 1;
   return pstate * (w.hot.rack.throttled[w.compiled.sys.rack[sys]!] === 1 ? THROTTLE_LOAD : 1);
 }
 
-/** PSU cap × PDU cap: every core clock below a capped supply is multiplied by it (spec §9.5). */
-export const capFactorOf = (w: World, sys: number): number =>
-  w.hot.sys.capFactor[sys]! * w.hot.rack.capFactor[w.compiled.sys.rack[sys]!]!;
-
-/** The clock multiplier exec applies: DVFS or turbo, throttle, and both caps (spec §9.3). */
+/** The clock multiplier exec applies: DVFS or turbo, and throttle (spec §9.3). */
 export function clockFactorOf(w: World, sys: number): number {
   const h = w.hot.sys;
   const pstate = h.dvfsOn[sys] === 1 ? DVFS_CLOCK : h.turboOn[sys] === 1 ? TURBO_CLOCK : 1;
-  return pstate * (w.hot.rack.throttled[w.compiled.sys.rack[sys]!] === 1 ? THROTTLE_CLOCK : 1) * capFactorOf(w, sys);
+  return pstate * (w.hot.rack.throttled[w.compiled.sys.rack[sys]!] === 1 ? THROTTLE_CLOCK : 1);
 }
 
 /**
@@ -71,31 +79,20 @@ export function clockFactorOf(w: World, sys: number): number {
  * Watts follow work (D6.1): compile gives cores, RAM and drives
  * idleW = 0.1 × wPerUnit × native × push^0.25 and loadW = wPerUnit × rate × push^0.3 at clock
  * factor 1. Clock, caches, package and scheduler are idle-only, so the cores carry all CPU load
- * and DVFS, turbo, throttle and the cap scale it. CPU busy excludes reserved threads waiting on
+ * and DVFS, turbo and throttle scale it. CPU busy excludes reserved threads waiting on
  * GPU, RAM or IO stages. Accelerator watts come from evaluated hardware.
  * The lone system's pipe draws 0.1 W per bit/s it sent this tick (D10.4). Core utilization is `busy / cores`; RAM counts
  * as fully used while a stage runs, accelerators use per-card busy seconds, drives IO stages / ncq.
  */
-export function cpuDrawW(w: World, sys: number, kind: number, settings: PhysSettings): number {
- if(kind===DRAW_NONE)return 0;if(!settings.realDraw)return PRE_SYSTEM_CPU_W;
- const c=w.compiled.sys,h=w.hot.sys,base=c.clockIdleW[sys]!+c.idleW[sys*4]!;
- if(kind===DRAW_SLEEP)return S3_FACTOR*(c.coreIdleW[sys]!+base);
- const cores=c.cores[sys]!,busy=kind===DRAW_FULL?Math.min(cores,Math.max(0,h.busy[sys]!)):0;
- const idle=cores>0?c.coreIdleW[sys]!*(busy+(cores-busy)*cstateFactor(w,h.cstate[sys]!))/cores:c.coreIdleW[sys]!;
- return idle+base*(settings.packageIdle&&busy===0?PACKAGE_IDLE_FACTOR:1)+(cores>0?c.coreLoadW[sys]!*busy/cores*loadFactorOf(w,sys)*capFactorOf(w,sys):0);
-}
-export function systemDraw(w: World, sys: number, kind: number, settings: PhysSettings): SystemDraw {
-  out.deliveredW = 0; out.idleW = 0; out.capLoadW = 0;
-  if (kind === DRAW_NONE) return out;
+export function systemDraw(w: World, sys: number, kind: number, settings: PhysSettings): number {
+  if (kind === DRAW_NONE) return 0;
   // D38: before System the CPU draws a fixed power nothing changes (clock, cache and core upgrades included).
-  if (!settings.realDraw) { out.idleW = PRE_SYSTEM_CPU_W; out.deliveredW = PRE_SYSTEM_CPU_W; return out; }
+  if (!settings.realDraw) return PRE_SYSTEM_CPU_W;
   const c = w.compiled.sys, h = w.hot.sys;
   const o = sys * R;
   const uncoreIdle = c.idleW[o + CPU]!, ramIdle = c.idleW[o + RAM]!, gpuIdle = c.idleW[o + GPU]!, ioIdle = c.idleW[o + IO]!;
   if (kind === DRAW_SLEEP) {
-    out.idleW = S3_FACTOR * (c.coreIdleW[sys]! + c.clockIdleW[sys]! + uncoreIdle + ramIdle + gpuIdle + ioIdle);
-    out.deliveredW = out.idleW;
-    return out;
+    return S3_FACTOR * (c.coreIdleW[sys]! + c.clockIdleW[sys]! + uncoreIdle + ramIdle + gpuIdle + ioIdle);
   }
   const full = kind === DRAW_FULL;
   const cores = c.cores[sys]!;
@@ -104,7 +101,7 @@ export function systemDraw(w: World, sys: number, kind: number, settings: PhysSe
   const coreIdle = cores > 0 ? (c.coreIdleW[sys]! * (busy + (cores - busy) * cstateFactor(w, h.cstate[sys]!))) / cores : c.coreIdleW[sys]!;
   const pkg = settings.packageIdle && busy === 0 ? PACKAGE_IDLE_FACTOR : 1;
   const idle = coreIdle + (c.clockIdleW[sys]! + uncoreIdle) * pkg + ramIdle + gpuIdle + ioIdle;
-  let load = 0, capLoad = 0;
+  let load = 0, coreLoad = 0;
   if (full) {
     const ioConc = Math.max(1, c.ioConc[sys]!);
     const ioU = Math.min(1, h.active[o + IO]! / ioConc);
@@ -112,12 +109,9 @@ export function systemDraw(w: World, sys: number, kind: number, settings: PhysSe
       + acceleratorLoadW(w, sys)
       + c.loadW[o + IO]! * ioU
       + c.pipeWPerBit[sys]! * h.pipeBits[sys]! / DT_S;
-    capLoad = c.coreLoadW[sys]! * u * loadFactorOf(w, sys);
+    coreLoad = c.coreLoadW[sys]! * u * loadFactorOf(w, sys);
   }
-  out.idleW = idle;
-  out.capLoadW = capLoad;
-  out.deliveredW = idle + load + capLoad * capFactorOf(w, sys);
-  return out;
+  return idle + load + coreLoad;
 }
 
 /** Exec integrates task and research duty through stage events, including mid-tick completion. */
@@ -158,7 +152,7 @@ export function updateCState(w: World, sys: number, settings: PhysSettings): voi
 /**
  * P-state switches for the next tick (spec §9.3). DVFS holds while nothing is queued or reserved,
  * and no CPU thread holds research.
- * Turbo needs DVFS off, PSU usage under 90% and, once the rack is opened, the rack under 80 °F.
+ * Turbo needs DVFS off and, once the rack is opened, the rack under 80 °F.
  */
 export function updatePStates(w: World, sys: number, settings: PhysSettings): void {
   const h = w.hot.sys;
@@ -166,7 +160,7 @@ export function updatePStates(w: World, sys: number, settings: PhysSettings): vo
   const dvfs = (flags & SYS_DVFS) !== 0 && h.queueLen[sys] === 0 && h.reserved[sys] === 0 && h.researchThreads[sys] === 0;
   const rack = w.compiled.sys.rack[sys]!;
   const coolRack = w.compiled.rack.opened[rack] !== 1 || w.hot.rack.tempF[rack]! < TURBO_MAX_F;
-  const turbo = (flags & SYS_TURBO) !== 0 && !dvfs && h.psuUsage[sys]! < TURBO_MAX_USAGE && coolRack;
+  const turbo = (flags & SYS_TURBO) !== 0 && !dvfs && coolRack;
   h.dvfsOn[sys] = dvfs ? 1 : 0;
   h.turboOn[sys] = turbo ? 1 : 0;
 }
@@ -178,5 +172,3 @@ export function publishClockFactor(w: World, sys: number): void {
   w.hot.sys.clockFactor[sys] = next;
   dirtySystem(w, sys);
 }
-
-export const capTenths = (factor: number): number => Math.round(factor * CAP_STEPS_MAX);

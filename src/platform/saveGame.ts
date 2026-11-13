@@ -58,7 +58,3 @@ export function saveGame(state: GameState, savedAtMs: number, adapter: Persisten
   if (frozen) return true;
   return adapter.setImmediate(SAVE_KEY, { savedAtMs, save: serializeSave(state), ...(absence ? { absence: { ...absence } } : {}) });
 }
-
-export function clearSave(adapter: PersistenceAdapter = bitRougePersistence): Promise<void> {
-  return adapter.remove(SAVE_KEY);
-}

@@ -32,8 +32,6 @@ function modeText(site: SiteView): string | null {
     case 'offline': return 'Offline';
     case 'asleep': return 'Asleep';
     case 'standby': return 'Standby';
-    case 'crashed': return 'Crashed';
-    case 'dark': return site.grid?.rebootMs != null && site.grid.rebootMs > 0 ? `Dark · grid ${secondsText(site.grid.rebootMs / 1000)}` : 'Dark';
     default: return null;
   }
 }
@@ -90,7 +88,7 @@ export function globalLabels(s: GlobalSnapshot, frame: WorldFrame, out: LabelWri
     if (!built) continue;
     const wide = (b.w - 8) * n, mode = modeText(site);
     out.label(`site${i}`, b.x + 4, b.y + p.footY);
-    if (mode) out.text(mode, site.online === 'crashed' || site.online === 'dark' ? 'warn' : 'mute');
+    if (mode) out.text(mode, 'mute');
     else {
       const hot = `${whole(Math.round(site.hottestF))}°F`, grid = site.grid ? `${whole(Math.round(site.grid.usage * 100))}%` : null;
       const long = fits(`Hot ${hot} · Grid ${grid ?? ''}`, type, wide);

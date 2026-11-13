@@ -1,2 +1,1 @@
-export { ResearchScreen, ResearchView } from './ResearchScreen';
-export { projectKey } from './model';
+export { ResearchScreen } from './ResearchScreen';

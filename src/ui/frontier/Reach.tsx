@@ -1,16 +1,11 @@
 // The report's progress ruler and earnings comparison. The ruler's labels share the bar's span.
 import { useLayoutEffect, useRef, type ReactNode } from 'react';
-import { tierOf, tierValue, type Amount, type ResearchId, type RoundReport, type RunwayView } from '../../game';
+import { tierOf, tierValue, type Amount, type RoundReport } from '../../game';
 import { CoinIcon, GemIcon } from '../plates/icons';
 import { amountText, wholeText } from '../hooks/format';
 import { shortCount } from '../plates/format';
 import { useShell } from '../storeHooks';
 
-/** Shorter labels for some milestones; every other milestone shows its research tree name. */
-const ERA_SHORT: Readonly<Record<string, string>> = { fabKhz: 'kHz', fabMhz: 'MHz', fabGhz: 'GHz' };
-export const eraName = (node: ResearchId | string, eras: RunwayView['eras']): string =>
-  ERA_SHORT[node] ?? eras.find(e => e.node === node)?.name ?? node;
-export const pctText = (p: number) => `${Math.floor(p * 100)}%`;
 
 /** "NEW BEST" when the round beat every round before it (never on the first). */
 export function reportBadge(report: RoundReport): string | null {

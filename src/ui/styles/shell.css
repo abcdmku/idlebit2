@@ -58,8 +58,8 @@ html, body, #root { margin: 0; width: 100%; height: 100%; overflow: hidden; back
 .source-add .source-buy.short .source-price .pz { color: var(--muted); }
 /* A flat site (a rack bay) reads on one line; a site narrower than its text wears it as a tag at its edge. */
 .source-add[data-mode="row"] .source-buy { flex-direction: row; gap: 8px; }
-/* The World list's closed regions: the research that opens them, on the head line of their plate. */
-.source-add[data-mode="head"] .source-buy { align-items: flex-start; justify-content: flex-start; padding: 4px 16px !important; }
+/* The World's closed regions: the research that opens them, on the head line of their plate (list) or legend (grid). */
+.source-add[data-mode="head"] .source-buy { align-items: flex-start; justify-content: flex-start; padding: var(--head-y, 4px) 16px !important; }
 .source-add[data-mode="stack3"] .source-price { display: flex; flex-direction: column; align-items: center; }
 .source-add[data-mode="out"] .source-buy { display: block; overflow: visible; }
 .source-add[data-mode="out"] .source-text { position: absolute; left: var(--tag-x, 0); top: var(--tag-y, 100%); height: 20px; display: flex;
@@ -94,8 +94,6 @@ b, .b { font-weight: 700; }
 .now-detail { position: absolute; }
 .now-detail:hover { box-shadow: inset 0 0 0 1px var(--cyan); }
 .task-accent { position: absolute; background: var(--task-color); pointer-events: none; }
-.task-type { display: inline-flex; align-items: center; gap: 8px; }
-.task-type canvas { flex: none; image-rendering: pixelated; }
 .research { --fill: #1d1238; --rim: #5a2a58; text-align: left; }
 .research.open, .callout { --rim: var(--paper); }
 .callout { --fill: #1d1740; z-index: 9; pointer-events: auto; }

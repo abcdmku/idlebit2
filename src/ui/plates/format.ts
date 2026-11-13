@@ -76,13 +76,6 @@ export function wholeText(value: Amount | number | bigint): string {
   return sign + compactWhole(n);
 }
 
-/** Whole Credits per minute, signed: "−9,960/min", "+12.3k/min", "0/min". */
-export function perMinuteText(value: Amount | number, signed = true): string {
-  const n = toNumber(value);
-  const body = wholeText(Math.abs(Math.trunc(n)));
-  return (n < 0 && body !== '0' ? MINUS : signed && n > 0 ? '+' : '') + body + '/min';
-}
-
 /** At most 3 significant figures with an SI prefix and a space: "30 ", "1.00 P", "42.7 T". */
 export function sig3(n: number): string {
   if (!Number.isFinite(n)) return '—';
@@ -132,19 +125,3 @@ export function measureUnit(n: number, unit: EffectPreview['unit']): string {
 }
 export const fahrenheit = (f: number) => `${Math.round(f)}°F`;
 export const percent = (fraction: number) => `${Math.round(Math.max(0, fraction) * 100)}%`;
-
-/** m:ss or h:mm:ss, floored. */
-export function clock(seconds: number): string {
-  if (!Number.isFinite(seconds)) return '—';
-  const t = Math.max(0, Math.floor(seconds)), h = Math.floor(t / 3600), m = Math.floor((t % 3600) / 60), s = t % 60;
-  return (h ? `${h}:${String(m).padStart(2, '0')}` : String(m)) + ':' + String(s).padStart(2, '0');
-}
-
-/** A hardware duration: "4 min 10 s", "2 h 5 min", "3 d 4 h". */
-export function span(seconds: number): string {
-  const t = Math.max(0, Math.round(seconds)), d = Math.floor(t / 86400), h = Math.floor((t % 86400) / 3600), m = Math.floor((t % 3600) / 60), s = t % 60;
-  if (d >= 2) return `${d} d ${h} h`;
-  if (d || h) return `${d * 24 + h} h ${m} min`;
-  if (m) return `${m} min ${s} s`;
-  return `${s} s`;
-}

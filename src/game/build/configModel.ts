@@ -55,26 +55,21 @@ export function fullLoadWatts(spec: SystemSpec, u: Unlocks): number {
   return watts;
 }
 
-/** Inert legacy save field. Systems receive power from their rack. */
-export function sizedPsu(_spec: SystemSpec, _u: Unlocks): SupplyBuild {
-  return { gen: 0, level: 1, capped: false };
-}
 
 const SIZED = new Map<string, SystemSpec>();
-/** One shared spec per (tier, board, kind, PSU), so barebones systems share their parts (R20). */
+/** One shared spec per (tier, board, kind), so barebones systems share their parts (R20). */
 export function barebonesSystemSpec(tier: number, u: Unlocks, board: BoardKind = 'general', storageNode = false): SystemSpec {
   const shape: SystemSpec = storageNode
     ? { ...barebonesSpec(0, 'general'), kind: 'storageNode', cpu: null, cpuCount: 0, drives: [{ gen: Math.max(0, newestGen(u, 'storage', PARTS.storage.base.length)), level: 1, speedLevel: 1 }] }
     : barebonesSpec(tier, board);
-  const psu = sizedPsu(shape, u);
-  const key = `${storageNode ? 's' : tier}:${board}:${shape.drives[0]?.gen ?? ''}:${psu.gen}:${psu.level}`;
+  const key = `${storageNode ? 's' : tier}:${board}:${shape.drives[0]?.gen ?? ''}`;
   let spec = SIZED.get(key);
-  if (!spec) { spec = { ...shape, psu }; SIZED.set(key, spec); }
+  if (!spec) { spec = shape; SIZED.set(key, spec); }
   return spec;
 }
 
 const cooler: CoolerBuild = { gen: 0, level: 1, setpointF: SETPOINT_DEFAULT_F };
-const supply: SupplyBuild = { gen: 0, level: 1, capped: false };
+const supply: SupplyBuild = { gen: 0, level: 1 };
 const router: RouterBuild = baseRouter(0);
 const rackSwitch: SwitchBuild = starterRackSwitch(0, 4);
 const roomSwitch: SwitchBuild = starterRoomSwitch(0, 4);
@@ -147,7 +142,7 @@ function switchChecks(u: Unlocks, sw: SwitchBuild, room: boolean): Check[] {
 export function rackLock(u: Unlocks, cfg: RackConfig): LockReason | null {
   return first([
     ...partOk(u, 'rackCooler', cfg.cooler), () => (cfg.cooler.setpointF !== SETPOINT_DEFAULT_F ? ruleLock(u, 'rackSetpoint') : null),
-    ...partOk(u, 'pdu', cfg.pdu), () => (cfg.pdu.capped ? ruleLock(u, 'powerCap') : null),
+    ...partOk(u, 'pdu', cfg.pdu),
     () => genLock(u, 'lb', cfg.lb.gen), ...routerChecks(u, cfg.lb), ...switchChecks(u, cfg.switch, false),
     ...cfg.servers.map((s): Check => () => (s ? systemLock(u, s.spec) : null)),
   ]);

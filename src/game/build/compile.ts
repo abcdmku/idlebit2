@@ -1,7 +1,7 @@
 import type { CompiledBuffers } from '../core/buffers';
 import { MAX_SCHED_K, MAX_SCHED_Q } from '../core/constants';
 import type { BuildState, SystemBuild, SystemSpec } from '../types/build';
-import { QUEUE_STRATEGY_IDS, RULE_IDS, type RuleId } from '../types/catalog';
+import { QUEUE_STRATEGY_IDS } from '../types/catalog';
 import type { ResearchState, Unlocks } from '../types/state';
 import { capacity, capacity2, PARTS, partWatts } from './catalog';
 import { compileAccels } from './compileAccels';
@@ -26,9 +26,7 @@ import { hasRule, ruleParam } from './research/unlocks';
  *   idleW/loadW  per resource at full use (§9.1 post-D5), rule factors applied (ecc, ramWatts, HBM watts);
  *                [cpu] is the uncore only: package, caches, scheduler (idle only). coreIdleW/coreLoadW are
  *                the cores (rate parts: the clock); clocks are idle-only, so clockLoadW is 0.
- *   psuLoss      final loss fraction (lossPerLevel folded in);  psuCapSwitch = capped and powerCap
- *   rules        bit i = RULE_IDS[i] (i < 32) granted; dvfs and turbo also need the system switch,
- *                coreIdle needs a C-state limit above 0.
+
  *   board        0 general, 1 accelerator;  etaCfg   η_cfg (D7.5), see configEfficiency
  * Every CPU of a system is the same design (D7.3): CPU-side sums are one CPU × cpuCount.
  * Storage nodes have no CPU: threads, K and slots are 0.
@@ -41,8 +39,6 @@ export const compileUnits = (compiled: CompiledBuffers, build: BuildState, resea
   compileLinks(compiled, build, u);
 };
 
-const SETTING_RULES: readonly RuleId[] = ['dvfs', 'turbo', 'coreIdle'];
-
 /** D7.5 values, fixed properties of the board (D39). */
 const SOCKET_FACTOR = [1, 1, 0.92, 0.85, 0.78];
 const DIMM_FACTOR = [1, 1, 1, 0.95, 0.9];
@@ -54,20 +50,6 @@ export function configEfficiency(spec: SystemSpec): number {
   const socket = SOCKET_FACTOR[n]!;
   const dimm = spec.board === 'accelerator' ? 1 : DIMM_FACTOR[Math.min(4, m)]!;
   return socket * dimm;
-}
-
-function ruleMask(sys: SystemSpec, u: Unlocks): number {
-  let mask = 0;
-  for (let i = 0; i < 32 && i < RULE_IDS.length; i += 1) {
-    const id = RULE_IDS[i]!;
-    if (!u.rules.includes(id)) continue;
-    if (SETTING_RULES.includes(id)) {
-      const on = id === 'dvfs' ? sys.settings.dvfs : id === 'turbo' ? sys.settings.turbo : sys.settings.cStateLimit > 0;
-      if (!on) continue;
-    }
-    mask |= 1 << i;
-  }
-  return mask >>> 0;
 }
 
 export function compileSystem(c: CompiledBuffers, build: SystemBuild, u: Unlocks): void {
@@ -160,11 +142,6 @@ export function compileSystem(c: CompiledBuffers, build: SystemBuild, u: Unlocks
 
   const watts = [[uncoreIdle, 0], [ramIdle, ramLoad], [gpuWatts.idle, gpuWatts.load], [ioIdle, ioLoad]] as const;
   for (let r = 0; r < R; r += 1) { s.idleW[i * R + r] = watts[r]![0]; s.loadW[i * R + r] = watts[r]![1]; }
-
-  s.psuCapW[i] = 0;
-  s.psuLoss[i] = 0;
-  s.psuCapSwitch[i] = 0;
-  s.rules[i] = ruleMask(sys, u);
 }
 
 /**

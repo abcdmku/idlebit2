@@ -36,20 +36,6 @@ export function siteHolds(target: HitTarget, focus: LevelSnapshot): { slot: Boar
   return { slot: kind, part: { unit, slot: kind === 'cpu' ? { kind: 'cpu', socket: i } : { kind, index: i } } };
 }
 
-/**
- * The part an empty board site's Add will install looks like the first one of its kind (CPU 1, RAM 1, Storage 1): the
- * site measures that view at open so its frame already has room for it (R17), and holds still after the Add.
- * Only the next free site becomes its part after its Add; a farther "+" stays an add plate.
- */
-export function siteProxy(target: HitTarget, focus: LevelSnapshot): { slot: BoardSlot; part: PartRef } | null {
-  const kind = /^(?:slot-|add:)(ram|drive|cpu)[0-9]*$/.exec(target.id)?.[1] as BoardSlot | undefined;
-  if (!kind || focus.level !== 'system') return null;
-  const n = kind === 'cpu' ? focus.cpuCount : kind === 'ram' ? focus.ram.length : focus.storage.length;
-  if (n === 0 || target.slot !== n) return null;
-  const unit = { kind: 'system' as const, id: focus.systemId };
-  return { slot: kind, part: { unit, slot: kind === 'cpu' ? { kind: 'cpu', socket: 0 } : { kind, index: 0 } } };
-}
-
 const NOUN = { ram: 'RAM', drive: 'Drive', socket: 'CPU' } as const;
 type BoardAdd = keyof typeof NOUN;
 const boardAdd = (q: Quote): BoardAdd | null =>

@@ -9,7 +9,7 @@ const RAM = 1, IO = 3, R = 4;
 
 /**
  * Event-driven power (architecture §1.5). A system's power step is a pure function of its draw
- * inputs, its rack's supply and lump context, a few fleet-wide values and its own phys state.
+ * inputs, its rack's lump context, a few fleet-wide values and its own phys state.
  * When none of those changed since a step that reached a fixed point (it changed no phys state),
  * repeating the step would write exactly what is already there until a running C-state or S3
  * timer reaches its threshold (the due tick), so the phase skips it and reuses its cached
@@ -52,7 +52,6 @@ export interface PowerCache {
   readonly reserved: Uint16Array;
   readonly running: Uint16Array;
   readonly wake: Int32Array;
-  readonly cap: Float64Array;
   readonly cstate: Uint8Array;
   readonly dvfs: Uint8Array;
   readonly turbo: Uint8Array;
@@ -60,20 +59,16 @@ export interface PowerCache {
   readonly pipeBits: Float64Array;
   /** Per card (system × MAX_ACCELS): task + research duty seconds. Watts follow these alone. */
   readonly duty: Float64Array;
-  /** Per system rack contributions: PSU delivered and loss watts, capped core load × cap factor. */
+  /** Per system rack contribution: the watts it draws at thermal duty 1. */
   readonly delivered: Float64Array;
-  readonly loss: Float64Array;
-  readonly capLoad: Float64Array;
-  /** Per rack: supply/lump context bits and PDU cap factor last seen; members to re-add. */
+  /** Per rack: lump context bits last seen; members to re-add. */
   readonly rackCtx: Int32Array;
-  readonly rackCap: Float64Array;
   /** Per rack: the thermal duty its members' drawW was last written at (0: not yet). */
   readonly rackDuty: Float64Array;
   readonly rackForce: Uint8Array;
   readonly rackResum: Uint8Array;
   /** Per rack sums of member contributions (the old per-tick scratch accumulators). */
   readonly rackIn: Float64Array;
-  readonly rackCapLoad: Float64Array;
   readonly rackAny: Uint8Array;
   /** Alive systems by rack, ascending (CSR): members of rack r are memberIds[memberAt[r]..memberAt[r+1]). */
   readonly memberAt: Int32Array;
@@ -129,10 +124,10 @@ function allocCache(c: CompiledBuffers): PowerCache {
     stable: new Uint8Array(n), due: new Float64Array(n), stampIdle: new Uint8Array(n), stampEmpty: new Uint8Array(n),
     mode: new Uint8Array(n), busy: new Float64Array(n), ram: new Uint16Array(n), io: new Uint16Array(n),
     queueLen: new Uint16Array(n), reserved: new Uint16Array(n), running: new Uint16Array(n), wake: new Int32Array(n),
-    cap: new Float64Array(n), cstate: new Uint8Array(n), dvfs: new Uint8Array(n), turbo: new Uint8Array(n), pipeBits: new Float64Array(n), duty: new Float64Array(n * MAX_ACCELS),
-    delivered: new Float64Array(n), loss: new Float64Array(n), capLoad: new Float64Array(n),
-    rackCtx: new Int32Array(nr).fill(-1), rackCap: new Float64Array(nr), rackDuty: new Float64Array(nr), rackForce: new Uint8Array(nr), rackResum: new Uint8Array(nr),
-    rackIn: new Float64Array(nr), rackCapLoad: new Float64Array(nr),
+    cstate: new Uint8Array(n), dvfs: new Uint8Array(n), turbo: new Uint8Array(n), pipeBits: new Float64Array(n), duty: new Float64Array(n * MAX_ACCELS),
+    delivered: new Float64Array(n),
+    rackCtx: new Int32Array(nr).fill(-1), rackDuty: new Float64Array(nr), rackForce: new Uint8Array(nr), rackResum: new Uint8Array(nr),
+    rackIn: new Float64Array(nr),
     rackAny: new Uint8Array(nr), memberAt, memberIds, steps: new Int32Array(n),
     log: null, lastTick: -2, unstable: new Int32Array(n), unstableN: 0, nextUnstable: new Int32Array(n), nextUnstableN: 0,
     dueAt: new Map(), candAt: new Int32Array(n), candStamp: 0, cand: new Int32Array(n),
@@ -166,21 +161,16 @@ export function powerCache(w: World, settings: PhysSettings, researchOn: boolean
 }
 
 /**
- * Bits of everything a system step reads from its rack, room and their supplies; a change, or a
- * moved PDU cap factor, re-runs every member of the rack this tick (rackForce).
+ * Bits of everything a system step reads from its rack: the throttle, whether it is cool enough
+ * for turbo, and whether it is opened. A change re-runs every member of the rack this tick (rackForce).
  */
-export function refreshRackContexts(w: World, k: PowerCache, zoneDark: Float64Array): void {
+export function refreshRackContexts(w: World, k: PowerCache): void {
   const c = w.compiled.rack, h = w.hot.rack;
-  const roomOf = c.room, openedOf = c.opened, pduFailed = h.pduFailed, crashed = h.crashed, roomCrashed = w.hot.room.crashed;
-  const throttled = h.throttled, tempF = h.tempF, capFactor = h.capFactor;
+  const openedOf = c.opened, throttled = h.throttled, tempF = h.tempF, rackCtx = k.rackCtx;
   for (let r = 0; r < c.len; r += 1) {
-    const room = roomOf[r]!;
     const opened = openedOf[r] === 1;
-    const ctx = (pduFailed[r] === 1 ? 1 : 0) | (zoneDark[room] === 1 ? 2 : 0) | (crashed[r] === 1 ? 4 : 0)
-      | (roomCrashed[room] === 1 ? 8 : 0) | (throttled[r] === 1 ? 16 : 0)
-      | (!opened || tempF[r]! < TURBO_MAX_F ? 32 : 0) | (opened ? 64 : 0);
-    const cap = capFactor[r]!;
-    if (ctx !== k.rackCtx[r] || cap !== k.rackCap[r]) { k.rackForce[r] = 1; k.rackCtx[r] = ctx; k.rackCap[r] = cap; }
+    const ctx = (throttled[r] === 1 ? 1 : 0) | (!opened || tempF[r]! < TURBO_MAX_F ? 2 : 0) | (opened ? 4 : 0);
+    if (ctx !== rackCtx[r]) { k.rackForce[r] = 1; rackCtx[r] = ctx; }
   }
 }
 
@@ -193,8 +183,8 @@ function unchanged(w: World, k: PowerCache, s: number): boolean {
   if (!(k.stable[s] === 1 && w.tick < k.due[s]! && k.rackForce[w.compiled.sys.rack[s]!] === 0
     && h.mode[s] === k.mode[s] && h.busy[s] === k.busy[s] && h.active[o + RAM] === k.ram[s] && h.active[o + IO] === k.io[s]
     && h.queueLen[s] === k.queueLen[s] && h.reserved[s] === k.reserved[s] && h.running[s] === k.running[s]
-    && h.wakeTicks[s] === k.wake[s] && h.psuRebootTicks[s] === 0 && h.psuOverTicks[s] === 0
-    && h.capFactor[s] === k.cap[s] && h.cstate[s] === k.cstate[s] && h.dvfsOn[s] === k.dvfs[s] && h.turboOn[s] === k.turbo[s]
+    && h.wakeTicks[s] === k.wake[s]
+    && h.cstate[s] === k.cstate[s] && h.dvfsOn[s] === k.dvfs[s] && h.turboOn[s] === k.turbo[s]
     && h.pipeBits[s] === k.pipeBits[s])) return false;
   // Equal duty gives equal accelerator watts. A bad duty (NaN, out of range) never equals the
   // recorded one, so the step re-runs and its full draw validates it exactly as before.
@@ -279,12 +269,12 @@ function collectAll(w: World, k: PowerCache, out: Int32Array): number {
   const c = w.compiled.sys, h = w.hot.sys, tick = w.tick;
   const alive = c.alive, rackOf = c.rack, duty = k.duty;
   const mode = h.mode, busy = h.busy, active = h.active, queueLen = h.queueLen, reserved = h.reserved, running = h.running;
-  const wake = h.wakeTicks, reboot = h.psuRebootTicks, over = h.psuOverTicks, cap = h.capFactor, cstate = h.cstate;
+  const wake = h.wakeTicks, cstate = h.cstate;
   const dvfs = h.dvfsOn, turbo = h.turboOn, taskS = h.accelTaskS, researchS = h.accelResearchS, pipeBits = h.pipeBits, kPipe = k.pipeBits;
   const idleSince = h.idleSinceTick, emptySince = h.emptySinceTick;
   const stable = k.stable, due = k.due, force = k.rackForce, stampIdle = k.stampIdle, stampEmpty = k.stampEmpty;
   const kMode = k.mode, kBusy = k.busy, kRam = k.ram, kIo = k.io, kQueue = k.queueLen, kReserved = k.reserved;
-  const kRunning = k.running, kWake = k.wake, kCap = k.cap, kCstate = k.cstate, kDvfs = k.dvfs, kTurbo = k.turbo;
+  const kRunning = k.running, kWake = k.wake, kCstate = k.cstate, kDvfs = k.dvfs, kTurbo = k.turbo;
   const len = c.len;
   let n = 0;
   for (let s = 0; s < len; s += 1) {
@@ -293,8 +283,8 @@ function collectAll(w: World, k: PowerCache, out: Int32Array): number {
     let same = stable[s] === 1 && tick < due[s]! && force[rackOf[s]!] === 0
       && mode[s] === kMode[s] && busy[s] === kBusy[s] && active[o + RAM] === kRam[s] && active[o + IO] === kIo[s]
       && queueLen[s] === kQueue[s] && reserved[s] === kReserved[s] && running[s] === kRunning[s]
-      && wake[s] === kWake[s] && reboot[s] === 0 && over[s] === 0
-      && cap[s] === kCap[s] && cstate[s] === kCstate[s] && dvfs[s] === kDvfs[s] && turbo[s] === kTurbo[s]
+      && wake[s] === kWake[s]
+      && cstate[s] === kCstate[s] && dvfs[s] === kDvfs[s] && turbo[s] === kTurbo[s]
       && pipeBits[s] === kPipe[s];
     for (let p = s * MAX_ACCELS, end = p + MAX_ACCELS; same && p < end; p += 1) same = taskS[p]! + researchS[p]! === duty[p];
     if (!same) { out[n] = s; n += 1; continue; }
@@ -332,11 +322,11 @@ function collectCandidates(w: World, k: PowerCache, log: TouchLog, out: Int32Arr
   // collectAll's comparison over the candidates, columns hoisted.
   const rackOf = c.sys.rack, duty = k.duty;
   const mode = h.mode, busy = h.busy, active = h.active, queueLen = h.queueLen, reserved = h.reserved, running = h.running;
-  const wake = h.wakeTicks, reboot = h.psuRebootTicks, over = h.psuOverTicks, cap = h.capFactor, cstate = h.cstate;
+  const wake = h.wakeTicks, cstate = h.cstate;
   const dvfs = h.dvfsOn, turbo = h.turboOn, taskS = h.accelTaskS, researchS = h.accelResearchS, pipeBits = h.pipeBits, kPipe = k.pipeBits;
   const stable = k.stable, due = k.due;
   const kMode = k.mode, kBusy = k.busy, kRam = k.ram, kIo = k.io, kQueue = k.queueLen, kReserved = k.reserved;
-  const kRunning = k.running, kWake = k.wake, kCap = k.cap, kCstate = k.cstate, kDvfs = k.dvfs, kTurbo = k.turbo;
+  const kRunning = k.running, kWake = k.wake, kCstate = k.cstate, kDvfs = k.dvfs, kTurbo = k.turbo;
   let n = 0;
   for (let i = 0; i < m; i += 1) {
     const s = cand[i]!;
@@ -344,8 +334,8 @@ function collectCandidates(w: World, k: PowerCache, log: TouchLog, out: Int32Arr
     let same = stable[s] === 1 && tick < due[s]! && force[rackOf[s]!] === 0
       && mode[s] === kMode[s] && busy[s] === kBusy[s] && active[o + RAM] === kRam[s] && active[o + IO] === kIo[s]
       && queueLen[s] === kQueue[s] && reserved[s] === kReserved[s] && running[s] === kRunning[s]
-      && wake[s] === kWake[s] && reboot[s] === 0 && over[s] === 0
-      && cap[s] === kCap[s] && cstate[s] === kCstate[s] && dvfs[s] === kDvfs[s] && turbo[s] === kTurbo[s]
+      && wake[s] === kWake[s]
+      && cstate[s] === kCstate[s] && dvfs[s] === kDvfs[s] && turbo[s] === kTurbo[s]
       && pipeBits[s] === kPipe[s];
     for (let p = s * MAX_ACCELS, end = p + MAX_ACCELS; same && p < end; p += 1) same = taskS[p]! + researchS[p]! === duty[p];
     if (!same) { out[n] = s; n += 1; continue; }
@@ -367,7 +357,7 @@ export function recordInputs(w: World, s: number, k: PowerCache): void {
   const o = s * R;
   k.mode[s] = h.mode[s]!; k.busy[s] = h.busy[s]!; k.ram[s] = h.active[o + RAM]!; k.io[s] = h.active[o + IO]!;
   k.queueLen[s] = h.queueLen[s]!; k.reserved[s] = h.reserved[s]!; k.running[s] = h.running[s]!; k.wake[s] = h.wakeTicks[s]!;
-  k.cap[s] = h.capFactor[s]!; k.cstate[s] = h.cstate[s]!; k.dvfs[s] = h.dvfsOn[s]!; k.turbo[s] = h.turboOn[s]!;
+  k.cstate[s] = h.cstate[s]!; k.dvfs[s] = h.dvfsOn[s]!; k.turbo[s] = h.turboOn[s]!;
   k.pipeBits[s] = h.pipeBits[s]!;
   const taskS = h.accelTaskS, researchS = h.accelResearchS;
   for (let p = s * MAX_ACCELS, end = p + MAX_ACCELS; p < end; p += 1) k.duty[p] = taskS[p]! + researchS[p]!;
@@ -388,13 +378,12 @@ export function writeRackDraw(w: World, r: number, k: PowerCache, duty: number):
 
 /** Re-adds rack r from its members' contributions, in the full pass's ascending system order. */
 export function resumRack(r: number, k: PowerCache): void {
-  let input = 0, capLoad = 0, any = 0;
+  let input = 0, any = 0;
   for (let i = k.memberAt[r]!; i < k.memberAt[r + 1]!; i += 1) {
     const s = k.memberIds[i]!;
-    const delivered = k.delivered[s]!, loss = k.loss[s]!;
-    input = input + delivered + loss;
-    capLoad = capLoad + k.capLoad[s]!;
+    const delivered = k.delivered[s]!;
+    input = input + delivered;
     if (delivered > 0) any = 1;
   }
-  k.rackIn[r] = input; k.rackCapLoad[r] = capLoad; k.rackAny[r] = any;
+  k.rackIn[r] = input; k.rackAny[r] = any;
 }

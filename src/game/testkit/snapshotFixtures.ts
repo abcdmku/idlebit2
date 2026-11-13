@@ -9,8 +9,8 @@ import type { CoolerView, LbView, PortView, RackSlotView, SupplyView, SwitchView
  * renderers have a shape to draw before S6's testkit-derived fixtures (view/fixtures.ts) land.
  */
 const supply = (kind: SupplyView['kind'], capacityW: number, deliveredW: number): SupplyView => ({
-  kind, generation: 0, level: 1, capacityW, deliveredW, usage: deliveredW / capacityW, overloadS: 0, failed: false,
-  rebootMs: null, loss: 0.3, lossW: deliveredW * 0.3, capped: false, capFactor: 1, creditsPerMinute: deliveredW * 1.3 * 60 * 0.01,
+  kind, generation: 0, level: 1, capacityW, deliveredW, usage: deliveredW / capacityW,
+  loss: 0.3, lossW: deliveredW * 0.3, creditsPerMinute: deliveredW * 1.3 * 60 * 0.01,
 });
 const port = (peer: number | null, active: boolean): PortView => ({ speedHz: 1000, rung: 0, peer, active, family: active ? familyId(0) : null, progress: active ? 0.5 : 0, queued: 0 });
 const sw = (ports: number): SwitchView => ({
@@ -31,7 +31,7 @@ const CHIP: ChipSnapshot = {
     clock: { hz: 1, effectiveHz: 1, generation: 0, level: 1 }, coreSites: 1,
     cores: [{ socket: 0, generation: 0, level: 1, busy: 1, taskId: 1, family: 0, activity: 'compute', progress: 0.25, threads: 1, shard: 0, shardThreads: 1, research: 0, cstate: 0, hz: 1, sleep: null, rate: 1 }],
     cache: { generation: 0, level: 1, usedBits: 1, loadedBits: 1, capacityBits: 1, spilledOutBits: 0 },
-    scheduler: null, queue: [], researchShare: 0, pipe: { speed: 1000, transfer: null, waiting: false }, psu: supply('psu', 4, 0.4), slots: [{ kind: 'core', index: 1, locked: true }],
+    scheduler: null, queue: [], researchShare: 0, pipe: { speed: 1000, transfer: null, waiting: false }, slots: [{ kind: 'core', index: 1, locked: true }],
 };
 
 const ROOM_RACKS: readonly RackSlotView[] = Array.from({ length: 16 }, (_, i) => ({
@@ -46,7 +46,7 @@ export const LEVEL_FIXTURES: { readonly [L in LevelId]: Extract<LevelSnapshot, {
     level: 'system', parent: { level: 'rack', id: rackId(0) }, systemId: systemId(0), kind: 'server', board: 'general', cpuCount: 1, ramSlots: 1, etaCfg: 1,
     online: 'onMarket', timerS: null, timerTotalS: null, chip: CHIP, chips: [CHIP], cpuBusy: [1],
     cpu: { slot: 0, kind: 'cpu', generation: 0, level: 1, active: true, resourceBusy: 1 },
-    ram: [], gpu: [], storage: [], psu: supply('psu', 4, 0.4),
+    ram: [], gpu: [], storage: [],
     running: [task], queue: { cap: 0, count: 0, sample: [] }, reserved: 0,
     rates: { ops: 1, ramBits: 0, gpuOps: 0, ioBits: 0 }, capacities: { cache: 1, ram: 0, vram: 0, storage: 0 },
     used: { memory: 1, vram: 0, storage: 0 },
@@ -57,7 +57,7 @@ export const LEVEL_FIXTURES: { readonly [L in LevelId]: Extract<LevelSnapshot, {
     ] }, drawW: 0.4, saveable: false, slots: [{ kind: 'ram', index: 0, locked: true }], inbound: null,
   },
   rack: {
-    level: 'rack', parent: { level: 'room', id: roomId(0) }, rackId: rackId(0), online: 'onMarket', timerS: null, tempF: 72, eff: 1, crashS: 0, crashed: false, throttled: false,
+    level: 'rack', parent: { level: 'room', id: roomId(0) }, rackId: rackId(0), online: 'onMarket', timerS: null, tempF: 72, eff: 1, throttled: false,
     slot: 0, row: ROOM_RACKS.slice(0, RACK_SLOTS_PER_ROW),
     cooler, pdu: supply('pdu', 64, 12), lb, switch: sw(4),
     servers: Array.from({ length: 12 }, (_, i) => ({
@@ -68,7 +68,7 @@ export const LEVEL_FIXTURES: { readonly [L in LevelId]: Extract<LevelSnapshot, {
   room: {
     level: 'room', parent: { level: 'global', id: 0 }, roomId: roomId(0), siteId: siteId(0), zone: 0, zones: [roomId(0), null, null],
     online: 'onMarket', timerS: null,
-    tempF: 71, outsideF: 70, crashS: 0, crashed: false, cooler: { ...cooler, capacityW: 256 }, ups: [supply('ups', 1024, 80)],
+    tempF: 71, outsideF: 70, cooler: { ...cooler, capacityW: 256 }, ups: [supply('ups', 1024, 80)],
     network: { switch: sw(4), lb }, rows: 2, maxRows: 2,
     racks: ROOM_RACKS,
     saveable: true, flows: [],

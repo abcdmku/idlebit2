@@ -3,23 +3,20 @@ import { DT_S, MAX_UPS } from '../core/constants';
 import { MODE, setUnitMode } from '../core/timers';
 import { touchSystem } from '../core/touch';
 import type { World } from '../core/world';
-import { CAP_STEPS_MAX, CSTATES, S3_AFTER_TICKS, S3_WAKE_TICKS } from './constants';
-import { DRAW_NONE, capTenths, drawKind, publishClockFactor, systemDraw, thermalDuty, updateCState, updatePStates } from './draw';
+import { CSTATES, S3_AFTER_TICKS, S3_WAKE_TICKS } from './constants';
+import { DRAW_NONE, drawKind, publishClockFactor, systemDraw, thermalDuty, updateCState, updatePStates } from './draw';
 import { billSite, billUtility, linkWatts, routerW, sitePrice } from './energy';
 import { generationFuelShare, siteGenerationW } from './start';
-import { forRackSystems, syncMode, zoneDark } from './modes';
 import { collectSteps, noteDue, noteUnstable, powerCache, recordInputs, refreshRackContexts, resumRack, writeRackDraw, type PowerCache } from './powerCache';
 import { scratch } from './scratch';
-import { SYS_CAPPED, physSettings, type PhysSettings } from './settings';
-import {
-  failGrid, failPdu, failPsu, failUps, overloadFailed, stepCap, stepOverload, supplyLossW, supplyUsage, tickReboots,
-} from './supplies';
+import { physSettings, type PhysSettings } from './settings';
+import { supplyLossW, supplyMultiplier, supplyUsage } from './supplies';
 
 /**
  * Power phase (tick step 8, spec §9): bottom up, systems → rack PDUs → zone UPSs → site grids.
  * Draws use the switches and temperatures from the start of the tick and the cooler watts the
- * previous heat step set. Everything is billed for this tick; failures found here take effect
- * from the next tick, after the running reboot timers count down.
+ * previous heat step set. Everything is billed for this tick. Supplies never overload: every
+ * purchase is refused at the PDU, UPS and grid limits (spec §9.2).
  *
  * Systems are event-driven (powerCache.ts): only a system whose inputs or rack context changed,
  * or whose last step was not a fixed point, runs its step; the others keep their contribution.
@@ -34,63 +31,49 @@ export function powerPhase(w: World): void {
   const k = powerCache(w, settings, researchOn);
   const links = linkWatts(w);
 
-  /* A changed supply, lump, throttle or PDU cap re-runs every system of the rack. */
-  const dark = scratch('roomDark', c.room.len);
-  for (let m = 0; m < c.room.len; m += 1) dark[m] = zoneDark(w, m) ? 1 : 0;
-  refreshRackContexts(w, k, dark);
+  /* A changed lump or throttle re-runs every system of the rack. */
+  refreshRackContexts(w, k);
 
-  /* Systems: draw, board PSU, C-states and P-states for the next tick. */
-  let psuFails: number[] | null = null;
+  /* Systems: draw, C-states and P-states for the next tick. */
   const steps = collectSteps(w, k, k.steps);
   for (let i = 0; i < steps; i += 1) {
     const s = k.steps[i]!;
     k.rackResum[c.sys.rack[s]!] = 1;
-    if (systemStep(w, s, settings, researchOn, k)) (psuFails ??= []).push(s);
+    systemStep(w, s, settings, researchOn, k);
   }
   for (let r = 0; r < c.rack.len; r += 1) {
     if (k.rackResum[r] === 1 || k.rackForce[r] === 1) resumRack(r, k);
     k.rackResum[r] = 0; k.rackForce[r] = 0;
   }
 
-  /* Rack PDUs: system inputs at the rack's thermal duty, plus cooler, switch and load balancer (spec §9.2, §10.4). */
+  /* Rack PDUs: system inputs, switch and load balancer at the rack's thermal duty, plus the cooler (spec §9.2, §10.4). */
   const roomIn = scratch('roomIn', c.room.len), roomHeat = scratch('roomHeat', c.room.len), roomAny = scratch('roomAny', c.room.len);
   // D31.3: watts each room's racks drew from their batteries this tick (not billed).
   const roomBat = scratch('roomBat', c.room.len), roundOn = w.round.phase === 'running';
-  const battery = hr0(h), rackPowered = h.rack.powered;
-  let pduFails: number[] | null = null;
   {
     // Columns hoisted: one load each for the whole loop.
-    const cr = c.rack, hr = h.rack, roomCrashed = h.room.crashed;
+    const cr = c.rack, hr = h.rack;
     const alive = cr.alive, roomOf = cr.room, openedOf = cr.opened, pduCapW = cr.pduCapW, pduLoss = cr.pduLoss;
-    const lbIdleW = cr.lbIdleW;
-    const crashedOf = hr.crashed, pduFailed = hr.pduFailed, coolerWOf = hr.coolerW, capFactor = hr.capFactor, tempF = hr.tempF;
-    const pduOver = hr.pduOverTicks, drawW = hr.drawW, pduUsage = hr.pduUsage, heatW = hr.heatW, pduCapped = settings.pduCapped;
+    const lbIdleW = cr.lbIdleW, battery = hr.batteryJ, rackPowered = hr.powered;
+    const coolerWOf = hr.coolerW, tempF = hr.tempF, drawW = hr.drawW, pduUsage = hr.pduUsage, heatW = hr.heatW;
+    const rackAny = k.rackAny, rackIn = k.rackIn, rackDuty = k.rackDuty, linkRack = links.rack;
     for (let r = 0; r < cr.len; r += 1) {
       if (alive[r] !== 1) continue;
       const room = roomOf[r]!;
       const opened = openedOf[r] === 1;
-      const crashed = crashedOf[r] === 1 || roomCrashed[room] === 1;
-      const powered = opened && pduFailed[r] === 0 && (k.rackAny[r] === 1 || crashed);
-      const switchW = powered ? links.rack[r]! : 0;
-      const lbW = powered ? routerW(lbIdleW[r]!) : 0;
-      const coolerW = powered ? coolerWOf[r]! : 0;
-      // Above 80 °F the rack's systems duty-cycle: their draw, and so their heat, falls with their speed.
+      const powered = opened && rackAny[r] === 1;
+      // Above 80 °F everything in the rack duty-cycles: its draw, and so its heat, falls with what it does.
       const duty = thermalDuty(tempF[r]!);
-      if (duty !== 1 || k.rackDuty[r] !== 1) writeRackDraw(w, r, k, duty);
-      const systemsW = k.rackIn[r]! * duty;
+      const switchW = powered ? linkRack[r]! * duty : 0;
+      const lbW = powered ? routerW(lbIdleW[r]!) * duty : 0;
+      const coolerW = powered ? coolerWOf[r]! : 0;
+      if (duty !== 1 || rackDuty[r] !== 1) writeRackDraw(w, r, k, duty);
+      const systemsW = rackIn[r]! * duty;
       const delivered = systemsW + switchW + lbW + coolerW;
       const cap = opened ? pduCapW[r]! : 0;
-      const usage = supplyUsage(delivered, cap);
-      const loss = cap > 0 ? supplyLossW(delivered, cap, pduLoss[r]!) : 0;
-      const capped = cap > 0 && pduCapped[r] === 1;
-      const capLoad = k.rackCapLoad[r]! * duty;
-      const fixed = delivered - capLoad * capFactor[r]!;
-      pduOver[r] = stepOverload(pduOver[r]!, usage, !capped || fixed > cap);
-      const nextCap = capped && delivered > 0 ? stepCap(capTenths(capFactor[r]!), fixed, capLoad, cap) / CAP_STEPS_MAX : capped ? capFactor[r]! : 1;
-      if (nextCap !== capFactor[r]) {
-        capFactor[r] = nextCap;
-        forRackSystems(w, r, (s) => publishClockFactor(w, s));
-      }
+      // supplyUsage and supplyLossW (phys/supplies.ts), with the usage computed once.
+      const usage = cap > 0 ? delivered / cap : 0;
+      const loss = cap > 0 ? delivered * pduLoss[r]! * supplyMultiplier(usage) : 0;
       drawW[r] = delivered;
       pduUsage[r] = usage;
       // D31.3: while the round runs and the rack is powered, its PDU input comes from the battery first.
@@ -100,36 +83,34 @@ export function powerPhase(w: World): void {
         battery[r] = charge - covered;
         roomBat[room] = roomBat[room]! + covered / DT_S;
       }
-      // Heat is the watts drawn in the rack (spec §10.3): systems, their PSU losses, PDU loss, switch and LB.
+      // Heat is the watts drawn in the rack (spec §10.3): systems, PDU loss, switch and LB.
       heatW[r] = opened ? systemsW + loss + switchW + lbW : 0;
       roomIn[room] = roomIn[room]! + delivered + loss;
       roomHeat[room] = roomHeat[room]! + coolerW;
-      if (delivered > 0 || crashed) roomAny[room] = 1;
-      if (overloadFailed(pduOver[r]!)) (pduFails ??= []).push(r);
+      if (delivered > 0) roomAny[room] = 1;
     }
   }
-  /* Zone UPSs: rack inputs plus network rack and room cooling, split across live UPSs (dualFeed). */
+  /* Zone UPSs: rack inputs plus network rack and room cooling, split across the zone's UPSs (dualFeed). */
   const siteIn = scratch('siteIn', c.site.len), siteAny = scratch('siteAny', c.site.len), siteBat = scratch('siteBat', c.site.len);
-  const upsFails: number[] = [];
   for (let m = 0; m < c.room.len; m += 1) {
     if (c.room.alive[m] !== 1) continue;
     const site = c.room.site[m]!;
     const opened = c.room.opened[m] === 1;
-    const powered = opened && dark[m] !== 1 && (roomAny[m] === 1 || h.room.crashed[m] === 1);
-    const networkW = powered ? links.room[m]! + routerW(c.room.lbIdleW[m]!) : 0;
+    const powered = opened && roomAny[m] === 1;
+    // The network rack stands in the zone's air and duty-cycles on its line (spec §10.4).
+    const networkW = powered ? (links.room[m]! + routerW(c.room.lbIdleW[m]!)) * (opened ? thermalDuty(h.room.tempF[m]!) : 1) : 0;
     const coolerW = powered ? h.room.coolerW[m]! : 0;
     const delivered = roomIn[m]! + networkW + coolerW;
-    const loss = opened ? upsStep(w, m, delivered, settings, (i) => upsFails.push(m * MAX_UPS + i)) : 0;
+    const loss = opened ? upsStep(w, m, delivered, settings) : 0;
     h.room.drawW[m] = delivered;
     h.room.heatW[m] = opened ? roomHeat[m]! + networkW + loss : 0;
     siteIn[site] = siteIn[site]! + delivered + loss;
     // Battery watts skip the UPS loss on their share too.
     if (roomBat[m]! > 0) siteBat[site] = siteBat[site]! + (delivered > 0 ? roomBat[m]! * (delivered + loss) / delivered : roomBat[m]!);
-    if (delivered > 0 || h.room.crashed[m] === 1) siteAny[site] = 1;
+    if (delivered > 0) siteAny[site] = 1;
   }
 
   /* Site grids and billing (spec §9.6). */
-  let gridFails: number[] | null = null;
   let anyPowered = false;
   for (let s = 0; s < c.site.len; s += 1) {
     if (c.site.alive[s] !== 1) continue;
@@ -137,27 +118,14 @@ export function powerPhase(w: World): void {
     const powered = siteAny[s] === 1;
     anyPowered ||= powered;
     const delivered = siteIn[s]! + (opened && powered ? links.site[s]! : 0);
-    const up = opened && h.site.gridFailed[s] === 0;
-    const cap = up ? c.site.gridCapW[s]! : 0;
-    const usage = supplyUsage(delivered, cap);
+    const cap = opened ? c.site.gridCapW[s]! : 0;
     const loss = cap > 0 ? supplyLossW(delivered, cap, c.site.gridLoss[s]!) : 0;
-    h.site.gridOverTicks[s] = stepOverload(h.site.gridOverTicks[s]!, usage);
     h.site.drawW[s] = delivered;
-    h.site.gridUsage[s] = usage;
+    h.site.gridUsage[s] = supplyUsage(delivered, cap);
     billSiteInput(w, s, delivered, loss, siteBat[s]!);
-    if (overloadFailed(h.site.gridOverTicks[s]!)) (gridFails ??= []).push(s);
   }
   billUtility(w, links.utility, anyPowered);
-
-  /* Running reboots count down first, so a supply failing now is dark for the full boot time. */
-  tickReboots(w);
-  if (psuFails) for (const s of psuFails) failPsu(w, s);
-  if (pduFails) for (const r of pduFails) failPdu(w, r);
-  for (const i of upsFails) failUps(w, Math.floor(i / MAX_UPS), i % MAX_UPS);
-  if (gridFails) for (const s of gridFails) failGrid(w, s);
 }
-
-const hr0 = (h: World['hot']): Float64Array => h.rack.batteryJ;
 
 /**
  * D31: a site's input is met first by rack batteries (their share, with the grid loss on it), then by
@@ -180,56 +148,34 @@ function billSiteInput(w: World, s: number, delivered: number, loss: number, bat
   g[G.roundFuel] = g[G.roundFuel]! + fromGen * fuel * credits;
 }
 
-/** One zone's UPS step. Returns the summed loss; reports UPS indices that reached 10 s. */
-function upsStep(w: World, m: number, delivered: number, settings: PhysSettings, onFail: (index: number) => void): number {
+/** One zone's UPS step: the load is shared equally by its UPSs. Returns the summed loss. */
+function upsStep(w: World, m: number, delivered: number, settings: PhysSettings): number {
   const c = w.compiled.room, h = w.hot.room;
   const count = Math.min(MAX_UPS, settings.upsCount[m]!);
-  let live = 0;
-  for (let i = 0; i < count; i += 1) if (h.upsFailed[m * MAX_UPS + i] === 0) live += 1;
   let loss = 0;
   for (let i = 0; i < count; i += 1) {
     const k = m * MAX_UPS + i;
-    const up = h.upsFailed[k] === 0;
-    const share = up && live > 0 ? delivered / live : 0;
-    const cap = up ? c.upsCapW[k]! : 0;
-    const usage = supplyUsage(share, cap);
+    const share = delivered / count;
+    const cap = c.upsCapW[k]!;
     if (cap > 0) loss += supplyLossW(share, cap, c.upsLoss[k]!);
-    h.upsUsage[k] = usage;
-    h.upsOverTicks[k] = stepOverload(h.upsOverTicks[k]!, usage);
-    if (overloadFailed(h.upsOverTicks[k]!)) onFail(i);
+    h.upsUsage[k] = supplyUsage(share, cap);
   }
   return loss;
 }
 
-
 /**
- * One system's full power step. Writes its rack contributions to the cache and records whether
- * it was a fixed point: it changed none of the system's phys state and its overload timer is
- * idle. A running C-state or S3 timer changes nothing until its threshold tick, which is kept as
- * the step's due tick. Returns true when its PSU fails this tick.
+ * One system's full power step. Writes its rack contribution to the cache and records whether
+ * it was a fixed point: it changed none of the system's phys state. A running C-state or S3
+ * timer changes nothing until its threshold tick, which is kept as the step's due tick.
  */
-function systemStep(w: World, s: number, settings: PhysSettings, researchOn: boolean, k: PowerCache): boolean {
-  const c = w.compiled, h = w.hot, sys = h.sys;
-  const mode0 = sys.mode[s], cap0 = sys.capFactor[s], over0 = sys.psuOverTicks[s], cstate0 = sys.cstate[s];
+function systemStep(w: World, s: number, settings: PhysSettings, researchOn: boolean, k: PowerCache): void {
+  const c = w.compiled, sys = w.hot.sys;
+  const mode0 = sys.mode[s], cstate0 = sys.cstate[s];
   const dvfs0 = sys.dvfsOn[s], turbo0 = sys.turboOn[s], wake0 = sys.wakeTicks[s], clock0 = sys.clockFactor[s];
-  syncMode(w, s);
   const kind = drawKind(sys.mode[s]!, researchOn && sys.researchThreads[s]! > 0);
-  const d = systemDraw(w, s, kind, settings);
-  const delivered = d.deliveredW;
-  const cap = settings.psuLive ? c.sys.psuCapW[s]! : 0;
-  const usage = supplyUsage(delivered, cap);
-  const loss = cap > 0 ? supplyLossW(delivered, cap, c.sys.psuLoss[s]!) : 0;
-  const capped = cap > 0 && (settings.sys[s]! & SYS_CAPPED) !== 0;
-  const capNow = sys.capFactor[s]!, rackCap = h.rack.capFactor[c.sys.rack[s]!]!;
-  const fixed = delivered - d.capLoadW * capNow * rackCap;
-  sys.psuOverTicks[s] = stepOverload(sys.psuOverTicks[s]!, usage, !capped || fixed > cap);
-  if (!capped) sys.capFactor[s] = 1;
-  else if (kind !== DRAW_NONE) {
-    sys.capFactor[s] = stepCap(capTenths(capNow), fixed, d.capLoadW * rackCap, cap) / CAP_STEPS_MAX;
-  }
+  const delivered = systemDraw(w, s, kind, settings);
   sys.drawW[s] = delivered;
-  sys.psuUsage[s] = usage;
-  k.delivered[s] = delivered; k.loss[s] = loss; k.capLoad[s] = d.capLoadW * capNow;
+  k.delivered[s] = delivered;
   const cores = c.sys.cores[s]!, fullyBusy = cores === 0 || sys.busy[s]! >= cores;
   let due = Infinity;
   if (kind !== DRAW_NONE) {
@@ -246,18 +192,15 @@ function systemStep(w: World, s: number, settings: PhysSettings, researchOn: boo
   const sleep = sleepStep(w, s, settings);
   if (sleep === SLEEP_WAIT) due = Math.min(due, Math.max(sys.emptySinceTick[s]!, w.round.startTick) + S3_AFTER_TICKS);
   publishClockFactor(w, s);
-  const failed = overloadFailed(sys.psuOverTicks[s]!);
   k.stampIdle[s] = kind !== DRAW_NONE && fullyBusy ? 1 : 0;
   k.stampEmpty[s] = sleep === SLEEP_STAMP ? 1 : 0;
   k.due[s] = due;
-  k.stable[s] = !failed && sleep !== SLEEP_CHANGED && over0 === 0 && sys.psuOverTicks[s] === 0
-    && sys.mode[s] === mode0 && sys.capFactor[s] === cap0 && sys.cstate[s] === cstate0 && sys.dvfsOn[s] === dvfs0
-    && sys.turboOn[s] === turbo0 && sys.wakeTicks[s] === wake0 && sys.clockFactor[s] === clock0
-    && sys.psuRebootTicks[s] === 0 ? 1 : 0;
+  k.stable[s] = sleep !== SLEEP_CHANGED
+    && sys.mode[s] === mode0 && sys.cstate[s] === cstate0 && sys.dvfsOn[s] === dvfs0
+    && sys.turboOn[s] === turbo0 && sys.wakeTicks[s] === wake0 && sys.clockFactor[s] === clock0 ? 1 : 0;
   if (k.stable[s] === 0) noteUnstable(k, s);
   if (due !== Infinity) noteDue(k, s, due);
   recordInputs(w, s, k);
-  return failed;
 }
 
 /** sleepStep outcomes: no write, a tick stamp, a wait on the S3 timer, or a change or countdown. */

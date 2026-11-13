@@ -3,7 +3,7 @@
 // and each payout pops on the core that ran it.
 import type { ChipSnapshot } from '../../../game';
 import { P, R, copyRect, partVersionOf, resetHitTarget, sumVersions } from '../../core';
-import type { HitTarget, LevelRegistry, LevelRenderer, Rect, WorldForm, WorldFrame } from '../../core';
+import type { HitTarget, LevelRegistry, LevelRenderer, Rect, WorldForm } from '../../core';
 import { chipLabels } from './labels';
 import { coreSites, setRestArea } from './layout';
 import { partRef } from './model';
@@ -28,7 +28,6 @@ function slot(s: ChipSnapshot, out: HitTarget[], i: number, id: TargetId, r: Rec
 
 export function createChipRenderer(_registry: LevelRegistry): LevelRenderer<'chip'> {
   const pickups = new QueuePickups();
-  let lastFrame: WorldFrame | null = null;
   let restForm: WorldForm = 'desktop';
   return {
     id: 'chip', name: 'CPU', plansAtRest: true, panCue: true,
@@ -46,7 +45,7 @@ export function createChipRenderer(_registry: LevelRegistry): LevelRenderer<'chi
     /** A die too tall for the view opens on its top: the queue, the cache and the first cores (tasks take the lowest free core). The rest is a pan away. */
     restCentre(s, out) { const f = chipFloor(s, restForm); out.x = f.pkg.x + f.pkg.w / 2; out.y = f.focus.y; },
     draw(g, s, view, frame) {
-      lastFrame = frame; const form = frame.form ?? 'desktop';
+      const form = frame.form ?? 'desktop';
       const queue = pickups.update(s, frame);
       drawWorld(g, s, frame, form, view, queue);
       pickups.draw(g, s, frame, chipFloor(s, form), siteCount(s), form);
@@ -90,10 +89,6 @@ export function createChipRenderer(_registry: LevelRegistry): LevelRenderer<'chi
       // a core added (or a core's part changed) flashes the whole block
       if (id === 'cores') return s.cores.length * 1000 + sumVersions(s.cores);
       return null;
-    },
-    faults(s, out) {
-      if (!out.length || (s.online !== 'crashed' && s.online !== 'dark')) return 0;
-      copyRect(chipFloor(s, lastFrame?.form).die, out[0]!); return 1;
     },
     icon(g) {
       g.clearRect(0, 0, 16, 16);

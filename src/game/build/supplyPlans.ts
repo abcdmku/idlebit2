@@ -10,7 +10,7 @@ import type { Plan } from './plan';
 /** Existing levels, sized to the requested load in one quote, with the same summed level prices. */
 export function supplyPlans(state: GameState, part: PartRef, minimumCapacity: number): { action: GameAction; plan: Plan }[] {
   const p = readPart(state.build, part);
-  if (!p || (p.id !== 'psu' && p.id !== 'pdu' && p.id !== 'ups') || !Number.isFinite(minimumCapacity) || minimumCapacity <= 0) return [];
+  if (!p || (p.id !== 'pdu' && p.id !== 'ups') || !Number.isFinite(minimumCapacity) || minimumCapacity <= 0) return [];
   const row = PARTS[p.id];
   const need = Math.max(minimumCapacity, capacity(row, p.gen, p.level));
   const out: { action: GameAction; plan: Plan }[] = [];

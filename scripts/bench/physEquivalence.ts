@@ -45,7 +45,7 @@ const FIXTURES: Record<string, Fixture> = {
   fleetMax34: { ticks: 1_000, every: 250, make: () => advanceGameOwned(primeMarket(provisionInfrastructure(buildState(MAX_FLEET)), 34), FLEET_WARMUP_TICKS * TICK_MS).state },
 };
 
-/** Supply and lump events seen, by kind (proves fleetMaxHot cycles supplies). */
+/** Events seen, by kind. */
 function tallyEvents(state: GameState, since: number, out: Record<string, number>): number {
   for (const e of state.events.entries) if (e.seq >= since) out[e.kind] = (out[e.kind] ?? 0) + 1;
   return state.events.nextSeq;

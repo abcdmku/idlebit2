@@ -4,34 +4,15 @@ import type { QueueEntryView, RenderSnapshot } from '../../game';
 import { TICK_MS } from '../../game';
 import { ArtCanvas } from '../art/ArtCanvas';
 import { drawTaskIcon } from '../art/deckArt';
-import { clockTone, useHeadSeconds, useWindowLeft, windowText } from '../hooks/headClock';
+import { clockTone, useHeadSeconds, useWindowLeft } from '../hooks/headClock';
 import { familyName, sizeText, transferText } from '../hooks/feedModel';
 import { clockText } from '../hooks/format';
-import { blockedText, taskBits, waitingText } from '../hooks/taskRequirements';
+import { blockedText, waitingText } from '../hooks/taskRequirements';
 import { shallowEqual, useGameSelector } from '../storeHooks';
 import { restartKey, restartOf } from './restart';
 
 export function TaskIcon({ task, n }: { task: QueueEntryView; n: number }) {
   return <ArtCanvas w={16} h={16} n={n} artKey={String(task.family)} draw={g => drawTaskIcon(g, task.family)} />;
-}
-
-/** Whether a line of body text fits w px (Chakra Petch averages about 0.52 em a character; 0.56 covers bold names and capitals). */
-export const fits = (text: string, w: number, body: number): boolean => text.length * body * 0.56 <= w;
-
-/** A transfer time on a narrow card: "2.3 s", "12 s"; wider cards say "lands 2.34 s". */
-export const shortSeconds = (s: number): string => (s < 10 ? `${s.toFixed(1)} s` : `${Math.round(s)} s`);
-
-/** What a blocked task is missing, short: "2 b", "tensor", "8 systems"; `tiny` for the phone's 48 px cards. */
-export function needShort(task: QueueEntryView, tiny = false): string {
-  switch (task.blockedBy) {
-    case 'cache': case 'ram': case 'disk': return taskBits(task.workingSetBits);
-    case 'vram': return tiny ? taskBits(task.vramBits) : `${taskBits(task.vramBits)} VRAM`;
-    case 'gpu': return tiny ? 'GPU' : task.tensor ? 'tensor' : 'GPU';
-    case 'gpuCores': return tiny ? 'GPU' : `${task.gpuCoresMin} cores`;
-    case 'members': return tiny ? `${task.members} sys` : `${task.members} systems`;
-    case 'zones': return tiny ? `${task.minZones} AZ` : `${task.minZones} zones`;
-    default: return (blockedText(task) ?? '').replace(/^Needs /, '');
-  }
 }
 
 export function taskTitle(task: QueueEntryView): string {
@@ -74,5 +55,3 @@ export function AutoReturn({ testId = 'head-clock', compact = false }: { testId?
   return r.auto !== null ? <span className="dim" data-testid={testId}>{compact ? 'Return in' : 'Auto return in'} {clockText(r.auto)}</span>
     : null;
 }
-
-export { windowText };

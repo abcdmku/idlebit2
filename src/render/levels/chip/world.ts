@@ -39,10 +39,6 @@ export function canAddCore(chip: ChipSnapshot): boolean {
   for (const s of chip.slots) if (s.kind === 'core' && s.index === n) return !s.locked;
   return true;
 }
-export function siteLocked(chip: ChipSnapshot, i: number): boolean {
-  for (const s of chip.slots) if (s.kind === 'core' && s.index === i) return s.locked;
-  return i >= chip.coreSites;
-}
 /** No scheduler yet and its slot is open to buy. Otherwise (locked or not offered) the queue site is locked. */
 export function queueOpen(chip: ChipSnapshot): boolean {
   for (const s of chip.slots) if (s.kind === 'scheduler') return !s.locked;

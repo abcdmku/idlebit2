@@ -7,7 +7,7 @@ import type { GhostState, LevelRegistry, Rect, ViewPresentation, WorldFrame } fr
 import type { RackSlotView, RoomSnapshot } from '../../../game';
 import { fanAt } from '../rack/art';
 import type { FanBank } from '../rack/art';
-import { coolGrade, roomPowered } from './state';
+import { coolGrade } from './state';
 import { drawBack, drawFront } from './static';
 import { FIBRE, drawCrac, drawExhaust, drawGateway, drawPerf, drawTrayRun, drawTrunk } from './sprites';
 import type { CracArt } from './sprites';
@@ -16,7 +16,7 @@ import { cracCount, drawDataPlane, drawJob, drawNetRack, drawPlumbing, drawPower
 import { COLS, G, RACK_PITCH, RACK_W, WORLD_X, exhaustY, rackX, rowY, trayY } from './layout';
 
 type G = CanvasRenderingContext2D;
-const crac: CracArt = { grade: 1, angle: 0, duty: 0, powered: true }, site: Rect = { x: 0, y: 0, w: 0, h: 0 };
+const crac: CracArt = { grade: 1, angle: 0, duty: 0 }, site: Rect = { x: 0, y: 0, w: 0, h: 0 };
 
 /** First empty slot in FIFO order (row-major), or -1 when the floor is full. */
 export function nextFreeSlot(s: RoomSnapshot): number {
@@ -45,12 +45,11 @@ export function addRackRect(s: RoomSnapshot, free: number, out: Rect): Rect {
 }
 /** The floor is full and the room may grow: the next row is the build site. */
 export const canAddRow = (s: RoomSnapshot): boolean => nextFreeSlot(s) < 0 && s.rows < s.maxRows;
-/** A rack in trouble, at full strength: crashed or dark (red, doubled), hot or PDU-loaded (amber, red past the limit). */
+/** A rack in trouble, at full strength: hot or PDU-loaded (amber, red past the limit). */
 function rackMark(g: G, k: RackSlotView, rr: Rect): void {
   const h = rr.h - 1;
-  if (k.state === 'crashed' || k.state === 'dark') { outline(g, rr.x, rr.y, 16, h, P.fault); outline(g, rr.x + 1, rr.y + 1, 14, h - 2, P.fault); }
-  else if (k.tempF > 80) outline(g, rr.x, rr.y, 16, h, k.tempF >= 100 ? P.fault : P.amber);
-  else if (k.pduUsage > 0.9 && k.powered !== false) outline(g, rr.x, rr.y, 16, h, k.pduUsage > 1 ? P.fault : P.amber);
+  if (k.tempF > 80) outline(g, rr.x, rr.y, 16, h, k.tempF >= 100 ? P.fault : P.amber);
+  else if (k.pduUsage > 0.9 && k.powered !== false) outline(g, rr.x, rr.y, 16, h, P.amber);
 }
 function drawRow(g: G, s: RoomSnapshot, r: number, registry: LevelRegistry, frame: WorldFrame, lit: boolean, heat: number): void {
   let first = -1, last = -1, load = 0, n = 0;
@@ -79,8 +78,7 @@ function drawRow(g: G, s: RoomSnapshot, r: number, registry: LevelRegistry, fram
     if (!k || k.rackId === null) continue;
     const x = rackX(c), y = rowY(r) + 1;
     drawPerf(g, x, y, G.tileH);
-    const bad = k.state === 'crashed' || k.state === 'dark';
-    if (hot || bad || k.tempF > 80) { const a = g.globalAlpha; g.globalAlpha = a * (bad ? 0.45 : 0.25); dither(g, x + 1, y, RACK_PITCH - 1, G.tileH - 1, bad ? P.fault : P.heat); g.globalAlpha = a; }
+    if (hot || k.tempF > 80) { const a = g.globalAlpha; g.globalAlpha = a * 0.25; dither(g, x + 1, y, RACK_PITCH - 1, G.tileH - 1, P.heat); g.globalAlpha = a; }
   }
   // marks last, over the whole row, so the next cabinet never covers one
   for (let c = first; c <= last; c++) { const k = s.racks[r * COLS + c]; if (k && k.rackId !== null) rackMark(g, k, RACK_RECTS[r * COLS + c]!); }
@@ -89,7 +87,7 @@ function drawRow(g: G, s: RoomSnapshot, r: number, registry: LevelRegistry, fram
 export interface WorldContext { readonly registry: LevelRegistry; readonly fans: FanBank }
 export function drawWorld(g: G, s: RoomSnapshot, view: ViewPresentation, frame: WorldFrame, ctx: WorldContext): void {
   const rows = Math.max(1, s.rows), G0 = G, H = G.worldH, IY = G.iy, WORLD_W = G.worldW, RACK_RECTS = G.racks, JOB_PATHS = G.jobPaths;
-  const powered = roomPowered(s), paused = frame.paused, live = powered && !paused && !s.crashed;
+  const paused = frame.paused, live = !paused;
   let traffic = false;
   const ports = s.network.switch.ports;
   for (let i = 0; i < ports.length; i++) if (ports[i].active) { traffic = true; break; }
@@ -99,19 +97,19 @@ export function drawWorld(g: G, s: RoomSnapshot, view: ViewPresentation, frame: 
 
   R(g, WORLD_X, 0, WORLD_W, H, BG.room);
   drawBack(g);
-  drawGateway(g, G.gateway, 1 + Math.min(3, s.network.switch.generation), live && (uplink || traffic), powered);
+  drawGateway(g, G.gateway, 1 + Math.min(3, s.network.switch.generation), live && (uplink || traffic));
   drawDataPlane(g, s, live);
-  drawNetRack(g, s, live, powered, frame.timeMs);
-  drawPowerPath(g, s, powered);
+  drawNetRack(g, s, live, frame.timeMs);
+  drawPowerPath(g, s);
   drawUpsBank(g, s);
   if (G0.trunk > G0.net.x + G0.net.w) R(g, G0.ix + 17, IY - 15, 4, 1, FIBRE);
   drawTrunk(g, G0.trunk, G0.trunkY, trayY(rows - 1) + 2, rows, rowY, G0.pitch - 12, lit);
-  drawThermo(g, s, paused, powered);
+  drawThermo(g);
   drawZoneSign(g, s, paused);
   const cracs = cracCount();
   drawPlumbing(g, s, cracs);
-  crac.grade = coolGrade(s); crac.powered = powered;
-  crac.duty = powered && !paused ? Math.max(0, Math.min(1, s.cooler.duty)) : 0;
+  crac.grade = coolGrade(s);
+  crac.duty = !paused ? Math.max(0, Math.min(1, s.cooler.duty)) : 0;
   crac.angle = fanAt(ctx.fans, 0, s.roomId, frame.timeMs, crac.duty, frame.reducedMotion);
   // back to front: each CRAC before the first row that stands in front of its foot
   let c = 0;
@@ -140,11 +138,6 @@ export function drawWorld(g: G, s: RoomSnapshot, view: ViewPresentation, frame: 
   if (live && !drawRoomFlows(g, s, frame)) for (let i = 0; i < ports.length; i++) {
     const p = ports[i], slot = p.peer;
     if (p.active && slot !== null && slot < JOB_PATHS.length && s.racks[slot]?.rackId != null) drawJob(g, JOB_PATHS[slot], p.progress);
-  }
-  if (!powered || s.crashed) {
-    const a = g.globalAlpha; g.globalAlpha = a * (powered ? 0.35 : 0.55);
-    R(g, G0.ix, IY - 4, G0.iw, G0.ib - IY + 4, P.ink); g.globalAlpha = a;
-    if (s.crashed) outline(g, G0.ix - 1, IY - 5, G0.iw + 2, G0.ib - IY + 6, P.fault);
   }
   drillDim(g, s, frame, H);
 }

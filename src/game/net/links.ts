@@ -3,6 +3,8 @@ import { wakeRouters } from '../core/routerQueue';
 import { DT_S } from '../core/constants';
 import type { World } from '../core/world';
 import { hasRule } from '../exec/rules';
+import { EFF_FLAT_HIGH_F as HOT_F } from '../phys/constants';
+import { linkThermalRate } from '../phys/draw';
 import { memberPayload, shapeOf } from '../exec/shape';
 import { active, dropJoinHint, joinLink, leaveLink, rescanActive } from './fifo';
 import { nextLink } from './paths';
@@ -29,11 +31,20 @@ export function removeArrival(r: number): void {
 export const transferBits = (w: World, r: number): number =>
   w.hot.rec.count[r]! * memberPayload(shapeOf(w.hot.rec.family[r]!), w.hot.rec.units[r]!);
 
-/** Sends for DT_S on link l. Collects records ready to move on into `moving`. */
-function serveLink(w: World, l: number): void {
+/** Whether any opened rack or zone is above 80 °F: only then can a link send below its compiled speed (spec §10.4). */
+function anyHotLump(w: World): boolean {
+  const rack = w.hot.rack.tempF, room = w.hot.room.tempF;
+  for (let r = 0; r < rack.length; r += 1) if (rack[r]! > HOT_F) return true;
+  for (let m = 0; m < room.length; m += 1) if (room[m]! > HOT_F) return true;
+  return false;
+}
+
+/** Sends for DT_S on link l. Collects records ready to move on into `moving`. `hot`: anyHotLump this tick. */
+function serveLink(w: World, l: number, hot: boolean): void {
   dropJoinHint(w.hot, l);
   const rec = w.hot.rec, lh = w.hot.link, lc = w.compiled.link;
-  const speed = lc.speed[l]!;
+  // A hot switch or network rack sends at its thermal duty (spec §10.4); the room threshold stays the compiled one.
+  const speed = hot ? lc.speed[l]! * linkThermalRate(w.compiled, w.hot, l) : lc.speed[l]!;
   const chans = Math.max(1, lc.channels[l]!);
   if (chanFree.length < chans) chanFree = new Float64Array(chans * 2);
   chanFree.fill(0, 0, chans);
@@ -65,7 +76,7 @@ function serveLink(w: World, l: number): void {
   for (let k = 0; k < chans; k += 1) busy += chanFree[k]!;
   lh.busyS[l] = busy;
   lh.bitClock[l] = lh.bitClock[l]! + bits;
-  const before = lh.backlog[l]!, room = chans * speed * DT_S;
+  const before = lh.backlog[l]!, room = chans * lc.speed[l]! * DT_S;
   lh.backlog[l] = Math.max(0, before - bits);
   // First-link room came back (net/split.ts linkRoom): the routers above may split again.
   if (before >= room && lh.backlog[l]! < room) wakeLink(w, l);
@@ -95,10 +106,11 @@ export function linkPhase(w: World): void {
   const log = w.touch;
   if (active.hot !== w.hot || log === undefined || active.log !== log || active.mark.length < lh.len) rescanActive(w.hot, log ?? null);
   const list = active.list.subarray(0, active.n).sort();
+  const hot = list.length > 0 && anyHotLump(w);
   for (let i = 0; i < list.length; i += 1) {
     const l = list[i]!;
     if (lh.qlen[l] === 0) { if (lh.busyS[l] !== 0) lh.busyS[l] = 0; continue; }
-    serveLink(w, l);
+    serveLink(w, l, hot);
   }
   if (log) {
     if (log.linkList.length < list.length) log.linkList = new Int32Array(list.length * 2);

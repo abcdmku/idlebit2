@@ -1,6 +1,6 @@
 // The four infrastructure slots (mockup levels/rack/infra.js): cooler (roof), switch and load
 // balancer (top two U), PDU (right post and plinth head). Each light is real snapshot state.
-import { P, R, frame as outline, mix, px } from '../../core';
+import { P, R, mix, px } from '../../core';
 import { drawWells } from './flowkit';
 import type { RackSnapshot } from '../../../game';
 import { ROOF } from './cabinet';
@@ -43,21 +43,20 @@ export function drawCooler(g: G, s: RackSnapshot, fans: FanBank, timeMs: number,
     disc(g, CAB.x + 20, cy, 5, P.ink); fan(g, CAB.x + 20, cy, 4, fanAt(fans, 0, key, timeMs, duty, still), duty > 0, P.coolHi);
     if (c.tech === 'closedLoop' || c.generation >= 1) { disc(g, CAB.x + 72, cy, 5, P.ink); fan(g, CAB.x + 72, cy, 4, fanAt(fans, 1, key + 1, timeMs, duty, still), duty > 0, P.coolHi); }
   }
-  drawReadout(g, s);
+  drawReadout(g);
 }
 function run(g: G, y: number, col: string): void {
   R(g, CAB.x + 8, y - 1, 78, 4, P.ink); R(g, CAB.x + 9, y, 76, 2, col); R(g, CAB.x + 9, y, 76, 1, mix(col, '#ffffff', 0.3));
 }
-/** The roof display's window; the °F and the crash countdown are the core's crisp label (labels.ts). Red-framed while crash time builds. */
-function drawReadout(g: G, s: RackSnapshot): void {
-  const r = READOUT, dark = s.online === 'dark' || s.pdu.failed;
-  R(g, r.x, r.y, r.w, r.h, P.ink); R(g, r.x + 1, r.y + 1, r.w - 2, r.h - 2, dark ? P.ink : s.crashed ? P.faultLo : mix(P.ledOff, P.ink, 0.55));
-  if (!dark && (s.crashed || s.crashS > 0)) outline(g, r.x, r.y, r.w, r.h, P.fault);
+/** The roof display's window; the °F is the core's crisp label (labels.ts). */
+function drawReadout(g: G): void {
+  const r = READOUT;
+  R(g, r.x, r.y, r.w, r.h, P.ink); R(g, r.x + 1, r.y + 1, r.w - 2, r.h - 2, mix(P.ledOff, P.ink, 0.55));
 }
 
 /** A half cabinet's unit carries its name and value on its faceplate: the window the core's crisp label fills (labels.ts). */
-function nameLine(g: G, x: number, y: number, w: number, dark: boolean): void {
-  R(g, x, y + LCD_DY - 1, w, LCD_H + 1, P.ink); R(g, x + 1, y + LCD_DY, w - 2, LCD_H - 1, dark ? P.ink : mix(P.ledOff, P.ink, 0.55));
+function nameLine(g: G, x: number, y: number, w: number): void {
+  R(g, x, y + LCD_DY - 1, w, LCD_H + 1, P.ink); R(g, x + 1, y + LCD_DY, w - 2, LCD_H - 1, mix(P.ledOff, P.ink, 0.55));
 }
 // ---------- switch ----------
 const SW_BODY = [mix(P.wafer, P.steelLo, 0.35), P.logicLo, mix(P.logicLo, P.ink, 0.25)];
@@ -70,59 +69,58 @@ export function switchSpeeds(s: RackSnapshot, out: { lo: number; hi: number }): 
 /** Port jacks, each with its transfer light (lit only while that link carries a real transfer) and its own speed tier (D35: ports upgrade one by one). */
 export function drawSwitch(g: G, s: RackSnapshot, quiet: boolean): void {
   const r = SWITCH_RECT, fy = SWITCH_FACE.y, sw = s.switch, gen = Math.max(0, Math.min(2, sw.generation)), bez = SW_BODY[gen];
-  const off = s.online === 'dark' || s.pdu.failed;
-  R(g, r.x, r.y, r.w, r.h, P.ink); R(g, r.x + 1, r.y + 1, r.w - 2, r.h - 2, off ? mix(bez, P.ink, 0.5) : bez);
+  R(g, r.x, r.y, r.w, r.h, P.ink); R(g, r.x + 1, r.y + 1, r.w - 2, r.h - 2, bez);
   R(g, r.x + 1, r.y + 1, r.w - 2, 1, gen >= 2 ? P.coolLo : mix(bez, '#ffffff', 0.15));
   ears(g, r, bez, gen ? 2 : 0);
-  if (fy > r.y) nameLine(g, r.x + 2, r.y, UPLINK_JACK.x - 4 - r.x, off);
-  px(g, r.x + r.w - 4, fy + 3, off ? OFF : P.led);
+  if (fy > r.y) nameLine(g, r.x + 2, r.y, UPLINK_JACK.x - 4 - r.x);
+  px(g, r.x + r.w - 4, fy + 3, P.led);
   for (let i = 0; i < SERVER_SLOTS; i++) {
     const jx = portX(i), p = sw.ports[i];
     if (!p) { R(g, jx, fy + 4, 4, 5, mix(bez, P.ink, 0.25)); continue; }
     R(g, jx, fy + 4, 4, 5, P.ink); R(g, jx + 1, fy + 5, 2, 3, p.peer !== null ? P.steel : mix(unitCol(p.speedHz), P.ink, 0.6));
-    R(g, jx, fy + 2, 4, 1, !quiet && !off && p.active ? P.net : OFF);
+    R(g, jx, fy + 2, 4, 1, !quiet && p.active ? P.net : OFF);
     // the port's speed tier: dots = the 1-2-5 step, brightness = the decade, colour = the unit
     const step = p.rung % 3, dec = Math.floor(p.rung / 3) % 3, col = mix(unitCol(p.speedHz), P.ink, dec === 0 ? 0.55 : dec === 1 ? 0.3 : 0);
-    for (let k = 0; k <= step; k++) px(g, jx + k + (step < 2 ? 1 : 0), fy + 10, off ? OFF : col);
+    for (let k = 0; k <= step; k++) px(g, jx + k + (step < 2 ? 1 : 0), fy + 10, col);
   }
   const u = UPLINK_JACK, up = sw.uplinks[0];
   R(g, u.x, fy + 3, u.w, 6, P.ink); R(g, u.x + 1, fy + 4, u.w - 2, 4, P.steel); R(g, u.x + 2, fy + 5, u.w - 4, 2, up ? unitCol(up.speedHz) : P.steelLo);
-  R(g, u.x, fy + 1, u.w, 1, !quiet && !off && !!up && up.active ? P.net : OFF);
+  R(g, u.x, fy + 1, u.w, 1, !quiet && !!up && up.active ? P.net : OFF);
 }
 
 // ---------- load balancer ----------
 /** Strategy display; one light per server slot, lit on the slot the balancer routed to this tick. */
 export function drawLB(g: G, s: RackSnapshot, quiet: boolean): void {
-  const r = LB_RECT, fy = LB_FACE.y, bez = mix(P.wafer, P.logicLo, 0.5), dk = s.online === 'dark' || s.pdu.failed, off = dk || quiet, lb = s.lb;
-  R(g, r.x, r.y, r.w, r.h, P.ink); R(g, r.x + 1, r.y + 1, r.w - 2, r.h - 2, dk ? mix(bez, P.ink, 0.5) : bez);
+  const r = LB_RECT, fy = LB_FACE.y, bez = mix(P.wafer, P.logicLo, 0.5), lb = s.lb;
+  R(g, r.x, r.y, r.w, r.h, P.ink); R(g, r.x + 1, r.y + 1, r.w - 2, r.h - 2, bez);
   R(g, r.x + 1, r.y + 1, r.w - 2, 1, mix(bez, '#ffffff', 0.15));
   ears(g, r, bez, lb.generation >= 1 ? 2 : 0);
-  if (fy > r.y) nameLine(g, r.x + 2, r.y, r.w - 4, dk);
-  px(g, r.x + r.w - 4, fy + 3, dk ? OFF : P.led);
+  if (fy > r.y) nameLine(g, r.x + 2, r.y, r.w - 4);
+  px(g, r.x + r.w - 4, fy + 3, P.led);
   // routed per second: the window the core's crisp label fills (labels.ts)
   const lx = r.x + LB_LCD.dx, lw = LB_LCD.w;
-  R(g, lx, fy + LCD_DY - 1, lw, LCD_H + 2, P.ink); R(g, lx + 1, fy + LCD_DY, lw - 2, LCD_H, dk ? P.ink : mix(P.sramLo, P.ink, 0.5));
-  R(g, lx + lw + 2, fy + 4, 3, 3, P.ink); px(g, lx + lw + 3, fy + 5, !off && lb.lastTarget !== null ? P.bit : OFF);
+  R(g, lx, fy + LCD_DY - 1, lw, LCD_H + 2, P.ink); R(g, lx + 1, fy + LCD_DY, lw - 2, LCD_H, mix(P.sramLo, P.ink, 0.5));
+  R(g, lx + lw + 2, fy + 4, 3, 3, P.ink); px(g, lx + lw + 3, fy + 5, !quiet && lb.lastTarget !== null ? P.bit : OFF);
   const mx = lx + lw + 8;
   for (let i = 0; i < SERVER_SLOTS; i++) {
     const has = s.servers[i]?.systemId != null;
-    R(g, mx + i * 3, fy + 4, 2, 4, off || !has ? OFF : lb.lastTarget === i ? P.bit : mix(P.net, P.ink, 0.55));
+    R(g, mx + i * 3, fy + 4, 2, 4, quiet || !has ? OFF : lb.lastTarget === i ? P.bit : mix(P.net, P.ink, 0.55));
   }
   // D25.7: the router queue's wells, between the routing lights and the status LED
-  drawWells(g, lb.queue, LB_WELLS.x, fy + LB_WELLS.dy, LB_WELLS.w, LB_WELLS.h, !off);
+  drawWells(g, lb.queue, LB_WELLS.x, fy + LB_WELLS.dy, LB_WELLS.w, LB_WELLS.h, !quiet);
 }
 
 // ---------- PDU: outlet strip on the right post, readout head on the plinth ----------
 export function drawPdu(g: G, s: RackSnapshot, quiet: boolean): void {
-  const x = STRIP.x - 1, h = BAY_H, off = s.online === 'dark' || s.pdu.failed;
+  const x = STRIP.x - 1, h = BAY_H;
   R(g, x, U0, STRIP.w + 1, h, P.ink); R(g, x + 1, U0 + 1, STRIP.w - 1, h - 2, P.steelLo);
   // a twin's left bay plugs into a slim rail on the divider: one light per unit
   if (plan.id === 'twin') R(g, OPEN.x + OPEN.w, U0, 1, h, P.ink);
   // Power control (row 0) has no outlet: the uplink drops past it.
   for (let u = -2; u < SERVER_SLOTS; u++) {
     const v = u >= 0 ? s.servers[u] : null, used = u < 0 || (!!v && v.systemId !== null);
-    const r = u < 0 ? (u === -2 ? SWITCH_FACE : LB_FACE) : serverRect(u, cell), on = !off && used && !(v && s.crashed);
-    const led = on ? (v && v.load > 0.05 && !quiet ? P.amber : P.led) : OFF;
+    const r = u < 0 ? (u === -2 ? SWITCH_FACE : LB_FACE) : serverRect(u, cell);
+    const led = used ? (v && v.load > 0.05 && !quiet ? P.amber : P.led) : OFF;
     if (r.x + r.w + 2 < STRIP.x && plan.id === 'twin') { px(g, r.x + r.w, r.y + (r.h >> 1) - 1, used ? led : P.steelLo); continue; }
     // a half row's two sleds take an outlet each, the left sled's above the right's
     const oy = r.w < OPEN.w ? r.y + (r.x > OPEN.x ? 7 : 1) : r.y + (r.h >> 1) - 2;
@@ -136,17 +134,15 @@ const cell = { x: 0, y: 0, w: 0, h: 0 };
 function drawPduHead(g: G, s: RackSnapshot): void {
   const r = PLINTH, sp = s.pdu, use = sp.usage, bez = mix(P.steelLo, P.ink, 0.25);
   R(g, r.x, r.y, r.w, r.h, P.ink); R(g, r.x + 1, r.y + 1, r.w - 2, r.h - 2, bez); R(g, r.x + 1, r.y + 1, r.w - 2, 1, P.steelLo);
-  // usage, overload and reboot countdown: the window the core's crisp label fills (labels.ts)
+  // usage: the window the core's crisp label fills (labels.ts)
   const lx = r.x + PDU_LCD.dx, lw = PDU_LCD.w;
-  R(g, lx, r.y + 1, lw, 9, P.ink); R(g, lx + 1, r.y + 1, lw - 2, 9, sp.failed ? P.faultLo : mix(P.amber, P.ink, 0.88));
+  R(g, lx, r.y + 1, lw, 9, P.ink); R(g, lx + 1, r.y + 1, lw - 2, 9, mix(P.amber, P.ink, 0.88));
   const bx = r.x + PDU_BAR.dx, lit = Math.round(Math.min(1.1, use) * 10);
-  for (let i = 0; i < PDU_BAR.n; i++) R(g, bx + i * PDU_BAR.pitch, r.y + 3, 3, 5, sp.failed ? (i === 10 ? P.fault : OFF) : i < lit ? (i >= 10 ? P.fault : i >= 9 ? P.amber : P.led) : OFF);
+  for (let i = 0; i < PDU_BAR.n; i++) R(g, bx + i * PDU_BAR.pitch, r.y + 3, 3, 5, i < lit ? (i >= 10 ? P.fault : i >= 9 ? P.amber : P.led) : OFF);
   // a twin's plinth has room for a second display under the right bay: the watts, the core's crisp label (labels.ts)
   if (plan.id === 'twin') {
     const wx = bayX(1);
     R(g, wx, r.y, OPEN.w, r.h, P.ink); R(g, wx + 1, r.y + 1, OPEN.w - 2, r.h - 2, bez); R(g, wx + 1, r.y + 1, OPEN.w - 2, 1, P.steelLo);
-    R(g, wx + 2, r.y + 1, OPEN.w - 4, 9, s.online === 'dark' || sp.failed ? P.ink : mix(P.amber, P.ink, 0.88));
+    R(g, wx + 2, r.y + 1, OPEN.w - 4, 9, mix(P.amber, P.ink, 0.88));
   }
-  if (sp.failed) outline(g, r.x - 1, r.y - 1, r.w + 2, r.h + 2, P.fault);
-  else if (sp.overloadS > 0) outline(g, r.x - 1, r.y - 1, r.w + 2, r.h + 2, use > 1 ? P.fault : P.amber);
 }

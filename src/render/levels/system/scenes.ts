@@ -3,7 +3,7 @@
 // 'shard' (D25): a shard on the port, a 2-thread Parallel shard on cores 1 and 2, and an
 // Accelerated shard in its GPU stage on card 1 (its thread held on core 4).
 import { FAMILIES, familyId, systemId, payoutCreditsAt, payloadAt } from '../../../game';
-import type { ChipSnapshot, CoreView, FamilyDef, GpuStats, PartRef, PartView, Quote, SupplyView, SystemSnapshot, TaskRequirementsView, TaskView,
+import type { ChipSnapshot, CoreView, FamilyDef, GpuStats, PartRef, PartView, Quote, SystemSnapshot, TaskRequirementsView, TaskView,
   TransferView } from '../../../game';
 
 const ID = systemId(0), PARENT = { level: 'system', id: ID } as const;
@@ -18,7 +18,7 @@ const PARALLEL: Run = { taskId: 700, family: 13, shard: 1, threads: 2 }, ACCEL: 
 export function chipScene(stage: 'boot' | 'chip' | 'system' | 'shard', online: ChipSnapshot['online'] = 'onMarket'): ChipSnapshot {
   coreN = 0;
   if (stage === 'boot') return {
-    level: 'chip', socket: 0, parent: null, systemId: ID, cpuCount: 1, online, tier: 0, psu: psu(0.65), clock: { hz: 1, effectiveHz: 1, generation: 0, level: 1 }, coreSites: 1,
+    level: 'chip', socket: 0, parent: null, systemId: ID, cpuCount: 1, online, tier: 0, clock: { hz: 1, effectiveHz: 1, generation: 0, level: 1 }, coreSites: 1,
     cores: [core(false, 0, 0.36)], cache: { generation: 0, level: 1, usedBits: 0, loadedBits: 0, capacityBits: 1, spilledOutBits: 0 },
     scheduler: null, queue: [], researchShare: 0.36, pipe: { speed: 1000, transfer: null, waiting: false }, slots: [{ kind: 'core', index: 1, locked: true }, { kind: 'scheduler', index: 0, locked: true }],
   };
@@ -26,7 +26,7 @@ export function chipScene(stage: 'boot' | 'chip' | 'system' | 'shard', online: C
   const cores = shard ? [core(true, 0.3, 0, PARALLEL), core(true, 0.3, 0, PARALLEL), core(false, 0, 0.4), core(true, 0.6, 0, ACCEL)]
     : sys ? [core(true, 0.3), core(true, 0.6), core(false, 0, 0.4), core(true, 0.2)] : [core(false, 0, 0.51), core(false, 0, 0.51)];
   return {
-    level: 'chip', socket: 0, parent: sys ? PARENT : null, systemId: ID, cpuCount: 1, online, tier: 0, psu: psu(5.5),
+    level: 'chip', socket: 0, parent: sys ? PARENT : null, systemId: ID, cpuCount: 1, online, tier: 0,
     clock: { hz: sys ? 8 : 4, effectiveHz: sys ? 8 : 4, generation: 0, level: sys ? 4 : 3 }, coreSites: sys ? 4 : 2, cores,
     cache: { generation: 0, level: sys ? 7 : 4, usedBits: sys ? 32 : 0, loadedBits: sys ? 32 : 0,
       capacityBits: sys ? 64 : 8, spilledOutBits: 0 },
@@ -45,10 +45,7 @@ export const GPU_SCENE_STATS: GpuStats = {
   efficiencyOpsPerJ: 4000 / 2200,
 };
 const gpu = (slot: number, active: boolean, held = active ? 2048 : 0): PartView => ({ ...part('gpu', slot, 1, active), gpu: GPU_SCENE_STATS, vramUsedBits: held });
-const psu = (deliveredW: number): SupplyView => ({
-  kind: 'psu', generation: 0, level: 1, capacityW: 64, deliveredW, usage: deliveredW / 64, overloadS: 0, failed: false, rebootMs: null,
-  loss: 0.3, lossW: deliveredW * 0.3, capped: false, capFactor: 1, creditsPerMinute: 0,
-});
+
 /** Freeze catalog facts at a chosen size (units) for hand-built scenes. */
 export function sceneTaskRequirements(family: FamilyDef, size: number): TaskRequirementsView {
   return {
@@ -115,7 +112,7 @@ function baseScene(stage: SystemStage, online: SystemSnapshot['online']): System
     ram: boot ? [] : full ? [0, 1, 2, 3, 4, 5].map(i => part('ram', i, 2, i < 2)) : [part('ram', 0, 2, !shard), part('ram', 1, 2, !shard)],
     gpu: boot ? [] : full ? Array.from({ length: 8 }, (_, i) => gpu(i, i === 6, i === 0 || i === 6 ? 2048 : 0)) : [gpu(0, shard)],
     storage: boot ? [] : full ? [0, 1, 2, 3].map(i => part('drive', i, 3, i === 1)) : [part('drive', 0, 1, false)],
-    psu: psu(boot ? 0.65 : 5.5),
+
     running: runningOf(stage),
     inbound: shard ? sceneInbound() : null,
     memory: { tiers: [] }, queue: { cap: 8, count: 3, sample: [] }, reserved: 0, rates: { ops: 8, ramBits: 4, gpuOps: 0, ioBits: 0 },

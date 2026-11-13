@@ -106,27 +106,16 @@
   background: #120d28; box-shadow: inset 2px 2px 0 #07050f, inset -2px -2px 0 #2a2252; }
 .v3-plate .key-pair { display: grid; grid-template-columns: 1fr 1fr; gap: var(--s2); }
 
-/* Toggle and choice controls. */
-.v3-plate .cx-tog, .v3-plate .cx-row { position: relative; min-height: 44px; padding: var(--s1) var(--s2); box-sizing: border-box; border: 0; width: 100%;
+/* Toggle controls. */
+.v3-plate .cx-tog { position: relative; min-height: 44px; padding: var(--s1) var(--s2); box-sizing: border-box; border: 0; width: 100%;
   background: #261d48; color: #efeaff; box-shadow: inset 0 -3px 0 #160f2e, 0 0 0 2px #0e0b1c; font-weight: 600; line-height: var(--lh); text-align: left; cursor: pointer; }
 .v3-plate .cx-tog { display: flex; align-items: center; gap: var(--s2); margin-top: var(--s2); }
 .v3-plate .cx-tog s { flex: none; position: relative; width: 30px; height: 16px; background: #15122a; box-shadow: 0 0 0 2px #0e0b1c; text-decoration: none; }
 .v3-plate .cx-tog s::after { content: ""; position: absolute; left: 2px; top: 2px; width: 12px; height: 12px; background: #6e6698; }
 .v3-plate .cx-tog.on s { background: #128a68; }
 .v3-plate .cx-tog.on s::after { left: 16px; background: #b8ffe6; }
-.v3-plate .cx-tog small, .v3-plate .cx-row small { display: block; font-weight: 400; color: #a99be6; }
-/* Two choices a row where they fit, one in a narrow plate: never a row cut off at the side. */
-.v3-plate .cx-rows { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--s2); margin-top: var(--s2); }
-.v3-plate .cx-row span { min-width: 0; overflow-wrap: normal; }
+.v3-plate .cx-tog small { display: block; font-weight: 400; color: #a99be6; }
 .system-power { scroll-margin-top: var(--s2); }
-.system-power .cx-rows { grid-template-columns: repeat(4, minmax(0, 1fr)); }
-.system-power .cx-row { justify-content: center; padding: var(--s1); }
-.v3-plate .cx-row { display: flex; align-items: center; gap: var(--s2); }
-.v3-plate .cx-row u { flex: none; width: 10px; height: 10px; background: #15122a; box-shadow: 0 0 0 2px #0e0b1c; text-decoration: none; }
-.v3-plate .cx-row.on { background: #33296b; box-shadow: inset 0 -3px 0 #160f2e, 0 0 0 2px #efeaff; }
-.v3-plate .cx-row.on u { background: #8ef5ff; }
-.v3-plate .cx-row.lock { cursor: default; color: #8d84b3; background: #1f1838; }
-.v3-plate .cx-row.lock small { color: #ffab98; }
 
 /* cooler setpoint */
 .v3-plate .setpoint { display: grid; grid-template-columns: minmax(0, 1fr) 44px 56px 44px; align-items: center; gap: var(--s2); margin-top: var(--s2); min-height: 44px; }
@@ -148,7 +137,6 @@
 .v3-plate .sw-s { color: #a99be6; }
 .v3-plate .p-online:is([data-state="online"], [data-state="paused"]) .sw-t b { color: #7dff9a; }
 .v3-plate .p-online:is([data-state^="going"], [data-state="booting"], [data-state="cold"]) .sw-t b { color: #ffb03b; }
-.v3-plate .p-online[data-state="crashed"] .sw-t b { color: #ff6a5a; }
 .v3-plate .p-online[data-state="offline"] .sw-t b { color: var(--dim); }
 .v3-plate .sw-pips { display: flex; gap: var(--s1); flex: none; visibility: hidden; }
 .v3-plate .p-online:is([data-state^="going"], [data-state="booting"], [data-state="cold"]) .sw-pips { visibility: visible; }
@@ -371,8 +359,6 @@
 .v3-plate .key:is(.row, .ghost, .quiet) .pz { color: #ffcc3d; }
 .v3-plate .key:is(.row, .ghost, .quiet) .pz.d { color: #27d9a0; }
 .v3-plate .key:disabled .pz { color: #b9b0df; }
-.v3-plate .cx-row.lock small { display: inline-flex; flex: none; margin-left: auto; }
-.v3-plate .system-power .cx-row { gap: var(--s1); }
 .v3-plate .plate-section { margin-top: var(--s4); }
 .v3-plate .power-option { display: flex; flex-direction: column; gap: var(--s1); }
 .v3-plate .power-option p { margin: 0; }

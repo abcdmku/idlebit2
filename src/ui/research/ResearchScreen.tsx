@@ -169,9 +169,11 @@ export function ResearchView(p: ResearchViewProps) {
 
 const lineOf = (s: RenderSnapshot, tree: ResearchTreeView, stopped: boolean): LineState => {
   const r = s.feed.research;
-  if (r) return { id: r.project, name: r.name, running: r.running, stopped, progress: r.progress, opsPerSec: r.opsPerSec || tree.takenOpsPerSec };
+  const between = s.hud.roundState !== 'running';
+  const requested = s.research.breakRequested;
+  if (r) return { id: r.project, name: r.name, running: r.running, stopped, progress: r.progress, opsPerSec: r.opsPerSec || tree.takenOpsPerSec, between, requested };
   const a = tree.nodes.find(n => n.id === tree.active);
-  return a ? { id: a.id, name: a.name, running: tree.opsPerSec > 0, stopped, progress: a.progress, opsPerSec: tree.takenOpsPerSec } : NO_LINE;
+  return a ? { id: a.id, name: a.name, running: tree.opsPerSec > 0, stopped, progress: a.progress, opsPerSec: tree.takenOpsPerSec, between, requested } : NO_LINE;
 };
 
 export function ResearchScreen() {
@@ -181,7 +183,7 @@ export function ResearchScreen() {
 
 function OpenResearch({ project, at }: { project: ResearchId | null; at: NodeRef }) {
   const shell = useShell(), L = useLayout();
-  const key = useGameSelector(s => `${s.epoch}|${shell.store.getState().build.revision}|${s.research.active}|${Math.floor(s.research.progress * 100)}|`
+  const key = useGameSelector(s => `${s.epoch}|${shell.store.getState().build.revision}|${s.research.active}|${Math.floor(s.research.progress * 100)}|${s.feed.research?.running}|`
     + `${s.research.queued}|${s.research.stoppedInsolvent}|${s.hud.data}|${s.hud.credits}|${s.hud.roundState}|${Object.values(s.unlocked).join()}`, Object.is, 250);
   const { tree, visible } = useMemo(() => {
     const state = shell.store.getState();

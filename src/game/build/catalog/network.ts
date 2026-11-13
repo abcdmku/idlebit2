@@ -99,13 +99,6 @@ export function networkStepPrice(row: NetworkLadderDef, k: number, uplink = fals
   return result;
 }
 
-/** Sum the individually rounded steps; same-speed actions sum this for each changed port. */
-export function networkStepsBetween(row: NetworkLadderDef, fromK: number, toK: number, uplink = false, zones = 1): bigint {
-  let total = 0n;
-  for (let k = fromK; k < toK; k += 1) total += networkStepPrice(row, k, uplink, zones);
-  return total;
-}
-
 /**
  * D12 / spec A.3: payload equals work. Round L36 native server traffic up to a 1-2-5 rung.
  * Native kHz/MHz/GHz servers have 8/16/32 cores, 2/4/8 lanes and clock × 1.5^35.

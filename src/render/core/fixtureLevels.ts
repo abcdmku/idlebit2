@@ -1,7 +1,6 @@
-import { chipScene } from '../levels/chip/scenes';
 // Development and test fixture: two plain box levels (system board, chip) and a minimal
 // RenderSnapshot. No sim code runs. Real levels come from R2 and R3.
-import type { ChipSnapshot, GameEvent, RenderSnapshot, SupplyView, SystemSnapshot } from '../../game';
+import type { GameEvent, RenderSnapshot } from '../../game';
 import { systemId } from '../../game';
 import { ZERO_AMOUNT } from '../../game/amount';
 import { copyRect, rect } from './geom';
@@ -17,23 +16,7 @@ export const CHIP_SLOT = rect(52, 55, 76, 76);
 export const SAVE_AT = rect(180, 16, 7, 7);
 const chipSize = rect(0, 0, 192, 192), boardSize = rect(0, 0, 200, 256);
 const chipFocus = rect(24, 10, 144, 178), boardFocus = rect(4, 4, 192, 248);
-const SUPPLY: SupplyView = { kind: 'psu', generation: 0, level: 1, capacityW: 4, deliveredW: 0, usage: 0,
-  overloadS: 0, failed: false, rebootMs: null, loss: 0, lossW: 0, capped: false, capFactor: 1, creditsPerMinute: 0 };
 
-export function fixtureChip(online: ChipSnapshot['online'] = 'onMarket'): ChipSnapshot {
-  return { ...chipScene('boot'), online };
-}
-export function fixtureSystem(online: SystemSnapshot['online'] = 'onMarket'): SystemSnapshot {
-  const part = { slot: 0, kind: 'cpu' as const, generation: 0, level: 1, active: false, resourceBusy: 0 };
-  return {
-    power: { actualW: 0.2, reservedW: 0.4, rackReservedW: 0.4, capacityW: 1, rackOpen: false },
-    level: 'system', parent: null, systemId: systemId(0), kind: 'server', board: 'general', cpuCount: 1, ramSlots: 1, etaCfg: 1,
-    chip: fixtureChip(online), chips: [fixtureChip(online)], inbound: null, cpuBusy: [0], online, timerS: null, timerTotalS: null, cpu: part, ram: [], gpu: [], storage: [],
-    psu: SUPPLY,
-    running: [], memory: { tiers: [] }, queue: { cap: 0, count: 0, sample: [] }, reserved: 0, rates: { ops: 0, ramBits: 0, gpuOps: 0, ioBits: 0 },
-    capacities: { cache: 0, ram: 0, vram: 0, storage: 0 }, used: { memory: 0, vram: 0, storage: 0 }, drawW: 0, saveable: true, slots: [],
-  };
-}
 /** A complete idle snapshot for render core tests and the development harness. */
 export function fixtureSnapshot(focus: LevelSnapshot, partner: LevelSnapshot | null = null,
   o: { simTimeMs?: number; epoch?: number; round?: 'running' | 'ended' | 'between'; events?: readonly GameEvent[]; completions?: readonly Completion[] } = {}): RenderSnapshot {
@@ -49,7 +32,7 @@ export function fixtureSnapshot(focus: LevelSnapshot, partner: LevelSnapshot | n
       window: [], research: null, headDeadlineTick: round === 'running' ? 99 : null, blockedBy: null, transfers: [],
       inTransfer: 0, queued: 0, running: 0, taken: 0, dismissed: 0, intensity: 1, takesPerSec: 0,
       recentOutcomes: [], liveFailures: null, rates: { met: 0, fail: 0 }, failBin: null },
-    research: { active: null, name: null, progress: 0, stoppedInsolvent: false, needsData: false, queued: 0, opsPerSec: 0 },
+    research: { active: null, name: null, progress: 0, stoppedInsolvent: false, needsData: false, queued: 0, opsPerSec: 0, breakRequested: false },
     unlocked: { chip: true, system: true, rack: true, room: true, global: true },
     home: { chip: { level: 'chip', id: systemId(0) }, system: { level: 'system', id: systemId(0) } },
     round: { index: 1, state: round, lastReport: null, frontier: { bestI: 0, bestRound: 0, reaches: [] }, canReturn: false, autoReturn: { available: false, on: false, inMs: null } },
@@ -94,7 +77,6 @@ export function createFixtureLevels(registry: LevelRegistry): readonly [LevelRen
       t.unit = { kind: 'system', id: s.systemId }; copyRect(SAVE_AT, t.rect); return from + 1;
     },
     payoutAnchor: (s, c, out) => (c.system === s.systemId ? (copyRect(CHIP_SLOT, out), 0) : -1),
-    faults: (s, out) => (s.online === 'crashed' ? (copyRect(CHIP_SLOT, out[0]), 1) : 0),
     icon: g => R(g, 2, 1, 12, 14, P.mask),
   };
   return [board, chip];

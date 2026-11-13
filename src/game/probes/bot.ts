@@ -61,14 +61,14 @@ function cpuNeedsCooling(state: GameState, rack: number): boolean {
   });
 }
 
-function cpuNeedsSupply(state: GameState, system: number, part: 'psu' | 'pdu' | 'ups' = 'psu'): boolean {
+function cpuNeedsSupply(state: GameState, system: number, part: 'pdu' | 'ups'): boolean {
   const q = quote(state, {kind:'tray',at:{level:'chip',id:systemId(system)}}).quotes.find(q => q.action.type === 'replaceCpu');
   if (!q || (q.locked && q.locked.code !== 'power') || !q.affordable || q.overSupply?.part !== part) return false;
   const payback = score(state, q);
   const researchBoost = state.research.active !== null && q.effect?.researchOpsBefore !== undefined && q.effect.researchOpsAfter !== undefined
     && q.effect.researchOpsAfter >= 8 * Math.max(1, q.effect.researchOpsBefore) && Number(q.cost) <= Number(state.wallet.credits) / 3;
-  // The overloaded supply inflates the counterfactual energy bill. A budgeted research-speed
-  // investment may need that supply repaired before its final completion budget can be quoted.
+  // A budgeted research-speed investment may need the supply at its limit raised before its final
+  // completion budget can be quoted.
   return researchBoost || payback !== null && (payback <= CPU_SAVE_PAYBACK_S || Number(q.cost) <= Number(state.wallet.credits) / 2);
 }
 
@@ -85,14 +85,6 @@ export interface BotEvent {
   readonly creditCost?: string;
   /** Wait for a complete paid round before making another CPU-capacity investment after Rack. */
   readonly researchCapacityAdded?: boolean;
-  readonly psu?: {
-    readonly system: number;
-    readonly replacement: boolean;
-    readonly capacityBeforeW: number;
-    readonly capacityAfterW: number;
-    readonly lossBefore: number;
-    readonly lossAfter: number;
-  };
 }
 
 /** Research that opens a level or a structural step comes first (docs/research.md milestones). */
@@ -191,7 +183,7 @@ export function candidateRequests(state: GameState, need: MeetNeed = {}): QuoteR
     if (!levels.system) return;
     const system = systemId(id), spec = build.systems[id]!.spec;
     reqs.push({ kind: 'tray', at: { level: 'system', id: system } });
-    reqs.push({ kind: 'part', part: { unit: { kind: 'system', id: system }, slot: { kind: 'psu' } } });
+
     reqs.push({ kind: 'part', part: { unit: { kind: 'system', id: system }, slot: { kind: 'cpu', socket: 0 } } });
     spec.ram.forEach((_, index) => reqs.push({ kind: 'part', part: { unit: { kind: 'system', id: system }, slot: { kind: 'ram', index } } }));
     if (spec.ram.length === 0) reqs.push({ kind: 'part', part: { unit: { kind: 'system', id: system }, slot: { kind: 'ram', index: 0 } } });
@@ -297,7 +289,7 @@ const GATE_PAYBACK_S = 20;
 /**
  * Lower is better: seconds to pay back from the extra income a purchase carries (1 Credit per op).
  * Compute, ports and new servers count only what their pipe carries, so a pipe-bound system buys
- * no compute. Null = it carries nothing more. Gates (cache, RAM, PSU, drives, coolers, the first
+ * no compute. Null = it carries nothing more. Gates (cache, RAM, drives, coolers, the first
  * GPU) carry no rate; they are priced against current income, so cheap gates come early.
  */
 export function score(state: GameState, q: Quote): number | null {
@@ -386,17 +378,11 @@ export function score(state: GameState, q: Quote): number | null {
     const gain = next ? marketGain(state, next) : 0;
     return gain > 0 && cost / gain <= CPU_SAVE_PAYBACK_S ? cost / gain : null;
   }
-  if (!supplyNeeded(state, a)) {
-    // A more efficient PSU pays back in energy saved, like a rate part.
-    if (!isPsu(a)) return null;
-    const next = tryAction(state, a);
-    const gain = next ? marketGain(state, next) : 0;
-    return gain > 0 ? cost / gain : null;
-  }
+  if (!supplyNeeded(state, a)) return null;
   if (!gateNeeded(state, a, cost)) return null;
   return GATE_PAYBACK_S * cost / Math.max(1, income(state));
 }
-const isPsu = (a: GameAction): boolean => (a.type === 'upgradePart' || a.type === 'replacePart') && a.part.slot.kind === 'psu';
+
 
 /** The failure detail a capacity gate answers (cache, RAM, drives, GPU), or null. */
 function gateDetail(a: GameAction): readonly string[] | null {
@@ -454,18 +440,15 @@ function supplyNeeded(state: GameState, a: GameAction): boolean {
   if (a.type !== 'upgradePart' && a.type !== 'replacePart') return true;
   const { unit, slot } = a.part, h = state.hot;
   switch (slot.kind) {
-    case 'psu': return unit.kind === 'system' && ((h.sys.psuUsage[unit.id] ?? 0) > SUPPLY_USE
-      || cpuNeedsSupply(state, unit.id)
-      || (() => { const w = fullLoadW(state, unit.id); return w.idle + w.load > SUPPLY_USE * (state.compiled.sys.psuCapW[unit.id] ?? 0); })()
-      || (state.research.unlocks.gens.gpu !== 0 && !state.build.systems[unit.id]?.spec.accels.some((c) => c.kind === 'gpu')));
+
     case 'pdu': return unit.kind === 'rack' && ((h.rack.pduUsage[unit.id] ?? 0) > SUPPLY_USE
       || state.research.active !== null && researchRackHeat(state, unit.id) > 0.9 * (state.compiled.rack.pduCapW[unit.id] ?? 0)
       || sampleSystems(state).some(id => state.build.systems[id]?.rack === unit.id && cpuNeedsSupply(state, id, 'pdu'))
       || (rackHasRoom(state, unit.id).port && !rackHasRoom(state, unit.id).power && (state.build.racks[unit.id]?.servers.includes(null) ?? false)));
-    // Hot, or the last round lost work to heat: a player adds cooling.
+    // Hot: a player adds cooling.
     case 'rackCooler': return unit.kind === 'rack' && ((h.rack.tempF[unit.id] ?? 0) > HOT_F
       || state.research.active !== null && researchRackHeat(state, unit.id) > (state.compiled.rack.coolerQc[unit.id] ?? 0)
-      || cpuNeedsCooling(state, unit.id) || (state.round.reports.at(-1)?.failedByCause.heat ?? 0) > 0);
+      || cpuNeedsCooling(state, unit.id));
     case 'roomCooler': return unit.kind === 'room' && (h.room.tempF[unit.id] ?? 0) > HOT_F;
     case 'ups': return unit.kind === 'room' && ((h.room.upsUsage[unit.id * MAX_UPS] ?? 0) > SUPPLY_USE
       || sampleSystems(state).some(id => state.build.racks[state.build.systems[id]!.rack]?.room === unit.id && cpuNeedsSupply(state, id, 'ups')));
@@ -480,7 +463,7 @@ export function buyable(state: GameState, quotes: readonly Quote[], recovery: Re
     && !q.overSupply
     && !(state.research.active !== null && q.effect?.researchCooling)
     && amountCompare(q.cost, '0') > 0 && !(running && q.cold)
-    && psuImproves(state, q) && (recovery.has(q) || gpuImproves(q)) && gpuFitsSupply(state, q) && memoryImproves(state, q));
+    && supplyImproves(q) && (recovery.has(q) || gpuImproves(q)) && gpuFitsSupply(state, q) && memoryImproves(state, q));
 }
 
 /** A RAM or drive purchase must keep the system's memory bandwidth (and a replacement its capacity): a new module at L1 can be 100× slower. */
@@ -497,20 +480,15 @@ function memoryImproves(state: GameState, q: Quote): boolean {
   return n.memCap[id]! >= b.memCap[id]! && n.ramBw[id]! >= b.ramBw[id]! && n.ioRate[id]! >= b.ioRate[id]!;
 }
 
-/** Replacements must keep capacity and efficiency; level upgrades trade efficiency for capacity. */
-function psuImproves(state: GameState, q: Quote): boolean {
+/** A PDU or UPS replacement must keep its capacity. */
+function supplyImproves(q: Quote): boolean {
   const a = q.action;
   if (a.type === 'replacePart' && (a.part.slot.kind === 'pdu' || a.part.slot.kind === 'ups'))
     return !!q.effect && q.effect.capacityAfter >= q.effect.capacityBefore;
-  if (a.type !== 'replacePart' || a.part.unit.kind !== 'system' || a.part.slot.kind !== 'psu') return true;
-  const next = tryAction(state, a);
-  if (!next) return false;
-  const id = a.part.unit.id, before = state.compiled.sys, after = next.compiled.sys;
-  return after.psuCapW[id]! >= before.psuCapW[id]! && after.psuLoss[id]! <= before.psuLoss[id]!
-    && (after.psuCapW[id]! > before.psuCapW[id]! || after.psuLoss[id]! < before.psuLoss[id]!);
+  return true;
 }
 
-/** Reject cards that exceed full-load supply headroom. Ask PSU quotes above. */
+/** Reject cards that exceed full-load supply headroom. */
 function gpuFitsSupply(_state: GameState, q: Quote): boolean {
   return !q.overSupply;
 }
@@ -637,18 +615,10 @@ function buyParts(state: GameState, policy: Policy, log: BotEvent[], need: MeetN
     if (!best) break;
     const next = tryAction(s, best.action);
     if (!next) break;
-    const a = best.action;
-    const id = (a.type === 'replacePart' || a.type === 'upgradePart')
-      && a.part.unit.kind === 'system' && a.part.slot.kind === 'psu' ? a.part.unit.id : null;
     const beforeRate = s.build.systems.reduce((n, sys, i) => n + (sys?.online ? (s.compiled.sys.threadRate[i] ?? 0) * (s.compiled.sys.threads[i] ?? 0) : 0), 0);
     const afterRate = next.build.systems.reduce((n, sys, i) => n + (sys?.online ? (next.compiled.sys.threadRate[i] ?? 0) * (next.compiled.sys.threads[i] ?? 0) : 0), 0);
     log.push({ tick: s.clock.tick, kind: 'buy', label: best.label, cost: best.cost,
       ...(s.research.unlocks.levels.rack && afterRate > beforeRate * 1.01 ? { researchCapacityAdded: true } : {}),
-      ...(id === null ? {} : { psu: {
-        system: id, replacement: a.type === 'replacePart',
-        capacityBeforeW: s.compiled.sys.psuCapW[id]!, capacityAfterW: next.compiled.sys.psuCapW[id]!,
-        lossBefore: s.compiled.sys.psuLoss[id]!, lossAfter: next.compiled.sys.psuLoss[id]!,
-      } }),
     });
     s = next;
   }
@@ -678,6 +648,8 @@ function milestonePath(tree: ReturnType<typeof selectResearchTree>): { path: Set
 const ESSENTIAL = ['lbCapability', 'sw100k', 'gddr6', 'gpuGen2', 'meteredPdu', 'rackVarSpeed'];
 /** Off-path research since the last milestone started may spend this share of the next milestone path's Data. */
 const OFF_PATH_SHARE = 0.5;
+/** An essential project may park a running milestone when its work is at most this share of the milestone's remaining work. */
+const ESSENTIAL_WORK_SHARE = 0.05;
 
 /**
  * Research like a player saving for the next level: the next milestone and its missing
@@ -731,7 +703,7 @@ function researchInvestment(before: GameState, after: GameState, cost: number): 
 /** Between rounds, wait for a project to finish when it needs at most this long. */
 const RESEARCH_WAIT_S = 300;
 
-/** An affordable CPU blocked by a maxed PSU needs its supply research before another long milestone. */
+/** An affordable CPU blocked by a maxed PDU or UPS needs its supply research before another long milestone. */
 function supplyResearchPath(state: GameState, byId: ReadonlyMap<string, ResearchNodeView>): Set<string> {
   const path = new Set<string>();
   const add = (id: string) => {
@@ -739,11 +711,9 @@ function supplyResearchPath(state: GameState, byId: ReadonlyMap<string, Research
     if (!node || node.state === 'done' || path.has(id)) return;
     path.add(id); node.requires.forEach(add);
   };
-  for (const id of sampleSystems(state)) for (const part of ['psu', 'pdu', 'ups'] as const) if (cpuNeedsSupply(state, id, part)) {
+  for (const id of sampleSystems(state)) for (const part of ['pdu', 'ups'] as const) if (cpuNeedsSupply(state, id, part)) {
     const rack = state.build.systems[id]!.rack, room = state.build.racks[rack]!.room;
-    const request: QuoteRequest = part === 'psu'
-      ? { kind: 'part', part: { unit: { kind: 'system', id: systemId(id) }, slot: { kind: 'psu' } } }
-      : part === 'pdu' ? { kind: 'infra', unit: { kind: 'rack', id: rackId(rack) }, slot: 'power' }
+    const request: QuoteRequest = part === 'pdu' ? { kind: 'infra', unit: { kind: 'rack', id: rackId(rack) }, slot: 'power' }
       : { kind: 'infra', unit: { kind: 'room', id: roomId(room) }, slot: 'power' };
     const next = quote(state, request).quotes.find(q => q.action.type === 'replacePart' && q.locked?.code === 'research' && q.locked.node);
     if (next?.locked?.node) add(next.locked.node);
@@ -776,10 +746,25 @@ function startResearch(state: GameState, log: BotEvent[]): GameState {
   const supply = open.filter(n => supplyPath.has(n.id)).sort(byPrice)[0];
   // An affordable milestone may park a side project; a short supply project may park a milestone.
   // Paid work is retained and is resumed through startResearch when the prerequisite is done.
-  const recoveryActive = tree.active !== null && (/^psu/.test(tree.active) || tree.active === 'rackVarSpeed');
-  if (tree.active !== null && (recoveryActive || !supply && (path.has(tree.active) || !onPath))) return state;
+  const recoveryActive = tree.active !== null && tree.active === 'rackVarSpeed';
   const offPath = open.filter((n) => !path.has(n.id) && since + priceOf(n) <= OFF_PATH_SHARE * pathData).sort(byPrice);
-  const pick = supply ?? onPath ?? offPath.find((n) => ESSENTIAL.includes(n.id)) ?? (target ? offPath[0] : open.sort(byPrice)[0]);
+  // An essential project (a switch, PDU or balancer generation the fleet grows through) also parks a milestone,
+  // when it is short beside the work the milestone still needs: days of MHz fab must not hold back an hour of
+  // Metered PDU. Which of the two became affordable first is an accident of the round, not a plan.
+  const left = (n: ResearchNodeView) => n.workOps * (1 - n.progress);
+  const short = (n: ResearchNodeView, beside: ResearchNodeView) => left(n) <= ESSENTIAL_WORK_SHARE * left(beside);
+  const active = tree.active !== null ? byId.get(tree.active) : undefined;
+  const running = active && path.has(active.id) ? active : undefined;
+  const essential = offPath.find((n) => ESSENTIAL.includes(n.id) && (!running || short(n, running)));
+  const urgent = supply ?? (running ? essential : undefined);
+  // The milestone it parked does not park it back.
+  const finishing = !!active && !!onPath && !path.has(active.id) && ESSENTIAL.includes(active.id) && short(active, onPath);
+  if (tree.active !== null && (recoveryActive || finishing || !urgent && (path.has(tree.active) || !onPath))) return state;
+  // Essentials before fillers: while one is within the budget but not yet affordable, the wallet saves for it.
+  const saving = tree.nodes.some((n) => n.state === 'available' && ESSENTIAL.includes(n.id) && !path.has(n.id)
+    && since + priceOf(n) <= OFF_PATH_SHARE * pathData && !open.includes(n));
+  const filler = saving ? undefined : target ? offPath[0] : open.sort(byPrice)[0];
+  const pick = urgent ?? onPath ?? offPath.find((n) => ESSENTIAL.includes(n.id)) ?? filler;
   if (!pick) return state;
   if (!supply && !path.has(pick.id)) {
     const next = tree.nodes.filter(n => path.has(n.id) && n.state === 'available').sort(byPrice)[0];
@@ -810,7 +795,7 @@ function startResearch(state: GameState, log: BotEvent[]): GameState {
  * Returns the new state; every action taken is appended to `log`.
  */
 /** Each opened router has its own free, researched filters, including the room above mixed racks. */
-const RACK_FILTERS = ['capability', 'health'] as const;
+const RACK_FILTERS = ['capability'] as const;
 function useFilters(state: GameState): GameState {
   let s = state;
   const units: ScopeRef[] = [

@@ -29,7 +29,7 @@ export interface DressOptions {
   readonly front: number;
   /** Takes per tick written into the rate ring. */
   readonly takesPerTick: number;
-  /** Slots 2, 5, 8 and 11 of every third rack show boot, dark, crashed and cold (then goingOffline, asleep). */
+  /** Slots 2, 5, 8 and 11 of every third rack show boot, cold, goingOffline and asleep. */
   readonly specials: boolean;
 }
 
@@ -46,7 +46,7 @@ function dressCompiled(state: GameState): CompiledBuffers {
     if (!c.sys.Q[s]) c.sys.Q[s] = b.scheduler ? 16 : 0;
     if (!c.sys.clockHz[s]) c.sys.clockHz[s] = 2 ** (b.cpu?.clock.level ?? 1);
     if (!c.sys.cacheBits[s]) c.sys.cacheBits[s] = 8 * 2 ** (b.cpu?.cache.level ?? 1);
-    if (!c.sys.psuCapW[s]) c.sys.psuCapW[s] = 4;
+
   }
   for (let r = 0; r < c.rack.len; r += 1) {
     if (!c.rack.coolerQc[r]) c.rack.coolerQc[r] = 64;
@@ -70,7 +70,7 @@ function addRecord(hot: HotBuffers, family: number, count: number, taken: number
 }
 
 const RECORD_SYSTEMS = 16;
-const SPECIALS = [MODE.boot, MODE.dark, MODE.crashed, MODE.cold, MODE.goingOffline, MODE.asleep];
+const SPECIALS = [MODE.boot, MODE.cold, MODE.goingOffline, MODE.asleep];
 
 function dressSystems(c: CompiledBuffers, hot: HotBuffers, o: DressOptions): void {
   const running = o.round === 'running';
@@ -80,12 +80,11 @@ function dressSystems(c: CompiledBuffers, hot: HotBuffers, o: DressOptions): voi
     const special = o.specials && slot % 3 === 2 && rack % 3 === 0 ? SPECIALS[(Math.floor(slot / 3) + rack) % SPECIALS.length]! : -1;
     hot.sys.mode[s] = !running ? MODE.paused : special >= 0 ? special : MODE.onMarket;
     if (special === MODE.boot || special === MODE.cold || special === MODE.goingOffline) hot.sys.timer[s] = 30 + ((s * 17) % 60);
-    if (special === MODE.dark) hot.sys.psuRebootTicks[s] = 40;
     if (!running || special >= 0) continue;
     const threads = c.sys.threads[s]!;
     const busy = Math.max(1, Math.round(threads * (0.4 + 0.6 * hash(s))));
     hot.sys.busyThreads[s] = busy; hot.sys.busy[s] = busy; hot.sys.running[s] = busy;
-    hot.sys.psuUsage[s] = 0.3 + 0.5 * hash(s + 1); hot.sys.drawW[s] = hot.sys.psuUsage[s]! * c.sys.psuCapW[s]!;
+    hot.sys.drawW[s] = (0.3 + 0.5 * hash(s + 1)) * 4;
     hot.sys.usedCache[s] = c.sys.cacheBits[s]! * 0.5;
     // Running records on the CPU run list, with stage progress spread over 0..1 (rate 1 on a 0-anchored clock).
     const effClock = 1_000;
@@ -116,8 +115,7 @@ function dressContainers(c: CompiledBuffers, hot: HotBuffers, o: DressOptions): 
     hot.rack.coolerDuty[r] = running ? 1 : 0; hot.rack.coolerW[r] = running ? 2 + load * 6 : 0;
     hot.rack.pduUsage[r] = load; hot.rack.eff[r] = 1;
     if (running) { hot.rack.lbRouted[r] = 1 + (r % 3); hot.rack.lbLast[r] = r % 12; }
-    if (o.specials && running && r % 7 === 5) { hot.rack.crashed[r] = 1; hot.rack.tempF[r] = 101; hot.rack.crashTicks[r] = 60; }
-    if (o.specials && running && r % 7 === 6) { hot.rack.pduOverTicks[r] = 45; hot.rack.pduUsage[r] = 1.12; }
+    if (o.specials && running && r % 7 === 5) { hot.rack.tempF[r] = 101; hot.rack.eff[r] = 0.475; hot.rack.throttled[r] = 1; }
   }
   for (let m = 0; m < c.room.len; m += 1) {
     if (c.room.alive[m] !== 1) continue;
@@ -167,10 +165,10 @@ export function fixtureReport(index: number, durationTicks: number): RoundReport
   return {
     byType: [{ type: 'compute', metWork: 128_400, failedWork: 27_500, dismissed: 4 }],
     index, startTick: 0, endedBy: 'sla', durationTicks, durationMs: durationTicks * TICK_MS, met: 1_284,
-    failedByCause: { timeout: 190, cantRun: 61, misroute: 12, power: 9, heat: 0, swap: 3, late: 0 },
-    failDetail: { timeout: 'link', cantRun: 'ram', misroute: 'cache', power: 'psu', heat: null, swap: 'cold', late: null },
+    failedByCause: { timeout: 190, cantRun: 61, misroute: 12, swap: 3, late: 0 },
+    failDetail: { timeout: 'link', cantRun: 'ram', misroute: 'cache', swap: 'cold', late: null },
     details: [{ cause: 'timeout', detail: 'link', count: 150 }, { cause: 'cantRun', detail: 'ram', count: 61 }],
-    peakIntensity: 6.4, frontier: { priorBest: 5.8, priorBestRound: 2, priorBestMet: 1_100, firstTaken: [], runwayStart: null, runwayEnd: null }, dismissed: 4, deliveredWork: 128_400, failedWork: 27_500, spill: { ramWork: 0, diskWork: 0 }, gross: amount(18_420), data: amount(212), energy: amount(1_310), net: amount(17_110), researchOps: 48_000,
+    peakIntensity: 6.4, frontier: { priorBest: 5.8, priorBestRound: 2, priorBestMet: 1_100, runwayStart: null, runwayEnd: null }, dismissed: 4, deliveredWork: 128_400, failedWork: 27_500, spill: { ramWork: 0, diskWork: 0 }, gross: amount(18_420), data: amount(212), energy: amount(1_310), net: amount(17_110), researchOps: 48_000,
     energyBreakdown: { billed: amount(1_310), fromBattery: amount(0), batteryRefill: amount(0), fromGeneration: amount(0), fuel: amount(0) },
   };
 }

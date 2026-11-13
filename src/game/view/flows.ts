@@ -3,6 +3,7 @@ import { MAX_RACK_PORTS, MAX_ROOM_PORTS, MAX_SITES, MAX_UPLINKS, MAX_ZONES_PER_S
 import type { World } from '../core/world';
 import { memberPayload, shapeOf } from '../exec/shape';
 import { FIRST, nextLink } from '../net/paths';
+import { linkThermalRate } from '../phys/draw';
 import { familyId, rackId, roomId, systemId, type NodeRef } from '../types/ids';
 import type { GameState } from '../types/state';
 import type { TransferView } from '../types/views';
@@ -73,7 +74,7 @@ export function linkTransfer(state: GameState, r: number, l: number, name: Trans
   const { shard, shards } = shardOf(state.hot, r);
   return {
     taskId, family: familyId(rec.family[r]!), systemId: systemId(target), link: name,
-    bitsSent: Math.max(0, bits - Math.max(0, rec.finish[r]!)), bits, speed: c.link.speed[l] ?? 0,
+    bitsSent: Math.max(0, bits - Math.max(0, rec.finish[r]!)), bits, speed: (c.link.speed[l] ?? 0) * linkThermalRate(c, state.hot, l),
     shard, shards, units, from: fromOf(state, l, target), to: toOf(state, l, target), key: shardKey(taskId, shard),
   };
 }

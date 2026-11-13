@@ -1,6 +1,6 @@
 // A row neighbour beside the active rack (D17.2), at 1:1 in its own column and drawn dimmed
 // to keep the focus on the active rack (Control deck README "Rack row"). A neighbour in trouble
-// (crashed, dark, hot, overloaded) keeps a full-strength frame, so it is found from the active rack. It is drawn from its
+// (hot, near its PDU's limit) keeps a full-strength frame, so it is found from the active rack. It is drawn from its
 // RackSlotView: real modes, °F and PDU usage. The view has no per-port or fan state, so its
 // cables stay unlit and its fans stand still. Allocation-free: one scratch server view.
 import { P, R, frame as outline, lampState } from '../../core';
@@ -9,7 +9,7 @@ import type { PortView, RackSlotView, ServerSlotView, UnitMode } from '../../../
 import { fan } from './art';
 import { drawClips, drawPatch, shell } from './cabinet';
 import { drawLB, drawSwitch } from './infra';
-import { CAB, CAB_RECT, PDU_BAR, PDU_LCD, PLINTH, READOUT, SERVER_SLOTS, UP_X, WORLD, createRoute, patchRoute, serverRect } from './layout';
+import { CAB, PDU_BAR, PDU_LCD, PLINTH, READOUT, SERVER_SLOTS, UP_X, WORLD, createRoute, patchRoute, serverRect } from './layout';
 import { drawServer } from './sprites';
 import type { ServerLook } from './sprites';
 import type { RackSnapshot } from '../../../game';
@@ -28,12 +28,12 @@ const server: Mut<ServerSlotView> = {
 };
 const route = createRoute(), face = { x: 0, y: 0, w: 0, h: 0 };
 const lookOf = (mode: UnitMode, rack: RackSlotView, paused: boolean, market: boolean): ServerLook =>
-  rack.state === 'dark' || rack.state === 'standby' || rack.powered === false || mode === 'dark' || mode === 'standby' ? 'dark' : rack.state === 'crashed' || mode === 'crashed' ? 'crash' : paused ? (market ? 'paused' : 'out')
+  rack.state === 'standby' || rack.powered === false || mode === 'standby' ? 'dark' : paused ? (market ? 'paused' : 'out')
     : mode === 'offline' || mode === 'goingOffline' ? 'offline' : mode === 'boot' || mode === 'cold' ? 'boot' : mode === 'asleep' ? 'asleep' : 'live';
 
 /** Plates with no lights: a neighbour's switch and LB faces at their real positions. */
 const plates = {
-  online: 'onMarket', pdu: { failed: false }, crashed: false, lb: { generation: 0, strategy: 'firstFit', lastTarget: null },
+  lb: { generation: 0, strategy: 'firstFit', lastTarget: null },
   switch: { generation: 0, ports: [] as PortView[], uplinks: [] as PortView[] }, servers: [] as ServerSlotView[],
 } as unknown as RackSnapshot;
 
@@ -63,16 +63,12 @@ export function drawNeighbour(g: G, v: RackSlotView, x: number, paused: boolean)
     drawBody(g, v, paused);
     g.restore(); g.globalAlpha = alpha;
   }
-  // trouble, at full strength: the whole cabinet when it crashed or lost power, its roof when hot, its PDU head when overloaded
-  const c = CAB_RECT;
-  if (v.state === 'crashed' || v.state === 'dark') { outline(g, x + c.x - 1, c.y - 1, c.w + 2, c.h + 2, P.fault); outline(g, x + c.x, c.y, c.w, c.h, P.fault); }
-  else {
-    if (v.tempF > 80) outline(g, x + CAB.x, CAB.roofY, CAB.w, CAB.roofH, v.tempF >= 100 ? P.fault : P.amber);
-    if (v.pduUsage > 0.9) outline(g, x + PLINTH.x - 1, PLINTH.y - 1, PLINTH.w + 2, PLINTH.h + 2, v.pduUsage > 1 ? P.fault : P.amber);
-  }
+  // trouble, at full strength: its roof when hot, its PDU head when near its limit
+  if (v.tempF > 80) outline(g, x + CAB.x, CAB.roofY, CAB.w, CAB.roofH, v.tempF >= 100 ? P.fault : P.amber);
+  if (v.pduUsage > 0.9) outline(g, x + PLINTH.x - 1, PLINTH.y - 1, PLINTH.w + 2, PLINTH.h + 2, P.amber);
 }
 function drawBody(g: G, v: RackSlotView, paused: boolean): void {
-  const on = v.state !== 'dark' && v.state !== 'empty' && v.state !== 'standby' && v.powered !== false && !paused;
+  const on = v.state !== 'empty' && v.state !== 'standby' && v.powered !== false && !paused;
   shell(g);
   for (let i = 0; i < 3; i++) fan(g, 27 + i * 24, CAB.roofY + 11, 6, 0, false);
   R(g, READOUT.x, READOUT.y, READOUT.w, READOUT.h, P.ink);

@@ -112,11 +112,6 @@ export function createSystemRenderer(registry: LevelRegistry): LevelRenderer<'sy
       for (const p of list) if (p.slot === slot) return partVersionOf(p);
       return null;
     },
-    faults(s, out) {
-      let n = 0;
-      if (s.online === 'crashed' && n < out.length) packageRect(boardModel(s).b, 0, out[n++]!);
-      return n;
-    },
     icon(g) {
       g.clearRect(0, 0, 16, 16);
       R(g, 1, 3, 14, 11, P.ink); R(g, 2, 4, 12, 8, P.mask); R(g, 2, 4, 12, 1, P.maskHi); R(g, 2, 12, 12, 1, '#1f1848');

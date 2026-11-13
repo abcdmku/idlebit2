@@ -5,15 +5,14 @@
 // load balancer, PDU)
 // and up to twelve servers; tap a server and its sled slides out into the System board.
 import { P, R, copyRect, partVersionOf, px, setRect } from '../../core';
-import type { LevelRegistry, LevelRenderer, Rect } from '../../core';
+import type { LevelRegistry, LevelRenderer } from '../../core';
 import { createFanBank } from './art';
-import { CAB_RECT, FOCUS, PHONE_TAG_GUTTER, PLINTH, ROW_W, U, U0, UP_X, WORLD, colX, plan, planFor, serverRect, setPlan } from './layout';
+import { FOCUS, PHONE_TAG_GUTTER, ROW_W, U, UP_X, WORLD, colX, plan, planFor, setPlan } from './layout';
 import { drawRackMini } from './mini';
 import { gutter, rackLabels } from './labels';
 import { rackCol, rackRowScroll } from './row';
 import { rackChildren, rackTargets, rackPayoutAnchor, rackShardAnchor } from './targets';
 import { drawRow } from './world';
-import { rackDark } from './sprites';
 
 export { rackRowScroll, clampScroll, createRowScroll, snapScroll } from './row';
 export type { RackRowScroll } from './row';
@@ -89,17 +88,6 @@ export function createRackRenderer(registry: LevelRegistry): LevelRenderer<'rack
         case 'powerCtl': return s.powerCtl ? partVersionOf(s.powerCtl) : null;
         default: return null;
       }
-    },
-    faults(s, out: Rect[]) {
-      const ax = colX(rackCol(s));
-      let n = 0;
-      if (s.crashed && n < out.length) { setRect(out[n++], ax + CAB_RECT.x + 8, U0, CAB_RECT.w - 16, 4); }
-      if (rackDark(s) && n < out.length) { copyRect(PLINTH, out[n]); out[n++].x += ax; }
-      for (let i = 0; i < s.servers.length && n < out.length; i++) {
-        if (s.servers[i].state !== 'crashed' || s.crashed) continue;
-        serverRect(i, out[n]); out[n++].x += ax;
-      }
-      return n;
     },
     icon,
   };

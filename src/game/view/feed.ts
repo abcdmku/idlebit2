@@ -12,7 +12,7 @@ import type { FeedSnapshot } from '../types/snapshot';
 import type { GameState } from '../types/state';
 import type { OutcomeView, QueueEntryView, ResearchQueueEntryView, TaskIcon, TransferView } from '../types/views';
 import { researchDef, TREE_INDEX } from '../build/research/tree';
-import { researchOpsPerSec } from './research';
+import { breakRequested, researchOpsPerSec } from './research';
 import { feedRates } from './feedRates';
 import { linkName, linkTransfer, pipeTransfer } from './flows';
 import { taskRequirements } from './taskRequirements';
@@ -128,7 +128,7 @@ export function researchEntry(state: GameState): ResearchQueueEntryView | null {
   return {
     kind: 'research', key: -1 - (TREE_INDEX.get(r.active) ?? 0), project: r.active, name: def?.name ?? r.active, work,
     progress: work > 0 ? Math.min(1, r.activeProgress / work) : 0, running: holders > 0, holders, threads,
-    opsPerSec: holders > 0 ? researchOpsPerSec(state) : 0,
+    opsPerSec: holders > 0 ? researchOpsPerSec(state) : 0, breakRequested: breakRequested(state),
   };
 }
 

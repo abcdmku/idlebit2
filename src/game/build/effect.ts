@@ -10,8 +10,7 @@ import type { CapacityUnit, EffectPreview } from '../types/quotes';
 import type { GameState, Unlocks } from '../types/state';
 import { capacity, capacity2, isLeveled, partWatts, PARTS, type LeveledPartId } from './catalog';
 import { compileSystem } from './compile';
-import { lossFraction } from './catalog/curves';
-import { supplyLossW } from '../phys/supplies';
+
 import { POWER_SLOTS, readPart } from './partAccess';
 import { installedGpuStats } from './gpu';
 import type { AccelBuild } from '../types/gpu';
@@ -23,7 +22,7 @@ import { workProfile, type WorkProfile } from './workEnergy';
  * and payback from recent paid work minus energy per unit of work at saved sleep settings.
  * Research earns no Credits. A nonpositive estimated return differs from an unestimated benefit.
  */
-interface SysValues { rate: number; mem: number; cache: number; gpu: number; store: number; psu: number; queue: number; idle: number; load: number; ramBw: number; io: number }
+interface SysValues { rate: number; mem: number; cache: number; gpu: number; store: number; queue: number; idle: number; load: number; ramBw: number; io: number }
 interface SysFigures extends SysValues { work: WorkProfile }
 
 /** Figures are pure in (spec, unlocks), both immutable, and a tray re-asks them every frame. */
@@ -44,14 +43,14 @@ function compileFigures(spec: SystemSpec, u: Unlocks): SysFigures {
   for (let r = 0; r < 4; r += 1) { idle += c.idleW[r]!; load += c.loadW[r]!; }
   return {
     rate: c.threadRate[0]! * c.cores[0]! * c.etaCfg[0]!, mem: c.ramCap[0]!, cache: c.cacheBits[0]!, gpu: c.gpuOps[0]!,
-    store: c.storageCap[0]!, psu: c.psuCapW[0]!, queue: c.Q[0]!, idle, load, ramBw: c.ramBw[0]!, io: c.ioRate[0]!, work: workProfile(c, 0, spec, u),
+    store: c.storageCap[0]!, queue: c.Q[0]!, idle, load, ramBw: c.ramBw[0]!, io: c.ioRate[0]!, work: workProfile(c, 0, spec, u),
   };
 }
 
 const CAPACITY: Record<string, [keyof SysValues, CapacityUnit, boolean]> = {
   cpu: ['rate', 'Hz', true], core: ['rate', 'ops/s', true], clock: ['rate', 'Hz', true],
   cache: ['cache', 'bits', false], scheduler: ['queue', 'slots', false],
-  ram: ['mem', 'bits', false], gpu: ['gpu', 'ops/s', true], npu: ['gpu', 'ops/s', true], drive: ['store', 'bits', false], psu: ['psu', 'W', false],
+  ram: ['mem', 'bits', false], gpu: ['gpu', 'ops/s', true], npu: ['gpu', 'ops/s', true], drive: ['store', 'bits', false],
 };
 /**
  * A part's shown x → y is the number the board prints on that part (coordinator rule): the clock's
@@ -105,17 +104,6 @@ export function preview(before: number, after: number, unit: CapacityUnit, wBefo
   };
 }
 
-/**
- * A power supply change: capacity in W, its loss before and after (percent at typical load), and
- * the system's input power at its current draw (delivered + loss), so the energy delta is the
- * saving and payback is price / saving.
- */
-function psuEffect(state: GameState, id: number, a: SystemSpec, b: SystemSpec, capA: number, capB: number, price: number, cost: bigint): EffectPreview {
-  const lossA = lossFraction(PARTS.psu, a.psu.gen, a.psu.level), lossB = lossFraction(PARTS.psu, b.psu.gen, b.psu.level);
-  const draw = state.hot.sys.drawW[id] ?? 0;
-  const wa = draw + supplyLossW(draw, capA, lossA), wb = draw + supplyLossW(draw, capB, lossB);
-  return { ...preview(capA, capB, 'W', wa, wb, price, cost, 0), lossPctBefore: lossA * 100, lossPctAfter: lossB * 100 };
-}
 
 /**
  * Preview of a part change already applied in `after` (same system or infra unit). `total`: the system's own
@@ -140,21 +128,19 @@ export function partEffect(state: GameState, ref: PartRef, after: BuildState, co
       const gain = gpuMarketKnown(state) ? (Math.min(fb.rate + fb.gpu, pipe) - Math.min(fa.rate + fa.gpu, pipe)) * scale * gpuMarketShare(state) : null;
       const energy = workEnergyChange(state, id, fb.work, Math.min(fb.rate + fb.gpu, pipe));
       const wa = fa.idle + fa.load, wb = fb.idle + fb.load;
-      return { ...preview(before.rate, afterCard.rate, 'ops/s', wa + supplyLossW(wa, fa.psu, state.compiled.sys.psuLoss[id] ?? 0),
-        wb + supplyLossW(wb, fb.psu, state.compiled.sys.psuLoss[id] ?? 0), price, cost, gain, energy), marketEstimate: true };
+      return { ...preview(before.rate, afterCard.rate, 'ops/s', wa, wb, price, cost, gain, energy), marketEstimate: true };
     }
     const cores = Math.max(1, state.compiled.sys.cores[id] ?? 1);
     const use = Math.min(1, Math.max(0, (state.hot.sys.busy[id] ?? 0) / cores));
     const threads = Math.max(1, state.compiled.sys.threads[id] ?? 1);
     const paidUse = Math.min(1, Math.max(0, (state.hot.sys.active[id * 4] ?? 0) / threads));
     const fa = figures(a, u), fb = figures(b, u);
-    if (ref.slot.kind === 'psu') return psuEffect(state, id, a, b, fa.psu, fb.psu, price, cost);
+
     const [field, unit, isRate] = key;
     const fixed = !u.levels.system;
     const demand = isRate ? 1 : use;
     const wa = fixed ? PRE_SYSTEM_CPU_W : fa.idle + fa.load * demand, wb = fixed ? PRE_SYSTEM_CPU_W : fb.idle + fb.load * demand;
-    const inputA = fixed ? wa : wa + supplyLossW(wa, fa.psu, state.compiled.sys.psuLoss[id] ?? 0);
-    const inputB = fixed ? wb : wb + supplyLossW(wb, fb.psu, state.compiled.sys.psuLoss[id] ?? 0);
+    const inputA = wa, inputB = wb;
     const pipe = state.compiled.sys.pipeSpeed[id] ?? 0;
     const scale = state.round.reports.length ? paidWorkScale(state) : paidUse;
     const gain = isRate && cpuMarketKnown(state) ? (Math.min(fb.rate + fb.gpu, pipe) - Math.min(fa.rate + fa.gpu, pipe)) * scale : null;

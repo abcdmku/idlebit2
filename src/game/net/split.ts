@@ -1,5 +1,5 @@
 import { LINK_KIND } from '../core/buffers';
-import { DT_S, GATHER_WAIT_TICKS, MAX_ROOM_PORTS, MAX_SHARDS, MAX_UPS, MAX_ZONES_PER_SITE, RACKS_PER_ROOM, SERVERS_PER_RACK } from '../core/constants';
+import { DT_S, GATHER_WAIT_TICKS, MAX_ROOM_PORTS, MAX_SHARDS, MAX_ZONES_PER_SITE, RACKS_PER_ROOM, SERVERS_PER_RACK } from '../core/constants';
 import { rqLen, rqLevel, rqRow } from '../core/routerQueue';
 import type { World } from '../core/world';
 import { canRunOn } from '../market/fleet';
@@ -167,23 +167,13 @@ const queueEmpty = (w: World, kind: number, id: number): boolean => {
 
 /** local (spec §8.4): keep the first candidate whose systems with room could take the whole split alone. */
 function localFilter(w: World, kind: number, C: Int32Array, S: Int32Array, n: number, need: number): number {
-  let m = n;
-  if (kind === SITE) {
-    let k = 0;
-    for (let i = 0; i < m; i += 1) {
-      let dark = false;
-      for (let u = 0; u < MAX_UPS; u += 1) if (w.hot.room.upsFailed[C[i]! * MAX_UPS + u] === 1) dark = true;
-      if (!dark) { C[k] = C[i]!; S[k] = S[i]!; k += 1; }
-    }
-    if (k > 0) m = k;
-  }
-  for (let i = 0; i < m; i += 1) {
+  for (let i = 0; i < n; i += 1) {
     if (takers(w, kind, C[i]!, need) >= need) {
       C[0] = C[i]!; S[0] = S[i]!;
       return 1;
     }
   }
-  return m;
+  return n;
 }
 
 function rollback(n: number, notes: number, used: number): false { tree.n = n; tree.notes = notes; tree.used = used; return false; }

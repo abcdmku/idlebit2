@@ -59,7 +59,6 @@ export type GameAction =
   /** D25.7: one more router queue slot (L → L + 1, at most 32). Hot. */
   | { readonly type: 'upgradeRouterQueue'; readonly unit: ScopeRef }
   | { readonly type: 'setSetpoint'; readonly unit: { readonly kind: 'rack'; readonly id: RackId } | { readonly kind: 'room'; readonly id: RoomId }; readonly setpointF: number }
-  | { readonly type: 'setPowerCap'; readonly part: PartRef; readonly on: boolean }
   | { readonly type: 'setSystemSetting'; readonly system: SystemId; readonly setting: 'dvfs' | 'turbo'; readonly on: boolean }
   | { readonly type: 'setCStateLimit'; readonly system: SystemId; readonly limit: 0 | 1 }
   | { readonly type: 'startResearch'; readonly project: ResearchId }

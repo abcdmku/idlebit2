@@ -5,7 +5,7 @@
 // strategy and the PDU's watts are name tags: beside a tower, with a leader, where the rest keeps a
 // gutter; on the blank panel beside a twin's infrastructure; on a half cabinet's own faceplates.
 // Row neighbours carry their °F, PDU load and, when they are not running, their state.
-import { ROUTE_NAMES, UNIT_MODES, formatHertz } from '../../../game';
+import { ROUTE_NAMES, formatHertz } from '../../../game';
 import type { RackSlotView, RackSnapshot, ServerSlotView } from '../../../game';
 import { labelTextWidth, payoutCount, typeForScale, typeName, typeOf, wattsText } from '../../core';
 import type { LabelTone, LabelWriter, ViewPresentation, WorldFrame } from '../../core';
@@ -58,7 +58,6 @@ const line = { text: '', short: '', tone: 'dim' as LabelTone, bold: false };
 export function serverLine(v: ServerSlotView, look: ServerLook): typeof line {
   line.bold = false; line.short = '';
   switch (look) {
-    case 'crash': line.text = 'Crashed'; line.tone = 'fault'; line.bold = true; return line;
     case 'noport': line.text = 'No port'; line.tone = 'warn'; return line;
     case 'offline': line.text = v.state === 'goingOffline' ? label('Stopping ', ceil(v.timerS), ' s') : 'Offline'; if (v.state === 'goingOffline') line.short = label('Stop ', ceil(v.timerS), ' s'); line.tone = v.state === 'goingOffline' ? 'warn' : 'dim'; return line;
     case 'boot': line.text = label('Boot ', ceil(v.timerS), ' s'); line.tone = 'warn'; return line;
@@ -76,13 +75,11 @@ export function serverLine(v: ServerSlotView, look: ServerLook): typeof line {
 
 export function rackLabels(s: RackSnapshot, view: ViewPresentation, frame: WorldFrame, out: LabelWriter): void {
   const ax = colX(rackCol(s)), dark = rackDark(s), type = typeForScale(frame.scale ?? 2), scale = frame.scale ?? 2;
-  // roof: the rack's °F, and under it why it is in trouble (crashed, heating toward a crash, throttled)
+  // roof: the rack's °F, and under it its efficiency while it runs hot (throttled)
   if (!dark) {
-    const two = s.crashed || s.crashS > 0 || s.eff < 0.995, r = READOUT;
+    const two = s.eff < 0.995, r = READOUT;
     out.label('temp', ax + r.x + (r.w >> 1), two ? 8 : 12, 'center').text(label('', Math.round(s.tempF), '°F'), tempTone(s.tempF), true);
-    if (s.crashed) out.br().text('Halted', 'fault');
-    else if (s.crashS > 0) out.br().text(label('Hot ', ceil(s.crashS), ' s'), 'fault');
-    else if (two) out.br().text(label('Eff ', Math.round(s.eff * 100), '%'), 'warn');
+    if (two) out.br().text(label('Eff ', Math.round(s.eff * 100), '%'), 'warn');
   }
   const pc = s.powerCtl ?? null, py = POWER_CTL_RECT.y + LCD_DY;
   if (pc && !dark) {
@@ -131,12 +128,10 @@ export function rackLabels(s: RackSnapshot, view: ViewPresentation, frame: World
   neighbours(s, frame.paused, out);
 }
 
-/** The PDU head: load, or the overload seconds, or the reboot countdown after it tripped. */
+/** The PDU head: its load, or Standby while the rack is powered off. */
 function pduLine(s: RackSnapshot, ax: number, out: LabelWriter): void {
   const p = s.pdu, x = inX(ax + PLINTH.x + PDU_LCD.dx), y = PLINTH.y + 1;
-  if (p.failed) out.label('pduv', x, y).text(label('Reboot ', ceil((p.rebootMs ?? 0) / 1000), ' s'), 'fault', true);
-  else if (s.online === 'dark' || s.online === 'standby') out.label('pduv', x, y).text(s.online === 'standby' ? 'Standby' : 'No power', 'dim');
-  else if (p.overloadS > 0) out.label('pduv', x, y).text(label('Overload ', ceil(p.overloadS), ' s'), p.usage > 1 ? 'fault' : 'warn', true);
+  if (s.online === 'standby') out.label('pduv', x, y).text('Standby', 'dim');
   else {
     out.label('pduv', x, y).text(label('', Math.round(p.usage * 100), '%'), p.usage > 0.9 ? 'warn' : 'ok');
     // a half cabinet has no gutter for the PDU's tag: its watts follow the load on the head's display
@@ -196,32 +191,24 @@ function faceTags(s: RackSnapshot, ax: number, dark: boolean, out: LabelWriter):
   if (!dark) out.text(ROUTE_NAMES[s.lb.strategy]?.name ?? '', 'value');
 }
 
-const MODE = UNIT_MODES;
 /** A neighbour that is not simply running says so across its first sleds, loud enough to find from the active rack. */
 function neighbourState(v: RackSlotView): { text: string; tone: LabelTone } | null {
-  if (v.state === 'crashed') return CRASHED;
-  if (v.state === 'dark') return NO_POWER;
   if (v.state === 'standby' || v.powered === false) return (v.wakeMs ?? 0) > 0 ? WAKING : STANDBY;
   if (v.state === 'offline' || v.state === 'goingOffline') return OFFLINE;
   if (v.state === 'boot' || v.state === 'cold') return BOOT;
-  let crashed = 0;
-  for (let i = 0; i < SERVER_SLOTS; i++) if (MODE[v.servers[i] ?? 0] === 'crashed') crashed++;
-  if (!crashed) return null;
-  SOME.text = label('', crashed, ' crashed');
-  return SOME;
+  return null;
 }
-const SOME: { text: string; tone: LabelTone } = { text: '', tone: 'fault' };
-const CRASHED = { text: 'Crashed', tone: 'fault' } as const, NO_POWER = { text: 'No power', tone: 'fault' } as const, STANDBY = { text: 'Standby', tone: 'dim' } as const;
+const STANDBY = { text: 'Standby', tone: 'dim' } as const;
 const WAKING = { text: 'Powering on', tone: 'warn' } as const, OFFLINE = { text: 'Offline', tone: 'dim' } as const, BOOT = { text: 'Starting', tone: 'warn' } as const;
 function neighbours(s: RackSnapshot, paused: boolean, out: LabelWriter): void {
   const row = rowViews(s);
   if (!row) return;
   for (let c = 0; c < ROW_COLS; c++) {
     if (!isNeighbour(s, c)) continue;
-    const v = row[c]!, x = colX(c), lit = v.state !== 'dark' && v.state !== 'standby' && v.powered !== false;
+    const v = row[c]!, x = colX(c), lit = v.state !== 'standby' && v.powered !== false;
     if (lit) {
       out.label(NT[c]!, x + READOUT.x + (READOUT.w >> 1), 12, 'center').text(label('', Math.round(v.tempF), '°F'), v.tempF > 80 ? tempTone(v.tempF) : 'dim');
-      if (!paused) out.label(NP[c]!, inX(x + PLINTH.x + PDU_LCD.dx), PLINTH.y + 1).text(label('', Math.round(v.pduUsage * 100), '%'), v.pduUsage > 1 ? 'fault' : v.pduUsage > 0.9 ? 'warn' : 'dim');
+      if (!paused) out.label(NP[c]!, inX(x + PLINTH.x + PDU_LCD.dx), PLINTH.y + 1).text(label('', Math.round(v.pduUsage * 100), '%'), v.pduUsage > 0.9 ? 'warn' : 'dim');
     }
     const st = neighbourState(v);
     if (st) out.label(NS[c]!, x + OPEN.x + (OPEN.w >> 1), SRV_Y + SLED_H + sledDy() + LCD_DY, 'center', true).text(st.text, st.tone, true);

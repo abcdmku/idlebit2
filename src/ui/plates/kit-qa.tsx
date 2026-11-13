@@ -85,20 +85,19 @@ const tree = (phase: 'running' | 'between') => ({
   active: researchId('fabKhz'), opsPerSec: 6400, holdOpsPerSec: 6400, queue: [], queueSlots: 0, horizon: 'system' as const, lenders: [],
   creditsPerMinute: (phase === 'between' ? '9960' : '0') as Amount,
 });
-const supplyPdu = { ...LEVEL_FIXTURES.rack.pdu, level: 2, capacityW: 4096, deliveredW: 4710, usage: 1.15, overloadS: 6.2, lossW: 520, loss: 0.11 };
+const supplyPdu = { ...LEVEL_FIXTURES.rack.pdu, level: 2, capacityW: 4096, deliveredW: 3890, usage: 0.95, lossW: 430, loss: 0.11 };
 const scenes: Record<string, { level: LevelId; plate: ReactNode }> = {
   part: { level: 'system', plate: <PartPlate {...common} title="Clock" sub="1 kHz" level={2} pips={[2, 4]} status="Sets the speed of every core" lines={[]}
     quotes={R([q({ type: 'upgradePart', part: clockPart }, 360, { effect: eff(1000, 2000, 'ops/s', 250) }),
       q({ type: 'replacePart', part: clockPart, generation: 1, preserveCapacity: true }, 2_400, { label: 'kHz clock', cold: true, downtimeMs: 10_000, effect: eff(1000, 16_000, 'ops/s', 7_500, 2, 6) })])} /> },
   'part-locked': { level: 'system', plate: <PartPlate {...common} title="Clock" sub="1 kHz" level={4} pips={[4, 4]} status="Sets the speed of every core"
     quotes={R([q({ type: 'replacePart', part: clockPart, generation: 1, preserveCapacity: true }, 2_400, { label: 'kHz clock', cold: true, downtimeMs: 10_000, locked: lockR('fabKhz', 'Needs kHz fab research') })])} /> },
-  psu: { level: 'system', plate: <SupplyPlate {...common} supply={{ ...LEVEL_FIXTURES.system.psu, capacityW: 64, deliveredW: 5.5, usage: 0.086, lossW: 1.65 }} maxLevel={4}
-    quotes={R([q({ type: 'upgradePart', part: { unit: { kind: 'system', id: sys }, slot: { kind: 'psu' } } }, 180, { effect: eff(64, 128, 'W', null) })])} /> },
+
   pdu: { level: 'rack', plate: <SupplyPlate {...common} supply={supplyPdu} maxLevel={4}
     quotes={R([q({ type: 'upgradePart', part: { unit: rack, slot: { kind: 'pdu' } } }, 7_480, { effect: eff(4096, 8192, 'W', null) }),
       q({ type: 'replacePart', part: { unit: rack, slot: { kind: 'pdu' } }, generation: 1, preserveCapacity: true }, 64_000, { label: 'Metered PDU', cold: true, downtimeMs: 10_000, locked: lockR('meteredPdu', 'Needs Metered PDU research') })])} /> },
   cooler: { level: 'rack', plate: <CoolerPlate {...common} unit={rack} cooler={{ ...LEVEL_FIXTURES.rack.cooler, level: 2, capacityW: 600, watts: 140, equilibriumF: 84 }}
-    lump={{ tempF: 83, crashS: 0, crashed: false, eff: 0.93 }} maxLevel={4}
+    lump={{ tempF: 83, eff: 0.93 }} maxLevel={4}
     quotes={R([q({ type: 'upgradePart', part: { unit: rack, slot: { kind: 'rackCooler' } } }, 23_400, { effect: eff(600, 1100, 'W', null) }),
       q({ type: 'replacePart', part: { unit: rack, slot: { kind: 'rackCooler' } }, generation: 1, preserveCapacity: true }, 64_000, { label: 'Water loop', cold: true, downtimeMs: 10_000, locked: lockR('rackWater', 'Needs Rack water research') }),
       q({ type: 'setSetpoint', unit: rack, setpointF: 70 }, 0, { locked: lockR('fanControl', 'Needs Fan control research') })])} /> },

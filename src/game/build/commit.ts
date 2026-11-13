@@ -5,12 +5,12 @@ import { debitCredits } from '../core/actions';
 import { MODE, restingMode, setUnitMode, startTransition } from '../core/timers';
 import { compileAll, syncHotSizes } from '../core/topology';
 import { commitWorld, openWorld, type World } from '../core/world';
-import { killSubtree } from '../exec';
+import { killSystem } from '../exec';
 import { reconcileHardware } from '../exec/hardware';
 import type { ActionOutcome, GameAction } from '../types/actions';
 import { investmentChange } from './investments';
 import type { BuildState } from '../types/build';
-import { systemId, type UnitRef } from '../types/ids';
+import type { UnitRef } from '../types/ids';
 import type { GameState } from '../types/state';
 
 /** One validated edit of `build`, ready to commit. */
@@ -59,7 +59,7 @@ export function commitBuild(state: GameState, change: BuildChange, action?: Game
   const old: World = { ...w, build: state.build, compiled: state.compiled };
 
   for (const s of change.removed ?? []) {
-    killSubtree(old, { kind: 'system', id: systemId(s) }, 'swap');
+    killSystem(old, s, 'swap');
     setUnitMode(w, s, MODE.empty);
   }
   for (const s of change.added ?? []) {

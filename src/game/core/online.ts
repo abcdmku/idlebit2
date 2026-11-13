@@ -1,14 +1,14 @@
-import { killSubtree } from '../exec';
+import { killSystem } from '../exec';
 import type { ActionOf, ActionOutcome } from '../types/actions';
 import type { BuildState } from '../types/build';
-import { systemId, type UnitRef } from '../types/ids';
+import type { UnitRef } from '../types/ids';
 import type { GameState } from '../types/state';
 import { cloneCompiled } from './buffers';
 import { MODE, restingMode, setUnitMode, startTransition } from './timers';
 import { writeTopology } from './topology';
 import { commitWorld, openWorld } from './world';
 
-/** Modes an online/offline switch acts on. dark, crashed and cold resolve through restingMode later. */
+/** Modes an online/offline switch acts on. cold resolves through restingMode later. */
 const SWITCHABLE = new Set<number>([MODE.onMarket, MODE.asleep, MODE.boot, MODE.goingOffline, MODE.draining, MODE.offline, MODE.paused, MODE.standby]);
 
 function withOnline(build: BuildState, unit: UnitRef, online: boolean): BuildState | null {
@@ -52,7 +52,7 @@ export function setOnline(state: GameState, action: ActionOf<'setOnline'>): Acti
     } else if (drain && mode !== MODE.boot && mode !== MODE.offline) {
       setUnitMode(w, s, MODE.draining);
     } else {
-      killSubtree(w, { kind: 'system', id: systemId(s) }, 'swap');
+      killSystem(w, s, 'swap');
       startTransition(w, s, 'goingOffline');
     }
   }

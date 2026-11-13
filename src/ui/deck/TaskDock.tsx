@@ -74,7 +74,7 @@ export function TaskDock(props: DockProps) {
           <span title={`Up to ${cores} CPU cores`}><ArtCanvas w={8} h={8} n={2} artKey="core" draw={g => drawMiniIcon(g, 'core')} /><b>{cores}</b></span>
           <span title={`${fact.label} ${fact.value}`}><ArtCanvas w={8} h={8} n={2} artKey={fact.icon} draw={g => drawMiniIcon(g, fact.icon)} /><b className="cyan">{fact.value.replace(/\s/g, '')}</b></span>
         </span> : <span className="task-peek-resources"><b>{research ? 'Research' : 'No task'}</b>{research && <span className="rnd">{Math.floor(research.progress * 100)}%</span>}</span>}
-        <span className="task-peek-state"><span className={blocked ? 'warn' : 'mute'}>{head && running ? shortStatus(head) : research ? 'Next in line' : status}</span>
+        <span className="task-peek-state"><span className={blocked ? 'warn' : 'mute'}>{head && running ? shortStatus(head) : research && running ? 'Next in line' : status}</span>
           {head && running && !head.committed && seconds !== null && <span className={clockTone(seconds)}>{seconds}s</span>}</span>
         <ArtCanvas w={4} h={4} n={2} artKey={String(expanded)} className="task-drawer-chevron" draw={g => {
           g.clearRect(0, 0, 4, 4); g.fillStyle = '#96efff';

@@ -11,7 +11,7 @@ import { compileAll } from '../../src/game/core/topology';
 /** A Rack-era server draws about 12% of its all-parts maximum over a round (measured: 2.6e7 of 2.16e8 W); PDU and cooler are sized to that with 20% headroom. */
 const DRAW_SHARE = 0.12;
 const RICH = '1' + '0'.repeat(40);
-const NEEDED = ['s3Sleep', 'meteredPdu', 'powerCtl', 'packageC', ...Array.from({ length: 36 }, (_, i) => `cstate${i + 1}`), 'lbCapability', 'lbHealth'];
+const NEEDED = ['s3Sleep', 'meteredPdu', 'powerCtl', 'packageC', ...Array.from({ length: 36 }, (_, i) => `cstate${i + 1}`), 'lbCapability'];
 
 export function loadStage(path: string): GameState {
   const loaded = deserializeSave((JSON.parse(readFileSync(path, 'utf8')) as { save: string }).save);
@@ -24,13 +24,13 @@ export function tryAct(s: GameState, a: GameAction): GameState {
   return out.ok ? out.state : s;
 }
 
-/** One server's full-load watts (every part at full use, through its PSU). */
+/** One server's full-load watts (every part at full use). */
 export function fullW(s: GameState, id = 0): number {
   const c = s.compiled.sys;
   let w = c.coreIdleW[id]! + c.coreLoadW[id]! + c.clockIdleW[id]!;
   for (let r = 0; r < 4; r += 1) w += c.idleW[id * 4 + r]! + c.loadW[id * 4 + r]!;
   for (let a = 0; a < 8; a += 1) w += c.accelLoadW[id * 8 + a]!;
-  return w / Math.max(0.05, 1 - c.psuLoss[id]!);
+  return w;
 }
 
 export interface FleetOptions { readonly powerCtl?: { readonly startWith: number; readonly headWaitS: number } | null; readonly log?: boolean }
@@ -59,7 +59,7 @@ export function grownFleet(stage: GameState, n: number, opts: FleetOptions = {})
   for (let p = 0; p < s.build.racks[0]!.switch.ports.length; p += 1) for (let i = 0; i < 20 && s.build.racks[0]!.switch.ports[p]! < k0; i += 1) s = tryAct(s, { type: 'upgradePort', sw: rack, port: p });
   // Uplinks as fast as the switch allows (D25: an uplink must carry its ports combined).
   for (let u = 0; u < s.build.racks[0]!.switch.uplinks.length; u += 1) for (let i = 0; i < 30; i += 1) s = tryAct(s, { type: 'upgradeUplink', sw: rack, uplink: u });
-  for (const filter of ['capability', 'health'] as const) s = tryAct(s, { type: 'setFilter', unit: rack, filter, on: true });
+  for (const filter of ['capability'] as const) s = tryAct(s, { type: 'setFilter', unit: rack, filter, on: true });
   if (opts.powerCtl) {
     s = tryAct(s, { type: 'replacePart', part: { unit: rack, slot: { kind: 'powerCtl' } }, generation: 0, preserveCapacity: false });
     s = tryAct(s, { type: 'setStartConfig', unit: rack, startWith: opts.powerCtl.startWith, headWaitS: opts.powerCtl.headWaitS, busyPct: null, order: 'fastest' });

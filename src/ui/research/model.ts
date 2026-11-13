@@ -2,39 +2,21 @@
 // only its own level's parts in board order, and under each part the projects worth seeing now.
 // Every prerequisite a shown project still needs is shown too, so a "Needs X" always has an X to go to.
 import type { Amount, GameAction, LevelId, ResearchId, ResearchNodeView, ResearchPartId, ResearchTabId, ResearchTreeView } from '../../game';
-import type { PartIconKind } from '../art/deckArt';
 import { priceOf, shortBy } from './money';
 
 export const TABS: readonly ResearchTabId[] = ['cpu', 'system', 'rack', 'room', 'global'];
 export const TAB_LEVEL: Readonly<Record<ResearchTabId, LevelId>> = { cpu: 'chip', system: 'system', rack: 'rack', room: 'room', global: 'global' };
 export const LEVEL_TAB: Readonly<Record<LevelId, ResearchTabId>> = { chip: 'cpu', system: 'system', rack: 'rack', room: 'room', global: 'global' };
 export const TAB_NAMES: Readonly<Record<ResearchTabId, string>> = { cpu: 'CPU', system: 'System', rack: 'Rack', room: 'Room', global: 'World' };
-export const TAB_ICON: Readonly<Record<ResearchTabId, PartIconKind>> = { cpu: 'cpu', system: 'ram', rack: 'rack', room: 'cool', global: 'site' };
 
 type Part = Exclude<ResearchPartId, 'structure'>;
 /** Each tab's parts in board order. Structure projects sit in the tab's "Next level" section. */
 export const TAB_PARTS: Readonly<Record<ResearchTabId, readonly Part[]>> = {
   cpu: ['cores', 'clock', 'cache', 'queue', 'fab'],
-  system: ['cpu', 'ram', 'drive', 'gpu', 'psu', 'board'],
+  system: ['cpu', 'ram', 'drive', 'gpu', 'board'],
   rack: ['switch', 'lb', 'rackCooling', 'rackPower'],
   room: ['netRack', 'roomCooling', 'ups'],
   global: ['dataPlane', 'backbone', 'site', 'globalScheduler'],
-};
-export const PART_NAMES: Readonly<Record<ResearchPartId, string>> = {
-  cores: 'Cores', clock: 'Clock', cache: 'Cache', queue: 'Scheduler', fab: 'Fab',
-  cpu: 'CPU', ram: 'RAM', drive: 'Drive', gpu: 'GPU', psu: 'Power supply', board: 'Board',
-  switch: 'Switch', lb: 'Load balancer', rackCooling: 'Rack cooling', rackPower: 'Rack power',
-  netRack: 'Room network', roomCooling: 'Room cooling', ups: 'UPS',
-  dataPlane: 'Data plane', backbone: 'Backbone', site: 'Site power', globalScheduler: 'Global scheduler',
-  structure: 'Next level',
-};
-export const PART_ICON: Readonly<Record<ResearchPartId, PartIconKind>> = {
-  cores: 'core', clock: 'clock', cache: 'cache', queue: 'queue', fab: 'cpu',
-  cpu: 'cpu', ram: 'ram', drive: 'stor', gpu: 'gpu', psu: 'power', board: 'pipe',
-  switch: 'switch', lb: 'lb', rackCooling: 'cool', rackPower: 'power',
-  netRack: 'switch', roomCooling: 'cool', ups: 'power',
-  dataPlane: 'lb', backbone: 'switch', site: 'site', globalScheduler: 'queue',
-  structure: 'rack',
 };
 
 /** One part under a tab: its finished projects (folded) and the rows worth seeing now. */
@@ -131,13 +113,6 @@ export function buildBoard(tree: ResearchTreeView, visible: ReadonlySet<Research
 
 /** Rows in screen order on one tab. */
 export const tabRows = (m: TabModel): ResearchNodeView[] => [...m.parts, ...(m.next ? [m.next] : [])].flatMap(g => g.rows);
-
-/** The shown projects that list `id` as a prerequisite, and how many more come later. */
-export function leadsTo(tree: ResearchTreeView, board: Board, id: ResearchId): { shown: ResearchNodeView[]; later: number } {
-  const after = tree.nodes.filter(n => n.state !== 'done' && n.requires.includes(id));
-  const shown = after.filter(n => board.where.has(n.id));
-  return { shown, later: after.length - shown.length };
-}
 
 /**
  * The one-line key other surfaces show for a project (the deck's ready count, the GPU plate). The

@@ -37,5 +37,3 @@ export function wattsText(w: number): string { return si(w, 'W'); }
 
 /** Seconds left on a transfer, one decimal, never below 0.1 while it runs. */
 export function secondsText(s: number): string { return `${Math.max(0.1, s).toFixed(1)} s`; }
-
-export function plural(n: number, one: string, many: string): string { return `${whole(n)} ${n === 1 ? one : many}`; }

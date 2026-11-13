@@ -14,10 +14,10 @@ import { rect } from '../../core';
 import type { Rect, RestArea, WorldForm } from '../../core';
 import { MINI_SIZE } from '../room/mini';
 import { listPlan } from './list';
-import { CHANNEL, EAST, HEAD, HUB, HUB_FOOT, LANE_Y, ROW_GAP, SEA_BOTTOM, SEA_TOP, SEA_X, SIGN_H, SOUTH, TRUNK_X, WEST } from './plan';
+import { CHANNEL, EAST, HEAD, HUB, HUB_FOOT, LANE_Y, LOCK_HEAD, ROW_GAP, SEA_BOTTOM, SEA_TOP, SEA_X, SIGN_H, SOUTH, TRUNK_X, WEST } from './plan';
 import type { Cols, Lines, Path, Plan } from './plan';
 export { HEAD, SIGN_H } from './plan';
-export type { Cols, Path, Plan } from './plan';
+export type { Path, Plan } from './plan';
 
 /** Region → [column, row] per column count. */
 type Grid = Readonly<Record<RegionId, readonly [number, number]>>;
@@ -37,9 +37,11 @@ const LANDMASS: Readonly<Record<RegionId, number>> = {
 const CELL_MIN = 72, CELL_MAX = 112, TILE_MAX = 32;
 /** CSS px the UI's two-line name and price takes across a zone add pad (desktop, phone type), and the narrowest hall beside it. */
 const ADD_W = { desktop: 114, phone: 80 } as const, HALL_MIN = 10;
+/** CSS px the closed regions' legend text takes with its inset (desktop type), and the art px of its lock. */
+const LEGEND_CSS = 160, LEGEND_LOCK = 12;
 
 const snap8 = (v: number): number => Math.floor(v / 8) * 8;
-function build(cols: Cols, cellW: number, lines: Lines, tileMax: number, addW: number): Plan {
+function build(cols: Cols, cellW: number, lines: Lines, tileMax: number, addW: number, legendW: number): Plan {
   const rows = ROWS[cols], grid = GRIDS[cols];
   const tileW = Math.min(tileMax, Math.floor((cellW - 10) / 3)), tileH = Math.round(tileW * MINI_SIZE.h / MINI_SIZE.w);
   // header plate, halls and data plane, then the footer on the next text line
@@ -62,20 +64,21 @@ function build(cols: Cols, cellW: number, lines: Lines, tileMax: number, addW: n
     rect(b.x + 5 + 2 * hallW, b.y + top, cellW - 6 - 2 * hallW, tileH),
   ]);
   return {
-    key: `${cols}:${cellW}:${lines}:${tileMax}:${addW}`, list: false, lines, pitchX, pitchY,
+    key: `${cols}:${cellW}:${lines}:${tileMax}:${addW}:${legendW}`, list: false, lines, pitchX, pitchY,
     size: rect(-SEA_X, -SEA_TOP, w + 2 * SEA_X, h + SEA_TOP + SEA_BOTTOM), focus: rect(0, 0, w, h),
     cells, land: REGION_IDS.map(id => LANDMASS[id]), col: REGION_IDS.map(id => grid[id][0]),
-    tiles, tight, lock: null,
+    tiles, tight, lock: null, legend: rect(w - EAST - legendW, LANE_Y - 2 - LOCK_HEAD, legendW, LOCK_HEAD),
     pads: cells.map(b => rect(b.x + 3, b.y + SIGN_H + 2, cellW - 6, cellH - SIGN_H - 5)), padMax: Infinity,
     footY, hub: rect(HUB.x, HUB.y, HUB.w, HUB.h), laneY: LANE_Y,
     trunkX, planeY, routes,
   };
 }
 const plans = new Map<string, Plan>();
-function planOf(cols: Cols, cellW: number, lines: Lines, addW: number, tileMax = TILE_MAX): Plan {
-  const key = `${cols}:${cellW}:${lines}:${tileMax}:${addW}`;
+function planOf(cols: Cols, cellW: number, lines: Lines, n: number, addCss: number, tileMax = TILE_MAX): Plan {
+  const addW = Math.ceil(addCss / n), legendW = Math.ceil(LEGEND_CSS / n) + LEGEND_LOCK;
+  const key = `${cols}:${cellW}:${lines}:${tileMax}:${addW}:${legendW}`;
   let p = plans.get(key);
-  if (!p) { p = build(cols, cellW, lines, tileMax, addW); plans.set(key, p); }
+  if (!p) { p = build(cols, cellW, lines, tileMax, addW, legendW); plans.set(key, p); }
   return p;
 }
 /** The cell width `cols` columns get in `w` art px (under CELL_MIN: they don't fit). */
@@ -105,7 +108,7 @@ export function planFor(area: RestArea | undefined, form: WorldForm | undefined,
     const built = regionMask(s), closed = regionMask(s, true);
     return area ? listPlan(Math.floor(area.w / n), Math.floor(area.h / n), built, closed) : listPlan(176, 268, built, closed);
   }
-  if (!area) return planOf(3, 96, 2, Math.ceil(addCss / 3));
+  if (!area) return planOf(3, 96, 2, 3, addCss);
   for (let n = area.scale; n >= 2; n--) {
     const w = Math.floor(area.w / n), h = Math.floor(area.h / n);
     let best: Plan | null = null, bestW = 0;
@@ -113,7 +116,7 @@ export function planFor(area: RestArea | undefined, form: WorldForm | undefined,
       const cellW = cellWidth(cols, w);
       if (cellW < CELL_MIN) continue;
       for (const lines of n >= 3 ? LINES3 : LINES2) {
-        const p = planOf(cols, cellW, lines, Math.ceil(addCss / n));
+        const p = planOf(cols, cellW, lines, n, addCss);
         if (p.focus.h > h) continue;
         if (!best || cellW > bestW) { best = p; bestW = cellW; }
         break;
@@ -121,14 +124,14 @@ export function planFor(area: RestArea | undefined, form: WorldForm | undefined,
     }
     if (best) return best;
   }
-  const n = Math.min(2, area.scale), w = Math.floor(area.w / n), h = Math.floor(area.h / n), addW = Math.ceil(addCss / n);
+  const n = Math.min(2, area.scale), w = Math.floor(area.w / n), h = Math.floor(area.h / n);
   let cols: Cols = 1, cellW = Math.max(CELL_MIN, cellWidth(1, w));
   for (const c of COLS) if (cellWidth(c, w) >= CELL_MIN) { cols = c; cellW = cellWidth(c, w); break; }
   for (let t = TILE_MAX; t >= 24; t -= 2) {
-    const p = planOf(cols, cellW, 1, addW, t), peek = (h - HEAD) % p.pitchY;
+    const p = planOf(cols, cellW, 1, n, addCss, t), peek = (h - HEAD) % p.pitchY;
     if (peek >= 10 && peek <= p.pitchY - 16) return p;
   }
-  return planOf(cols, cellW, 1, addW);
+  return planOf(cols, cellW, 1, n, addCss);
 }
 
 let current: Plan = planFor(undefined, 'desktop');

@@ -16,7 +16,7 @@ const loaded = deserializeSave((JSON.parse(readFileSync(arg('from', ''), 'utf8')
 if (!loaded.ok) throw new Error(loaded.error);
 const stageState = loaded.state;
 const RICH = '1' + '0'.repeat(40);
-const NEEDED = ['s3Sleep', 'meteredPdu', 'powerCtl', 'packageC', ...Array.from({ length: 36 }, (_, i) => `cstate${i + 1}`), 'lbCapability', 'lbHealth'];
+const NEEDED = ['s3Sleep', 'meteredPdu', 'powerCtl', 'packageC', ...Array.from({ length: 36 }, (_, i) => `cstate${i + 1}`), 'lbCapability'];
 
 function tryAct(s: GameState, a: GameAction): GameState {
   const out = applyAction(s, a);
@@ -29,7 +29,7 @@ function fullW(s: GameState): number {
   let w = c.coreIdleW[0]! + c.coreLoadW[0]! + c.clockIdleW[0]!;
   for (let r = 0; r < 4; r += 1) w += c.idleW[r]! + c.loadW[r]!;
   for (let a = 0; a < 8; a += 1) w += c.accelLoadW[a]!;
-  return w / Math.max(0.05, 1 - c.psuLoss[0]!);
+  return w;
 }
 
 function grown(n: number, withCtl: boolean): GameState {
@@ -54,7 +54,7 @@ function grown(n: number, withCtl: boolean): GameState {
   console.log(`fixture: ${n} servers, server full load ${fullW(s).toExponential(2)} W, PDU ${full().toExponential(2)} W`);
   const k0 = s.build.racks[0]!.switch.ports[0]!;
   for (let p = 0; p < s.build.racks[0]!.switch.ports.length; p += 1) for (let i = 0; i < 20 && s.build.racks[0]!.switch.ports[p]! < k0; i += 1) s = tryAct(s, { type: 'upgradePort', sw: rack, port: p });
-  for (const filter of ['capability', 'health'] as const) s = tryAct(s, { type: 'setFilter', unit: rack, filter, on: true });
+  for (const filter of ['capability'] as const) s = tryAct(s, { type: 'setFilter', unit: rack, filter, on: true });
   if (withCtl) {
     s = tryAct(s, { type: 'replacePart', part: { unit: rack, slot: { kind: 'powerCtl' } }, generation: 0, preserveCapacity: false });
     s = tryAct(s, { type: 'setStartConfig', unit: rack, startWith: Number(arg('start-with', '1')), headWaitS: Number(arg('head-wait', '2')), busyPct: null, order: 'fastest' });

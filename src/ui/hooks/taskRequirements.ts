@@ -1,43 +1,15 @@
-﻿import type { FailDetail, QueueEntryView, TaskRequirementsView } from '../../game';
-import { formatOps, formatSize, regionName } from '../../game';
+﻿import type { FailDetail, QueueEntryView } from '../../game';
+import { formatSize, regionName } from '../../game';
 import type { TaskWaitReason } from '../../game';
 
 /** Sizes print through the shared formatter: "2 b", "21.4 kb" (one string everywhere). */
 export const taskBits = (n: number): string => formatSize(n);
 
-export function accelRequirements(task: Pick<TaskRequirementsView, 'gpuCoresMin' | 'vramBits'>): string {
-  const needs: string[] = [];
-  if (task.gpuCoresMin > 0) needs.push(`${task.gpuCoresMin.toLocaleString('en-US')} GPU cores`);
-  if (task.vramBits > 0) needs.push(`${taskBits(task.vramBits)} VRAM`);
-  return needs.join(' · ');
-}
-
-/** One formatter for numerical simulation facts, wherever the task is shown. */
-export function requirementText(task: TaskRequirementsView): string {
-  // D26: compute and GPU stages are ops; a mem stage is bits touched, wherever they sit.
-  const facts = task.stages.map(stage => stage.resource === 'mem' ? `Traffic ${formatSize(stage.work)}`
-    : `${stage.resource === 'gpu' ? 'GPU' : 'CPU'} ${formatOps(stage.work)}`);
-  // The working set fills cache, then RAM, then disk (D26.1): one memory need, never "storage".
-  if (task.workingSetBits > 0) facts.push(`Memory ${formatSize(task.workingSetBits)}`);
-  const accel = accelRequirements(task);
-  if (accel) facts.push(accel);
-  // D25.6: a distributed task's minimum split, worded as what it needs (lead: no grain on cards).
-  if (task.members > 1) facts.push(`${task.members} servers`);
-  if (task.minZones > 1) facts.push(`${task.minZones} zones`);
-  if (task.region !== null) facts.push(regionName(task.region));
-  if (task.ecc) facts.push('ECC');
-  if (task.tensor) facts.push('Tensor');
-  return facts.join(' · ');
-}
-
 /**
- * No system can take work because something upstream is down (lead, 26 Oct). One label per detail, in the
+ * No system can take work because none is online (lead, 26 Oct). One label per detail, in the
  * task status, the head card, the report and the platform line alike.
  */
-export const OUTAGE_TEXT: Readonly<Partial<Record<FailDetail, string>>> = {
-  psu: 'Power supply down', pdu: 'PDU down', ups: 'UPS down', grid: 'Grid down',
-  rack: 'Rack overheated', room: 'Zone overheated', offline: 'No server online',
-};
+export const OUTAGE_TEXT: Readonly<Partial<Record<FailDetail, string>>> = { offline: 'No server online' };
 
 const WAIT_TEXT: Readonly<Record<TaskWaitReason, string>> = {
   round: 'Next round', head: 'Waiting for earlier tasks', research: 'Waiting for CPU cores used by research',

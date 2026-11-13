@@ -128,17 +128,13 @@ export const upgradesBetween = (row: CatalogRow, g: number, from: number, to: nu
   for (let l = from; l < to; l += 1) total += upgradePrice(row, g, l, lanes);
   return total;
 };
-/** Install plus every upgrade up to `level` (spec §13.3). */
-export const priceToLevel = (row: CatalogRow, g: number, level: number, lanes = 1): bigint =>
-  installPrice(row, g) + upgradesBetween(row, g, 1, level, lanes);
 /** Scales a whole price by a factor, rounding up. */
 export const scalePrice = (price: bigint, factor: number): bigint => (factor === 1 ? price : ceilCredits(Number(price) * factor));
 
 /* ---------- Ladders (spec §7.3, §12.5) ---------- */
 
 export const ladderSpeed = (k: number): number => k < 0 ? 0 : [1, 2, 5][k % 3]! * 10 ** (3 + Math.floor(k / 3));
-/** xp = speed(k) / speed(baseK[g]). */
-export const portX = (row: LadderDef, g: number, k: number): number => ladderSpeed(k) / ladderSpeed(row.baseK[g]!);
+
 /** Watts of one port or uplink at rung k (D18.5); the generation sets only the rung range. */
 export const portWatts = (row: LadderDef, _g: number, k: number): Watts => k < 0 ? NONE : linkWatts(row.wPerUnit, ladderSpeed(k));
 export const ladderInstall = (row: LadderDef, g: number): bigint => ceilCredits(row.price[g] ?? 0);

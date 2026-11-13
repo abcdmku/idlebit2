@@ -13,8 +13,7 @@ export type SiteId = Brand<number, 'SiteId'>;
 export type FamilyId = Brand<number, 'FamilyId'>;
 /** Research node id string from docs/research.md §9, e.g. "pipelining". */
 export type ResearchId = Brand<string, 'ResearchId'>;
-/** Index into the link tables. */
-export type LinkId = Brand<number, 'LinkId'>;
+
 
 export const systemId = (n: number) => n as SystemId;
 export const rackId = (n: number) => n as RackId;
@@ -45,7 +44,7 @@ export type NodeRef =
 export type PartSlot =
   | { readonly kind: 'cpu' | 'clock' | 'cache'; readonly socket: number }
   | { readonly kind: 'core'; readonly socket: number; readonly index: number }
-  | { readonly kind: 'scheduler' | 'psu' }
+  | { readonly kind: 'scheduler' }
   | { readonly kind: 'ram' | 'gpu' | 'drive'; readonly index: number }
   | { readonly kind: 'rackCooler' | 'pdu' | 'lb' | 'switch' }
   | { readonly kind: 'roomCooler' | 'roomLb' | 'roomSwitch' }

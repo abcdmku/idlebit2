@@ -10,7 +10,7 @@ import type { SystemSnapshot } from '../types/snapshot';
 import type { GameState } from '../types/state';
 import type { BuildSlotView, PartView, PartViewKind } from '../types/views';
 import { chipSnapshot, chipStatic, cpuCountOf, type ChipStatic } from './chip';
-import { modeName, psuView, systemTimerS, ticksToS } from './common';
+import { modeName, systemTimerS, ticksToS } from './common';
 import { inboundTransfer } from './flows';
 import { queuedTasks, runningTasks } from './tasks';
 import { acceleratorView } from './accelerators';
@@ -94,7 +94,7 @@ export function systemSnapshot(state: GameState, id: SystemId, parent: NodeRef |
     storage: (spec?.drives ?? []).map((d, i) => ({
       ...part(i, 'drive', d.gen, d.level, ioBusy),
       speedLevel: d.speedLevel, capacityBits: capacity(PARTS.storage, d.gen, d.level), usedBits: occupied(capacity(PARTS.storage, d.gen, d.level), 'disk'), rateBits: capacity2(PARTS.storage, d.gen, d.speedLevel), })),
-    psu: psuView(state, id, spec?.psu ?? { gen: 0, level: 1, capped: false }),
+
     running: runningTasks(state, id, Math.max(c.K[id] ?? 0, 1)),
     queue: { cap: c.Q[id] ?? 0, count: h.queueLen[id] ?? 0, sample: queuedTasks(state, id, 0, QUEUE_SAMPLE) },
     reserved: h.reserved[id] ?? 0,

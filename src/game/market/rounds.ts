@@ -3,7 +3,7 @@ import { G } from '../core/buffers';
 import { ROUND_REPORTS_KEPT, STALL_END_TICKS, TICK_MS } from '../core/constants';
 import { pushEvent, roundDetails } from '../core/events';
 import { energyBreakdown, resetRoundTotals, roundTotals, settleLedger } from '../core/ledger';
-import { MODE, restingMode, setUnitMode } from '../core/timers';
+import { restingMode, setUnitMode } from '../core/timers';
 import type { World } from '../core/world';
 import type { RoundEndedBy, RoundReport } from '../types/report';
 import { dropAllWork } from '../exec';
@@ -31,12 +31,11 @@ function roundTypes(w: World): RoundReport['byType'] {
  * drops it below. Each round opens at the intensity the last one earned.
  */
 
-/** Every system not held by a supply failure or a crash takes its §4.3 resting mode at once. */
+/** Every system takes its §4.3 resting mode at once. */
 function settleModes(w: World): void {
-  const mode = w.hot.sys.mode;
   const alive = w.compiled.sys.alive;
   for (let s = 0; s < w.hot.sys.len; s += 1) {
-    if (alive[s] !== 1 || mode[s] === MODE.dark || mode[s] === MODE.crashed) continue;
+    if (alive[s] !== 1) continue;
     setUnitMode(w, s, restingMode(w, s));
   }
 }

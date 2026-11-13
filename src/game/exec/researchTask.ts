@@ -12,7 +12,7 @@ import { canAdmit, hasLink, noteAdmit, noteAdmitted, noteTake, STORAGE_NODE } fr
  * market queue: while it waits there it is the head, has no clock, and the tasks behind it wait.
  * The next systems with room take it, each on all its free threads (a fine-grain divisible task,
  * D25), and hold one slot and those threads until the project completes. It carries no payload
- * and pays nothing. A holder that stops running (dark, crashed, cold, offline) lets go; when none
+ * and pays nothing. A holder that stops running (cold, offline) lets go; when none
  * is left the project is back at the queue front with its progress kept. Between rounds the
  * market is paused and the project waits in line for Return to market, unless the player started
  * it during this break (G.researchBreak): then every powered, linked server with a free thread takes it.

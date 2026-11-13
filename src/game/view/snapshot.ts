@@ -13,7 +13,6 @@ import { researchBadge } from './research';
 import { roomSnapshot } from './room';
 import { systemSnapshot, systemStatic } from './system';
 
-export { slaPercent } from './hud';
 
 /**
  * What a published snapshot was built from. Level snapshots are reused whole while their inputs

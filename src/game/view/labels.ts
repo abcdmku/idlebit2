@@ -19,7 +19,6 @@ export const ROUTE_NAMES: Readonly<Record<RouteStrategyId, { name: string; short
 export const FILTER_NAMES: Readonly<Record<FilterId, { name: string; note: string }>> = {
   region: { name: 'Region-aware', note: 'Only where the task may run.' },
   capability: { name: 'Capability-aware', note: 'Never sends a task where it cannot run.' },
-  health: { name: 'Health checks', note: 'Skips units in an overload or crash countdown.' },
   power: { name: 'Power-aware', note: 'Skips units whose supply is near its limit.' },
   thermal: { name: 'Thermal-aware', note: 'Steers work off hot units.' },
   local: { name: 'Zone-aware', note: 'Keeps a task in one rack, zone or site when it fits there whole.' },

@@ -5,7 +5,7 @@
 //   &scene=boot|landing|mid|max|paused  swap the CPU snapshot for a renderer QA scene
 //   &hover=<target id>  the hover/press bracket on that target (QA)
 //   &pops=<age ms>  payout pops on the level's first components, held at that age (QA only)
-//   &case=zones|regions|flows|max|dark|sitout|power|crash  swap the World snapshot for a renderer case
+//   &case=zones|regions|flows|max|sitout|power  swap the World snapshot for a renderer case
 import { fixtureSnapshot, fixtureState } from '../../game/fixtures';
 import { deriveRenderSnapshot } from '../../game';
 import type { FixtureName } from '../../game/fixtures';

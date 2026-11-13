@@ -38,7 +38,7 @@ export interface BoardLayout {
   readonly focus: Rect;
   /** Reserved spot for the save icon: rear right corner, clear of the pipe's connector. */
   readonly save: Point;
-  /** Brownout and dark states dim the board's top face. */
+  /** An offline board's top face dims. */
   readonly powered: Rect;
   /** Set dressing: the first of three chokes (null: no room), and the capacitors. */
   readonly chokes: Point | null;

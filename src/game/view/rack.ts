@@ -70,7 +70,6 @@ function serverSlot(state: GameState, rack: number, slot: number, sw: SwitchView
 export function rackSnapshot(state: GameState, id: RackId, parent: NodeRef | null): RackSnapshot {
   const b = state.build.racks[id]!;
   const c = state.compiled.rack, h = state.hot.rack;
-  const crashed = (h.crashed[id] ?? 0) === 1, failed = (h.pduFailed[id] ?? 0) === 1;
   const sw = rackSwitch(state, id);
   const probe = rackProbe(state, id);
   const servers: ServerSlotView[] = [];
@@ -84,14 +83,13 @@ export function rackSnapshot(state: GameState, id: RackId, parent: NodeRef | nul
   const row = Array.from({ length: RACK_SLOTS_PER_ROW }, (_, column) =>
     rackSlot(state, state.compiled.room.racks[rowBase + column] ?? -1));
   return {
-    level: 'rack', parent, rackId: id, slot, row, online: containerMode(state, c.alive[id], c.intent[id], failed, crashed, probe),
+    level: 'rack', parent, rackId: id, slot, row, online: containerMode(state, c.alive[id], c.intent[id], probe),
     timerS: probeTimerS(state, probe),
-    tempF: h.tempF[id] ?? 70, eff: h.eff[id] ?? 1, crashS: ticksToS(h.crashTicks[id] ?? 0), crashed,
+    tempF: h.tempF[id] ?? 70, eff: h.eff[id] ?? 1,
     throttled: (h.throttled[id] ?? 0) === 1,
     cooler: coolerView(c, h, id, b.cooler, rackSurroundF(state, id)),
     pdu: { reservedW: viewW(rackPowerBudget(state.build, id, state.research.unlocks).reserved), ...supplyView('pdu', b.pdu, {
-      capacityW: c.pduCapW[id] ?? 0, usage: h.pduUsage[id] ?? 0, overTicks: h.pduOverTicks[id] ?? 0, failed,
-      rebootTicks: h.pduRebootTicks[id] ?? 0, loss: c.pduLoss[id] ?? 0, capSwitch: (c.pduCapSwitch[id] ?? 0) === 1 && b.pdu.capped, capFactor: 1,
+      capacityW: c.pduCapW[id] ?? 0, usage: h.pduUsage[id] ?? 0, loss: c.pduLoss[id] ?? 0,
     }, siteEnergyPrice(state, state.compiled.room.site[c.room[id] ?? 0] ?? 0)) },
     lb: lbView(state, b.lb, { kind: 0, id, strategy: c.lbStrategy[id] ?? 0, filters: c.lbFilters[id] ?? 0, routed: h.lbRouted[id] ?? 0, last: h.lbLast[id] ?? -1 }),
     switch: sw, powerCtl: powerCtlView(state, id), powerCtlLocked: !genUnlocked(state.research.unlocks, 'powerCtl', 0), servers,

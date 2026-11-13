@@ -4,5 +4,5 @@
  */
 export { admitPhase } from './admit';
 export { runPhase } from './run';
-export { dropAllWork, killSubtree } from './kill';
+export { dropAllWork, killSystem } from './kill';
 export { reconcileAccelerators } from './reconcile';

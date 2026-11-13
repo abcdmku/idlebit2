@@ -8,10 +8,9 @@ import type { QueuedTask } from '../types/state';
 import { baseWeight, CURVE, deadlineJitter, nextIntensity, sizeScale, taskSize } from './curve';
 import { FAMILIES, payoutAt } from './families';
 import { recipeTotals } from './recipes';
-import { canRunFleet, detailIndex, DETAIL_CODE, isDownGate } from './fleet';
+import { canRunFleet, detailIndex, isDownGate } from './fleet';
 import { failTasks } from './sla';
 import { researchQueued } from '../exec/researchTask';
-import { noteTaken } from './frontier';
 
 /**
  * The endless queue (program D10, spec §5.2, §14.1 steps 2 and 7). The window holds the head and next 50
@@ -139,7 +138,6 @@ export function takeHead(w: World, r: number): number {
   else unlink(w.hot, frontList(w.hot), r);
   rec.loc[t] = LOC.free;
   rec.taken[t] = w.tick;
-  noteTaken(w, rec.family[t]!);
   w.hot.g[G.taken] = w.hot.g[G.taken]! + 1;
   const row = ringRow(w);
   w.hot.ring.taken[row] = w.hot.ring.taken[row]! + 1;
@@ -209,8 +207,8 @@ export function dismissAt(w: World, i: number): void {
 /** The head fails at its deadline step (spec §5.2): cantRun when no static-capability hardware can run it. */
 function failHead(w: World): void {
   const gate = headGate(w);
-  // A down fleet fails the head for the reason it is down (power, heat, swap), not as a capability.
-  const cause = gate === 0 ? 'timeout' : !isDownGate(gate) ? 'cantRun' : gate <= DETAIL_CODE.grid ? 'power' : gate <= DETAIL_CODE.room ? 'heat' : 'swap';
+  // A down fleet fails the head as a swap (switched off or swapping), not as a capability.
+  const cause = gate === 0 ? 'timeout' : !isDownGate(gate) ? 'cantRun' : 'swap';
   const detail = gate !== 0 ? detailIndex(gate) : NO_DETAIL;
   const front = w.hot.g[G.frontHead]!;
   if (front >= 0) {

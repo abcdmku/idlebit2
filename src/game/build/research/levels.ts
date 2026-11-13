@@ -26,9 +26,9 @@ export const LEVEL_RESEARCH: readonly ResearchDef[] = (['cstate', 'memoryVoltage
       : [{ kind: 'rule', id: 'bootSeconds', params: { seconds, level } }];
     const effect = series === 'cstate' ? `Idle CPU cores use ${Math.round(factor * 100)}% of their base idle power.`
       : series === 'memoryVoltage' ? `RAM uses ${Math.round(factor * 100)}% of its base power, with the same capacity and bandwidth.`
-      : `Boots, reboots and cold hardware changes take ${secondsToTicks(seconds) * TICK_MS / 1000} s.`;
+      : `Boots and cold hardware changes take ${secondsToTicks(seconds) * TICK_MS / 1000} s.`;
     return { id: researchId(`${series}${level}`), name: NAMES[series], category: series === 'memoryVoltage' ? 'memory' : series === 'cstate' ? 'power' : 'operations',
       requires: [researchId(level === 1 ? 'systemBoard' : `${series}${level - 1}`)], level: 'system', era: 'hz', tier: 1,
       data: 0, creditCost: amount(researchLevelCost(level)), work: 0, effects, effect, summary: effect,
-      answers: [series === 'bootLoader' ? 'downtime' : 'energy'], implemented: true, purchase: { series, level, maxLevel: RESEARCH_LEVEL_MAX } };
+      answers: [series === 'bootLoader' ? 'downtime' : 'energy'], purchase: { series, level, maxLevel: RESEARCH_LEVEL_MAX } };
   }));

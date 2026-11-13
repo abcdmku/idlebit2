@@ -14,7 +14,7 @@ export function marketResearchCpuEnergy(state: GameState): number {
     const used = 1 / Math.max(1, c.threads[id] ?? 1);
     const watts = p.cpuIdle * (used + (1 - used) * p.sleep) + p.cpuLoad * used + p.otherIdle;
     const site = c.site[id] ?? 0, price = REGIONS[state.compiled.site.region[site] ?? 0]!.energyPrice;
-    cost += (watts + supplyLossW(watts, p.cap, p.loss)) * price;
+    cost += watts * price;
   });
   return cost;
 }
@@ -23,7 +23,7 @@ export function marketResearchCpuEnergy(state: GameState): number {
 export function pausedResearchEnergy(state: GameState): number {
   const c = state.compiled, h = state.hot;
   const input = (w: number, cap: number, loss: number, enabled = true) => w + (enabled ? supplyLossW(w, cap, loss) : 0);
-  const systemNow = (s: number) => input(h.sys.drawW[s] ?? 0, c.sys.psuCapW[s] ?? 0, c.sys.psuLoss[s] ?? 0, state.research.unlocks.levels.rack);
+  const systemNow = (s: number) => h.sys.drawW[s] ?? 0;
   const rackNow = (r: number) => input(h.rack.drawW[r] ?? 0, c.rack.pduCapW[r] ?? 0, c.rack.pduLoss[r] ?? 0, c.rack.opened[r] === 1);
   const upsLoss = (room: number, watts: number) => {
     let cap = 0, loss = 0;

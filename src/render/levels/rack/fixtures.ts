@@ -13,15 +13,15 @@ const BASE = LEVEL_FIXTURES.rack;
 
 export interface RackCase {
   id?: number; slot?: number; built?: readonly number[]; servers?: number; ports?: number; active?: readonly number[];
-  uplink?: boolean; tempF?: number; crashed?: boolean; crashS?: number; dark?: boolean; tech?: CoolTech; gen?: number;
-  modes?: Readonly<Record<number, UnitMode>>; cores?: number; usage?: number; overloadS?: number; lbTarget?: number | null;
+  uplink?: boolean; tempF?: number; tech?: CoolTech; gen?: number;
+  modes?: Readonly<Record<number, UnitMode>>; cores?: number; usage?: number; lbTarget?: number | null;
   /** D25: shard flows (server slot → system in `to`) and the LB queue. */
   flows?: readonly FlowCase[]; queue?: LbView['queue'];
   /** Between rounds: every sled rests 'paused'; the slots in `out` sit out the next round (off market). */
   between?: boolean; out?: readonly number[];
   /** D31: Power control installed (battery charge share, seconds left, awake systems); the rest of the sleds sleep. */
   power?: { gen?: number; charge: number; secondsLeft: number | null; awake: number };
-  /** Per row column: overrides of that neighbour's slot view (a crashed, dark or hot neighbour). */
+  /** Per row column: overrides of that neighbour's slot view (a standby or hot neighbour). */
   row?: Readonly<Record<number, Partial<RackSlotView>>>;
 }
 /** D31: a start controller view (rack, room or global). */
@@ -44,13 +44,13 @@ const EMPTY_SLOT: RackSlotView = { rackId: null, state: 'empty', load: 0, tempF:
 /** A rack at room slot `slot` (row-major), with racks in `built` columns of its row. */
 export function rackCase(o: RackCase, timeMs: number): RackRowSnapshot {
   const id = o.id ?? 0, slot = o.slot ?? 2, col = slot % 8, rowBase = slot - col, n = o.servers ?? 9, t = timeMs / 1000;
-  const nPorts = o.ports ?? 12, active = new Set(o.between ? [] : o.active ?? [0, 3, 6]), crashed = !!o.crashed, dark = !!o.dark;
+  const nPorts = o.ports ?? 12, active = new Set(o.between ? [] : o.active ?? [0, 3, 6]);
   const between = !!o.between, out = new Set(o.out ?? []), pw = o.power;
   const ports = Array.from({ length: nPorts }, (_, i) =>
-    port(i < n ? i : null, i < n && active.has(i) && !dark && !crashed, (t * 0.6 + i * 0.29) % 1, Math.min(9, Math.floor(i / 2))));
+    port(i < n ? i : null, i < n && active.has(i), (t * 0.6 + i * 0.29) % 1, Math.min(9, Math.floor(i / 2))));
   const servers: ServerSlotView[] = Array.from({ length: 12 }, (_, i) => {
     if (i >= n) return { ...BASE.servers[11], systemId: null, kind: null, state: 'empty', onMarket: false, port: ports[i] ?? null, load: 0, running: 0, cores: 0, busyCores: 0 };
-    const mode: UnitMode = o.modes?.[i] ?? (dark ? 'dark' : crashed ? 'crashed' : between ? 'paused' : pw && i >= pw.awake ? 'asleep' : 'onMarket'), cores = o.cores ?? [1, 4, 8, 16, 32, 64][i % 6];
+    const mode: UnitMode = o.modes?.[i] ?? (between ? 'paused' : pw && i >= pw.awake ? 'asleep' : 'onMarket'), cores = o.cores ?? [1, 4, 8, 16, 32, 64][i % 6];
     const busy = mode === 'onMarket' ? Math.round(cores * ((i * 37) % 10) / 10) : 0;
     return {
       systemId: systemId(id * 12 + i), kind: i === 8 ? 'storageNode' : 'server', state: mode, onMarket: !out.has(i) && mode !== 'offline' && mode !== 'goingOffline', load: cores ? busy / cores : 0,
@@ -64,13 +64,13 @@ export function rackCase(o: RackCase, timeMs: number): RackRowSnapshot {
     c === col ? neighbour(id, n, 0.6, o.tempF ?? 72, between, out)
       : built.has(c) ? { ...neighbour(100 + rowBase + c, 4 + ((c * 5) % 9), (c % 3) * 0.4, 68 + c * 3, between, between && c % 2 ? new Set([1, 2]) : new Set()), ...o.row?.[c] } : EMPTY_SLOT);
   const s: Mutable<RackRowSnapshot> = {
-    ...BASE, rackId: rackId(id), online: dark ? 'dark' : crashed ? 'crashed' : between ? 'paused' : 'onMarket',
-    tempF: o.tempF ?? 72, eff: (o.tempF ?? 72) > 80 ? 0.86 : 1, crashed, crashS: o.crashS ?? 0,
+    ...BASE, rackId: rackId(id), online: between ? 'paused' : 'onMarket',
+    tempF: o.tempF ?? 72, eff: (o.tempF ?? 72) > 80 ? 0.86 : 1,
     cooler: { ...BASE.cooler, tech: o.tech ?? 'air', generation: o.gen ?? 1, duty: o.tempF && o.tempF > 80 ? 1 : 0.55 },
-    pdu: { ...BASE.pdu, usage: o.usage ?? 0.39, failed: dark, rebootMs: dark ? 6000 : null, overloadS: o.overloadS ?? 0 },
+    pdu: { ...BASE.pdu, usage: o.usage ?? 0.39 },
     lb: { ...BASE.lb, strategy: 'leastConn', lastTarget: o.lbTarget === undefined ? 3 : o.lbTarget, queue: o.queue ?? BASE.lb.queue },
     flows: (o.flows ?? []).map(f => flowAt(f, timeMs)),
-    switch: { ...BASE.switch, generation: 1, ports, uplinks: [port(null, !!o.uplink && !dark, (t * 0.45) % 1, 6)] },
+    switch: { ...BASE.switch, generation: 1, ports, uplinks: [port(null, !!o.uplink, (t * 0.45) % 1, 6)] },
     servers, saveable: true, slot, row,
     powerCtl: pw ? {
       generation: pw.gen ?? 0, level: 2,
@@ -101,12 +101,10 @@ export const CASES: Readonly<Record<string, (timeMs: number) => RackRowSnapshot>
   last: t => rackCase({ slot: 7, built: [4, 5, 6, 7] }, t),
   alone: t => rackCase({ slot: 0, built: [0], servers: 3, ports: 4 }, t),
   full: t => rackCase({ servers: 12, built: [0, 1, 2, 3, 4, 5, 6, 7], active: [0, 1, 2, 5, 9, 11], uplink: true }, t),
-  hot: t => rackCase({ tempF: 94, crashS: 4, usage: 0.95, overloadS: 3 }, t),
-  /** Trouble among running sleds and neighbours: a crashed, a booting, an offline and an asleep sled; a crashed, a dark and a hot neighbour. */
-  mixed: t => rackCase({ servers: 11, tempF: 86, usage: 0.93, uplink: true, modes: { 1: 'crashed', 2: 'boot', 4: 'offline', 7: 'asleep' },
-    built: [0, 1, 2, 3, 4], row: { 1: { state: 'crashed' }, 3: { state: 'dark', powered: false }, 4: { tempF: 97, pduUsage: 1.04 } } }, t),
-  crash: t => rackCase({ tempF: 103, crashed: true }, t),
-  dark: t => rackCase({ dark: true }, t),
+  hot: t => rackCase({ tempF: 94, usage: 0.95 }, t),
+  /** Mixed states among running sleds and neighbours: a booting, an offline and an asleep sled; a standby and a hot neighbour. */
+  mixed: t => rackCase({ servers: 11, tempF: 86, usage: 0.93, uplink: true, modes: { 2: 'boot', 4: 'offline', 7: 'asleep' },
+    built: [0, 1, 2, 3, 4], row: { 3: { state: 'standby', powered: false }, 4: { tempF: 97, pduUsage: 0.96 } } }, t),
   water: t => rackCase({ tech: 'water', gen: 2, tempF: 66 }, t),
   noport: t => rackCase({ servers: 10, ports: 8, modes: { 2: 'boot', 4: 'offline' } }, t),
   paused: t => rackCase({}, t),

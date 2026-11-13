@@ -54,7 +54,7 @@ export const ROWS: Readonly<Record<LevelId, readonly RowDef[]>> = {
 };
 
 /**
- * What a level sells beyond the tray, each from its own quote (A08): the System's PSU, the rack's
+ * What a level sells beyond the tray, each from its own quote (A08): the rack's
  * Power control (D31.3, its fifth infrastructure slot), and each router's queue (D25.7), which is what
  * tapping the load balancer offers. At most two per level.
  */
@@ -79,7 +79,7 @@ export function extraOffer(quotes: readonly Quote[] | undefined): Quote | null {
 
 /** The part quote request behind an extra row at `at`. */
 export function extraRequest(at: NodeRef, def: RowDef): QuoteRequest | null {
-  if (at.level === 'system' && def.slot === 'psu') return { kind: 'part', part: { unit: { kind: 'system', id: at.id }, slot: { kind: 'psu' } } };
+
   // D31: each scope's optional power part (rack Power control, room and global start controllers).
   if (at.level === 'rack' && def.key === 'powerCtl') return { kind: 'power', unit: { kind: 'rack', id: at.id as RackId } };
   if (at.level === 'room' && def.key === 'roomStart') return { kind: 'power', unit: { kind: 'room', id: at.id as RoomId } };
@@ -171,10 +171,9 @@ export interface OfferContext {
 /** What answers a failure or a block: the rows that would let the work run (A02, QA-05). */
 export const WALL_ROWS: Readonly<Partial<Record<FailDetail, readonly string[]>>> = {
   cache: ['cache'], ram: ['ram', 'storage'], disk: ['ram', 'storage'], ecc: ['ram'], gpu: ['gpu'], gpuCores: ['gpu'], vram: ['gpu'], link: ['link'],
-  psu: ['psu'], pdu: ['pdu'], ups: ['ups'], rack: ['rackCooler'], room: ['roomCooler'],
 };
 /** Supplies and coolers: worth buying only near their limit. */
-export const SUPPLY_ROWS: ReadonlySet<string> = new Set(['psu', 'pdu', 'ups', 'rackCooler', 'roomCooler']);
+export const SUPPLY_ROWS: ReadonlySet<string> = new Set(['pdu', 'ups', 'rackCooler', 'roomCooler']);
 /** A row a suggestion may point at: something to buy, or research that opens it; never Max or a dead lock. */
 export const actionable = (o: Offer) => !!o.quote && (o.right.kind === 'price' || o.right.kind === 'research') && !(o.price !== null && o.price <= 0);
 

@@ -78,9 +78,6 @@ function check(raw: unknown): GameState {
   int(frontier.bestRound, 'round.frontier.bestRound');
   int(frontier.bestMet, 'round.frontier.bestMet');
   int(frontier.bestMetRound, 'round.frontier.bestMetRound');
-  const taken = arr(frontier.taken, 'round.frontier.taken');
-  taken.forEach((f, i) => { if (!FAMILIES[int(f, `round.frontier.taken[${i}]`)]) fail('round.frontier.taken', 'unknown family'); });
-  if (int(frontier.takenAtStart, 'round.frontier.takenAtStart') > taken.length) fail('round.frontier.takenAtStart', 'exceeds taken');
   if (round.runwayStart !== null) obj(round.runwayStart, 'round.runwayStart');
   const build = obj(s.build, 'build');
   const lengths = ['systems', 'racks', 'rooms', 'sites'].map((k) => arr(build[k], `build.${k}`).length);

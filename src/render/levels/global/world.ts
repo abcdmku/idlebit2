@@ -54,14 +54,13 @@ function pip(site: SiteView, paused: boolean): string {
     // between rounds: dim green when the site runs next round; an off-market site reads 'offline' (lampOff)
     case 'online': return paused ? PIP_READY : P.led;
     case 'switching': return P.amber;
-    case 'fault': return P.fault;
     default: return P.lampOff;
   }
 }
 function plate(g: G, x: number, y: number, w: number, h: number): void {
   R(g, x - 1, y - 1, w + 2, h + 2, P.ink); R(g, x, y, w, h, PLATE); R(g, x, y, w, 1, PLATE_HI);
 }
-/** A built site's header plate, with its lamp (online, switching, fault). */
+/** A built site's header plate, with its lamp (online, switching, off). */
 function drawSign(g: G, b: Rect, site: SiteView, paused: boolean): void {
   plate(g, b.x, b.y, b.w, SIGN_H);
   R(g, b.x + 2, b.y + 4, 5, 5, P.ink); R(g, b.x + 3, b.y + 5, 3, 3, pip(site, paused));
@@ -147,6 +146,7 @@ export function drawGlobal(g: G, s: GlobalSnapshot, frame: WorldFrame, ctx: Glob
   const gate = s.sites[gw];
   if (gate && gate.siteId !== null) drawCable(g, p, gw, null, live && !!gate.dataPlane?.active);
   for (const L of s.backbone.links) { const r = regionOfSite(s, L.siteId); if (r >= 0 && r !== gw) drawCable(g, p, r, L, live && L.active); }
+  let shut = false;
   for (let i = 0; i < p.cells.length && i < s.sites.length; i++) {
     const site = s.sites[i], b = p.cells[i]!, built = site.siteId !== null;
     if (built) {
@@ -162,8 +162,9 @@ export function drawGlobal(g: G, s: GlobalSnapshot, frame: WorldFrame, ctx: Glob
       const pad = p.pads[i]!, a = g.globalAlpha;
       g.globalAlpha = a * CARD_ALPHA; R(g, b.x, b.y, b.w, b.h, PLATE); g.globalAlpha = a;
       dotted(g, b.x, b.y, b.w, b.h, CARD_EDGE);
-      R(g, b.x + 2, b.y + 4, 5, 5, P.ink); R(g, b.x + 3, b.y + 5, 3, 3, pip(site, frame.paused));
-      if (!site.open) veil(g, b, 0.3);
+      if (site.open || !p.legend) { R(g, b.x + 2, b.y + 4, 5, 5, P.ink); R(g, b.x + 3, b.y + 5, 3, 3, pip(site, frame.paused)); }
+      // a closed region on the grid keeps its name and climate under a lock; the legend says what opens it, once
+      if (!site.open) { veil(g, b, 0.3); if (p.legend) { shut = true; smallLock(g, b.x + 1, b.y + 3); } }
       else if (!view?.sourceActions?.includes(`region${i}`)) cross(g, pad.x + (pad.w >> 1), pad.y + (pad.h >> 1), PAD);
     }
     // Between rounds an off-market site (it sits out the next round) is clearly darker, and so is a
@@ -173,6 +174,7 @@ export function drawGlobal(g: G, s: GlobalSnapshot, frame: WorldFrame, ctx: Glob
     if (built) drawGeneration(g, b, site.generation, standby);
   }
   if (p.lock) drawLock(g, p.lock);
+  else if (shut && p.legend) drawLock(g, p.legend);
   if (live) drawGlobalForks(g, s);
   drawHub(g, p, s, live);
   // D25 shard flows over the cables (none before the sim sends them)
@@ -185,8 +187,8 @@ export function drawGlobal(g: G, s: GlobalSnapshot, frame: WorldFrame, ctx: Glob
   }
 }
 /**
- * The closed regions' plate (list): one quiet, dim card with a lock at the east end of its head line, where the UI
- * prints the research that opens them. The regions' names and climates are its lines (labels.ts).
+ * The closed regions' plate (list) or legend (grid): one quiet, dim card with a lock at the east end of its head line,
+ * where the UI prints the research that opens them. On the list the regions' names and climates are its lines (labels.ts).
  */
 function drawLock(g: G, b: Rect): void {
   const a = g.globalAlpha, x = b.x + b.w - 10, y = b.y + 2;
@@ -195,6 +197,11 @@ function drawLock(g: G, b: Rect): void {
   veil(g, b, 0.3);
   R(g, x, y + 3, 7, 6, P.ink); R(g, x + 1, y + 4, 5, 4, P.mute); px(g, x + 3, y + 5, P.ink); px(g, x + 3, y + 6, P.ink);
   R(g, x + 1, y, 5, 3, P.ink); R(g, x + 2, y + 1, 1, 2, P.mute); R(g, x + 4, y + 1, 1, 2, P.mute); R(g, x + 2, y + 1, 3, 1, P.mute);
+}
+/** A closed cell's lock, 5 × 7, where an open region has its lamp. */
+function smallLock(g: G, x: number, y: number): void {
+  R(g, x + 1, y, 3, 1, P.mute); R(g, x + 1, y + 1, 1, 2, P.mute); R(g, x + 3, y + 1, 1, 2, P.mute);
+  R(g, x, y + 3, 5, 4, P.mute); R(g, x + 2, y + 4, 1, 2, P.ink);
 }
 /** The scheduler hub: its router queue's wells, and one LED per backbone link, lit while it carries a transfer. */
 function drawHub(g: G, p: Plan, s: GlobalSnapshot, live: boolean): void {

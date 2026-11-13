@@ -1,15 +1,13 @@
 import { partName } from '../../game';
-import type { CoolTech, FilterId, PartId, PartSlotKind, QueueStrategyId, RouteStrategyId, UnitKind } from '../../game';
+import type { FilterId, PartId, PartSlotKind, QueueStrategyId, RouteStrategyId, UnitKind } from '../../game';
 
 /** Player-facing names and one-line notes. Copy only: no rule here decides anything. */
 
 export { ROUTE_NAMES, FILTER_NAMES, QUEUE_NAMES, rackLetter, zoneLetter, regionName } from '../../game';
 
-export const COOL_TECH: Readonly<Record<CoolTech, string>> = { air: 'Air', water: 'Water', closedLoop: 'Closed loop' };
-
 /** Plate title per part slot kind. */
 export const SLOT_TITLE: Readonly<Record<PartSlotKind, string>> = {
-  cpu: 'CPU', clock: 'Clock', cache: 'Cache', core: 'Core', scheduler: 'Scheduler', psu: 'Power supply',
+  cpu: 'CPU', clock: 'Clock', cache: 'Cache', core: 'Core', scheduler: 'Scheduler',
   ram: 'RAM', gpu: 'GPU', drive: 'Storage', rackCooler: 'Rack cooling', pdu: 'Rack PDU', lb: 'Load balancer', switch: 'Switch',
   roomCooler: 'Room cooling', roomLb: 'Room load balancer', roomSwitch: 'Network rack', ups: 'UPS', dataPlane: 'Data plane', grid: 'Site grid',
   backbone: 'Backbone link', globalScheduler: 'Global scheduler',
@@ -18,13 +16,6 @@ export const SLOT_TITLE: Readonly<Record<PartSlotKind, string>> = {
 
 /** Noun for "New …" and "Add …" on the configuration plate. */
 export const UNIT_NOUN: Readonly<Record<UnitKind | 'zone', string>> = { system: 'server', rack: 'rack', room: 'zone', zone: 'zone', site: 'site' };
-export const COPY_FROM: Readonly<Record<UnitKind, string>> = {
-  system: 'Copy a server in this rack', rack: 'Copy a rack in this zone', room: 'Copy a zone at this site', site: 'Copy a site',
-};
-
-/** Barebones tier labels (TierId = CPU generation). */
-export const TIER_LABELS = ['Hz', 'kHz', 'MHz', 'GHz', 'THz'] as const;
-export const tierLabel = (tier: number) => TIER_LABELS[tier] ?? `Tier ${tier + 1}`;
 
 /** A generation's display name from the catalog, e.g. "100 kHz switch". */
 export const genName = (part: PartId, generation: number) => partName(part, generation);
@@ -64,7 +55,6 @@ export function filterEffect(id: FilterId, child: RouteChild): string {
   switch (id) {
     case 'region': return "Task's region only";
     case 'capability': return 'Can run the task';
-    case 'health': return 'No fault timer';
     case 'power': return 'Under 90% load';
     case 'thermal': return 'Under 90 °F';
     case 'local': return `One ${child} per task`;

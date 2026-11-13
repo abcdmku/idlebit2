@@ -8,7 +8,7 @@ import type { PlateCommon } from './types';
 export { SETPOINT_MIN_F, SETPOINT_MAX_F };
 export const SETPOINT_STEP_F = 2;
 
-export interface LumpView { tempF: number; crashS: number; crashed: boolean; eff?: number; outsideF?: number }
+export interface LumpView { tempF: number; eff?: number; outsideF?: number }
 export type CoolerUnit = { readonly kind: 'rack'; readonly id: RackId } | { readonly kind: 'room'; readonly id: RoomId };
 
 export function coolerLines(c: CoolerView, _lump: LumpView): Line[] {

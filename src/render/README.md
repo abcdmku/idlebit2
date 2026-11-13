@@ -48,7 +48,7 @@ Every geometry method takes an optional trailing `form` (`'desktop' | 'phone'`, 
 | `followFocus?(s)` | True while the player drags the view (rack row): the rest camera follows the focus with no 0.25 s lerp. |
 | `payoutAnchor?(s, c, out, form)` | The component that completed `c` (a `CompletionView`): CPU core, System socket or GPU card, Rack sled, Room rack, World site. Writes its rect and returns a key stable per component, or -1 when it isn't shown. See Payouts. |
 | `popWindowMs?`, `partVersion?(s, id)`, `restEaseS?` | How long completions join a component's pop (Room 1 s). A number that rises when part target `id` is upgraded, for the purchase flash. Seconds the rest camera eases to a new focus (rack row 0.15). |
-| `faults?`, `icon` | Live fault rects (they smoke), the 16×16 rail icon. |
+| `icon` | The 16×16 rail icon. |
 
 ## Hits and commands
 
@@ -92,7 +92,6 @@ Without a framing the old largest-integer fit applies (harness, previews).
   - Room ↔ Rack: `hallDim(link, reduced)` dims the hall ahead of the push-in (datacenter/world.js `transInfo`).
   - World ↔ Room: `siteSink(link, reduced)` sinks the site into the map (global.js `diveOf`).
   - System ↔ CPU: the camera alone dives into the package (`miniRect`).
-- `transitionAlpha(frame.zoom, key)` tells a mini how far its full world has faded in. `drawContained(g, rect, size, draw)` draws a world into a rect with the zoom's contain transform.
 - Labels fade out over the first 15% of the eased zoom and in over the last 20%, each through its own world's camera (`core/zoomLayer.ts`, A27). Selection brackets hide during a zoom. The HUD and deck are DOM and never move.
 - **Rack row (A06, `rack/row.ts`).** Clamped so the row's first and last racks stop at the view edges. Ending a gesture snaps to the rack pitch in 0.15 s. A tapped neighbour holds for a frame, then eases to the framed rest. The UI divides drag px by `rackRowScroll.scale` (the rest scale) and may call `release(velocity)`.
 - **World (`global/plan.ts`, `layout.ts`, `list.ts`, `pan.ts`).** The map is planned for the free world (`planFor(area, form, snapshot)`), which on desktop spans the callout dock (`spansDock`). The view's fill (`BG.global`) is the map's sea colour.
@@ -101,7 +100,7 @@ Without a framing the old largest-integer fit applies (harness, previews).
   - A region without a site is one quiet card on the grid, and on the list once it is open: a translucent plate in a dim dotted edge with its ground showing through, muted text, no gold. Its pad is a target whether the region is open or not: the UI prints "Add site" and the quoted price on it, or the research that opens the region. A closed region's card is dimmer and has no lamp. A built site's zone add pad keeps the plain plate in a gold dotted edge. A site's empty zones are one pad.
 - **System (`system/layout.ts`).** Each board has three floorplans and rests on the first that fits the free world whole at the shell's N with 16 CSS px to spare in height, else the first that fits at all, else the same at the next scale down (`boardOf`): portrait (156 × 188 art px with the memory rows), landscape (228 × 146: the GPU slots in a column beside the sockets; desktop at 3 and 844 × 390, where the portrait board would run edge to edge) and compact (144 wide: a 40 px memory column, and under the sockets one row of the two GPU slots a general board can fill, each 67 art px wide; 320 px phones). An open GPU slot, and the open RAM or drive slots as one shared add, are plain dark plates on their hit rects. The shared add is the box of open slots that holds the UI's name and price best, and starts under an installed part whose footprint it would otherwise stand on (`model.ts` `openGroup`).
 - **CPU (`chip/layout.ts`).** The die rests whole: `floorOf` takes the first floorplan that fits the free world (desktop: the Control deck die at N, then eight tiles a row at 2; phone: its own die, then the short, broad or small one, then the dense plans on 17 to 27 px tiles: 32 sites whole at 390 × 780 and 844 × 390, 16 at 320 × 568). A dense plan keeps its tile rows on a pitch of 4 art px multiples, so every row's text lands on the text grid alike. A tile under 26 art px keeps its speed, type mark and progress and drops the activity word. Only a die with no plan that fits (320 × 568 past 16 sites) rests at 2 on the densest plan its width fits and pans down from its top (the queue, the cache, the Clock and the first 16 cores), with the pan cue.
-- **One bad frame never stops the loop.** Every level call (draw, labels, targets, children, entry, faults) is guarded. A failure is logged once per place and message (`reportRenderError`) and the frame goes on. A throw anywhere else cuts the zoom, and the next frame draws at rest.
+- **One bad frame never stops the loop.** Every level call (draw, labels, targets, children, entry) is guarded. A failure is logged once per place and message (`reportRenderError`) and the frame goes on. A throw anywhere else cuts the zoom, and the next frame draws at rest.
 
 ## Motion: real state at its real rate
 
@@ -111,8 +110,8 @@ Program §1 and v2 program §7 apply:
 - Lanes, clock LEDs and meters: `rateAnimation(rate, frame.timeMs, cells, active, out)`. A 1 Hz part steps once per second; at `EYE_RATE_HZ` (30) or above it is steady. Idle hardware is still.
 - Fans: `fanAnimation(key, frame.timeMs, cooler.duty, out)`; 3 rev/s at 100% duty on every level.
 - Transfers: `transferProgress(transfer, simTimeMs, timeMs)`; packets travel only when the transfer lasts at least `MIN_VISIBLE_TRANSFER_S`.
-- Timers: `drawUnitLamp(...)`; feed countdowns `secondsLeft(...)`.
-- Glow is temperature (`heatFx`), a fault is `faultFx` while it holds, offline is `darkFx`.
+- Timers: `drawUnitLamp(...)`.
+- Offline is `darkFx`.
 - While `frame.paused`, draw steady power LEDs only. The core draws a light veil (`VEIL_ALPHA` 0.28) so the world stays readable for between-round choices.
 - No idle twinkles, breathing pulses, sheens or decorative blinks.
 
@@ -151,7 +150,7 @@ Work pays on the component that ran it. Nothing flows out to the deck or the HUD
 - `view.ts` is the renderer's frame loop; its parts live beside it: `worldBuffers.ts` (the per-level offscreen buffers, the blit, the selection brackets), `restArea.ts` (a level's free world and framing), `zoomLayer.ts` (the two worlds of a zoom, and what is drawn over them), `restPan.ts`, `feedback.ts`.
 - `unit.ts`: `drawSaveIcon`, `saveIconRect`, `lampState`, `drawUnitLamp`, `drawVeil`.
 - `pops.ts`: `PayoutPops`, `completionMs`, the `Completion` shape (see Payouts).
-- `feed.ts`: `drawCart`, `drawFamilyGlyph` (by `FamilyId`), `drawReq`, `drawCause`, `deadlineMs`.
+- `feed.ts`: `drawCause`.
 - `pipe.ts`: `drawPipe`, `inbound`, `transferProgress`.
 - `familyIcons/` (task types and family icons, D23, for the canvas and the UI shell; the first release's icons, restored at the user's request):
   - Task types group the catalog bands; each has one colour ramp (`TYPE`: name, bands, `a` colour, `d` shade, `l` light, `k` plate) and one frame silhouette.
@@ -164,5 +163,5 @@ Work pays on the component that ran it. Nothing flows out to the deck or the HUD
 
 ## Try it
 
-- `/src/render/core/frame.html`: the real levels over the sim's view fixtures in the Control deck D17 frame (N, lattice, band, strip, pipe). Query: `form=desktop|phone`, `level=chip|system|rack|room|global`, `zoom=<from level>&hold=<0..1>`, `scene=boot|landing|mid|max|paused` (CPU QA scenes), `boot` (boot fixtures: a general board), `case=zones|regions|flows|max|dark|sitout|power|crash` (World cases, `levels/global/fixtures.ts`). Captures: `MSYS_NO_PATHCONV=1 node scripts/qa/capture.mjs --manifest=artifacts/qa/port/ra/manifest.json --out=artifacts/qa/port/ra --game-path=/src/render/core/frame.html`.
+- `/src/render/core/frame.html`: the real levels over the sim's view fixtures in the Control deck D17 frame (N, lattice, band, strip, pipe). Query: `form=desktop|phone`, `level=chip|system|rack|room|global`, `zoom=<from level>&hold=<0..1>`, `scene=boot|landing|mid|max|paused` (CPU QA scenes), `boot` (boot fixtures: a general board), `case=zones|regions|flows|max|sitout|power` (World cases, `levels/global/fixtures.ts`). Captures: `MSYS_NO_PATHCONV=1 node scripts/qa/capture.mjs --manifest=artifacts/qa/port/ra/manifest.json --out=artifacts/qa/port/ra --game-path=/src/render/core/frame.html`.
 - `/src/render/core/harness.html`: every registered level over `LEVEL_FIXTURES`, with zoom buttons and a hold slider. `window.__r1` exposes `go(level)` and `hold(progress)`.

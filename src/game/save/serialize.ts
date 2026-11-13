@@ -6,7 +6,6 @@ import { SAVE_SCHEMA, SAVE_VERSION, type SaveEnvelope } from './schema';
 import { decodeArray, encodeArray, isEncodedArray, type EncodedArray } from './typedArrays';
 import { validateState } from './validate';
 
-export { SAVE_SCHEMA } from './schema';
 
 /**
  * Full state as JSON: typed arrays as base64 (run-length when mostly uniform), shared plain

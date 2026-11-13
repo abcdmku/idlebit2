@@ -175,8 +175,6 @@ export interface LevelRenderer<L extends LevelId = LevelId> {
   restCentre?(snapshot: SnapshotOf<L>, out: Point, hint: NodeRef | null): void;
   /** Optional: the panned rest's snap pitch in art px per axis (Room: the row pitch). */
   panSnap?(snapshot: SnapshotOf<L>): { readonly x: number; readonly y: number };
-  /** Optional: world rects currently faulted (crashed, failed supply). Each gets real smoke. */
-  faults?(snapshot: SnapshotOf<L>, out: Rect[]): number;
   /** 16×16 zoom rail icon. */
   icon(g: CanvasRenderingContext2D): void;
 }
@@ -242,10 +240,6 @@ export function copyHitTarget(source: HitTarget, out: HitTarget): HitTarget {
   out.unit = source.unit; out.sw = source.sw; out.port = source.port; out.slot = source.slot;
   out.rect.x = source.rect.x; out.rect.y = source.rect.y; out.rect.w = source.rect.w; out.rect.h = source.rect.h;
   return out;
-}
-export function sameRef(a: NodeRef | null, b: NodeRef | null): boolean {
-  return a === b || (!!a && !!b && a.level === b.level && a.id === b.id
-    && (a.level !== 'chip' || b.level !== 'chip' || (a.socket ?? 0) === (b.socket ?? 0)));
 }
 /** Allocates; call at navigation time only. */
 export function refKey(ref: NodeRef): string { return `${ref.level}:${ref.id}${ref.level === 'chip' ? `:${ref.socket ?? 0}` : ''}`; }

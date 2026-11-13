@@ -130,7 +130,7 @@ function drawActive(g: G, s: RackSnapshot, view: ViewPresentation, frame: WorldF
       pathAt(patchRoute(i, p.peer, route), p.progress, point); glowBit(g, point.x, point.y, 64, P.bit);
     }
   }
-  // dark rack: the supply failed, so nothing below it has power
+  // a rack in standby is powered off: nothing in it has power
   if (off) {
     const a = g.globalAlpha; g.globalAlpha = a * 0.5;
     R(g, OPEN.x, U0, CAB.w - 18, BAY_H, P.ink); R(g, CAB.x + 1, CAB.roofY + 1, CAB.w - 32, CAB.roofH - 2, P.ink); g.globalAlpha = a;

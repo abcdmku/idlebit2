@@ -5,7 +5,6 @@ import { resetRow } from '../core/table';
 import { openWorld } from '../core/world';
 import { DRAW_FULL, systemDraw } from '../phys/draw';
 import { deriveSettings, type PhysSettings } from '../phys/settings';
-import { supplyLossW } from '../phys/supplies';
 import type { SystemSpec } from '../types/build';
 import { rackId, systemId } from '../types/ids';
 import type { GpuPowerPoint, GpuPowerPreview } from '../types/quotes';
@@ -21,7 +20,7 @@ const scratchCompiled = allocCompiled(SIZE);
 const scratchHot = allocHot(SIZE, 0);
 
 /**
- * The full draw reads only the unlock-wide switches of the settings (packageIdle, psuLive), so
+ * The full draw reads only the unlock-wide switches of the settings (packageIdle), so
  * one derivation per unlocks object serves every preview.
  */
 const settingsMemo = new WeakMap<Unlocks, PhysSettings>();
@@ -49,18 +48,15 @@ function fullLoadPoint(state: GameState, sys: number, spec: SystemSpec): GpuPowe
   h.active[3] = compiled.sys.ioConc[0]!;
   h.dvfsOn[0] = actual.dvfsOn[sys]!;
   h.turboOn[0] = actual.turboOn[sys]!;
-  h.capFactor[0] = actual.capFactor[sys]!;
   hot.rack.throttled[0] = state.hot.rack.throttled[rack]!;
-  hot.rack.capFactor[0] = state.hot.rack.capFactor[rack]!;
   for (let slot = 0; slot < MAX_ACCELS; slot += 1) {
     if (compiled.sys.accelKind[slot] !== 0) h.accelTaskS[slot] = DT_S;
   }
   const preview = openWorld({ ...state, compiled, hot }, true);
   const settings = previewSettings(state);
-  const deliveredW = systemDraw(preview, 0, DRAW_FULL, settings).deliveredW;
-  const capacityW = settings.psuLive ? compiled.sys.psuCapW[0]! : 0;
-  const lossW = capacityW > 0 ? supplyLossW(deliveredW, capacityW, compiled.sys.psuLoss[0]!) : 0;
-  return { deliveredW, capacityW, lossW, inputW: deliveredW + lossW, headroomW: capacityW - deliveredW };
+  const deliveredW = systemDraw(preview, 0, DRAW_FULL, settings);
+  // A system has no supply of its own (D67): gpuPowerPreview fills in the rack PDU's capacity and headroom.
+  return { deliveredW, capacityW: 0, lossW: 0, inputW: deliveredW, headroomW: -deliveredW };
 }
 
 /** Separate from measured card-duty/payback previews: these figures expose whole-system supply fit. */

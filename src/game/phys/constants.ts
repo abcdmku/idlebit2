@@ -2,10 +2,9 @@ import { secondsToTicks } from '../core/constants';
 
 /* Phys starting values (spec §9, §10, Appendix B). Durations are whole ticks. */
 
-/** Supply loss multiplier bands (spec §9.2, D4.3): ×1 up to 90% usage, ×1.5 to 100%, ×3 above. */
-export const SUPPLY_BAND_1 = 0.9;
-export const SUPPLY_BAND_2 = 1;
-export const SUPPLY_MULT = [1, 1.5, 3] as const;
+/** Supply loss multiplier (spec §9.2, D4.3): ×1 up to 90% usage, ×1.5 above. No legal build exceeds 100%. */
+export const SUPPLY_BAND = 0.9;
+export const SUPPLY_MULT_HIGH = 1.5;
 
 /** C-states (spec §9.3): idle factor, ticks idle before it applies, wake latency in ticks. */
 export const CSTATES = [
@@ -20,19 +19,11 @@ export const DVFS_CLOCK = 0.5;
 export const DVFS_LOAD = 0.3;
 export const TURBO_CLOCK = 1.25;
 export const TURBO_LOAD = 1.8;
-export const TURBO_MAX_USAGE = 0.9;
 export const TURBO_MAX_F = 80;
 export const THROTTLE_AT_F = 95;
 export const THROTTLE_UNTIL_F = 90;
 export const THROTTLE_CLOCK = 0.5;
 export const THROTTLE_LOAD = 0.5;
-
-/** Power cap factor in tenths (spec §9.5): 1..10 → 0.1..1.0. Integer steps cannot drift. */
-export const CAP_STEPS_MAX = 10;
-export const CAP_STEPS_MIN = 1;
-export const CAP_HEADROOM = 0.9;
-
-export const UPS_RIDE_TICKS = secondsToTicks(30);
 
 /* Heat (spec §10). */
 export const COOLER_DELTA_F = 20;

@@ -12,8 +12,16 @@ TIMED[MODE.boot] = 1;
 TIMED[MODE.goingOffline] = 1;
 TIMED[MODE.cold] = 1;
 
-/** Sets a system's mode and transition timer (ticks). Phys uses this for dark and crashed. Dirties the rack on a change. */
+/**
+ * Timer columns the last timers phase found with no transition counting down (derived, never state).
+ * setUnitMode is the only writer of a live timer, and it drops the column when it starts one, so a
+ * listed column needs no scan. A copied, loaded or regrown column is a new array and is scanned.
+ */
+const idleTimers = new WeakSet<Int32Array>();
+
+/** Sets a system's mode and transition timer (ticks). Dirties the rack on a change. */
 export function setUnitMode(w: World, sys: number, mode: number, timerTicks = 0): void {
+  if (timerTicks > 0) idleTimers.delete(w.hot.sys.timer);
   if (w.hot.sys.mode[sys] !== mode) {
     noteModeChange(w.hot.sys.mode[sys]!, mode);
     dirtySystem(w, sys);
@@ -25,7 +33,7 @@ export function setUnitMode(w: World, sys: number, mode: number, timerTicks = 0)
 }
 
 /**
- * The mode a system rests in when no transition, failure or crash holds it (spec §4.3):
+ * The mode a system rests in when no transition holds it (spec §4.3):
  * paused between rounds, offline if its switch or an ancestor's is off, otherwise on market.
  * S3 sleep and research use are layered on by phys and exec.
  */
@@ -44,16 +52,17 @@ export function startTransition(w: World, sys: number, mode: 'boot' | 'goingOffl
 
 /**
  * Timers phase (tick step 1): counts down system transitions and applies those that end.
- * Auto-return fires right after it, still in step 1 (core/tick.ts). Supply reboots and crash
- * recoveries are phys timers (power and thermal phases).
+ * Auto-return fires right after it, still in step 1 (core/tick.ts).
  */
 export function timerPhase(w: World): void {
   const { mode, timer } = w.hot.sys;
+  if (idleTimers.has(timer)) return;
   const n = w.hot.sys.len;
+  let counting = false;
   for (let s = 0; s < n; s += 1) {
     const t = timer[s]!;
     if (t <= 0 || TIMED[mode[s]!] !== 1) continue;
-    if (t > 1) { timer[s] = t - 1; continue; }
+    if (t > 1) { timer[s] = t - 1; counting = true; continue; }
     timer[s] = 0;
     const next = mode[s] === MODE.goingOffline ? MODE.offline : restingMode(w, s);
     if (next !== mode[s]) {
@@ -62,6 +71,7 @@ export function timerPhase(w: World): void {
     }
     mode[s] = next;
   }
+  if (!counting) idleTimers.add(timer);
 }
 
 /** True when auto-return is due this tick (a named deadline, spec §4.6). */

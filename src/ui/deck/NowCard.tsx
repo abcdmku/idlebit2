@@ -34,12 +34,13 @@ export function NowCard() {
     .sort((a, b) => BigInt(a.cost) < BigInt(b.cost) ? -1 : BigInt(a.cost) > BigInt(b.cost) ? 1 : 0)[0] ?? null;
   const risk = running && !!head && !head.committed && headRisk(q.met, q.failed, q.checking, q.slaWindow);
   const open = () => { if (head) shell.view.dispatch({ type: 'openTask', task: taskKey(head.task) }); };
-  const status = !running ? 'After Return' : head ? blocked ? blockedText(head) ?? waitingText(head)
+  // A break run that no server can take (spec §11.3) is not waiting for Return.
+  const status = !running ? research?.breakRequested ? 'No server ready' : 'After Return' : head ? blocked ? blockedText(head) ?? waitingText(head)
     : head.waitingFor === 'restart' && restart.on && !head.committed ? restartText(restart) : waitingText(head) : 'Waiting for tasks';
   if (hasTaskDock(L)) return <TaskDock head={head} research={research} running={running} blocked={blocked} status={status} round={round}
     primaryLabel={blocked ? buy ? meetLabel(buy) : 'View fix' : 'Task details'} primaryCost={blocked && buy ? buy.cost : null}
     onPrimary={() => { if (blocked && buy) shell.dispatch(buy.action); else open(); }} />;
-  return <section className={`panel now task-now${blocked ? ' blocked' : ''}${head ? ' has-head' : ''}`} data-k="now" aria-label={research ? 'Research next in line' : 'Next task'} data-testid="now"
+  return <section className={`panel now task-now${blocked ? ' blocked' : ''}${head ? ' has-head' : ''}`} data-k="now" aria-label={research ? running ? 'Research next in line' : research.breakRequested ? 'Research, no server ready' : 'Research after Return' : 'Next task'} data-testid="now"
     style={{ ...box(L.now), ...taskTypeStyle(head?.family), ...(risk ? { '--rim': 'var(--fault)' } : {}) } as CSSProperties}>
     <RimClock w={L.now.w} n={L.N} blocked={blocked} />
     {head && <TaskAccent n={L.N} />}
@@ -53,7 +54,7 @@ export function NowCard() {
       </div>
       <div className="task-hardware">{head && <TaskFacts task={head} />}</div>
       <div className="task-state">
-        <span className={blocked ? 'warn' : 'mute'} data-testid="now-wait">{research ? 'Research next in line' : status}</span>
+        <span className={blocked ? 'warn' : 'mute'} data-testid="now-wait">{research ? running ? 'Research next in line' : 'Research after Return' : status}</span>
         <span className="task-clock">{research ? research.progress > 0 ? `${Math.floor(research.progress * 100)}% done` : null
           : !running ? round.phase !== 'ended' && <AutoReturn compact />
           : head?.committed ? <InQueue task={head} short={L.kind === 'phone'} />

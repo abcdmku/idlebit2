@@ -1,7 +1,7 @@
 // D31.3 rack Power control: the battery (time until billed) and the rack's start controller, one unit in
 // the rack's fifth infrastructure slot under the cooler. Empty: its add row (or the research it needs).
 // Installed: the battery row, the Start row, then upgrade and replace as on every part plate.
-import { formatClock, type GameAction, type PowerCtlView, type RackId, type ResearchId } from '../../game';
+import type { GameAction, PowerCtlView, RackId, ResearchId } from '../../game';
 import { genName } from './copy';
 import { quantity } from './format';
 import { PlateFrame } from './PlateFrame';
@@ -9,14 +9,6 @@ import { PowerKeys, powerGeneration } from './PowerKeys';
 import { StartRow } from './StartRow';
 import { Bar } from './widgets';
 import type { PlateCommon } from './types';
-
-/** The battery line: "BAT 4:12 left" while it carries the rack (the rack LCD's clock, QA-14), "On grid" once empty. */
-export function batteryText(b: PowerCtlView['battery']): string {
-  if (b.discharging && b.secondsLeft !== null) return `Battery · ${formatClock(b.secondsLeft)} left`;
-  if (b.chargeJ <= 0) return 'On grid · battery empty';
-  if (b.chargeJ >= b.capacityJ) return b.secondsLeft !== null ? `Battery full · ${formatClock(b.secondsLeft)} at this draw` : 'Battery full';
-  return `On grid · battery ${Math.round((b.chargeJ / b.capacityJ) * 100)}%`;
-}
 
 export interface PowerCtlPlateProps extends PlateCommon {
   rack: RackId;

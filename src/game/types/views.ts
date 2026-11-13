@@ -68,8 +68,8 @@ export interface ShardDoneView {
  * System modes (spec §4.3), plus `empty` for a slot with no unit. MODE_IDS index = the u8 in
  * hot `sys.mode`. `draining` = going offline with gracefulDrain, still running its tasks.
  */
-/** D31: `standby` = powered off by a start controller (0 W, not a split candidate); appended so saved mode codes keep their indexes. */
-export const UNIT_MODES = ['empty', 'onMarket', 'asleep', 'boot', 'goingOffline', 'draining', 'offline', 'paused', 'cold', 'crashed', 'dark', 'standby'] as const;
+/** D31: `standby` = powered off by a start controller (0 W, not a split candidate). */
+export const UNIT_MODES = ['empty', 'onMarket', 'asleep', 'boot', 'goingOffline', 'draining', 'offline', 'paused', 'cold', 'standby'] as const;
 export type UnitMode = (typeof UNIT_MODES)[number];
 
 export interface PowerBudgetView {
@@ -89,14 +89,8 @@ export interface SupplyView {
   readonly capacityW: number;
   readonly deliveredW: number;
   readonly usage: number;
-  /** Seconds accumulated; 0 hides the readout. */
-  readonly overloadS: number;
-  readonly failed: boolean;
-  readonly rebootMs: number | null;
   readonly loss: number;
   readonly lossW: number;
-  readonly capped: boolean;
-  readonly capFactor: number;
   /** Credits per minute of its delivered watts plus loss at the region's price, float64; display only ("<1" or whole). */
   readonly creditsPerMinute: number;
 }
@@ -198,7 +192,7 @@ export interface MemTierView {
   readonly rateBits: number | null;
 }
 
-export type PartViewKind = 'cpu' | 'core' | 'clock' | 'cache' | 'scheduler' | 'ram' | 'gpu' | 'npu' | 'drive' | 'psu';
+export type PartViewKind = 'cpu' | 'core' | 'clock' | 'cache' | 'scheduler' | 'ram' | 'gpu' | 'npu' | 'drive';
 export interface PartView {
   /** Independent bandwidth/IO level on RAM and drives. */
   readonly speedLevel?: number;
@@ -462,6 +456,12 @@ export interface ResearchQueueEntryView {
   readonly threads: number;
   /** Research ops per second this tick (0 while waiting). */
   readonly opsPerSec: number;
+  /**
+   * Between rounds: the player asked for this break's run (spec §11.3). With `running` false it
+   * was asked for but no paused, linked server can take it; without it the project waits for
+   * Return to market. Always false while a round runs.
+   */
+  readonly breakRequested: boolean;
 }
 /**
  * One shard moving over a link at its real speed (D10.4, D12.4, D25.4). All shards of one take
@@ -511,7 +511,7 @@ export type ResearchNodeState = 'done' | 'active' | 'parked' | 'queued' | 'avail
  */
 export type ResearchPartId =
   | 'cores' | 'clock' | 'cache' | 'queue' | 'fab'
-  | 'cpu' | 'ram' | 'drive' | 'gpu' | 'psu' | 'board'
+  | 'cpu' | 'ram' | 'drive' | 'gpu' | 'board'
   | 'switch' | 'lb' | 'rackCooling' | 'rackPower'
   | 'netRack' | 'roomCooling' | 'ups'
   | 'dataPlane' | 'backbone' | 'site' | 'globalScheduler'
@@ -602,9 +602,3 @@ export interface ResearchTreeView {
   readonly creditsPerMinute: Amount;
 }
 export interface SavedConfigsView { readonly kind: UnitKind; readonly names: readonly string[] }
-export interface QueuePage {
-  readonly systemId: SystemId;
-  readonly offset: number;
-  readonly total: number;
-  readonly tasks: readonly TaskView[];
-}
