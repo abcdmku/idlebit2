@@ -941,7 +941,7 @@ Every installed part allocates its full load against its rack PDU, including off
 
 **Starter supplies (D80).** The UPS and grid limits are checked only from the moment their level opens, and a Rack-era PDU can hold far more than a level 1 UPS: opening Room with a Metered PDU could put a legal build 61× over it. So a zone or site opens with its starter UPS or grid feed raised, free, to the lowest level that carries the allocation it inherits.
 
-Basic PDU capacity starts at 7.15e6 sim W (1 mW shown, D85) and doubles per level. Rack research costs 270k Data and 2.7M Credits, with 27M CPU ops of work (D80; 18M before). The seed-42 campaign unlocks Rack at 3:48. No timer grants this access.
+Basic PDU capacity starts at 7.15e6 sim W (1 mW shown, D85) and doubles per level. Rack research costs 5M Data and 50M Credits (D88; 270k and 2.7M before), with 27M CPU ops of work (D80; 18M before). The seed-42 campaign unlocks Rack at 3:48. No timer grants this access.
 
 **`dualFeed`.** A zone may hold a second UPS. The zone's load splits equally between the two, and the zone's limit is twice the smaller UPS's capacity.
 

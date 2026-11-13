@@ -88,7 +88,7 @@ D19 stretches the game to months. Data and work are now fitted to the real campa
 | CPU, round 1 | 0:00–0:05 | round 1 ends 4:38–4:50 (1:00 without purchases) | — |
 | System (`systemBoard`) | 30–60 min | 0:53 | 0:51 |
 | kHz (`fabKhz`) | — | 3:33 | 3:33 |
-| Rack (`rack`) | 5–8 h | 6:48 | 6:48 |
+| Rack (`rack`) | 2–5 h (D88) | 2:50–3:29 (seeds 42/1042/2042, D88) | — |
 | MHz (`fabMhz`) | — | about 1 d 6 h | 1 d 20 h |
 | Room (`room`) | 2–4 days | 3 d 2 h – 3 d 6 h | 2 d 19 h |
 | GHz (`fabGhz`) | — | see `docs/tasks.md` §9 | 6 d 23 h |
@@ -131,7 +131,7 @@ Structure unlocks and fab generations cost 3× their tier, so each era jump is a
 | W3 | 1,000 | 3,000 | Rounds 2–4 earn about 4,000 each |
 | W4 | 12,000 | 36,000 | `systemBoard` lands at 0:46–0:53 under the 1 kHz pipe cap (D19: 30–60 min) |
 | W5 | 15,000 | 45,000 | Pre-Rack Data income is about 60,000 per hour |
-| W6 | 50,000 | 150,000 | `fabKhz` at 3:33 and `rack` at 6:20; **Rack** opens at 6:40–6:48 (D19: 5–8 h) |
+| W6 | 50,000 | 150,000 | `fabKhz` at 3:33; `rack` itself is priced at 5M Data (D88) so **Rack** opens at 2:50–3:29 (band 2–5 h) |
 | W7 | 1e6 | 3e6 | Rack-era nodes: 10–20 min of Rack Data (5e6–6e6 per hour) |
 | W8 | 4e6 | 1.2e7 | under an hour of Rack Data |
 | W9 | 1.5e7 | 4.5e7 | — | `fabMhz` at about 1 d 6 h |
@@ -776,7 +776,7 @@ export const RESEARCH_V3: readonly ResearchNode[] = [
   // Structure
   n("systemBoard", "System", "structure", [], "system", "hz", 3, 40_000, [view("system"), gen("ram", 0), gen("storage", 0), gen("gpu", 0), gen("npu", 0), cap("cpuSockets", 4), cap("ramSlots", 4), cap("gpuSlots", 2), cap("driveSlots", 4), rule("ecc", { price: 1.25, watts: 1.1 }), rule("accelBoard", { sockets: 2, ramSlots: 8, gpuSlots: 8 })], ["ram", "gpu", "storage"]),
   // Work is RACK_WORK_OPS = 27e6 in tree.ts (D80), not the tier's volume.
-  n("rack", "Rack", "structure", ["fabKhz"], "rack", "khz", 7, 270_000, [view("rack"), gen("rackCooler", 0), gen("pdu", 0), gen("lb", 0), gen("switch", 0)], ["density", "rackDist"]),
+  n("rack", "Rack", "structure", ["fabKhz"], "rack", "khz", 7, 5_000_000, [view("rack"), gen("rackCooler", 0), gen("pdu", 0), gen("lb", 0), gen("switch", 0)], ["density", "rackDist"]),
   n("room", "Room", "structure", ["rack", "fabMhz"], "room", "mhz", 10, 1.2e8, [view("room"), gen("roomCooler", 0), gen("ups", 0), gen("row", 0)], ["density", "roomDist"]),
   n("dataCenter", "Data center", "structure", ["room", "stealRoom"], "global", "ghz", 12, 6e8, [view("global"), gen("dataPlane", 0), gen("grid", 0), gen("zone", 0), cap("siteZones", 2)], ["multiAz"]),
   n("regions", "Regions", "structure", ["dataCenter", "zoneAware"], "global", "ghz", 13, 1.2e9, [gen("site", 0), gen("backbone", 0), cap("sites", 4)], ["region"]),

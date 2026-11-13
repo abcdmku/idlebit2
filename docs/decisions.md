@@ -2102,3 +2102,11 @@ Owner direction: fix the post-Rack research crawl in both the game and the bot.
 Owner direction, closing D85 item 3. Replace CPU installs the new generation's cache at L1 instead of the lowest level that keeps the old capacity. kHz L1 holds 1,024 bits, more than a Hz cache up to L11; larger working sets spill to RAM until the player levels it. Cores still keep capacity. The seed-42 kHz package falls from about 380M Credits of value to under 1M.
 
 **Check (10 h, seeds 42, 1042, 2042, with D84–D86).** Every seed leaves the Hz CPU by 0:46–1:10 and grows: 9–12 systems, 53–61 research nodes, 2.6B–26.8B Credits and 0.5B–1.5B Data at 10 h (was 1 system and 1.27B Credits). Rack opens at 1:35–1:45, ahead of its 3:30–5:00 band. A Rack Data price of 1M or 2.5M (from 270k) moves it only to about 2:00, because income now compounds; pacing is open in `docs/backlog.md`.
+
+## D88, 13 Nov: Rack in 2–5 h, priced at 5M Data
+
+Owner direction: settle Rack pacing at 2–5 hours.
+
+1. **Band.** The Rack pacing target is 2:00–5:00 (was 3:30–5:00; D19's 5–8 h before that). `probes/pacing.ts` checks it.
+2. **Price.** After D85–D87 income compounds, so Rack opened at 1:35–1:45 as soon as its 270k Data was saved. `rack` now costs 5M Data and 50M Credits; its 27M ops of work are unchanged.
+3. **Check (8 h, seeds 42, 1042, 2042).** Rack Data 2.5M opened it at 1:59–2:08, 5M at 2:50–3:29, 10M at 4:50–5:22 and 20M at 5:41–6:13. 5M sits mid-band on every seed, with 2–12 systems and 54–55 research by 8 h.

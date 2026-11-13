@@ -7,7 +7,7 @@ import { deferredHardwareResearch } from './runtimeCompatibility';
 import { LEVEL_RESEARCH } from './levels';
 import { REWARD_RESEARCH } from '../../rewards/research';
 
-/** Rack's work volume: sized so the seed-42 campaign opens Rack inside 3:30–5:00 (docs/research.md, D79). */
+/** Rack's work volume (D79). Its 5M Data price (D88) holds the campaign's Rack inside 2:00–5:00. */
 const RACK_WORK_OPS = 27e6;
 const creditsOnly = new Set(CREDITS_ONLY);
 

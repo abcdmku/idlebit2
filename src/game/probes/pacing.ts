@@ -24,7 +24,7 @@ const MILESTONE_TARGETS: readonly [string, keyof Milestones, number, number][] =
   // Program D19 from System on.
   ['System unlocked', 'systemS', 20 * M, 30 * M],
   // D19 as amended 26 Oct (Rack research 9e6 Data, so the pipe wall lands as Rack comes within reach).
-  ['Rack unlocked', 'rackS', 3.5 * H, 5 * H],
+  ['Rack unlocked', 'rackS', 2 * H, 5 * H],
   ['Room unlocked', 'roomS', 2 * D, 4 * D],
   ['Data center (zones)', 'dataCenterS', 7 * D, 14 * D],
   ['Regions', 'regionsS', 14 * D, 28 * D],
