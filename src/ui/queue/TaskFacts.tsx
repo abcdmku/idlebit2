@@ -1,5 +1,5 @@
-import { regionName, type QueueEntryView } from '../../game';
-import { wholeText } from '../hooks/format';
+import { regionName, type Quote, type QueueEntryView } from '../../game';
+import { amountText, wholeText } from '../hooks/format';
 import { taskBits } from '../hooks/taskRequirements';
 import { CoinIcon, GemIcon } from '../plates/icons';
 
@@ -27,4 +27,12 @@ export function TaskFacts({ task, detailed = false }: { task: QueueEntryView; de
       {task.ecc && <span>ECC memory</span>}
     </>}
   </div>;
+}
+
+/** A fix key's price: its currency, and the Credit part of a mixed D83 purchase. */
+export function QuoteCost({ quote: q }: { quote: Pick<Quote, 'cost' | 'currency' | 'creditCost'> }) {
+  return <>
+    <span className="task-reward">{q.currency === 'data' ? <GemIcon /> : <CoinIcon />}{amountText(q.cost)}</span>
+    {q.currency === 'data' && q.creditCost && q.creditCost !== '0' && <span className="task-reward"><CoinIcon />{amountText(q.creditCost)}</span>}
+  </>;
 }

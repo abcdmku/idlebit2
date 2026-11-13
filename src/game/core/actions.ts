@@ -39,7 +39,7 @@ export function debitCredits(state: GameState, price: Amount): ActionOutcome {
   });
 }
 
-/** Debits whole Data (research starts only, D3.4). */
+/** Debits whole Data (research starts, D3.4; Data parts, D83). */
 export function debitData(state: GameState, cost: Amount): ActionOutcome {
   if (amountCompare(state.wallet.data, cost) < 0) return reject(state, 'funds', 'Not enough Data');
   return accept({

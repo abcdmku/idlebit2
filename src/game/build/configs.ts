@@ -126,7 +126,7 @@ export function planApplyConfig(state: GameState, unit: UnitRef, name: string): 
     const want = (saved.config as SystemConfig).spec;
     const r = mergeSpec(sys.spec, want);
     const l = systemLock(u, want);
-    if (l) return locked(l, saved.name, r.price);
+    if (l) return locked(l, saved.name, r.price, () => withSpec(state.build, unit.id, r.spec));
     return planned({ build: withSpec(state.build, unit.id, r.spec), price: r.price, cold: r.cold ? coldScopes(state, unit) : [] }, saved.name);
   }
   if (unit.kind === 'rack') {
@@ -162,7 +162,7 @@ export function planApplyConfig(state: GameState, unit: UnitRef, name: string): 
       if (r.cold) cold.add(s);
       build = withSpec(build, s, r.spec);
     });
-    if (l) return locked(l, saved.name, m.price);
+    if (l) return locked(l, saved.name, m.price, () => build);
     const scopes = m.cold ? coldScopes(state, unit) : [...cold].flatMap((s) => coldScopes(state, { kind: 'system', id: s as never }));
     return planned({ build, price: m.price, cold: scopes }, saved.name);
   }

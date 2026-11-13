@@ -10,6 +10,7 @@ export { applyAction } from './core/actions';
 export { selectBankruptcy } from './core/bankruptcy';
 export { deriveRenderSnapshot } from './view/snapshot';
 export { quote } from './build/quotes';
+export { CREDITS_PER_DATA_PART } from './build/currency';
 export { SETPOINT_MIN_F, SETPOINT_MAX_F } from './build/settings';
 export { selectSystemPower } from './view/systemPower';
 export { tierOf, tierValue } from './view/frontier';

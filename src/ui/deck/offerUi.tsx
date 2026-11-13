@@ -9,8 +9,17 @@ import type { Offer } from './offers';
 export function Coin({ n }: { n: number }) {
   return <ArtCanvas w={5} h={5} n={n} artKey="coin5" className="inl" draw={g => { g.clearRect(0, 0, 5, 5); g.drawImage(SPR.coin5, 0, 0); }} />;
 }
+export function Gem({ n }: { n: number }) {
+  return <ArtCanvas w={5} h={5} n={n} artKey="gem5" className="inl" draw={g => { g.clearRect(0, 0, 5, 5); g.drawImage(SPR.gem5, 0, 0); }} />;
+}
+/** The offer's price in its currency; a mixed D83 purchase adds its Credit part. */
 export function PriceText({ offer, n }: { offer: Offer; n: number }) {
-  return <span className={offer.affordable ? 'gold' : 'currency-short'}><Coin n={n} /> {wholeText(offer.price ?? 0)}</span>;
+  const data = offer.quote?.currency === 'data', credits = data ? Number(offer.quote?.creditCost ?? 0) : 0;
+  const tone = (c: string) => offer.affordable ? c : 'currency-short';
+  return <>
+    <span className={tone(data ? 'data' : 'gold')}>{data ? <Gem n={n} /> : <Coin n={n} />} {wholeText(offer.price ?? 0)}</span>
+    {credits > 0 && <> <span className={tone('gold')}><Coin n={n} /> {wholeText(credits)}</span></>}
+  </>;
 }
 export function LockGlyph({ n }: { n: number }) {
   return <ArtCanvas w={7} h={8} n={n} artKey="lock" className="inl" style={{ verticalAlign: 'middle' }} draw={g => { g.clearRect(0, 0, 7, 8); g.drawImage(SPR.lock, 0, 0); }} />;

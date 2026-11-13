@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react';
 import type { Quote, ResearchId } from '../../game';
 import { QuoteKey } from './widgets';
+import { costWords } from './purchaseText';
 
 export interface Option { readonly verb: string; readonly name: string; readonly quote: Quote; readonly effect?: ReactNode }
 export interface OptionRowProps {
@@ -10,7 +11,7 @@ export interface OptionRowProps {
 export function OptionRow({ option: o, primary = false, onAction, onResearch, researchName, className = '' }: OptionRowProps & { className?: string }) {
   const label = o.verb === 'Replace' ? o.name : o.verb;
   return <div className={className}><QuoteKey quote={o.quote} label={label} tone={primary ? '' : 'replace'}
-    ariaLabel={o.verb + ': ' + o.name + ', ' + o.quote.cost + ' Credits'}
+    ariaLabel={o.verb + ': ' + o.name + ', ' + costWords(o.quote)}
     onAction={onAction} onResearch={onResearch} researchName={researchName} /></div>;
 }
 export function OptionList({ options, className = '', rowClassName = '', ...row }: { options: readonly Option[]; className?: string; rowClassName?: string }

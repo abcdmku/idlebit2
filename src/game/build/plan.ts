@@ -1,6 +1,7 @@
 import type { ActionOutcome, GameAction, RejectionCode } from '../types/actions';
 import type { PartRef, UnitRef } from '../types/ids';
 import type { LockReason } from '../types/quotes';
+import type { BuildState } from '../types/build';
 import type { GameState } from '../types/state';
 import { reject } from '../core/actions';
 import { commitBuild, type BuildChange } from './commit';
@@ -11,12 +12,16 @@ import { commitBuild, type BuildChange } from './commit';
  */
 export type Plan =
   | { readonly ok: true; readonly change: BuildChange; readonly label: string }
-  | { readonly ok: false; readonly code: RejectionCode; readonly reason: string; readonly lock: LockReason | null; readonly price: bigint | null; readonly label: string };
+  | {
+    readonly ok: false; readonly code: RejectionCode; readonly reason: string; readonly lock: LockReason | null; readonly price: bigint | null; readonly label: string;
+    /** A locked purchase of several parts: the build it would make, so its quote splits currencies as the buy will (D83). */
+    readonly after?: () => BuildState;
+  };
 
 export const fail = (code: RejectionCode, reason: string, label = '', price: bigint | null = null): Plan =>
   ({ ok: false, code, reason, lock: code === 'locked' || code === 'cap' ? { code: code === 'cap' ? 'cap' : 'research', node: null, text: reason } : null, price, label });
-export const locked = (lock: LockReason, label = '', price: bigint | null = null): Plan =>
-  ({ ok: false, code: lock.code === 'research' ? 'locked' : 'cap', reason: lock.text, lock, price, label });
+export const locked = (lock: LockReason, label = '', price: bigint | null = null, after?: () => BuildState): Plan =>
+  ({ ok: false, code: lock.code === 'research' ? 'locked' : 'cap', reason: lock.text, lock, price, label, ...(after ? { after } : {}) });
 export const planned = (change: BuildChange, label: string): Plan => ({ ok: true, change, label });
 
 /** Runs a plan as an action. */

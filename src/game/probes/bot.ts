@@ -3,7 +3,8 @@ import { overSupply } from '../build/overSupply';
 import { marketResearchCpuEnergy } from '../build/researchEnergy';
 import { POWER_SCALE } from '../core/constants';
 import { capacity } from '../build/catalog/curves';
-import { amountCompare, amountToNumber } from '../amount';
+import { CREDITS_PER_DATA_PART } from '../build/currency';
+import { amount, amountCompare, amountToNumber, type Amount } from '../amount';
 import {
   applyAction, quote, rackId, REGIONS, roomId, selectMarketQueue, selectResearchTree, systemId,
   type GameAction, type GameState, type MeetNeed, type Quote, type QuoteRequest, type ResearchNodeView, type ScopeRef,
@@ -23,8 +24,14 @@ function ratePurchase(_state: GameState, q: Quote): boolean {
     || !!q.gpu?.before || ramTarget(q.action) !== null && q.effect?.unit === 'bit/s';
 }
 
+/** D83: a hardware quote's Credit part, its Data part, and its whole Credit value for payback. */
+const creditsOf = (q: Quote): number => amountToNumber(q.currency === 'credits' ? q.cost : q.creditCost ?? '0');
+const dataOf = (q: Quote): number => q.currency === 'data' ? amountToNumber(q.cost) : 0;
+const valueOf = (q: Quote): number => creditsOf(q) + dataOf(q) * Number(CREDITS_PER_DATA_PART);
+const atLeast = (have: Amount, need: number): Amount => amountCompare(have, need) >= 0 ? have : amount(Math.ceil(need));
+
 function fundedScore(state: GameState, q: Quote): number | null {
-  return score(q.affordable ? state : { ...state, wallet: { ...state.wallet, credits: q.cost } }, q);
+  return score(q.affordable ? state : { ...state, wallet: { ...state.wallet, credits: atLeast(state.wallet.credits, creditsOf(q)), data: atLeast(state.wallet.data, dataOf(q)) } }, q);
 }
 
 function configurePowerModes(state: GameState, log: BotEvent[]): GameState {
@@ -67,10 +74,10 @@ function cpuNeedsSupply(state: GameState, system: number, part: 'pdu' | 'ups'): 
   if (!q || (q.locked && q.locked.code !== 'power') || !q.affordable || q.overSupply?.part !== part) return false;
   const payback = score(state, q);
   const researchBoost = state.research.active !== null && q.effect?.researchOpsBefore !== undefined && q.effect.researchOpsAfter !== undefined
-    && q.effect.researchOpsAfter >= 8 * Math.max(1, q.effect.researchOpsBefore) && Number(q.cost) <= Number(state.wallet.credits) / 3;
+    && q.effect.researchOpsAfter >= 8 * Math.max(1, q.effect.researchOpsBefore) && creditsOf(q) <= Number(state.wallet.credits) / 3;
   // A budgeted research-speed investment may need the supply at its limit raised before its final
   // completion budget can be quoted.
-  return researchBoost || payback !== null && (payback <= CPU_SAVE_PAYBACK_S || Number(q.cost) <= Number(state.wallet.credits) / 2);
+  return researchBoost || payback !== null && (payback <= CPU_SAVE_PAYBACK_S || creditsOf(q) <= Number(state.wallet.credits) / 2);
 }
 
 /**
@@ -294,7 +301,7 @@ const GATE_PAYBACK_S = 20;
  * GPU) carry no rate; they are priced against current income, so cheap gates come early.
  */
 export function score(state: GameState, q: Quote): number | null {
-  const cost = amountToNumber(q.cost);
+  const cost = valueOf(q);
   const a = q.action;
   const battery = powerCtlScore(state, a, cost);
   if (battery !== undefined) return battery;
@@ -457,13 +464,13 @@ function supplyNeeded(state: GameState, a: GameAction): boolean {
   }
 }
 
-/** Affordable, unlocked Credit purchases; cold ones only between rounds. */
+/** Affordable, unlocked hardware purchases (Credits or D83 Data); cold ones only between rounds. */
 export function buyable(state: GameState, quotes: readonly Quote[], recovery: ReadonlySet<Quote> = new Set(), includeUnaffordable = false): Quote[] {
   const running = state.round.phase === 'running';
-  return quotes.filter((q) => q.currency === 'credits' && q.locked === null && (q.affordable || includeUnaffordable)
+  return quotes.filter((q) => q.action.type !== 'startResearch' && q.locked === null && (q.affordable || includeUnaffordable)
     && !q.overSupply
     && !(state.research.active !== null && q.effect?.researchCooling)
-    && amountCompare(q.cost, '0') > 0 && !(running && q.cold)
+    && valueOf(q) > 0 && !(running && q.cold)
     && supplyImproves(q) && (recovery.has(q) || gpuImproves(q)) && gpuFitsSupply(state, q) && memoryImproves(state, q));
 }
 
@@ -548,10 +555,11 @@ export function nextCpuSave(state: GameState): number {
   const q = quote(state, { kind: 'tray', at: { level: 'system', id: systemId(id) } }).quotes.find((x) => x.action.type === 'replaceCpu');
   // Affordable but cold mid-round still counts: the reserve holds until the round ends and the bot can buy it.
   if (!q || q.locked !== null) return 0;
-  const cost = amountToNumber(q.cost);
-  const rich = tryAction({ ...state, round: { ...state.round, phase: 'between' }, wallet: { ...state.wallet, credits: q.cost } }, q.action);
+  const rich = tryAction({ ...state, round: { ...state.round, phase: 'between' },
+    wallet: { ...state.wallet, credits: atLeast(state.wallet.credits, creditsOf(q)), data: atLeast(state.wallet.data, dataOf(q)) } }, q.action);
   const gain = rich ? marketGain(state, rich) : 0;
-  return gain > 0 && cost / gain <= CPU_SAVE_PAYBACK_S ? cost : 0;
+  // The reserve holds Credits; the Data part waits on the Data wallet.
+  return gain > 0 && valueOf(q) / gain <= CPU_SAVE_PAYBACK_S ? creditsOf(q) : 0;
 }
 
 function buyParts(state: GameState, policy: Policy, log: BotEvent[], need: MeetNeed): GameState {
@@ -571,7 +579,7 @@ function buyParts(state: GameState, policy: Policy, log: BotEvent[], need: MeetN
     for (const q of [...quotes]) {
       if ((q.locked && q.locked.code !== 'power') || !q.affordable || !q.overSupply || !gpuImproves(q) || score(s, q) === null) continue;
       const prep = supplyPreparation(s, q);
-      if (prep && Number(prep.cost) + Number(q.cost) + Number(s.round.reports.at(-1)?.energy ?? 0) <= Number(s.wallet.credits)) {
+      if (prep && creditsOf(prep) + creditsOf(q) + Number(s.round.reports.at(-1)?.energy ?? 0) <= Number(s.wallet.credits)) {
         quotes.push(prep); dependencies.add(prep);
       }
     }
@@ -580,7 +588,7 @@ function buyParts(state: GameState, policy: Policy, log: BotEvent[], need: MeetN
     const pending = log.reduce<BotEvent | undefined>((last, e) => e.researchCapacityAdded ? e : last, undefined);
     const eligible = buyable(s, quotes, recovery, true);
     const scores = new Map(eligible.map(q => [q, dependencies.has(q)
-      ? GATE_PAYBACK_S * Number(q.cost) / Math.max(1, grossRate(s)) : fundedScore(s, q)]));
+      ? GATE_PAYBACK_S * valueOf(q) / Math.max(1, grossRate(s)) : fundedScore(s, q)]));
     for (const q of eligible) {
       const roomPort = false;
       if (!q.affordable) continue;
@@ -598,16 +606,16 @@ function buyParts(state: GameState, policy: Policy, log: BotEvent[], need: MeetN
       // shorter completion bill instead of reserving the old, much longer project's energy.
       if (!roomPort && s.research.unlocks.levels.system) {
         const next = cpuTarget(q.action) !== null && s.round.phase !== 'running' && s.research.active !== null ? tryAction(s, q.action) : null;
-        const bill = next && researchInvestment(s, next, Number(q.cost)) !== null
+        const bill = next && researchInvestment(s, next, valueOf(q)) !== null
           ? researchLeftS(next) * researchEnergy(next) : Number(s.round.reports.at(-1)?.energy ?? 0);
-        if (credits - Number(q.cost) < bill) continue;
+        if (credits - creditsOf(q) < bill) continue;
       }
       // A purchase that pays back within the reserve horizon brings the saved-for research sooner (D32: research costs Credits too).
       const quick = !cpuSaving && s.research.unlocks.levels.rack && v !== null && v <= RESERVE_HORIZON_S;
       const blockingGate = recovery.has(q) && !ratePurchase(s, q);
       if (!dependencies.has(q) && !blockingGate && reserve > 0 && !quick
         && (cpuSaving || (!q.gpu && !answersRecentWall(s, q.action)))
-        && q.action.type !== 'replaceCpu' && credits - amountToNumber(q.cost) < reserve) continue;
+        && q.action.type !== 'replaceCpu' && credits - creditsOf(q) < reserve) continue;
       // A researched shrink is immediately useful when cores no longer fit.
       const bestIsPort = false;
       if (v !== null && (roomPort && !bestIsPort || roomPort === bestIsPort && v < bestScore)) {
@@ -620,7 +628,7 @@ function buyParts(state: GameState, policy: Policy, log: BotEvent[], need: MeetN
     if (!next) break;
     const beforeRate = s.build.systems.reduce((n, sys, i) => n + (sys?.online ? (s.compiled.sys.threadRate[i] ?? 0) * (s.compiled.sys.threads[i] ?? 0) : 0), 0);
     const afterRate = next.build.systems.reduce((n, sys, i) => n + (sys?.online ? (next.compiled.sys.threadRate[i] ?? 0) * (next.compiled.sys.threads[i] ?? 0) : 0), 0);
-    log.push({ tick: s.clock.tick, kind: 'buy', label: best.label, cost: best.cost,
+    log.push({ tick: s.clock.tick, kind: 'buy', label: best.label, cost: String(Math.round(valueOf(best))),
       ...(s.research.unlocks.levels.rack && afterRate > beforeRate * 1.01 ? { researchCapacityAdded: true } : {}),
     });
     s = next;

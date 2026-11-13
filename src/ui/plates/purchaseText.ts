@@ -1,5 +1,5 @@
 import type { Quote, ResearchId } from '../../game';
-import { bitRate, bits, measureUnit, ops, watts } from './format';
+import { bitRate, bits, measureUnit, ops, watts, wholeText } from './format';
 
 /** The component's resulting stats, kept within the existing two-line buy key. */
 export function purchaseGain(q: Quote): string {
@@ -35,5 +35,12 @@ export function purchaseReason(q: Quote, researchName?: (id: ResearchId) => stri
   const lock = q.locked;
   if (lock?.code === 'research' && lock.node) return `Needs ${researchName?.(lock.node) ?? lock.text.replace(/^Needs /, '')}`;
   if (lock) return lock.text === 'Max' ? 'Max level' : lock.text;
-  return q.affordable ? null : 'Not enough Credits';
+  return q.affordable ? null : q.currency === 'credits' ? 'Not enough Credits' : q.creditCost && q.creditCost !== '0' ? 'Not enough Data or Credits' : 'Not enough Data';
 }
+
+/** A price in words for screen readers: "40 Data and 120 Credits" for a mixed D83 purchase. */
+export const costWords = (q: Pick<Quote, 'cost' | 'currency' | 'creditCost'>): string => {
+  const whole = (a: string) => wholeText(Math.trunc(Number(a)));
+  if (q.currency === 'credits') return `${whole(q.cost)} Credits`;
+  return q.creditCost && q.creditCost !== '0' ? `${whole(q.cost)} Data and ${whole(q.creditCost)} Credits` : `${whole(q.cost)} Data`;
+};

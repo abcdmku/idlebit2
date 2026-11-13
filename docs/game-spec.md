@@ -1004,7 +1004,7 @@ whole = floor(energyMeter);  wallet -= whole;  energyMeter -= whole
 - "Completed tasks" are tasks met this tick: a split task joins the sums once, with its full payout, in the tick its last shard completes (D25.5). Finished shards of unmet tasks add nothing.
 - `whole` is an integral float64, converted to an integer `Amount` exactly (`BigInt(whole)`). Above 2^53 Credits per tick the meter's fraction is lost; that is harmless.
 - The wallet changes only by whole Credits, so it never holds a fraction (program D2).
-- The wallet may go negative only through energy debits. Purchases need `wallet >= price`. Research starts need `data >= cost` (§11.1).
+- The wallet may go negative only through energy debits. Purchases need `wallet >= price` in each currency they charge (§12.3, D83). Research starts need `data >= cost` (§11.1).
 - Round totals and the HUD's energy cost use the whole Credits debited.
 
 D56 applies the claimed market Data dividend after base whole Data is calculated and the claimed energy Credit discount when billing whole energy Credits. Each percentage keeps its own fractional remainder. Neither changes base task payment, physical watts or heat. Manual reward claims bypass this operating ledger and receive no dividend.
@@ -1219,6 +1219,8 @@ clock or RAM upgrade  = ceil(upgrade[g] × 1.7^(L−1) × drive)
 - `ceil` rounds up to a whole Credit, in exact decimal arithmetic. All prices are whole Credits (program D2).
 
 Every price below, after its multipliers, is rounded up with `ceil` to whole Credits.
+
+**Currency (D83).** Every price above is a Credit value. Cache, RAM capacity, drive capacity and accelerator cards (GPU, NPU) are paid in Data at `ceil(value ÷ 50)`, one Data per 50 Credits, about what tasks pay out per Data. Clocks, the RAM and drive Speed tracks and every other part are paid in Credits. A purchase that buys both kinds, such as Replace CPU, an added CPU, a new system or rack, or a config, charges each part in its own currency. Its price shows the Data first, then the Credits. Refunds return half the paid value in the currency it was paid in.
 
 Special prices:
 - **Extra units.** A core, RAM module, GPU, NPU or drive bought when `n >= 1` of that kind are already in the system (per socket for cores) costs `installPrice × 1.25^(n − 1)` **(s)**; cores use 1.65 **(s)**, as in v2.

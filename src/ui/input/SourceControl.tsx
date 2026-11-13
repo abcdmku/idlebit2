@@ -2,7 +2,7 @@ import { useEffect, useRef } from 'react';
 import type { HitTarget, Rect } from '../../render/core';
 import { selectResearchTree, type ResearchId } from '../../game';
 import { useQuote, useShell } from '../storeHooks';
-import { Price } from '../plates/widgets';
+import { Price, quotePrice } from '../plates/widgets';
 import { purchaseReason } from '../plates/purchaseText';
 import { sourceAction, sourceExtraRequest, sourceRequest, runSourceAction } from './sourceAction';
 
@@ -144,7 +144,7 @@ export function SourceControl({ target }: { target: HitTarget }) {
       {/* A locked site says what unlocks it where its price would stand. */}
       {add && research && <span className="source-price source-lock" data-qa-label>{detail}</span>}
       {!research && q.cost !== '0' && <span className="source-price" data-qa-label>{model.choice ? <span className="source-from">from </span>
-        : !disabled && !add && <span aria-hidden="true">↑ </span>}<Price cost={q.cost} currency={q.currency} affordable={q.affordable} /></span>}</span>
+        : !disabled && !add && <span aria-hidden="true">↑ </span>}<Price {...quotePrice(q)} affordable={q.affordable} /></span>}</span>
     </button>
   </div>;
 }

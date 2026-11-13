@@ -1,7 +1,7 @@
 import type { Quote, ResearchId } from '../../game';
-import { overloadWarning, resultingSpecs, purchaseGain, purchaseReason } from './purchaseText';
+import { costWords, overloadWarning, resultingSpecs, purchaseGain, purchaseReason } from './purchaseText';
 import { LockIcon } from './icons';
-import { Price } from './widgets';
+import { Price, quotePrice } from './widgets';
 
 /** Catalog order is generation order. Prefer the capacity-preserving quote for the next one. */
 export function nextGeneration(quotes: readonly Quote[]): Quote | undefined {
@@ -41,10 +41,10 @@ export function GenerationAction({ quote, primary = false, onAction, onResearch,
   const announcedLabel = node ? label : `Upgrade to ${fullTarget}`;
   // A lock's reason stays; resulting specs give way to the price in a narrow key.
   const why = !!quote.locked, detail = why ? reason : overloadWarning(quote) || spec;
-  const price = !(quote.locked && quote.cost === '0') && <Price cost={quote.cost} currency={quote.currency} affordable={quote.affordable} />;
+  const price = !(quote.locked && quote.cost === '0') && <Price {...quotePrice(quote)} affordable={quote.affordable} />;
   return <button type="button" className={`key generation-action${primary && !node ? '' : ' replace'}`} disabled={disabled}
     data-research-target={node ?? undefined} data-purchase-action={!node ? JSON.stringify(quote.action) : undefined}
-    aria-label={[announcedLabel, !node && spec, !node && reason, !node && `${quote.cost} Credits`].filter(Boolean).join('. ')}
+    aria-label={[announcedLabel, !node && spec, !node && reason, !node && costWords(quote)].filter(Boolean).join('. ')}
     onClick={event => { event.stopPropagation(); if (!disabled) { if (node) onResearch?.(node); else onAction(quote); } }}>
     {node ? <><span className="kl">{label}</span><span className="pz"><LockIcon /></span></> : <>
       <span className="gen-name"><span className="gen-target">{name}</span><span className="gen-verb">Upgrade to</span></span>

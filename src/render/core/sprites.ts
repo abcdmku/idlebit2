@@ -37,12 +37,15 @@ export function stamp(g: CanvasRenderingContext2D, sprite: CanvasImageSource, x:
 const COIN5 = ['.kkk.', 'kwyyk', 'kyyok', 'kyook', '.kkk.'];
 const COIN8 = ['..kkkk..', '.kwyyyk.', 'kwyyyyok', 'kwyyyyok', 'kyyyyyok', 'kyyyyook', '.kooook.', '..kkkk..'];
 const GEM8 = ['...kk...', '..kwtk..', '.kwttdk.', 'kwtttddk', 'kttttddk', '.kttddk.', '..kddk..', '...kk...'];
+const GEM5 = ['..k..', '.kwk.', 'kwtdk', '.kdk.', '..k..'];
 const LOCK = ['..kkk..', '.k...k.', '.k...k.', 'kkkkkkk', 'kgggggk', 'kggkggk', 'kgggggk', 'kkkkkkk'];
 const ARROW = ['...k...', '..kwk..', '.kyyyk.', 'kkyyykk', '..kyk..', '..kok..', '..kkk..'];
 const coinMap = { k: P.goldInk, w: P.goldHi, y: P.gold, o: P.goldLo };
 const drawCoin5: DrawSprite = g => g.drawImage(pix(COIN5, coinMap), 0, 0);
 const drawCoin8: DrawSprite = g => g.drawImage(pix(COIN8, coinMap), 0, 0);
-const drawGem: DrawSprite = g => g.drawImage(pix(GEM8, { k: '#06372a', w: P.dataHi, t: P.data, d: P.dataLo }), 0, 0);
+const gemMap = { k: '#06372a', w: P.dataHi, t: P.data, d: P.dataLo };
+const drawGem: DrawSprite = g => g.drawImage(pix(GEM8, gemMap), 0, 0);
+const drawGem5: DrawSprite = g => g.drawImage(pix(GEM5, gemMap), 0, 0);
 const drawLock: DrawSprite = g => g.drawImage(pix(LOCK, { k: P.ink, g: P.silk }), 0, 0);
 const drawArrow: DrawSprite = g => g.drawImage(pix(ARROW, { k: P.ink, w: P.goldHi, y: P.gold, o: P.goldLo }), 0, 0);
 const drawArrowDim: DrawSprite = g => g.drawImage(pix(ARROW, { k: P.ink, w: P.silkLo, y: P.silkLo, o: P.silkLo }), 0, 0);
@@ -50,6 +53,7 @@ export const SPR = {
   get coin5() { return cached('coin5', 5, 5, drawCoin5); },
   get coin8() { return cached('coin8', 8, 8, drawCoin8); },
   get gem8() { return cached('gem8', 8, 8, drawGem); },
+  get gem5() { return cached('gem5', 5, 5, drawGem5); },
   get lock() { return cached('lock', 7, 8, drawLock); },
   get arrow() { return cached('arrow', 7, 7, drawArrow); },
   get arrowDim() { return cached('arrowDim', 7, 7, drawArrowDim); },

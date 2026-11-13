@@ -8,6 +8,7 @@ import { powerInstallPlans } from './powerParts';
 import type { InfraSlot } from '../types/catalog';
 import { amount, amountCompare } from '../amount';
 import { investmentChange } from './investments';
+import { singleCost, splitCost } from './currency';
 import { MAX_ACCELS, TICK_MS } from '../core/constants';
 import type { GameAction } from '../types/actions';
 import { FILTER_IDS, ROUTE_STRATEGY_IDS, QUEUE_STRATEGY_IDS } from '../types/catalog';
@@ -144,10 +145,21 @@ function inboundQuotes(state: GameState, at: NodeRef): Quote[] {
 }
 
 /** Turns a plan into a quote. Locked and failed plans still show their price when they have one. */
-export function toQuote(state: GameState, action: GameAction, plan: Plan, effect: EffectPreview | null = null, currency: Currency = 'credits'): Quote {
+export function toQuote(state: GameState, action: GameAction, plan: Plan, effect: EffectPreview | null = null): Quote {
   const price = planPrice(plan) ?? 0n;
-  const cost = amount(price.toString());
-  const wallet = currency === 'credits' ? state.wallet.credits : state.wallet.data;
+  const maintenance = action.type === 'downgradePart' || action.type === 'removePart' || action.type === 'removeUnit';
+  const single = singleCost(action, price);
+  const after = plan.ok ? plan.change.build : single === null ? plan.after?.() : undefined;
+  const capital = after && (single === null || maintenance) ? investmentChange(state.build, after, price, action) : null;
+  // D83: Data parts pay their value ÷ CREDITS_PER_DATA_PART in Data; a mixed purchase leads with Data and adds the Credit part.
+  // A locked plan with no build to split (only ECC conversion, quoted at 0) falls back to its action's currency.
+  const split = single ?? capital?.cost ?? splitCost(price, action.type === 'convertRamToEcc' ? price : 0n);
+  const currency: Currency = split.data > 0n ? 'data' : 'credits';
+  const cost = amount((currency === 'data' ? split.data : split.credits).toString());
+  const creditCost = currency === 'data' && split.credits > 0n ? amount(split.credits.toString()) : null;
+  const affordable = (split.data <= 0n || amountCompare(state.wallet.data, split.data.toString()) >= 0)
+    && (split.credits <= 0n || amountCompare(state.wallet.credits, split.credits.toString()) >= 0);
+  const refund = capital && maintenance ? capital.refund : null;
   const cold = isCold(plan);
   const gpuEffect = action.type === 'installGpu' && plan.ok ? partEffect(state, {
     unit: { kind: 'system', id: action.system },
@@ -157,9 +169,8 @@ export function toQuote(state: GameState, action: GameAction, plan: Plan, effect
   const shownEffect = warning.overSupply && rawEffect?.marketEstimate
     ? { ...rawEffect, paybackS: null, paybackBlockedBySupply: true } : rawEffect;
   return {
-    action, label: plan.label, cost, currency, affordable: price <= 0n || amountCompare(wallet, cost) >= 0,
-    ...(plan.ok && (action.type === 'downgradePart' || action.type === 'removePart' || action.type === 'removeUnit')
-      ? { refund: amount(investmentChange(state.build, plan.change.build, plan.change.price, action).refund.toString()) } : {}),
+    action, label: plan.label, cost, currency, affordable, ...(creditCost ? { creditCost } : {}),
+    ...(refund ? { refund: amount(refund.credits.toString()), ...(refund.data > 0n ? { dataRefund: amount(refund.data.toString()) } : {}) } : {}),
     locked: plan.ok ? null : plan.lock ?? { code: plan.code === 'occupied' ? 'occupied' : plan.code === 'roundState' ? 'roundState' : 'fit', node: null, text: plan.reason },
     cold, downtimeMs: cold && state.round.phase === 'running' ? state.research.unlocks.bootTicks * TICK_MS : 0,
     effect: shownEffect, workOps: null, ...gpuMetadata(state, action, plan), ...warning,

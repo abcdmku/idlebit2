@@ -109,7 +109,7 @@ export function planAddUnit(state: GameState, parent: ScopeRef, slot: number, so
   const u = state.research.unlocks;
   const added: number[] = [];
   const done = (price: bigint, lock: LockReason | null, build: () => BuildState): Plan =>
-    (lock ? locked(lock, label, price) : planned({ build: build(), price, added }, label));
+    (lock ? locked(lock, label, price, () => build()) : planned({ build: build(), price, added }, label));
   switch (parent.kind) {
     case 'rack': {
       const rack = b.racks[parent.id];

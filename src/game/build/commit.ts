@@ -1,5 +1,5 @@
 import { amount } from '../amount';
-import { debitCredits } from '../core/actions';
+import { debitCredits, debitData, reject } from '../core/actions';
 import { MODE, restingMode, setUnitMode, startTransition } from '../core/timers';
 import { compileAll, syncHotSizes } from '../core/topology';
 import { commitWorld, openWorld, type World } from '../core/world';
@@ -7,6 +7,7 @@ import { killSystem } from '../exec';
 import { reconcileHardware } from '../exec/hardware';
 import type { ActionOutcome, GameAction } from '../types/actions';
 import { investmentChange } from './investments';
+import { singleCost } from './currency';
 import type { BuildState } from '../types/build';
 import type { UnitRef } from '../types/ids';
 import type { GameState } from '../types/state';
@@ -14,7 +15,7 @@ import type { GameState } from '../types/state';
 /** One validated edit of `build`, ready to commit. */
 export interface BuildChange {
   readonly build: BuildState;
-  /** Whole Credits to debit (re-quoted by the handler, never from the client). */
+  /** Whole Credit value (re-quoted by the handler, never from the client); D83 Data parts pay it ÷ CREDITS_PER_DATA_PART in Data. */
   readonly price: bigint;
   /** Reserved plan metadata; component edits are live. */
   readonly cold?: readonly UnitRef[];
@@ -39,13 +40,20 @@ export function systemsUnder(build: BuildState, unit: UnitRef): number[] {
  * relinquished hardware. Only newly installed systems boot; existing systems stay live.
  */
 export function commitBuild(state: GameState, change: BuildChange, action?: GameAction): ActionOutcome {
+  const capital = investmentChange(state.build, change.build, change.price, action);
+  // The quote's rule (quotes.ts): one-kind actions pay one currency, mixed ones split by asset (D83).
+  const cost = (action && singleCost(action, change.price)) ?? capital.cost;
   let next = state;
-  if (change.price > 0n) {
-    const paid = debitCredits(state, amount(change.price.toString()));
+  if (cost.credits > 0n) {
+    const paid = debitCredits(next, amount(cost.credits.toString()));
     if (!paid.ok) return paid;
     next = paid.state;
   }
-  const capital = investmentChange(state.build, change.build, change.price, action);
+  if (cost.data > 0n) {
+    const paid = debitData(next, amount(cost.data.toString()));
+    if (!paid.ok) return reject(state, paid.rejection.code, paid.rejection.reason);
+    next = paid.state;
+  }
   const build: BuildState = { ...change.build, investments: capital.investments, revision: state.build.revision + 1 };
   const compiled = compileAll(build, state.research, state.roundRewards);
   const after: GameState = { ...next, build, compiled };
@@ -63,6 +71,7 @@ export function commitBuild(state: GameState, change: BuildChange, action?: Game
     else setUnitMode(w, s, restingMode(w, s));
   }
   reconcileHardware(w, old, action);
-  w.ledger.credits += capital.refund;
+  w.ledger.credits += capital.refund.credits;
+  w.ledger.data += capital.refund.data;
   return { ok: true, state: commitWorld(after, w, state.clock.carryMs) };
 }

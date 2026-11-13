@@ -175,10 +175,11 @@ export function planAdd(state: GameState, system: SystemId, kind: BoardPartKind,
   const n = spec.cpuCount;
   const cpu = spec.cpu;
   const commit = (next: SystemSpec, price: bigint, label: string, cap: { have: number; limit: number; key?: Parameters<typeof ceilingLock>[1] } | null, part: LeveledPartId | null): Plan => {
-    if (part) { const lock = genLock(u, part, g); if (lock) return locked(lock, label, price); }
+    const after = () => withSpec(state.build, system, next);
+    if (part) { const lock = genLock(u, part, g); if (lock) return locked(lock, label, price, after); }
     if (cap && cap.have + 1 > cap.limit) {
       const lock = cap.key ? ceilingLock(u, cap.key, cap.have + 1) : null;
-      return locked(lock ?? { code: 'cap', node: null, text: 'No free slot' }, label, price);
+      return locked(lock ?? { code: 'cap', node: null, text: 'No free slot' }, label, price, after);
     }
     return planned({ build: withSpec(state.build, system, next), price }, label);
   };

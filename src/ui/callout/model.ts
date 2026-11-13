@@ -84,9 +84,8 @@ export function calloutModel(t: HitTarget, focus: LevelSnapshot, quotes: QuoteRe
   } else {
     const q = quotes ? primaryQuote(t, quotes.quotes) : null;
     if (q) {
-      const credits = q.currency === 'credits';
       change = q.effect ? changeText(q.effect) : q.label;
-      offer = { quote: q, price: q.locked || !credits ? null : Math.ceil(Number(q.cost)), affordable: !q.locked && credits && q.affordable,
+      offer = { quote: q, price: q.locked ? null : Math.ceil(Number(q.cost)), affordable: !q.locked && q.affordable,
         lock: q.locked?.text ?? null, where: false };
     }
   }

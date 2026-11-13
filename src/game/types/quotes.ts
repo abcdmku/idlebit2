@@ -115,10 +115,12 @@ export interface Quote {
   readonly overSupply?: OverSupply;
   readonly gpuPower?: GpuPowerPreview;
   readonly gpu?: { readonly before: GpuStats | null; readonly after: GpuStats };
-  /** Additional Credit fee when the primary currency is Data. */
+  /** The Credit part when the primary currency is Data (research D32; mixed hardware D83). */
   readonly creditCost?: Amount;
   /** Whole Credits returned by a downgrade or removal. */
   readonly refund?: Amount;
+  /** Whole Data returned for D83 Data parts. */
+  readonly dataRefund?: Amount;
   readonly action: GameAction;
   readonly label: string;
   readonly cost: Amount;

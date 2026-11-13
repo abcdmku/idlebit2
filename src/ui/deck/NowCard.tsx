@@ -12,12 +12,12 @@ import { stripOf } from '../QueueStrip';
 import { headRisk } from '../queue/risk';
 import { restartKey, restartOf, restartText } from '../queue/restart';
 import { AutoReturn, HeadClock, InQueue, roundOf, TaskIcon } from '../queue/taskText';
-import { TaskFacts, TaskRewards } from '../queue/TaskFacts';
+import { QuoteCost, TaskFacts, TaskRewards } from '../queue/TaskFacts';
+import { costWords } from '../plates/purchaseText';
+import { quoteValue } from './offers';
 import { box, useLayout } from '../shell/geometry';
 import { shallowEqual, useGameSelector, useShell, useViewState } from '../storeHooks';
 import { meetLabel, useMeet } from '../queue/meet';
-import { amountText } from '../hooks/format';
-import { CoinIcon } from '../plates/icons';
 import '../styles/task-cards.css';
 import { hasTaskDock } from '../layout';
 import { TaskDock } from './TaskDock';
@@ -30,15 +30,15 @@ export function NowCard() {
   const head = research ? null : q.window[0] ?? null, running = !q.frozen && round.phase === 'running';
   const blocked = running && !!head && head.blockedBy !== null;
   const meet = useMeet(blocked && !head.committed ? head : null);
-  const buy = meet.filter(quote => quote.currency === 'credits' && !quote.locked && quote.affordable && !quote.cold && !quote.overSupply && BigInt(quote.cost) > 0n)
-    .sort((a, b) => BigInt(a.cost) < BigInt(b.cost) ? -1 : BigInt(a.cost) > BigInt(b.cost) ? 1 : 0)[0] ?? null;
+  const buy = meet.filter(quote => !quote.locked && quote.affordable && !quote.cold && !quote.overSupply && BigInt(quote.cost) > 0n)
+    .sort((a, b) => quoteValue(a) - quoteValue(b))[0] ?? null;
   const risk = running && !!head && !head.committed && headRisk(q.met, q.failed, q.checking, q.slaWindow);
   const open = () => { if (head) shell.view.dispatch({ type: 'openTask', task: taskKey(head.task) }); };
   // A break run that no server can take (spec §11.3) is not waiting for Return.
   const status = !running ? research?.breakRequested ? 'No server ready' : 'After Return' : head ? blocked ? blockedText(head) ?? waitingText(head)
     : head.waitingFor === 'restart' && restart.on && !head.committed ? restartText(restart) : waitingText(head) : 'Waiting for tasks';
   if (hasTaskDock(L)) return <TaskDock head={head} research={research} running={running} blocked={blocked} status={status} round={round}
-    primaryLabel={blocked ? buy ? meetLabel(buy) : 'View fix' : 'Task details'} primaryCost={blocked && buy ? buy.cost : null}
+    primaryLabel={blocked ? buy ? meetLabel(buy) : 'View fix' : 'Task details'} primaryCost={blocked && buy ? buy : null}
     onPrimary={() => { if (blocked && buy) shell.dispatch(buy.action); else open(); }} />;
   return <section className={`panel now task-now${blocked ? ' blocked' : ''}${head ? ' has-head' : ''}`} data-k="now" aria-label={research ? running ? 'Research next in line' : research.breakRequested ? 'Research, no server ready' : 'Research after Return' : 'Next task'} data-testid="now"
     style={{ ...box(L.now), ...taskTypeStyle(head?.family), ...(risk ? { '--rim': 'var(--fault)' } : {}) } as CSSProperties}>
@@ -63,9 +63,9 @@ export function NowCard() {
       <div className="task-actions">
         <button type="button" className={`skey task-action${blocked ? ' warn' : ''}`} data-testid="now-detail" data-qa-target
           disabled={!head || !running || taskOpen} title={blocked && buy ? meetLabel(buy) : undefined}
-          aria-label={blocked && buy ? `Fix ${head ? familyName(head.family) : 'task'} for ${amountText(buy.cost)} Credits` : head ? `${familyName(head.family)}: details` : 'Task details'}
+          aria-label={blocked && buy ? `Fix ${head ? familyName(head.family) : 'task'} for ${costWords(buy)}` : head ? `${familyName(head.family)}: details` : 'Task details'}
           onClick={() => { if (blocked && buy) shell.dispatch(buy.action); else open(); }}>
-          {blocked ? buy ? <><span>{meetLabel(buy).split(' ')[0]}</span><span className="task-reward"><CoinIcon />{amountText(buy.cost)}</span></> : 'View fix' : 'Details'}
+          {blocked ? buy ? <><span>{meetLabel(buy).split(' ')[0]}</span><QuoteCost quote={buy} /></> : 'View fix' : 'Details'}
         </button>
         {running || round.phase === 'ended' ? <button type="button" className="skey task-action" data-testid="dismiss" data-qa-target
           disabled={!running || !head?.dismissible || taskOpen} title={head ? `Dismiss ${familyName(head.family)}: free, no SLA change` : undefined}

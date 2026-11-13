@@ -1,18 +1,16 @@
 import { useEffect, useRef, useState } from 'react';
-import type { Amount, QueueEntryView, ResearchQueueEntryView } from '../../game';
+import type { Quote, QueueEntryView, ResearchQueueEntryView } from '../../game';
 import { taskBits, waitingShort } from '../hooks/taskRequirements';
 import { clockTone, useHeadSeconds } from '../hooks/headClock';
 import { box, useLayout } from '../shell/geometry';
 import { useShell, useViewState } from '../storeHooks';
 import { useInnerBack } from '../shell/backGuard';
 import { useDialogFocus } from '../hooks/useDialogFocus';
-import { TaskFacts, TaskRewards } from '../queue/TaskFacts';
+import { QuoteCost, TaskFacts, TaskRewards } from '../queue/TaskFacts';
 import { returnToMarket } from '../input/commands';
 import { roundOf } from '../queue/taskText';
 import { ArtCanvas } from '../art/ArtCanvas';
 import { drawMiniIcon, type PartIconKind } from '../art/deckArt';
-import { amountText } from '../hooks/format';
-import { CoinIcon } from '../plates/icons';
 import '../styles/task-dock.css';
 
 interface DockProps {
@@ -24,7 +22,7 @@ interface DockProps {
   round: ReturnType<typeof roundOf>;
   primaryLabel: string;
   /** The fix's quoted price when the primary key buys it. */
-  primaryCost: Amount | null;
+  primaryCost: Quote | null;
   onPrimary(): void;
 }
 
@@ -110,6 +108,6 @@ function TaskDrawer({ head, research, status, blocked, running, primaryLabel, pr
       <dt>Status</dt><dd className={blocked ? 'warn' : 'mute'} data-testid="now-wait">{status}</dd>
     </dl>
     {head && <button type="button" className={`skey task-drawer-details${blocked ? ' warn' : ''}`} disabled={!running}
-      data-testid="now-detail" data-qa-target onClick={onPrimary}>{primaryLabel}{primaryCost !== null && <span className="task-reward"><CoinIcon />{amountText(primaryCost)}</span>}</button>}
+      data-testid="now-detail" data-qa-target onClick={onPrimary}>{primaryLabel}{primaryCost !== null && <QuoteCost quote={primaryCost} />}</button>}
   </section>;
 }

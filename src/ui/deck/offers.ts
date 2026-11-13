@@ -1,7 +1,7 @@
 // What the deck can buy: the build rows, the one Buy key and the callouts all read one offer list
 // built from quotes (A08). Prices, locks and effects come from the sim; this file only words them,
 // in one grammar (A14): name · change · a right column (price, "Needs <node>", "Max" or "At <place>").
-import type { EffectPreview, FailDetail, LevelId, NodeRef, PartSlotKind, Quote, QuoteRequest, RackId, RoomId } from '../../game';
+import { CREDITS_PER_DATA_PART, type EffectPreview, type FailDetail, type LevelId, type NodeRef, type PartSlotKind, type Quote, type QuoteRequest, type RackId, type RoomId } from '../../game';
 import type { PartIconKind } from '../art/deckArt';
 import { measureUnit } from '../plates/format';
 
@@ -27,7 +27,7 @@ export interface Offer {
   readonly change: string;
   /** The quote a Buy dispatches; null when nothing is offered here yet. */
   readonly quote: Quote | null;
-  /** Whole Credits, or null when locked or not for sale. */
+  /** Whole price in the quote's currency (D83: Data parts in Data), or null when locked or not for sale. */
   readonly price: number | null;
   readonly affordable: boolean;
   /** The sim's lock copy, including research and fit reasons. */
@@ -136,7 +136,7 @@ export function offerOf(def: RowDef, q: Quote | undefined, link = def.key === 'l
   }
   // A first add reads "Add …": a count from 0, or a card into a free bay (QA-15: never "GPU 0 → …" beside an installed card).
   const e = q.effect, first = (!!e && e.capacityBefore === 0 && (COUNTS.has(e.unit) || q.action.type === 'replacePart')) || (q.action.type === 'installGpu' && q.action.index === null);
-  const credits = q.currency === 'credits', price = q.locked || !credits ? null : whole(q.cost);
+  const price = q.locked ? null : whole(q.cost);
   // At the top of a ladder the step is a no-op: show where it stands ("32 slots"), not "32 → 32".
   // A first add keeps its "Add RAM" name and shows what it gives ("0 → 2 slots"), as the board does (user).
   // A start controller's upgrade has no capacity effect (D31): its level step, from the quote's "… · level 3".
@@ -146,7 +146,7 @@ export function offerOf(def: RowDef, q: Quote | undefined, link = def.key === 'l
   const change = maxed ? (e ? measure(e.capacityBefore, e.unit) : '')
     : step ? `L${Number(step[1]) - 1} → L${step[1]}` : !e ? q.label : e.capacityBefore === e.capacityAfter ? measure(e.capacityBefore, e.unit) : changeText(e);
   return { ...def, name: first ? `Add ${def.name}` : def.name, change,
-    quote: q, price, affordable: !q.locked && credits && q.affordable, lock: q.locked?.text ?? null, where: false, right: rightOf(q, price, false) };
+    quote: q, price, affordable: !q.locked && q.affordable, lock: q.locked?.text ?? null, where: false, right: rightOf(q, price, false) };
 }
 
 export interface Offers {
@@ -174,6 +174,12 @@ export const WALL_ROWS: Readonly<Partial<Record<FailDetail, readonly string[]>>>
 };
 /** Supplies and coolers: worth buying only near their limit. */
 export const SUPPLY_ROWS: ReadonlySet<string> = new Set(['pdu', 'ups', 'rackCooler', 'roomCooler']);
+/** Credit value for ranking offers across currencies: Data parts at their Credit value (D83), plus a mixed purchase's Credit part. */
+/** A quote's whole Credit value, for ranking purchases across currencies. */
+export const quoteValue = (q: Quote): number =>
+  Number(q.cost) * (q.currency === 'data' ? Number(CREDITS_PER_DATA_PART) : 1) + Number(q.creditCost ?? 0);
+export const offerValue = (o: Offer): number =>
+  (o.price ?? 0) * (o.quote?.currency === 'data' ? Number(CREDITS_PER_DATA_PART) : 1) + Number(o.quote?.creditCost ?? 0);
 /** A row a suggestion may point at: something to buy, or research that opens it; never Max or a dead lock. */
 export const actionable = (o: Offer) => !!o.quote && (o.right.kind === 'price' || o.right.kind === 'research') && !(o.price !== null && o.price <= 0);
 
@@ -195,8 +201,8 @@ export function buildOffers(level: LevelId, tray: readonly Quote[] | null, link:
     if (!usable(o)) return;
     const w = wall.indexOf(o.key);
     if (w >= 0 && (walled < 0 || w < wall.indexOf(rows[walled]!.key))) walled = i;
-    if (cheapest < 0 || o.price! < rows[cheapest]!.price!) cheapest = i;
-    if (o.affordable && (best < 0 || o.price! < rows[best]!.price!)) best = i;
+    if (cheapest < 0 || offerValue(o) < offerValue(rows[cheapest]!)) cheapest = i;
+    if (o.affordable && (best < 0 || offerValue(o) < offerValue(rows[best]!))) best = i;
   });
   const pick = walled >= 0 ? walled : best >= 0 ? best : cheapest;
   const research = rows.filter(o => o.right.kind === 'research' && o.quote?.locked?.node);

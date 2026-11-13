@@ -7,7 +7,7 @@ import type { HitTarget, Rect } from '../../render/core';
 import type { Quote } from '../../game';
 import { meetNeed, meetSystem } from '../queue/meet';
 import { shallowEqual, useGameSelector, useQuote, useShell } from '../storeHooks';
-import { Price } from '../plates/widgets';
+import { Price, quotePrice } from '../plates/widgets';
 
 const cheaper = (a: Quote, b: Quote) => (BigInt(a.cost) <= BigInt(b.cost) ? a : b);
 const partKind = (q: Quote | null | undefined) => (q && 'part' in q.action ? q.action.part.slot.kind : null);
@@ -24,7 +24,7 @@ export function FirstBuy({ targets }: { targets: readonly HitTarget[] }) {
     return chip && h?.blockedBy && s.round.state === 'running' ? { need: meetNeed(h), system: meetSystem(s) } : null;
   }, (a, b) => a === b || (!!a && !!b && a.system === b.system && shallowEqual(a.need, b.need)), 250);
   const fix = (useQuote(need?.need ? { kind: 'meet', system: need.system, need: need.need } : null)?.quotes ?? [])
-    .find(q => !q.locked && q.currency === 'credits' && partKind(q) !== null) ?? null;
+    .find(q => !q.locked && partKind(q) !== null) ?? null;
   const quote = fix ?? (steps.length ? steps.reduce(cheaper) : null);
   const kind = partKind(quote);
   const target = kind ? targets.find(t => t.kind === 'part' && t.part?.slot.kind === kind) : null;
@@ -49,6 +49,6 @@ export function FirstBuy({ targets }: { targets: readonly HitTarget[] }) {
   }, [shell, id, target, quote?.cost]);
   if (!quote || !id) return null;
   return <span ref={ref} className={`first-buy${quote.affordable ? '' : ' short'}`} data-testid="first-buy" hidden>
-    Upgrade <Price cost={quote.cost} currency={quote.currency} affordable={quote.affordable} />
+    Upgrade <Price {...quotePrice(quote)} affordable={quote.affordable} />
   </span>;
 }

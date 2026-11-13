@@ -5,7 +5,7 @@ import { bits, ops } from './format';
 import { PlateFrame } from './PlateFrame';
 import type { PlateCommon } from './types';
 import { GPU_GENERATIONS, gpuResearch, SERIES_NAMES } from './gpuModel';
-import { Key, Price, QuoteKey } from './widgets';
+import { Key, Price, QuoteKey, quotePrice } from './widgets';
 import { PartKeys, generationKey } from './PartKeys';
 import { GenerationAction } from './GenerationAction';
 import { ChoiceStrip } from './ChoiceStrip';
@@ -51,7 +51,7 @@ export function GpuPlate({ system, index, installed, onAction, onResearch, tasks
   const strip = (label: string, gpus: boolean) => {
     // An empty bay prices every card on its own key; an installed card's switch key carries the one price.
     const choices = options.map((q, i) => ({ id: String(i), label: q.gpu ? SERIES_NAMES[q.gpu.after.series] : q.label.replace(/ NPU$/, ''), gpu: !!q.gpu,
-      note: card ? undefined : <Price cost={q.cost} currency={q.currency} affordable={q.affordable} /> }))
+      note: card ? undefined : <Price {...quotePrice(q)} affordable={q.affordable} /> }))
       .filter(c => c.gpu === gpus);
     return choices.length > 0 && <div className="inline-setting"><span>{label}</span>
       <ChoiceStrip label={label} value={at} onPick={value => setChoice(Number(value))} choices={choices} /></div>;

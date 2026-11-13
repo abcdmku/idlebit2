@@ -14,12 +14,20 @@ export function Pips({ filled, max }: { filled: number; max: number }) {
 }
 
 /** A whole price with its currency glyph. Shortfalls use the menu or hardware context's shared color. */
-export function Price({ cost, currency = 'credits', affordable }: { cost: Amount | number; currency?: Currency; affordable?: boolean }) {
-  return <span className={`pz ${currency === 'data' ? 'd' : 'c'}`} data-affordable={affordable}
-    style={affordable === false ? { color: 'var(--currency-short)' } : undefined}>
+export function Price({ cost, currency = 'credits', creditCost, affordable }: {
+  cost: Amount | number; currency?: Currency; creditCost?: Amount | number | null; affordable?: boolean;
+}) {
+  const short = affordable === false ? { color: 'var(--currency-short)' } : undefined;
+  // D83: a mixed purchase leads with Data and adds its Credit part inside the same price cell.
+  const credits = currency === 'data' && creditCost != null && Number(creditCost) > 0;
+  return <span className={`pz ${currency === 'data' ? 'd' : 'c'}`} data-affordable={affordable} style={short}>
     {currency === 'data' ? <GemIcon /> : <CoinIcon />}<span>{wholeText(cost)}</span>
+    {credits && <span className="pz c" style={short}><CoinIcon /><span>{wholeText(creditCost)}</span></span>}
   </span>;
 }
+
+/** A quote's price cell: its currency, and the Credit part of a mixed purchase. */
+export const quotePrice = (q: Quote) => ({ cost: q.cost, currency: q.currency, creditCost: q.creditCost ?? null });
 
 export type Tone = '' | 'ben' | 'warn' | 'muted';
 export interface Line { readonly text: string; readonly tone?: Tone }
@@ -48,7 +56,7 @@ export function Lines({ lines, slots: _slots = lines.length }: { lines: readonly
 export type KeyTone = '' | 'replace' | 'replace prep' | 'go' | 'row' | 'ghost' | 'prio' | 'locked-action';
 export interface KeyProps {
   label: ReactNode;
-  price?: { cost: Amount; currency?: Currency } | null;
+  price?: { cost: Amount; currency?: Currency; creditCost?: Amount | null } | null;
   detail?: ReactNode;
   tone?: KeyTone;
   disabled?: boolean;
@@ -62,7 +70,7 @@ export function Key({ label, price, detail, tone = '', disabled, ariaLabel, pres
   return <button type="button" className={`key ${tone}${pressed ? ' on' : ''}`} disabled={disabled} aria-label={ariaLabel} aria-pressed={pressed} data-purchase-action={purchase ? JSON.stringify(purchase.action) : undefined}
     onClick={(e) => { e.stopPropagation(); if (!disabled) onPress(); }}>
     <span className="kl">{label}</span>
-    {price && <Price cost={price.cost} currency={price.currency} affordable={purchase?.affordable} />}
+    {price && <Price cost={price.cost} currency={price.currency} creditCost={price.creditCost} affordable={purchase?.affordable} />}
     {detail != null && <span className="action-detail clip">{detail}</span>}
   </button>;
 }
@@ -97,7 +105,7 @@ export function QuoteKey({ quote, label, detail, tone = '', researchName, onActi
   const shownLabel = quote.gpu && typeof label === 'string' ? `${label} · ${quote.gpu.after.cores} ${quote.gpu.after.cores === 1 ? 'core' : 'cores'}` : label;
   const cold = quote.cold && quote.downtimeMs > 0 ? Math.ceil(quote.downtimeMs / 1000) + 's offline' : '';
   const shown = quote.locked ? why : overloadWarning(quote) || [gain, cold].filter(Boolean).join(' · ') || why;
-  return <Key tone={tone} label={shownLabel} price={quote.locked && quote.cost === '0' ? null : { cost: quote.cost, currency: quote.currency }} detail={shown || undefined}
+  return <Key tone={tone} label={shownLabel} price={quote.locked && quote.cost === '0' ? null : quotePrice(quote)} detail={shown || undefined}
     ariaLabel={[ariaLabel ?? (typeof shownLabel === 'string' ? shownLabel : quote.label), purchaseGain(quote), why, cold].filter(Boolean).join('. ')}
     disabled={!!why} purchase={quote} onPress={() => onAction(quote)} />;
 }

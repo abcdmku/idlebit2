@@ -1,7 +1,7 @@
 // One meet line as a key (user, 26 Oct): "Buy Cache 2 → 16 b · 9" buys every level in one tap; "Install …";
 // or "Research X", which opens the research. An unaffordable line says "Saving up".
 import type { GameAction, Quote, ResearchId } from '../../game';
-import { Price } from '../plates/widgets';
+import { Price, quotePrice } from '../plates/widgets';
 import { useSavingUp } from '../deck/SavingUp';
 import { meetLabel } from './meet';
 
@@ -9,7 +9,7 @@ export function MeetKey({ quote: q, onAction, onResearch, researchName, classNam
   quote: Quote; onAction: (a: GameAction) => void; onResearch?: (id: ResearchId) => void;
   researchName?: (id: ResearchId) => string; className?: string;
 }) {
-  const lock = q.locked, credits = q.currency === 'credits', price = lock || !credits ? null : Math.ceil(Number(q.cost));
+  const lock = q.locked, price = lock ? null : Math.ceil(Number(q.cost));
   const saving = useSavingUp(price, q.affordable);
   if (lock?.code === 'research' && lock.node) {
     const node = lock.node;
@@ -17,7 +17,7 @@ export function MeetKey({ quote: q, onAction, onResearch, researchName, classNam
   }
   return <>
     <button type="button" className={className} data-qa-target data-testid="td-fix" disabled={!!lock || !q.affordable} onClick={() => onAction(q.action)}>
-      {meetLabel(q, researchName)}{price !== null && <Price cost={q.cost} currency={q.currency} affordable={q.affordable} />}</button>
+      {meetLabel(q, researchName)}{price !== null && <Price {...quotePrice(q)} affordable={q.affordable} />}</button>
     {(lock || saving) && <p className="need">{lock?.text ?? saving}</p>}
   </>;
 }
