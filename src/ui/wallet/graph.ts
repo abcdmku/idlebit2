@@ -45,9 +45,14 @@ export function balanceAxis(values: readonly Amount[]) {
   return { y, ticks: Array.from({ length: 5 }, (_, i) => amount((high - BigInt(i) * step).toString())) };
 }
 
-/** Both currencies share observation times, with independently rounded axes. */
-export function balanceGraph(samples: readonly WalletSample[], tick: number, current: { credits: Amount; data: Amount }) {
-  const points = samples.map(sample => ({ tick: sample.tick, credits: sample.credits, data: sample.data }));
+/** Both currencies share observation times, with independently rounded axes. Samples before `from` are cut;
+    the balance held at `from` opens the line. */
+export function balanceGraph(samples: readonly WalletSample[], tick: number, current: { credits: Amount; data: Amount }, from = 0) {
+  const all = samples.map(sample => ({ tick: sample.tick, credits: sample.credits, data: sample.data }));
+  const first = all.findIndex(point => point.tick >= from);
+  const points = first < 0 ? [] : all.slice(first);
+  const held = first < 0 ? all.at(-1) : all[first - 1];
+  if (held && (!points.length || points[0]!.tick > from)) points.unshift({ ...held, tick: from });
   const last = points.at(-1);
   if (!last || last.tick !== tick || last.credits !== current.credits || last.data !== current.data) points.push({ tick, ...current });
   const start = points[0]!.tick, end = Math.max(start + 1, tick);

@@ -3,11 +3,21 @@ import { TICK_MS, type Amount, type WalletSample } from '../../game';
 import { clockText } from '../hooks/format';
 import { axisText, balanceGraph, balanceText } from './graph';
 
+/** Time frames in ticks; null shows all kept history. */
+const FRAMES = [{ label: '1m', ticks: 60_000 / TICK_MS }, { label: '10m', ticks: 600_000 / TICK_MS }, { label: 'All', ticks: null }] as const;
+type Frame = (typeof FRAMES)[number]['ticks'];
+
+/** The chosen frame and reset point outlive the sheet for the session. A reset ahead of the clock (new game) lapses. */
+let kept: { frame: Frame; reset: number } = { frame: null, reset: 0 };
+
 export function BalanceChart({ samples, tick, current }: {
   samples: readonly WalletSample[]; tick: number; current: { credits: Amount; data: Amount };
 }) {
-  const graph = balanceGraph(samples, tick, current);
   const [selectedIndex, setSelectedIndex] = useState<number | null>(null);
+  const [view, setView] = useState(kept);
+  const update = (next: typeof kept) => { kept = next; setView(next); setSelectedIndex(null); };
+  const reset = view.reset <= tick ? view.reset : 0;
+  const graph = balanceGraph(samples, tick, current, Math.max(reset, view.frame === null ? 0 : tick - view.frame));
   const index = Math.min(selectedIndex ?? graph.points.length - 1, graph.points.length - 1);
   const point = graph.points[index]!;
   const inspect = (event: PointerEvent<SVGSVGElement>) => {
@@ -43,6 +53,12 @@ export function BalanceChart({ samples, tick, current }: {
       </svg>
       <div className="balance-chart-y data" aria-label="Data axis">{graph.data.ticks.map(label => <span key={label} title={label}>{axisText(label)}</span>)}</div>
       <div className="balance-chart-times"><span>{clockText(graph.start * TICK_MS)}</span><span>{clockText(graph.end * TICK_MS)}</span></div>
+    </div>
+    <div className="balance-chart-keys" role="group" aria-label="Time frame">
+      {FRAMES.map(frame => <button key={frame.label} type="button" className={`skey${view.frame === frame.ticks ? '' : ' off'}`}
+        data-qa-target aria-pressed={view.frame === frame.ticks} onClick={() => update({ ...view, frame: frame.ticks })}>{frame.label}</button>)}
+      <button type="button" className="skey off reset" data-qa-target disabled={reset === tick}
+        aria-label="Reset history: start the graph now" onClick={() => update({ ...view, reset: tick })}>Reset</button>
     </div>
     <figcaption>{selectedIndex !== null ? clockText(point.tick * TICK_MS) : samples.length > 1 ? 'Simulation time' : 'History starts when your balance changes'}</figcaption>
   </figure>;

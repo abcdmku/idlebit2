@@ -1910,6 +1910,8 @@ The user requested balance graphs on currency clicks and a bankruptcy option tha
 
 The simulation saves at most 600 recent wallet observations. End-of-tick changes coalesce within a simulation second; player actions keep before/after checkpoints. Offline simulation records the same history, independent of advance partitioning. Charts scale exact integer balances before converting coordinates to floats. Save version 36 resets earlier pre-live saves without migrations.
 
+Amended 12 Nov (user request): the graph takes 1m, 10m and All time frames plus a Reset that starts it at the current tick. Both are session view state; the saved history is unchanged.
+
 Bankruptcy requires a nonzero Credits balance and confirmation. It sets Credits to 0 and deducts `ceil(Data / 10)` whole Data, including a zero fee when Data is zero. Positive Credits are erased as the confirmation states. The fee is re-quoted by the simulation and recorded as lifetime Data spent. Hardware, unlocks, research progress, round state and fractional meters are retained, and insolvency-stopped research is released immediately.
 
 ## D67, 28 Oct: rack power is a build limit; cooling limits performance

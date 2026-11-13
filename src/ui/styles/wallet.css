@@ -38,6 +38,10 @@
 .balance-point { fill: var(--line); }
 .balance-cursor { stroke: var(--muted); stroke-width: 1; vector-effect: non-scaling-stroke; }
 .balance-chart-times { grid-column: 2; display: flex; justify-content: space-between; color: var(--muted); }
+.balance-chart-keys { display: flex; gap: 8px; margin: 8px 0 4px; }
+.balance-chart-keys .skey { position: relative; flex: 0 1 64px; min-width: 0; min-height: 44px; padding: 4px 8px; justify-content: center; }
+.balance-chart-keys .skey.reset { margin-left: auto; flex-basis: 88px; }
+.balance-chart-keys .skey.off:not(:disabled) { color: var(--muted); }
 .balance-chart figcaption { color: var(--dim); margin: 0 0 8px; }
 .bankruptcy { border-top: 1px solid var(--panel-hi); padding-top: 8px; }
 .bankruptcy h2 { margin: 0; font-size: var(--head); }
